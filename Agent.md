@@ -54,7 +54,6 @@
 
 ### 3. 全局主题切换 (Theming)
 *   **状态管理**: Zustand 监听系统配色并支持手动开关。
-*   **适配**: 页面通过 `useThemeStore` 获取 `isDark` 状态，动态计算 `theme` 对象（背景、文字、边框色）。
 
 ### 4. 交互细节
 *   **FeedCard**: 采用多热区点击设计（头像->用户、标题->问题、内容->回答）。
@@ -62,22 +61,12 @@
 *   **评论系统**: 支持展示 `child_comments` 及其对应的回复关系。
 
 ## 🚀 快速启动指南
-1.  **安装依赖**:
-    ```bash
-    npx expo install @shopify/flash-list @tanstack/react-query axios react-native-webview expo-secure-store zustand react-native-reanimated react-native-render-html
-    ```
 2.  **路径别名**:
     确保 `tsconfig.json` 配置了 `"@/*": ["./src/*"]`。
 3.  **启动项目**:
     ```bash
     npx expo start -c
     ```
-
-## ⚠️ 踩坑记录
-*   **路由类型报错**: 若 `router.push` 报错路径不存在，执行 `npx expo start -c` 重新生成 `.expo/types`。
-*   **知乎接口变动**: 若出现 `10003` 错误，说明 `v4` 接口签名升级，需优先尝试 `v3` 接口或简化 `include`。
-*   **WebView 无法登录**: 需设置正确的 `userAgent` 属性，否则知乎会强制跳转 App Store。
-
 ---
 **Status**: 核心阅读功能已完成（v0.5-alpha）
 **Author**: 猫咪程序员与他的 Agent 助手 🐱

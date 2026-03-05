@@ -11,39 +11,29 @@ export default function LoginScreen() {
   const webViewRef = useRef<WebView>(null);
   const borderColor = useThemeColor({}, 'border');
 
-  // 1. 更加频繁的检测脚本
-  const INJECTED_JS = `
-    (function() {
-      var lastCookie = "";
-      setInterval(function() {
-        var currentCookie = document.cookie;
-        if (currentCookie !== lastCookie) {
-          lastCookie = currentCookie;
-          window.ReactNativeWebView.postMessage(currentCookie);
-        }
-      }, 500);
-    })();
-  `;
+  // 1. 注入脚本：不再使用定时器强制抓取，而是定义一个辅助函数或者保持空白
+  const INJECTED_JS = `true;`; // 只是为了启用 injectedJavaScript
 
   const handleCookies = async (cookies: string) => {
-    // 只要抓到了 z_c0，或者抓到了包含 q_c1 等知乎特有标志的 cookie
-    if (cookies.includes('z_c0') || cookies.includes('d_c0')) {
+    // 关键：只有当包含 z_c0 (登录 Token) 时才认为是有效的登录 Cookie
+    if (cookies.includes('z_c0')) {
       await SecureStore.setItemAsync('user_cookies', cookies);
-      console.log('✅ Cookie 已保存');
-      // 这里的延时是为了确保存储完成
+      console.log('✅ 登录 Cookie 已成功捕获并保存');
+
+      // 成功后延迟跳转，确保存储生效
       setTimeout(() => {
         if (router.canGoBack()) {
           router.back();
         } else {
           router.replace('/(tabs)/profile');
         }
-      }, 500);
+      }, 800);
     }
   };
 
   return (
     <View style={styles.container}>
-      {/* 顶部加一个手动关闭按钮，防止由于逻辑失效被困在 WebView 里 */}
+      {/* 顶部标题栏 */}
       <View type="surface" style={[styles.header, { borderBottomColor: borderColor }]}>
         <Pressable onPress={() => router.back()}>
           <Text style={styles.closeBtn}>取消</Text>
@@ -59,23 +49,29 @@ export default function LoginScreen() {
         onMessage={(event) => {
           handleCookies(event.nativeEvent.data);
         }}
-        // 2. 关键：监听导航状态变化
         onNavigationStateChange={(navState) => {
-          console.log('当前 URL:', navState.url);
+          console.log('🌐 导航至:', navState.url);
 
-          // 如果 URL 变成了知乎首页，或者包含 "signin" 之外的内容，说明跳走了
-          if (
-            (navState.url === 'https://www.zhihu.com/' ||
-              navState.url.includes('zhihu.com/hot')) &&
-            !navState.loading
-          ) {
-            console.log('🚀 检测到页面跳转，尝试收网...');
-            // 此时尝试最后一次抓取 Cookie 并强制退出
+          // 如果检测到跳转到了首页、热榜或个人主页，说明登录可能已经成功
+          const isSuccessPage =
+            navState.url === 'https://www.zhihu.com/' ||
+            navState.url.includes('zhihu.com/hot') ||
+            navState.url.includes('zhihu.com/people/');
+
+          if (isSuccessPage && !navState.loading) {
+            console.log('🚀 检测到登录成功迹象，正在获取最终 Cookie...');
             webViewRef.current?.injectJavaScript(`window.ReactNativeWebView.postMessage(document.cookie)`);
           }
         }}
         onLoadStart={() => setLoading(true)}
-        onLoadEnd={() => setLoading(false)}
+        onLoadEnd={(syntheticEvent) => {
+          setLoading(false);
+          const { nativeEvent } = syntheticEvent;
+          // 每次页面加载完成都尝试抓取一次，以防万一
+          if (!nativeEvent.loading) {
+            webViewRef.current?.injectJavaScript(`window.ReactNativeWebView.postMessage(document.cookie)`);
+          }
+        }}
       />
 
       {loading && (
