@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "MyZhihuClient",
-    "slug": "MyZhihuClient",
-    "version": "1.0.0",
+    "name": "ZhihuMinusMinus",
+    "slug": "ZhihuMinusMinus",
+    "version": "0.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myzhihuclient",
+    "scheme": "zhihu--",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/images/splash-icon.png",
@@ -22,7 +22,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.huamu013.ZhihuMinusMinus"
     },
     "web": {
       "bundler": "metro",
@@ -35,6 +36,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "faa0f061-50e6-4ec4-bb6f-accda0dbd24f"
+      }
     }
   }
 }
