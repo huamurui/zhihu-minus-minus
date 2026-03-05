@@ -1,0 +1,120 @@
+name: Mobile Build
+
+on:
+  push:
+    branches:
+      - 'main'
+
+jobs:
+  android-build:
+    name: Android Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Validate Gradle wrapper
+        uses: gradle/wrapper-validation-action@v1
+        with:
+          min-wrapper-count: 1
+          allow-snapshots: false
+
+      - name: Fix Gradle wrapper permissions
+        run: |
+          chmod +x android/gradlew
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18.x'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: |
+          yarn install --frozen-lockfile
+
+      - name: Build Android Application
+        run: |
+          cd android
+          ./gradlew assembleRelease --no-daemon --warning-mode all
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-android
+          path: android/app/build/outputs/apk/release/*.apk
+          retention-days: 7
+
+  ios-build:
+    name: iOS Build
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18.x'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: |
+          yarn install --frozen-lockfile
+
+      - name: Install CocoaPods
+        run: |
+          sudo gem install cocoapods
+          cd ios && pod install --repo-update && cd ..
+
+      - name: Select Xcode Version
+        run: |
+            sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Set up code signing
+        env:
+          APPLE_DEVELOPER_TEAM_ID: ${{ secrets.APPLE_DEVELOPER_TEAM_ID }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+        run: |
+            cd ios
+            # Update the project to use the team ID
+            # using sed to update the project file
+            sed -i "" "s/DEVELOPMENT_TEAM = \"\";/DEVELOPMENT_TEAM = \"$APPLE_DEVELOPER_TEAM_ID\";/g" [zhihu--].xcodeproj/project.pbxproj
+
+      - name: Build iOS Application
+        run: |
+          cd ios
+          xcodebuild clean archive \
+            -workspace [zhihu--].xcworkspace \
+            -scheme [zhihu--] \
+            -configuration Release \
+            -archivePath $PWD/build/[zhihu--].xcarchive \
+            CODE_SIGN_IDENTITY="iPhone Distribution" \
+            DEVELOPMENT_TEAM=${{ secrets.APPLE_DEVELOPER_TEAM_ID }}
+
+      - name: Export iOS IPA
+        run: |
+          cd ios
+          xcodebuild -exportArchive \
+            -archivePath $PWD/build/[zhihu--].xcarchive \
+            -exportOptionsPlist $PWD/ExportOptions.plist \
+            -exportPath $PWD/build \
+            -allowProvisioningUpdates
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-ios
+          path: ios/build/*.ipa
+          retention-days: 7
