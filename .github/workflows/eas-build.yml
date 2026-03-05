@@ -1,0 +1,18 @@
+name: Android Build
+on:
+  push:
+    branches: [ main ] # 当代码推送到 main 分支时触发
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          token: ${{ secrets.EXPO_TOKEN }} # 在 expo.dev 生成的 Token
+      - run: npm install
+      - run: eas build --platform android --profile preview --local # --local 表示在本地(即GA虚拟机)打，不花钱
