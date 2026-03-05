@@ -13,19 +13,13 @@ const apiClient = axios.create({
 
 apiClient.interceptors.request.use(async (config) => {
   const cookie = await SecureStore.getItemAsync('user_cookies');
+
   if (cookie) {
     config.headers['Cookie'] = cookie;
-    const xsrf = getCookieValue(cookie, '_xsrf');
-    if (xsrf) {
-      config.headers['x-xsrf-token'] = xsrf; // POST 请求必备
-    }
   }
 
-  config.headers['Cookie'] = cookie || '';
-  // 关键：伪装成 iOS 端的 Safari
-  // 修改 User-Agent，有时模拟 Web 端比模拟 App 更管用
   config.headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36';
-  config.headers['x-requested-with'] = 'fetch'; // 伪装成现代浏览器 fetch  // 加上知乎 web 端的一些必备头
+  config.headers['x-requested-with'] = 'fetch';
   config.headers['Referer'] = 'https://www.zhihu.com/';
   return config;
 });

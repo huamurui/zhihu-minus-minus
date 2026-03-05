@@ -30,7 +30,7 @@ export default function ProfileScreen() {
     queryKey: ['me'],
     queryFn: async () => {
       try {
-        const res = await apiClient.get('/members/self?include=answer_count,articles_count,follower_count,following_count,headline,description,voteup_count,thanked_count');
+        const res = await apiClient.get('/me?include=answer_count,articles_count,follower_count,following_count,headline,description,voteup_count,thanked_count');
         return res.data;
       } catch (e) {
         return null;
