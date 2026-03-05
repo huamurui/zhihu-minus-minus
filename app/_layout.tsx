@@ -1,57 +1,62 @@
+import { useColorScheme } from '@/components/useColorScheme';
+import { useThemeStore } from '@/store/useThemeStore';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/components/useColorScheme';
-
-export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary,
-} from 'expo-router';
-
-export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: '(tabs)',
-};
-
-// Prevent the splash screen from auto-hiding before asset loading is complete.
+// 保持启动页显示，直到资源加载完成
 SplashScreen.preventAutoHideAsync();
 
+const queryClient = new QueryClient();
+
 export default function RootLayout() {
-  const [loaded, error] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
-
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
-  useEffect(() => {
-    if (error) throw error;
-  }, [error]);
-
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
-
-  if (!loaded) {
-    return null;
-  }
-
-  return <RootLayoutNav />;
-}
-
-function RootLayoutNav() {
   const colorScheme = useColorScheme();
+  const isDark = useThemeStore((state) => state.isDark);
+  const theme = isDark ? DarkTheme : DefaultTheme;
+
+  // 这里简单处理：如果以后需要加载字体，可以写在这里
+  useEffect(() => {
+    SplashScreen.hideAsync();
+  }, []);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-      </Stack>
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider value={theme}>
+        <Stack>
+          {/* 底部 Tab 主框架 */}
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          
+          {/* 文章详情页：从右侧推入 */}
+          <Stack.Screen 
+            name="article/[id]" 
+            options={{ 
+              headerTitle: '正文',
+              headerBackTitle: '返回',
+              headerTintColor: '#0084ff',
+            }} 
+          />
+
+          {/* 登录页：建议做成从底部弹出的 Modal */}
+          <Stack.Screen 
+            name="login" 
+            options={{ 
+              presentation: 'modal',
+              headerTitle: '登录知乎',
+              headerLeft: () => null, // 登录页左侧通常留空或放“取消”
+            }} 
+          />
+
+          {/* 其他 Modal 弹窗 */}
+          <Stack.Screen name="modal" options={{ presentation: 'modal', title: '提示' }} />
+        </Stack>
+        
+        {/* 全局状态栏控制 */}
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }

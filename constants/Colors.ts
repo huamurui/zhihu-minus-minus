@@ -1,19 +1,17 @@
-const tintColorLight = '#2f95dc';
-const tintColorDark = '#fff';
-
+// constants/Colors.ts
 export default {
   light: {
-    text: '#000',
+    text: '#1a1a1a',
     background: '#fff',
-    tint: tintColorLight,
+    tint: '#0084ff', // 这里的蓝色是灵魂
     tabIconDefault: '#ccc',
-    tabIconSelected: tintColorLight,
+    tabIconSelected: '#0084ff',
   },
   dark: {
     text: '#fff',
     background: '#000',
-    tint: tintColorDark,
+    tint: '#fff',
     tabIconDefault: '#ccc',
-    tabIconSelected: tintColorDark,
+    tabIconSelected: '#fff',
   },
 };
