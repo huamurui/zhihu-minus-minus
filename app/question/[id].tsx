@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { FlashList } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
@@ -86,28 +87,69 @@ const AnswerItem = ({ item }: { item: any }) => {
 export default function QuestionDetail() {
   const { id } = useLocalSearchParams();
   const borderColor = useThemeColor({}, 'border');
-
+  // console.log(id, 'id');
   // 1. 获取问题详情
-  const { data: question, isLoading: qLoading } = useQuery({
+  const { data: question, isLoading: qLoading, error: qError } = useQuery({
     queryKey: ['question', id],
     queryFn: async () => {
-      const res = await client.get(`/questions/${id}?include=content,excerpt,answer_count`);
-      return res.data;
+      try {
+        const res = await client.get(`/questions/${id}?include=content,excerpt,answer_count`);
+        return res.data || null;
+      } catch (err) {
+        console.error('获取问题详情失败:', err);
+        return null;
+      }
     }
   });
 
-  // 2. 获取回答列表 (增加 include 字段以获取头像和头衔)
-  const { data: answers, isLoading: aLoading, refetch } = useQuery({
+  // 2. 获取回答列表
+  const { data: answers, isLoading: aLoading } = useQuery({
     queryKey: ['question-answers', id],
     queryFn: async () => {
-      const include = 'data[*].content,voteup_count,comment_count,author.name,author.avatar_url,author.headline';
-      const res = await client.get(`/questions/${id}/answers?include=${include}&limit=20`);
-      return res.data.data;
+      try {
+        const include = 'data[*].content,voteup_count,comment_count,author.name,author.avatar_url,author.headline';
+        const res = await client.get(`/questions/${id}/answers?include=${include}&limit=20`);
+        return res.data.data || [];
+      } catch (err) {
+        console.error('获取回答列表失败:', err);
+        return [];
+      }
     }
   });
 
-  if (qLoading || aLoading) return <View style={styles.center}><ActivityIndicator /></View>;
+  if (qLoading || aLoading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#0084ff" />
+      </View>
+    );
+  }
 
+  return (
+    <View style={styles.container}>
+      <FlashList
+        data={answers || []}
+        {...({ estimatedItemSize: 200 } as any)}
+        ListHeaderComponent={
+          <View type="surface" style={styles.header}>
+            <Text style={styles.title}>{question?.title || '加载失败'}</Text>
+            {question?.excerpt ? (
+              <Text type="secondary" style={styles.qExcerpt}>
+                {question.excerpt.replace(/<[^>]+>/g, '')}
+              </Text>
+            ) : null}
+            <View style={[styles.qStats, { borderTopColor: borderColor }]}>
+              <Text style={styles.qStatText}>
+                {question?.answer_count || 0} 个回答
+              </Text>
+            </View>
+          </View>
+        }
+        renderItem={({ item }: { item: any }) => <AnswerItem item={item} />}
+        keyExtractor={(item: any) => item.id.toString()}
+      />
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({

@@ -1,7 +1,8 @@
 name: Android Build
 on:
   push:
-    branches: [ main ] # 当代码推送到 main 分支时触发
+  # 先不运行
+  # branches: [ main ] # 当代码推送到 main 分支时触发
 jobs:
   build:
     runs-on: ubuntu-latest

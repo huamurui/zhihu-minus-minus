@@ -1,13 +1,13 @@
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import axios from 'axios';
 import { useRouter } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 
 // 使用 @ 别名导入组件
+import apiClient from '@/api/client';
 import { FeedCard } from '@/components/FeedCard';
+import { HotCard, HotItem } from '@/components/HotCard';
 import { Text, View, useThemeColor } from '@/components/Themed';
 
 const API_CONFIG = {
@@ -24,22 +24,24 @@ export default function HomeScreen() {
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, refetch } = useInfiniteQuery({
     queryKey: ['zhihu-feed', activeTab],
     queryFn: async ({ pageParam = API_CONFIG[activeTab] }) => {
-      const cookie = await SecureStore.getItemAsync('user_cookies');
       try {
-        const res = await axios.get(pageParam, {
-          headers: {
-            'Cookie': cookie || '',
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1'
-          }
-        });
+        const res = await apiClient.get(pageParam);
+        const rawItems = res.data.data || [];
+
+        let items;
+        if (activeTab === 'recommend') {
+          items = rawItems.map((item: any) => parseRecommendData(item));
+        } else {
+          items = rawItems.map((item: any, index: number) => parseHotData(item, index));
+        }
 
         return {
-          items: res.data.data.map((item: any) => parseZhihuData(item, activeTab)),
+          items,
           nextUrl: res.data.paging?.next?.replace('http://', 'https://')
         };
       } catch (e: any) {
         console.log(`❌ API ${activeTab} 失败:`, e.response?.status || e.message);
-        return { items: getMockData(activeTab), nextUrl: null };
+        return { items: [], nextUrl: null };
       }
     },
     initialPageParam: API_CONFIG[activeTab],
@@ -70,31 +72,33 @@ export default function HomeScreen() {
 
       <FlashList
         data={flattenedData}
-        // keyExtractor={(item, index) => (item.type === 'date' ? item.date : item.data.id.toString() + index)}
-        {...({ estimatedItemSize: 180 } as any)}
+        {...({ estimatedItemSize: activeTab === 'recommend' ? 180 : 100 } as any)}
         onEndReached={() => hasNextPage && !isFetchingNextPage && fetchNextPage()}
         onEndReachedThreshold={0.5}
         onRefresh={refetch}
         refreshing={isLoading}
-        renderItem={({ item }: { item: any }) => (
-          <FeedCard
-            item={item}
-          />
-        )}
+        renderItem={({ item }: { item: any }) => {
+          if (activeTab === 'hot') {
+            return <HotCard item={item as HotItem} />;
+          }
+          return <FeedCard item={item} />;
+        }}
         ListFooterComponent={isFetchingNextPage ? <ActivityIndicator style={{ margin: 20 }} /> : null}
       />
     </View>
   );
 }
 
-// 数据解析适配器
-function parseZhihuData(item: any, type: string) {
-  // 推荐流和热榜的 target 嵌套层次不同
+// 推荐流数据解析
+function parseRecommendData(item: any) {
   const target = item.target || item;
+  console.log(target.question?.id);
   return {
     id: target.id?.toString() || Math.random().toString(),
     title: target.question?.title || target.title || "无标题内容",
+    questionId: target.question?.id || "",
     author: {
+      id: target.author?.id || "",
       name: target.author?.name || "匿名用户",
       avatar: target.author?.avatar_url || "https://picx.zhimg.com/v2-abed1a8c04700ba7d72b45195223e0ff_l.jpg",
       headline: target.author?.headline || ""
@@ -106,18 +110,17 @@ function parseZhihuData(item: any, type: string) {
   };
 }
 
-// 兜底 Mock
-function getMockData(type: string) {
-  return [
-    {
-      id: 'mock-1',
-      title: `这就是你看到的 ${type === 'hot' ? '热榜' : '推荐'} 模拟数据喵`,
-      author: { name: '开发猫', avatar: 'https://placekitten.com/100/100', headline: '正在努力 debug' },
-      excerpt: '如果看到这个，说明 API 还是 403 或 404 了。知乎的防火墙很厚，建议检查 Cookie 是否包含 z_c0...',
-      voteCount: 999,
-      commentCount: 66
-    }
-  ];
+// 热榜数据解析
+function parseHotData(item: any, index: number) {
+  const target = item.target || item;
+  return {
+    id: target.id?.toString() || Math.random().toString(),
+    rank: index + 1,
+    title: target.title || "无标题",
+    excerpt: target.excerpt || "",
+    image: target.children?.[0]?.thumbnail || target.image_url || null,
+    hotValue: target.detail_text || "",
+  };
 }
 
 const styles = StyleSheet.create({

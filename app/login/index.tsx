@@ -16,26 +16,38 @@ export default function LoginScreen() {
 
   const handleCookies = async (cookies: string) => {
     // 关键：只有当包含 z_c0 (登录 Token) 时才认为是有效的登录 Cookie
-    if (cookies.includes('z_c0')) {
-      await SecureStore.setItemAsync('user_cookies', cookies);
-      console.log('✅ 登录 Cookie 已成功捕获并保存');
+    // if (cookies.includes('z_c0')) {
+    console.log('🍪 捕获到完整 Cookie:', cookies);
+    const hasDc0 = cookies.includes('d_c0');
+    const hasZc0 = cookies.includes('z_c0');
+    console.log(`📊 Cookie 状态: d_c0=${hasDc0}, z_c0=${hasZc0}`);
 
-      // 成功后延迟跳转，确保存储生效
-      setTimeout(() => {
-        if (router.canGoBack()) {
-          router.back();
-        } else {
-          router.replace('/(tabs)/profile');
-        }
-      }, 800);
-    }
+    await SecureStore.setItemAsync('user_cookies', cookies);
+    console.log('✅ 登录 Cookie 已保存至 SecureStore');
+
+    // 成功后延迟跳转，确保存储生效
+    setTimeout(() => {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/(tabs)/profile');
+      }
+    }, 800);
+    // }
   };
 
   return (
     <View style={styles.container}>
       {/* 顶部标题栏 */}
       <View type="surface" style={[styles.header, { borderBottomColor: borderColor }]}>
-        <Pressable onPress={() => router.back()}>
+        <Pressable
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(tabs)');
+            }
+          }}>
           <Text style={styles.closeBtn}>取消</Text>
         </Pressable>
         <Text style={styles.title}>登录知乎</Text>
