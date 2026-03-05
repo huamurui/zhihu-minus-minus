@@ -1,25 +1,18 @@
-import { useThemeStore } from '@/store/useThemeStore';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from '@/components/Themed';
+import { StyleSheet } from 'react-native';
 
-export const CreationCard = ({ item, type }: { item: any, type: 'answer' | 'article' }) => {
-  const { isDark } = useThemeStore();
-  const theme = {
-    card: isDark ? '#1a1a1a' : '#fff',
-    text: isDark ? '#eee' : '#1a1a1a',
-    sub: '#888'
-  };
-
+export const CreationCard = ({ item }: { item: any, type: 'answer' | 'article' }) => {
   return (
-    <View style={[styles.card, { backgroundColor: theme.card }]}>
-      <Text style={[styles.title, { color: theme.text }]} numberOfLines={2}>
+    <View type="surface" style={styles.card}>
+      <Text style={styles.title} numberOfLines={2}>
         {item.title || item.question?.title}
       </Text>
-      <Text style={[styles.excerpt, { color: theme.sub }]} numberOfLines={3}>
+      <Text type="secondary" style={styles.excerpt} numberOfLines={3}>
         {item.excerpt?.replace(/<[^>]+>/g, '')}
       </Text>
-      <View style={styles.footer}>
-        <Text style={styles.statText}>{item.voteup_count} 赞同 · {item.comment_count} 评论</Text>
-        <Text style={styles.statText}>{item.updated_time ? new Date(item.updated_time * 1000).toLocaleDateString() : ''}</Text>
+      <View style={[styles.footer, { backgroundColor: 'transparent' }]}>
+        <Text type="secondary" style={styles.statText}>{item.voteup_count} 赞同 · {item.comment_count} 评论</Text>
+        <Text type="secondary" style={styles.statText}>{item.updated_time ? new Date(item.updated_time * 1000).toLocaleDateString() : ''}</Text>
       </View>
     </View>
   );
@@ -30,5 +23,5 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: 'bold', marginBottom: 8, lineHeight: 22 },
   excerpt: { fontSize: 14, lineHeight: 20 },
   footer: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 },
-  statText: { fontSize: 12, color: '#999' }
+  statText: { fontSize: 12 }
 });

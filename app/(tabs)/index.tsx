@@ -1,15 +1,14 @@
-import { parseFeedItem } from '@/utils/zhihu-parser';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 
 // 使用 @ 别名导入组件
 import { FeedCard } from '@/components/FeedCard';
-import { LikeButton } from '@/components/LikeButton';
+import { Text, View, useThemeColor } from '@/components/Themed';
 
 const API_CONFIG = {
   recommend: 'https://www.zhihu.com/api/v3/feed/topstory/recommend?limit=10',
@@ -19,26 +18,26 @@ const API_CONFIG = {
 export default function HomeScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'recommend' | 'hot'>('recommend');
+  const tintColor = useThemeColor({}, 'tint');
+  const borderBottomColor = useThemeColor({}, 'border');
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, refetch } = useInfiniteQuery({
     queryKey: ['zhihu-feed', activeTab],
     queryFn: async ({ pageParam = API_CONFIG[activeTab] }) => {
       const cookie = await SecureStore.getItemAsync('user_cookies');
       try {
-        // 知乎 V3 接口对 User-Agent 有要求，伪装成移动端浏览器
         const res = await axios.get(pageParam, {
-          headers: { 
+          headers: {
             'Cookie': cookie || '',
             'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1'
           }
         });
-        
+
         return {
           items: res.data.data.map((item: any) => parseZhihuData(item, activeTab)),
-          nextUrl: res.data.paging?.next?.replace('http://', 'https://') // 修正可能的协议错误
+          nextUrl: res.data.paging?.next?.replace('http://', 'https://')
         };
       } catch (e: any) {
-        // 打印详细错误方便调试
         console.log(`❌ API ${activeTab} 失败:`, e.response?.status || e.message);
         return { items: getMockData(activeTab), nextUrl: null };
       }
@@ -52,33 +51,36 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       {/* 顶部 Tab 导航 */}
-      <View style={styles.topNav}>
+      <View type="surface" style={[styles.topNav, { borderBottomColor }]}>
         {(['recommend', 'hot'] as const).map((tab) => (
           <Pressable key={tab} onPress={() => setActiveTab(tab)} style={styles.navItem}>
-            <Text style={[styles.navText, activeTab === tab && styles.activeNavText]}>
+            <Text
+              style={[
+                styles.navText,
+                activeTab === tab && { fontWeight: 'bold' }
+              ]}
+              type={activeTab === tab ? 'default' : 'secondary'}
+            >
               {tab === 'recommend' ? '推荐' : '热榜'}
             </Text>
-            {activeTab === tab && <View style={styles.activeLine} />}
+            {activeTab === tab && <View style={[styles.activeLine, { backgroundColor: tintColor }]} />}
           </Pressable>
         ))}
       </View>
 
       <FlashList
         data={flattenedData}
-        estimatedItemSize={180}
+        // keyExtractor={(item, index) => (item.type === 'date' ? item.date : item.data.id.toString() + index)}
+        {...({ estimatedItemSize: 180 } as any)}
         onEndReached={() => hasNextPage && !isFetchingNextPage && fetchNextPage()}
         onEndReachedThreshold={0.5}
         onRefresh={refetch}
         refreshing={isLoading}
-        renderItem={({ item }) => {
-          const parsedItem = parseFeedItem(item);
-          return (
-            <FeedCard 
-              item={parsedItem} 
-              footer={<LikeButton count={parsedItem.voteCount} />} 
-            />
-          );
-        }}
+        renderItem={({ item }: { item: any }) => (
+          <FeedCard
+            item={item}
+          />
+        )}
         ListFooterComponent={isFetchingNextPage ? <ActivityIndicator style={{ margin: 20 }} /> : null}
       />
     </View>
@@ -119,10 +121,9 @@ function getMockData(type: string) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f2f5' },
-  topNav: { flexDirection: 'row', backgroundColor: '#fff', paddingTop: 60, paddingHorizontal: 20, borderBottomWidth: 0.5, borderBottomColor: '#eee' },
+  container: { flex: 1 },
+  topNav: { flexDirection: 'row', paddingTop: 60, paddingHorizontal: 20, borderBottomWidth: 0.5 },
   navItem: { marginRight: 30, paddingBottom: 10, alignItems: 'center' },
-  navText: { fontSize: 16, color: '#999' },
-  activeNavText: { color: '#111', fontWeight: 'bold' },
-  activeLine: { width: 20, height: 3, backgroundColor: '#0084ff', borderRadius: 2, marginTop: 4 },
+  navText: { fontSize: 16 },
+  activeLine: { width: 20, height: 3, borderRadius: 2, marginTop: 4 },
 });

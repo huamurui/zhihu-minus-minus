@@ -12,28 +12,18 @@ import {
   ScrollView,
   StyleSheet,
   Switch,
-  Text,
-  View,
 } from 'react-native';
 
 // 导入我们之前定义的组件和 Store
 import apiClient from '@/api/client';
+import { Text, View, useThemeColor } from '@/components/Themed';
 import { useThemeStore } from '@/store/useThemeStore';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { isDark, toggleTheme } = useThemeStore();
-
-  // 定义主题颜色映射
-  const theme = {
-    bg: isDark ? '#000' : '#f6f6f6',
-    card: isDark ? '#1a1a1a' : '#fff',
-    text: isDark ? '#fff' : '#1a1a1a',
-    subText: isDark ? '#888' : '#999',
-    border: isDark ? '#333' : '#eee',
-    accent: '#0084ff',
-  };
+  const accentColor = useThemeColor({}, 'tint');
 
   // 1. 获取个人详细信息 (使用 API 抓取真实数据)
   const { data: me, isLoading, refetch } = useQuery({
@@ -43,20 +33,17 @@ export default function ProfileScreen() {
         const res = await apiClient.get('/members/self?include=answer_count,articles_count,follower_count,following_count,headline,description,voteup_count,thanked_count');
         return res.data;
       } catch (e) {
-        // 如果未登录或 Cookie 失效，这里会抛错
         return null;
       }
     },
   });
 
-  // 每次页面获得焦点时刷新数据 (例如从登录页回来)
   useFocusEffect(
     useCallback(() => {
       refetch();
     }, [])
   );
 
-  // 退出登录逻辑
   const handleLogout = () => {
     Alert.alert('退出登录', '确定要退出当前账号吗喵？', [
       { text: '取消', style: 'cancel' },
@@ -65,14 +52,13 @@ export default function ProfileScreen() {
         style: 'destructive',
         onPress: async () => {
           await SecureStore.deleteItemAsync('user_cookies');
-          queryClient.setQueryData(['me'], null); // 清除缓存
+          queryClient.setQueryData(['me'], null);
           router.replace('/login');
         },
       },
     ]);
   };
 
-  // 切换主题并触发震动
   const onToggleTheme = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     toggleTheme();
@@ -80,19 +66,19 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView
-      style={[styles.container, { backgroundColor: theme.bg }]}
+      style={styles.container}
       refreshControl={
-        <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={theme.accent} />
+        <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={accentColor} />
       }
     >
       {/* 1. 顶部用户信息区 */}
-      <View style={[styles.header, { backgroundColor: theme.card }]}>
+      <View type="surface" style={styles.header}>
         {me ? (
           <Pressable style={styles.userInfoRow} onPress={() => router.push(`/user/${me.id}`)}>
             <Image source={{ uri: me.avatar_url }} style={styles.avatar} />
-            <View style={styles.userText}>
-              <Text style={[styles.userName, { color: theme.text }]}>{me.name}</Text>
-              <Text style={[styles.headline, { color: theme.subText }]} numberOfLines={1}>
+            <View style={[styles.userText, { backgroundColor: 'transparent' }]}>
+              <Text style={styles.userName}>{me.name}</Text>
+              <Text type="secondary" style={styles.headline} numberOfLines={1}>
                 {me.headline || '点击查看个人主页'}
               </Text>
             </View>
@@ -103,50 +89,49 @@ export default function ProfileScreen() {
             <View style={[styles.avatar, styles.avatarPlaceholder]}>
               <Ionicons name="person" size={40} color="#ccc" />
             </View>
-            <View style={styles.userText}>
-              <Text style={[styles.userName, { color: theme.text }]}>点击登录</Text>
-              <Text style={[styles.headline, { color: theme.subText }]}>登录后开启更多精彩内容</Text>
+            <View style={[styles.userText, { backgroundColor: 'transparent' }]}>
+              <Text style={styles.userName}>点击登录</Text>
+              <Text type="secondary" style={styles.headline}>登录后开启更多精彩内容</Text>
             </View>
           </Pressable>
         )}
 
         {/* 2. 数据战绩统计 */}
-        <View style={styles.statsGrid}>
-          <StatItem count={me?.answer_count || 0} label="回答" theme={theme} />
-          <StatItem count={me?.articles_count || 0} label="文章" theme={theme} />
-          <StatItem count={me?.following_count || 0} label="关注" theme={theme} />
-          <StatItem count={me?.follower_count || 0} label="粉丝" theme={theme} />
+        <View style={[styles.statsGrid, { backgroundColor: 'transparent' }]}>
+          <StatItem count={me?.answer_count || 0} label="回答" />
+          <StatItem count={me?.articles_count || 0} label="文章" />
+          <StatItem count={me?.following_count || 0} label="关注" />
+          <StatItem count={me?.follower_count || 0} label="粉丝" />
         </View>
       </View>
 
       {/* 3. 我的资产 (收纳盒) */}
-      <View style={[styles.menuSection, { backgroundColor: theme.card, marginTop: 12 }]}>
-        <MenuItem icon="bookmark-outline" title="我的收藏" color="#ff9800" theme={theme} />
-        <MenuItem icon="heart-outline" title="我的点赞" color="#f44336" theme={theme} />
-        <MenuItem icon="time-outline" title="最近浏览" color="#2196f3" theme={theme} />
+      <View type="surface" style={[styles.menuSection, { marginTop: 12 }]}>
+        <MenuItem icon="bookmark-outline" title="我的收藏" color="#ff9800" />
+        <MenuItem icon="heart-outline" title="我的点赞" color="#f44336" />
+        <MenuItem icon="time-outline" title="最近浏览" color="#2196f3" />
       </View>
 
       {/* 4. 通用设置 */}
-      <View style={[styles.menuSection, { backgroundColor: theme.card, marginTop: 12 }]}>
-        {/* 亮暗模式切换 */}
-        <View style={styles.menuItem}>
-          <View style={styles.menuLeft}>
-            <View style={[styles.iconBox, { backgroundColor: isDark ? '#333' : '#f0f0f0' }]}>
+      <View type="surface" style={[styles.menuSection, { marginTop: 12 }]}>
+        <View style={[styles.menuItem, { backgroundColor: 'transparent' }]}>
+          <View style={[styles.menuLeft, { backgroundColor: 'transparent' }]}>
+            <View style={[styles.iconBox, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
               <Ionicons name={isDark ? "moon" : "sunny"} size={20} color={isDark ? "#ffcf40" : "#ff9800"} />
             </View>
-            <Text style={[styles.menuTitle, { color: theme.text }]}>夜间模式</Text>
+            <Text style={styles.menuTitle}>夜间模式</Text>
           </View>
           <Switch
             value={isDark}
             onValueChange={onToggleTheme}
-            trackColor={{ false: "#ddd", true: theme.accent }}
+            trackColor={{ false: "#ddd", true: accentColor }}
             thumbColor="#fff"
           />
         </View>
 
-        <MenuItem icon="notifications-outline" title="消息通知" theme={theme} onPress={() => router.push('/notifications' as any)} />
-        <MenuItem icon="settings-outline" title="更多设置" theme={theme} />
-        <MenuItem icon="help-circle-outline" title="反馈与建议" theme={theme} />
+        <MenuItem icon="notifications-outline" title="消息通知" onPress={() => router.push('/notifications' as any)} />
+        <MenuItem icon="settings-outline" title="更多设置" />
+        <MenuItem icon="help-circle-outline" title="反馈与建议" />
       </View>
 
       {/* 5. 退出登录按钮 */}
@@ -156,36 +141,34 @@ export default function ProfileScreen() {
         </Pressable>
       )}
 
-      <View style={{ height: 50 }} />
+      <View style={{ height: 50, backgroundColor: 'transparent' }} />
     </ScrollView>
   );
 }
 
-// --- 子组件：数据统计项 ---
-function StatItem({ count, label, theme }: any) {
+function StatItem({ count, label }: any) {
   return (
-    <View style={styles.statItem}>
-      <Text style={[styles.statNum, { color: theme.text }]}>{count}</Text>
-      <Text style={[styles.statLabel, { color: theme.subText }]}>{label}</Text>
+    <View style={[styles.statItem, { backgroundColor: 'transparent' }]}>
+      <Text style={styles.statNum}>{count}</Text>
+      <Text type="secondary" style={styles.statLabel}>{label}</Text>
     </View>
   );
 }
 
-// --- 子组件：菜单项 ---
-function MenuItem({ icon, title, color = "#666", theme, right, onPress }: any) {
+function MenuItem({ icon, title, color = "#666", right, onPress }: any) {
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.menuItem,
-        pressed && { backgroundColor: theme.bg },
+        pressed && { opacity: 0.7 },
       ]}
     >
-      <View style={styles.menuLeft}>
+      <View style={[styles.menuLeft, { backgroundColor: 'transparent' }]}>
         <View style={[styles.iconBox, { backgroundColor: color + '15' }]}>
           <Ionicons name={icon} size={20} color={color} />
         </View>
-        <Text style={[styles.menuTitle, { color: theme.text }]}>{title}</Text>
+        <Text style={styles.menuTitle}>{title}</Text>
       </View>
       {right ? right : <Ionicons name="chevron-forward" size={16} color="#ccc" />}
     </Pressable>
@@ -194,7 +177,6 @@ function MenuItem({ icon, title, color = "#666", theme, right, onPress }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  // 头部样式
   header: {
     paddingTop: 60,
     paddingHorizontal: 20,
@@ -231,7 +213,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 4,
   },
-  // 统计网格
   statsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -249,7 +230,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
   },
-  // 菜单列表
   menuSection: {
     paddingHorizontal: 16,
     borderRadius: 16,
@@ -278,7 +258,6 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     fontWeight: '500',
   },
-  // 退出登录
   logoutBtn: {
     marginTop: 30,
     paddingVertical: 15,

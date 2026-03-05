@@ -1,11 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
+import { Text, useThemeColor } from './Themed';
 
 export const LikeButton = ({ count }: { count: number }) => {
   const [liked, setLiked] = useState(false);
   const scale = useSharedValue(1);
+
+  const tintColor = useThemeColor({}, 'tint');
+  const borderColor = useThemeColor({}, 'border');
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }]
@@ -21,15 +25,22 @@ export const LikeButton = ({ count }: { count: number }) => {
   };
 
   return (
-    <Pressable onPress={handlePress} style={[styles.btn, liked && styles.likedBtn]}>
+    <Pressable
+      onPress={handlePress}
+      style={[
+        styles.btn,
+        { backgroundColor: liked ? tintColor : borderColor },
+        liked && styles.likedBtn
+      ]}
+    >
       <Animated.View style={animatedStyle}>
-        <Ionicons 
-          name={liked ? "caret-up" : "caret-up-outline"} 
-          size={18} 
-          color={liked ? "#fff" : "#0084ff"} 
+        <Ionicons
+          name={liked ? "caret-up" : "caret-up-outline"}
+          size={18}
+          color={liked ? "#fff" : tintColor}
         />
       </Animated.View>
-      <Text style={[styles.text, liked && styles.likedText]}>
+      <Text style={[styles.text, { color: liked ? "#fff" : tintColor }]}>
         {liked ? count + 1 : count} 赞同
       </Text>
     </Pressable>
@@ -37,8 +48,7 @@ export const LikeButton = ({ count }: { count: number }) => {
 };
 
 const styles = StyleSheet.create({
-  btn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f0f7ff', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, marginRight: 10 },
-  likedBtn: { backgroundColor: '#0084ff' },
-  text: { marginLeft: 4, fontSize: 13, color: '#0084ff', fontWeight: '600' },
-  likedText: { color: '#fff' }
+  btn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, marginRight: 10 },
+  likedBtn: { elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2 },
+  text: { marginLeft: 4, fontSize: 13, fontWeight: '600' },
 });

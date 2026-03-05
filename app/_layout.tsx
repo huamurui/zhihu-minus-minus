@@ -26,36 +26,46 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider value={theme}>
-        <Stack>
+        <Stack
+          screenOptions={{
+            headerStyle: {
+              backgroundColor: isDark ? '#1a1a1a' : '#ffffff',
+            },
+            headerTitleStyle: {
+              color: isDark ? '#ffffff' : '#1a1a1a',
+              fontWeight: 'bold',
+            },
+            headerTintColor: '#0084ff',
+            headerShadowVisible: false,
+          }}>
           {/* 底部 Tab 主框架 */}
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          
+
           {/* 文章详情页：从右侧推入 */}
-          <Stack.Screen 
-            name="article/[id]" 
-            options={{ 
+          <Stack.Screen
+            name="article/[id]"
+            options={{
               headerTitle: '正文',
               headerBackTitle: '返回',
-              headerTintColor: '#0084ff',
-            }} 
+            }}
           />
 
           {/* 登录页：建议做成从底部弹出的 Modal */}
-          <Stack.Screen 
-            name="login" 
-            options={{ 
+          <Stack.Screen
+            name="login"
+            options={{
               presentation: 'modal',
               headerTitle: '登录知乎',
               headerLeft: () => null, // 登录页左侧通常留空或放“取消”
-            }} 
+            }}
           />
 
           {/* 其他 Modal 弹窗 */}
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: '提示' }} />
         </Stack>
-        
+
         {/* 全局状态栏控制 */}
-        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+        <StatusBar style={isDark ? 'light' : 'dark'} />
       </ThemeProvider>
     </QueryClientProvider>
   );

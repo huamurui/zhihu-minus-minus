@@ -1,23 +1,18 @@
 import apiClient from '@/api/client';
 import { CreationCard } from '@/components/CreationCard';
-import { useThemeStore } from '@/store/useThemeStore';
+import { Text, View, useThemeColor } from '@/components/Themed';
 import { FlashList } from '@shopify/flash-list';
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet } from 'react-native';
 
 export default function UserDetailScreen() {
   const { id } = useLocalSearchParams();
-  const { isDark } = useThemeStore();
   const [activeTab, setActiveTab] = useState<'answers' | 'articles'>('answers');
 
-  const theme = {
-    bg: isDark ? '#000' : '#f6f6f6',
-    card: isDark ? '#1a1a1a' : '#fff',
-    text: isDark ? '#fff' : '#1a1a1a',
-    primary: '#0084ff'
-  };
+  const borderColor = useThemeColor({}, 'border');
+  const primaryColor = '#0084ff';
 
   // 1. 获取用户信息
   const { data: user } = useQuery({
@@ -38,39 +33,40 @@ export default function UserDetailScreen() {
   });
 
   const renderHeader = () => (
-    <View>
+    <View style={{ backgroundColor: 'transparent' }}>
       <Image source={{ uri: user?.cover_url || 'https://picx.zhimg.com/v2-3975ba668e1c6670e309228892697843_b.jpg' }} style={styles.cover} />
-      <View style={[styles.infoSection, { backgroundColor: theme.card }]}>
+      <View type="surface" style={styles.infoSection}>
         <Image source={{ uri: user?.avatar_url }} style={styles.avatar} />
-        <Text style={[styles.name, { color: theme.text }]}>{user?.name}</Text>
-        <Text style={styles.headline}>{user?.headline}</Text>
-        <View style={styles.statsRow}>
-          <Text style={[styles.stat, { color: theme.text }]}>{user?.follower_count} <Text style={styles.label}>粉丝</Text></Text>
-          <Text style={[styles.stat, { color: theme.text }]}>{user?.following_count || 0} <Text style={styles.label}>关注</Text></Text>
+        <Text style={styles.name}>{user?.name}</Text>
+        <Text type="secondary" style={styles.headline}>{user?.headline}</Text>
+        <View style={[styles.statsRow, { backgroundColor: 'transparent' }]}>
+          <Text style={styles.stat}>{user?.follower_count} <Text type="secondary" style={styles.label}>粉丝</Text></Text>
+          <Text style={styles.stat}>{user?.following_count || 0} <Text type="secondary" style={styles.label}>关注</Text></Text>
         </View>
       </View>
-      
+
       {/* 创作切换 Tab */}
-      <View style={[styles.tabBar, { backgroundColor: theme.card }]}>
-        <Pressable onPress={() => setActiveTab('answers')} style={[styles.tabItem, activeTab === 'answers' && styles.activeTab]}>
-          <Text style={[styles.tabText, activeTab === 'answers' && { color: theme.primary }]}>回答 {user?.answer_count}</Text>
+      <View type="surface" style={[styles.tabBar, { borderTopColor: borderColor, borderBottomColor: borderColor, borderBottomWidth: 0.5 }]}>
+        <Pressable onPress={() => setActiveTab('answers')} style={[styles.tabItem, activeTab === 'answers' && { borderBottomWidth: 2, borderBottomColor: primaryColor }]}>
+          <Text style={[styles.tabText, activeTab === 'answers' && { color: primaryColor }]}>回答 {user?.answer_count}</Text>
         </Pressable>
-        <Pressable onPress={() => setActiveTab('articles')} style={[styles.tabItem, activeTab === 'articles' && styles.activeTab]}>
-          <Text style={[styles.tabText, activeTab === 'articles' && { color: theme.primary }]}>文章 {user?.articles_count}</Text>
+        <Pressable onPress={() => setActiveTab('articles')} style={[styles.tabItem, activeTab === 'articles' && { borderBottomWidth: 2, borderBottomColor: primaryColor }]}>
+          <Text style={[styles.tabText, activeTab === 'articles' && { color: primaryColor }]}>文章 {user?.articles_count}</Text>
         </Pressable>
       </View>
     </View>
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.bg }]}>
+    <View style={styles.container}>
       <FlashList
         data={creations}
-        renderItem={({ item }) => <CreationCard item={item} type={activeTab === 'answers' ? 'answer' : 'article'} />}
-        estimatedItemSize={120}
+        renderItem={({ item }: { item: any }) => <CreationCard item={item} type={activeTab === 'answers' ? 'answer' : 'article'} />}
+        {...({ estimatedItemSize: 120 } as any)}
+        keyExtractor={(item: any, index: number) => item.id?.toString() || index.toString()}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={() => (
-          <View style={styles.empty}><Text style={{color: '#999'}}>{listLoading ? '搬运中...' : '这里空空如也喵'}</Text></View>
+          <View style={styles.empty}><Text type="secondary">{listLoading ? '搬运中...' : '这里空空如也喵'}</Text></View>
         )}
       />
     </View>
@@ -83,13 +79,12 @@ const styles = StyleSheet.create({
   infoSection: { padding: 20, paddingTop: 0 },
   avatar: { width: 80, height: 80, borderRadius: 40, borderWidth: 3, borderColor: '#fff', marginTop: -40 },
   name: { fontSize: 22, fontWeight: 'bold', marginTop: 10 },
-  headline: { color: '#999', marginTop: 5, fontSize: 14 },
+  headline: { marginTop: 5, fontSize: 14 },
   statsRow: { flexDirection: 'row', marginTop: 15 },
   stat: { marginRight: 20, fontWeight: 'bold', fontSize: 16 },
-  label: { fontWeight: 'normal', color: '#999', fontSize: 12 },
-  tabBar: { flexDirection: 'row', borderTopWidth: 0.5, borderTopColor: '#eee', marginTop: 10 },
+  label: { fontWeight: 'normal', fontSize: 12 },
+  tabBar: { flexDirection: 'row', borderTopWidth: 0.5, marginTop: 10 },
   tabItem: { flex: 1, paddingVertical: 15, alignItems: 'center' },
-  activeTab: { borderBottomWidth: 2, borderBottomColor: '#0084ff' },
   tabText: { fontWeight: 'bold', color: '#999' },
-  empty: { padding: 50, alignItems: 'center' }
+  empty: { padding: 50, alignItems: 'center', backgroundColor: 'transparent' }
 });

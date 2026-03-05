@@ -1,13 +1,16 @@
+import { Text, View, useThemeColor } from '@/components/Themed';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { useLocalSearchParams } from 'expo-router';
 import React from 'react';
-import { Image, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import RenderHtml from 'react-native-render-html';
 
 export default function ArticleDetail() {
   const { id } = useLocalSearchParams();
   const { width } = useWindowDimensions();
+  const textColor = useThemeColor({}, 'text');
+  const borderColor = useThemeColor({}, 'border');
 
   const { data, isLoading } = useQuery({
     queryKey: ['article', id],
@@ -31,29 +34,34 @@ export default function ArticleDetail() {
       </View>
 
       {/* HTML 内容渲染 */}
-      <View style={{ paddingHorizontal: 15 }}>
+      <View style={{ paddingHorizontal: 15, backgroundColor: 'transparent' }}>
         <RenderHtml
           contentWidth={width}
           source={{ html: data.body }}
           // 知乎日报的 HTML 需要配合它提供的 CSS，这里简单处理下图片和段落
           tagsStyles={{
-            p: { fontSize: 17, lineHeight: 26, color: '#333', marginBottom: 15 },
+            p: { fontSize: 17, lineHeight: 26, color: textColor, marginBottom: 15 },
             img: { borderRadius: 8, marginVertical: 10 },
-            blockquote: { borderLeftWidth: 4, borderLeftColor: '#eee', paddingLeft: 10 }
+            blockquote: { borderLeftWidth: 4, borderLeftColor: borderColor, paddingLeft: 10, color: textColor },
+            span: { color: textColor },
+            div: { color: textColor },
+            h1: { color: textColor },
+            h2: { color: textColor },
+            h3: { color: textColor },
           }}
         />
       </View>
-      <View style={{ height: 50 }} />
+      <View style={{ height: 50, backgroundColor: 'transparent' }} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { width: '100%', height: 300, position: 'relative' },
   topImage: { width: '100%', height: '100%' },
-  overlay: { position: 'absolute', bottom: 0, padding: 20, width: '100%', backgroundColor: 'rgba(0,0,0,0.3)' },
+  overlay: { position: 'absolute', bottom: 0, padding: 20, width: '100%', backgroundColor: 'rgba(0,0,0,0.4)' },
   topTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
-  imageSource: { color: 'rgba(255,255,255,0.6)', fontSize: 10, textAlign: 'right', marginTop: 8 }
+  imageSource: { color: 'rgba(255,255,255,0.7)', fontSize: 10, textAlign: 'right', marginTop: 8 }
 });

@@ -2,16 +2,22 @@
 export default {
   light: {
     text: '#1a1a1a',
-    background: '#fff',
-    tint: '#0084ff', // 这里的蓝色是灵魂
+    textSecondary: '#888',
+    background: '#f6f6f6',
+    surface: '#ffffff',
+    tint: '#0084ff',
+    border: '#eeeeee',
     tabIconDefault: '#ccc',
     tabIconSelected: '#0084ff',
   },
   dark: {
-    text: '#fff',
-    background: '#000',
-    tint: '#fff',
+    text: '#ffffff',
+    textSecondary: '#888',
+    background: '#000000',
+    surface: '#1a1a1a',
+    tint: '#0084ff',
+    border: '#333333',
     tabIconDefault: '#ccc',
-    tabIconSelected: '#fff',
+    tabIconSelected: '#ffffff',
   },
 };

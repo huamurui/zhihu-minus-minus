@@ -1,23 +1,19 @@
 import apiClient from '@/api/client';
-import { useThemeStore } from '@/store/useThemeStore';
+import { Text, View, useThemeColor } from '@/components/Themed';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, FlatList, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput } from 'react-native';
 
 export default function CommentScreen() {
   const { id } = useLocalSearchParams(); // Answer ID
   const router = useRouter();
-  const { isDark } = useThemeStore();
   const [inputText, setInputText] = useState('');
   const queryClient = useQueryClient();
 
-  const theme = {
-    bg: isDark ? '#121212' : '#fff',
-    text: isDark ? '#fff' : '#1a1a1a',
-    border: isDark ? '#333' : '#eee',
-    card: isDark ? '#1e1e1e' : '#f6f6f6'
-  };
+  const borderColor = useThemeColor({}, 'border');
+  const surfaceColor = useThemeColor({}, 'surface');
+  const textColor = useThemeColor({}, 'text');
 
   // 1. 获取根评论
   const { data: comments, isLoading, refetch } = useQuery({
@@ -47,54 +43,54 @@ export default function CommentScreen() {
     }
   });
 
-  const renderComment = ({ item }: any) => (
-    <View style={[styles.commentBox, { borderBottomColor: theme.border }]}>
-      <View style={styles.mainRow}>
+  const renderComment = ({ item }: { item: any }) => (
+    <View style={[styles.commentBox, { borderBottomColor: borderColor, backgroundColor: 'transparent' }]}>
+      <View style={[styles.mainRow, { backgroundColor: 'transparent' }]}>
         <Image source={{ uri: item.author.member.avatar_url }} style={styles.avatar} />
-        <View style={styles.right}>
-          <Text style={[styles.name, { color: theme.text }]}>{item.author.member.name}</Text>
-          <Text style={[styles.content, { color: theme.text }]}>{item.content}</Text>
-          
+        <View style={[styles.right, { backgroundColor: 'transparent' }]}>
+          <Text style={styles.name}>{item.author.member.name}</Text>
+          <Text style={styles.content}>{item.content}</Text>
+
           {/* 子评论预览区域 */}
           {item.child_comment_count > 0 && (
-            <Pressable 
-              style={[styles.replyPreview, { backgroundColor: theme.card }]}
+            <Pressable
+              style={[styles.replyPreview, { backgroundColor: surfaceColor }]}
               onPress={() => router.push(`/comments/replies/${item.id}`)}
             >
               {item.child_comments.slice(0, 2).map((child: any) => (
-                <Text key={child.id} style={[styles.replyText, { color: theme.text }]} numberOfLines={1}>
+                <Text key={child.id} style={styles.replyText} numberOfLines={1}>
                   <Text style={styles.bold}>{child.author.member.name}：</Text>{child.content}
                 </Text>
               ))}
               <Text style={styles.moreReplies}>查看全部 {item.child_comment_count} 条回复 {'>'}</Text>
             </Pressable>
           )}
-          
-          <Text style={styles.time}>{item.created_time_name} · 赞 {item.vote_count}</Text>
+
+          <Text type="secondary" style={styles.time}>{item.created_time_name} · 赞 {item.vote_count}</Text>
         </View>
       </View>
     </View>
   );
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.container, { backgroundColor: theme.bg }]}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
       <FlatList
         data={comments}
         renderItem={renderComment}
-        keyExtractor={item => item.id.toString()}
-        ListEmptyComponent={isLoading ? <Text style={styles.center}>加载中...</Text> : null}
+        keyExtractor={(item: any) => item.id.toString()}
+        ListEmptyComponent={isLoading ? <View style={styles.center}><Text type="secondary">加载中...</Text></View> : null}
       />
-      
+
       {/* 输入框 */}
-      <View style={[styles.inputBar, { borderTopColor: theme.border }]}>
+      <View type="surface" style={[styles.inputBar, { borderTopColor: borderColor }]}>
         <TextInput
-          style={[styles.input, { backgroundColor: theme.card, color: theme.text }]}
+          style={[styles.input, { backgroundColor: borderColor, color: textColor }]}
           placeholder="既然来了，就留下点什么吧..."
           placeholderTextColor="#999"
           value={inputText}
           onChangeText={setInputText}
         />
-        <Pressable 
+        <Pressable
           disabled={!inputText || mutation.isPending}
           onPress={() => mutation.mutate(inputText)}
         >
@@ -107,36 +103,21 @@ export default function CommentScreen() {
   );
 }
 
-// 样式部分省略，可参考之前的或自行微调
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  commentItem: { padding: 15, borderBottomWidth: 0.5 },
   mainRow: { flexDirection: 'row' },
   avatar: { width: 32, height: 32, borderRadius: 16 },
-  rightContent: { flex: 1, marginLeft: 12 },
-  authorName: { fontWeight: 'bold', fontSize: 14, marginBottom: 4 },
-  commentText: { fontSize: 15, lineHeight: 22 },
-  commentAction: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10, alignItems: 'center' },
-  timeText: { fontSize: 12, color: '#999' },
-  likeBox: { flexDirection: 'row', alignItems: 'center' },
-  likeCount: { fontSize: 12, color: '#999', marginLeft: 4 },
-  childBox: { marginTop: 10, padding: 10, borderRadius: 8 },
-  childText: { fontSize: 14, lineHeight: 20, marginBottom: 5 },
-  childName: { fontWeight: 'bold', color: '#0084ff' },
-  moreText: { color: '#0084ff', fontSize: 13, marginTop: 5, fontWeight: '500' },
-  centerText: { textAlign: 'center', marginTop: 50, color: '#999' },
-  inputBar: { flexDirection: 'row', alignItems: 'center', padding: 12, paddingBottom: 35 },
+  inputBar: { flexDirection: 'row', alignItems: 'center', padding: 12, paddingBottom: 35, borderTopWidth: 0.5 },
   input: { flex: 1, height: 40, borderRadius: 20, paddingHorizontal: 15, marginRight: 10 },
-  sendBtn: { paddingHorizontal: 5 },
   sendText: { color: '#0084ff', fontWeight: 'bold', fontSize: 16 },
   commentBox: { padding: 15, borderBottomWidth: 0.5 },
   right: { flex: 1, marginLeft: 12 },
   name: { fontWeight: 'bold', fontSize: 14, marginBottom: 4 },
   content: { fontSize: 15, lineHeight: 22 },
-  time: { fontSize: 12, color: '#999', marginTop: 10 },
+  time: { fontSize: 12, marginTop: 10 },
   replyPreview: { marginTop: 10, padding: 10, borderRadius: 8 },
   replyText: { fontSize: 14, lineHeight: 20, marginBottom: 5 },
   bold: { fontWeight: 'bold', color: '#0084ff' },
   moreReplies: { color: '#0084ff', fontSize: 13, marginTop: 5, fontWeight: '500' },
-  center: { textAlign: 'center', marginTop: 50, color: '#999' }
+  center: { textAlign: 'center', marginTop: 50 }
 });

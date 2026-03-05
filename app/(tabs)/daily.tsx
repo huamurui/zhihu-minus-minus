@@ -1,9 +1,10 @@
+import { Text, View, useThemeColor } from '@/components/Themed';
 import { FlashList } from "@shopify/flash-list";
 import { useInfiniteQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { useRouter } from 'expo-router';
 import React, { useMemo } from 'react';
-import { Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Image, Pressable, StyleSheet } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
@@ -23,27 +24,29 @@ const formatDate = (dateStr: string) => {
 // --- 骨架屏组件 ---
 const SkeletonCard = () => {
   const opacity = useSharedValue(0.3);
+  const skeletonBg = useThemeColor({}, 'border');
+
   React.useEffect(() => {
     opacity.value = withRepeat(withSequence(withTiming(0.7, { duration: 800 }), withTiming(0.3, { duration: 800 })), -1);
   }, []);
   const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
 
   return (
-    <View style={styles.card}>
-      <Animated.View style={[styles.image, { backgroundColor: '#E1E9EE' }, animatedStyle]} />
-      <View style={styles.textContainer}>
-        <Animated.View style={[{ width: '90%', height: 20, backgroundColor: '#E1E9EE', marginBottom: 10 }, animatedStyle]} />
-        <Animated.View style={[{ width: '40%', height: 14, backgroundColor: '#E1E9EE' }, animatedStyle]} />
+    <View type="surface" style={styles.card}>
+      <Animated.View style={[styles.image, { backgroundColor: skeletonBg }, animatedStyle]} />
+      <View style={[styles.textContainer, { backgroundColor: 'transparent' }]}>
+        <Animated.View style={[{ width: '90%', height: 20, backgroundColor: skeletonBg, marginBottom: 10 }, animatedStyle]} />
+        <Animated.View style={[{ width: '40%', height: 14, backgroundColor: skeletonBg }, animatedStyle]} />
       </View>
     </View>
   );
 };
 
-export default function HomeScreen() {
+export default function DailyScreen() {
   const router = useRouter();
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, refetch } = useInfiniteQuery({
-    queryKey: ['zhihu-feed'],
+    queryKey: ['zhihu-daily'],
     queryFn: async ({ pageParam = '' }) => {
       const url = pageParam ? `https://news-at.zhihu.com/api/4/news/before/${pageParam}` : `https://news-at.zhihu.com/api/4/news/latest`;
       const res = await axios.get(url);
@@ -53,7 +56,6 @@ export default function HomeScreen() {
     getNextPageParam: (lastPage) => lastPage.date,
   });
 
-  // --- 数据转换逻辑：插入日期分割线 ---
   const flattenedData = useMemo(() => {
     if (!data) return [];
     const items: ListItem[] = [];
@@ -78,43 +80,45 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <FlashList
         data={flattenedData}
-        keyExtractor={(item, index) => (item.type === 'date' ? item.date : item.data.id.toString() + index)}
-        estimatedItemSize={100}
+        keyExtractor={(item: any, index: number) => (item.type === 'date' ? item.date : item.data.id.toString() + index)}
+        {...({ estimatedItemSize: 100 } as any)}
         onEndReached={() => hasNextPage && !isFetchingNextPage && fetchNextPage()}
         onEndReachedThreshold={0.5}
         onRefresh={refetch}
         refreshing={isLoading}
-        renderItem={({ item }) => {
+        renderItem={({ item }: { item: any }) => {
           if (item.type === 'date') {
-            return <Text style={styles.dateHeader}>{formatDate(item.date)}</Text>;
+            return <View style={{ backgroundColor: 'transparent' }}><Text type="secondary" style={styles.dateHeader}>{formatDate(item.date)}</Text></View>;
           }
-          const { data: story } = item;
+          const story = item.data;
           return (
-            <Pressable 
-              style={({ pressed }) => [styles.card, pressed && { opacity: 0.7 }]}
+            <Pressable
+              style={({ pressed }) => [pressed && { opacity: 0.7 }]}
               onPress={() => router.push(`/article/${story.id}`)}
             >
-              <Image source={{ uri: story.images?.[0] }} style={styles.image} />
-              <View style={styles.textContainer}>
-                <Text style={styles.title} numberOfLines={2}>{story.title}</Text>
-                <Text style={styles.hint}>{story.hint}</Text>
+              <View type="surface" style={styles.card}>
+                <Image source={{ uri: story.images?.[0] }} style={styles.image} />
+                <View style={[styles.textContainer, { backgroundColor: 'transparent' }]}>
+                  <Text style={styles.title} numberOfLines={2}>{story.title}</Text>
+                  <Text type="secondary" style={styles.hint}>{story.hint}</Text>
+                </View>
               </View>
             </Pressable>
           );
         }}
-        ListFooterComponent={isFetchingNextPage ? <Text style={styles.loadingText}>加载中...喵</Text> : null}
+        ListFooterComponent={isFetchingNextPage ? <Text type="secondary" style={styles.loadingText}>加载中...喵</Text> : null}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f6f6f6' },
-  dateHeader: { padding: 15, fontSize: 14, color: '#888', fontWeight: '600' },
-  card: { flexDirection: 'row', backgroundColor: '#fff', marginHorizontal: 12, marginBottom: 12, padding: 12, borderRadius: 12 },
+  container: { flex: 1 },
+  dateHeader: { padding: 15, fontSize: 14, fontWeight: '600' },
+  card: { flexDirection: 'row', marginHorizontal: 12, marginBottom: 12, padding: 12, borderRadius: 12 },
   image: { width: 80, height: 80, borderRadius: 8 },
   textContainer: { flex: 1, marginLeft: 12, justifyContent: 'center' },
-  title: { fontSize: 16, fontWeight: 'bold', color: '#222', marginBottom: 6 },
-  hint: { fontSize: 12, color: '#999' },
-  loadingText: { textAlign: 'center', padding: 20, color: '#999' }
+  title: { fontSize: 16, fontWeight: 'bold', marginBottom: 6 },
+  hint: { fontSize: 12 },
+  loadingText: { textAlign: 'center', padding: 20 }
 });

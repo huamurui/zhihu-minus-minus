@@ -11,10 +11,12 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme].tint,
-        tabBarInactiveTintColor: '#888',
+        tabBarInactiveTintColor: Colors[colorScheme].textSecondary,
         // 让 TabBar 看起来更高级：加点阴影或边框
         tabBarStyle: {
+          backgroundColor: Colors[colorScheme].surface,
           borderTopWidth: 0.5,
+          borderTopColor: Colors[colorScheme].border,
           elevation: 0,
           height: 60,
           paddingBottom: 8,
@@ -26,7 +28,7 @@ export default function TabLayout() {
         // 首页我们自己写了顶部导航，所以把原生的 Header 关掉
         headerShown: false,
       }}>
-      
+
       <Tabs.Screen
         name="index"
         options={{
@@ -46,7 +48,18 @@ export default function TabLayout() {
           ),
           headerShown: true, // 日报页可以保留原生 Header
           headerTitle: '知乎日报',
-          headerTitleStyle: { fontWeight: 'bold' },
+          headerStyle: {
+            backgroundColor: Colors[colorScheme].surface,
+            borderBottomWidth: 0.5,
+            borderBottomColor: Colors[colorScheme].border,
+            elevation: 0,
+            shadowOpacity: 0,
+          },
+          headerTitleStyle: {
+            fontWeight: 'bold',
+            color: Colors[colorScheme].text,
+          },
+          headerTintColor: Colors[colorScheme].tint,
         }}
       />
 

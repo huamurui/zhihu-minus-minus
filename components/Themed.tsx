@@ -30,16 +30,18 @@ export function useThemeColor(
   }
 }
 
-export function Text(props: TextProps) {
-  const { style, lightColor, darkColor, ...otherProps } = props;
-  const color = useThemeColor({ light: lightColor, dark: darkColor }, 'text');
+export function Text(props: TextProps & { type?: 'default' | 'secondary' }) {
+  const { style, lightColor, darkColor, type = 'default', ...otherProps } = props;
+  const colorName = type === 'secondary' ? 'textSecondary' : 'text';
+  const color = useThemeColor({ light: lightColor, dark: darkColor }, colorName);
 
   return <DefaultText style={[{ color }, style]} {...otherProps} />;
 }
 
-export function View(props: ViewProps) {
-  const { style, lightColor, darkColor, ...otherProps } = props;
-  const backgroundColor = useThemeColor({ light: lightColor, dark: darkColor }, 'background');
+export function View(props: ViewProps & { type?: 'default' | 'surface' | 'border' }) {
+  const { style, lightColor, darkColor, type = 'default', ...otherProps } = props;
+  const colorName = type === 'surface' ? 'surface' : type === 'border' ? 'border' : 'background';
+  const backgroundColor = useThemeColor({ light: lightColor, dark: darkColor }, colorName);
 
   return <DefaultView style={[{ backgroundColor }, style]} {...otherProps} />;
 }
