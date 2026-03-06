@@ -18,6 +18,7 @@ import {
 import apiClient from '@/api/client';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { useThemeStore } from '@/store/useThemeStore';
+import CookieManager from '@react-native-cookies/cookies';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -52,6 +53,9 @@ export default function ProfileScreen() {
         style: 'destructive',
         onPress: async () => {
           await SecureStore.deleteItemAsync('user_cookies');
+          // webview 中的登录也要退出
+          await CookieManager.clearAll();
+
           queryClient.setQueryData(['me'], null);
           router.replace('/login');
         },

@@ -1,4 +1,5 @@
 import { Text, View, useThemeColor } from '@/components/Themed';
+import CookieManager from '@react-native-cookies/cookies';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import React, { useRef, useState } from 'react';
@@ -11,29 +12,40 @@ export default function LoginScreen() {
   const webViewRef = useRef<WebView>(null);
   const borderColor = useThemeColor({}, 'border');
 
-  // 1. 注入脚本：不再使用定时器强制抓取，而是定义一个辅助函数或者保持空白
-  const INJECTED_JS = `true;`; // 只是为了启用 injectedJavaScript
-
-  const handleCookies = async (cookies: string) => {
+  const handleCookies = async () => {
     // 关键：只有当包含 z_c0 (登录 Token) 时才认为是有效的登录 Cookie
-    // if (cookies.includes('z_c0')) {
-    console.log('🍪 捕获到完整 Cookie:', cookies);
-    const hasDc0 = cookies.includes('d_c0');
-    const hasZc0 = cookies.includes('z_c0');
-    console.log(`📊 Cookie 状态: d_c0=${hasDc0}, z_c0=${hasZc0}`);
+    // 获取 httpOnly cookie，webview 注入 js 是不行的，需要原生支持
+    try {
+      const cookies = await CookieManager.get('https://www.zhihu.com');
 
-    await SecureStore.setItemAsync('user_cookies', cookies);
-    console.log('✅ 登录 Cookie 已保存至 SecureStore');
+      // CookieManager.get 返回的是一个对象 { [name: string]: Cookie }
+      if (cookies && cookies['z_c0']) {
+        console.log('🍪 捕获到完整 Cookie (包含 z_c0)');
 
-    // 成功后延迟跳转，确保存储生效
-    setTimeout(() => {
-      if (router.canGoBack()) {
-        router.back();
-      } else {
-        router.replace('/(tabs)/profile');
+        // 将对象转换为 key=value; 格式的字符串，方便 axios 使用
+        const cookieString = Object.values(cookies)
+          .map(c => `${c.name}=${c.value}`)
+          .join('; ');
+
+        const hasDc0 = !!cookies['d_c0'];
+        const hasZc0 = !!cookies['z_c0'];
+        console.log(`📊 Cookie 状态: d_c0=${hasDc0}, z_c0=${hasZc0}`);
+
+        await SecureStore.setItemAsync('user_cookies', cookieString);
+        console.log('✅ 登录 Cookie 已保存至 SecureStore');
+
+        // 成功后延迟跳转，确保存储生效
+        setTimeout(() => {
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace('/(tabs)/profile');
+          }
+        }, 800);
       }
-    }, 800);
-    // }
+    } catch (error) {
+      console.error('❌ 获取 Cookie 失败:', error);
+    }
   };
 
   return (
@@ -57,32 +69,22 @@ export default function LoginScreen() {
       <WebView
         ref={webViewRef}
         source={{ uri: 'https://www.zhihu.com/signin' }}
-        injectedJavaScript={INJECTED_JS}
         onMessage={(event) => {
-          handleCookies(event.nativeEvent.data);
+          handleCookies();
         }}
         onNavigationStateChange={(navState) => {
           console.log('🌐 导航至:', navState.url);
-
+          handleCookies();
           // 如果检测到跳转到了首页、热榜或个人主页，说明登录可能已经成功
           const isSuccessPage =
             navState.url === 'https://www.zhihu.com/' ||
             navState.url.includes('zhihu.com/hot') ||
             navState.url.includes('zhihu.com/people/');
 
-          if (isSuccessPage && !navState.loading) {
-            console.log('🚀 检测到登录成功迹象，正在获取最终 Cookie...');
-            webViewRef.current?.injectJavaScript(`window.ReactNativeWebView.postMessage(document.cookie)`);
-          }
         }}
         onLoadStart={() => setLoading(true)}
         onLoadEnd={(syntheticEvent) => {
           setLoading(false);
-          const { nativeEvent } = syntheticEvent;
-          // 每次页面加载完成都尝试抓取一次，以防万一
-          if (!nativeEvent.loading) {
-            webViewRef.current?.injectJavaScript(`window.ReactNativeWebView.postMessage(document.cookie)`);
-          }
         }}
       />
 

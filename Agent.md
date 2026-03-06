@@ -78,3 +78,8 @@
  - 看看有没有办法拿到那个 httpOnly cookie... z_c0
  - 各页面及交互功能继续补充，实现搜索
  
+
+--- 
+
+获取 webview httpOnly cookie 要用的 "@react-native-cookies/cookies" 这种库... 它和 expo 可能没有贴贴的很好，所以用了这个之后不能扫码看结果开发了...  
+
