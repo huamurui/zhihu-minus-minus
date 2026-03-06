@@ -89,6 +89,6 @@ export const LikeButton = ({
 
 const styles = StyleSheet.create({
   btn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, marginRight: 10 },
-  likedBtn: { elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2 },
+  likedBtn: { elevation: 2, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2 },
   text: { marginLeft: 4, fontSize: 13, fontWeight: '600' },
 });
