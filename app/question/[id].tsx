@@ -87,7 +87,6 @@ const AnswerItem = ({ item }: { item: any }) => {
 export default function QuestionDetail() {
   const { id } = useLocalSearchParams();
   const borderColor = useThemeColor({}, 'border');
-  // console.log(id, 'id');
   // 1. 获取问题详情
   const { data: question, isLoading: qLoading, error: qError } = useQuery({
     queryKey: ['question', id],

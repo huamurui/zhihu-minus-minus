@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { signRequest96 } from './zse96/x';
 
 const apiClient = axios.create({
-  baseURL: 'https://www.zhihu.com',
+  baseURL: 'https://www.zhihu.com/api/v4',
   timeout: 10000,
 });
 const ZSE_VERSION = '101_3_3.0';
