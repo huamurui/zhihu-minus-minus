@@ -121,7 +121,7 @@ export default function ProfileScreen() {
       <View type="surface" style={[styles.menuSection, { marginTop: 12 }]}>
         <MenuItem icon="bookmark-outline" title="我的收藏" color="#ff9800" />
         <MenuItem icon="heart-outline" title="我的点赞" color="#f44336" />
-        <MenuItem icon="time-outline" title="最近浏览" color="#2196f3" />
+        <MenuItem icon="time-outline" title="最近浏览" color="#2196f3" onPress={() => router.push('/history')} />
       </View>
 
       {/* 4. 通用设置 */}
