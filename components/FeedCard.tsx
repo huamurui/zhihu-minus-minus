@@ -11,7 +11,7 @@ export const FeedCard = ({ item }: { item: any }) => {
     <View type="surface" style={styles.card}>
       {/* 热区1：点击作者头像/姓名 -> 用户页 */}
       <Pressable
-        onPress={() => router.push(`/user/${item.author.id}`)}
+        onPress={() => router.push(`/user/${item.author.url_token || item.author.id}`)}
         style={styles.authorRow}
       >
         <Image source={{ uri: item.author.avatar }} style={styles.avatar} />

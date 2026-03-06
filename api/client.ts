@@ -20,7 +20,9 @@ apiClient.interceptors.request.use(async (config) => {
     const dc0 = getDc0(cookie);
     if (dc0) {
       const body = config.data ? (typeof config.data === 'string' ? config.data : JSON.stringify(config.data)) : null;
-      const zse96 = signRequest96(config.url || '', body, ZSE_VERSION, dc0);
+      // 使用 getUri 获取包含 baseURL 和 params 的完整 URL 用于签名
+      const fullUrl = apiClient.getUri(config);
+      const zse96 = signRequest96(fullUrl, body, ZSE_VERSION, dc0);
       config.headers['x-zse-96'] = zse96;
       config.headers['x-zse-93'] = ZSE_VERSION;
       config.headers['x-requested-with'] = 'fetch';

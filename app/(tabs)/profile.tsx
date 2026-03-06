@@ -31,7 +31,7 @@ export default function ProfileScreen() {
     queryKey: ['me'],
     queryFn: async () => {
       try {
-        const res = await apiClient.get('/me?include=answer_count,articles_count,follower_count,following_count,headline,description,voteup_count,thanked_count');
+        const res = await apiClient.get('/me?include=url_token,answer_count,articles_count,follower_count,following_count,headline,description,voteup_count,thanked_count');
         return res.data;
       } catch (e) {
         return null;
@@ -78,7 +78,7 @@ export default function ProfileScreen() {
       {/* 1. 顶部用户信息区 */}
       <View type="surface" style={styles.header}>
         {me ? (
-          <Pressable style={styles.userInfoRow} onPress={() => router.push(`/user/${me.id}`)}>
+          <Pressable style={styles.userInfoRow} onPress={() => router.push(`/user/${me.url_token || me.id}`)}>
             <Image source={{ uri: me.avatar_url }} style={styles.avatar} />
             <View style={[styles.userText, { backgroundColor: 'transparent' }]}>
               <Text style={styles.userName}>{me.name}</Text>
@@ -104,8 +104,16 @@ export default function ProfileScreen() {
         <View style={[styles.statsGrid, { backgroundColor: 'transparent' }]}>
           <StatItem count={me?.answer_count || 0} label="回答" />
           <StatItem count={me?.articles_count || 0} label="文章" />
-          <StatItem count={me?.following_count || 0} label="关注" />
-          <StatItem count={me?.follower_count || 0} label="粉丝" />
+          <StatItem
+            count={me?.following_count || 0}
+            label="关注"
+            onPress={() => me && router.push(`/user/${me.url_token || me.id}/following`)}
+          />
+          <StatItem
+            count={me?.follower_count || 0}
+            label="粉丝"
+            onPress={() => me && router.push(`/user/${me.url_token || me.id}/followers`)}
+          />
         </View>
       </View>
 
@@ -150,12 +158,16 @@ export default function ProfileScreen() {
   );
 }
 
-function StatItem({ count, label }: any) {
+function StatItem({ count, label, onPress }: any) {
   return (
-    <View style={[styles.statItem, { backgroundColor: 'transparent' }]}>
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      style={[styles.statItem, { backgroundColor: 'transparent' }]}
+    >
       <Text style={styles.statNum}>{count}</Text>
       <Text type="secondary" style={styles.statLabel}>{label}</Text>
-    </View>
+    </Pressable>
   );
 }
 

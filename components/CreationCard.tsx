@@ -2,7 +2,7 @@ import { Text, View } from '@/components/Themed';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet } from 'react-native';
 
-export const CreationCard = ({ item, type }: { item: any, type: 'answer' | 'article' }) => {
+export const CreationCard = ({ item, type }: { item: any, type: 'answer' | 'article' | 'question' }) => {
   const router = useRouter();
 
   const handlePress = () => {
@@ -13,14 +13,14 @@ export const CreationCard = ({ item, type }: { item: any, type: 'answer' | 'arti
     <Pressable onPress={handlePress}>
       <View type="surface" style={styles.card}>
         <Text style={styles.title} numberOfLines={2}>
-          {item.title || item.question?.title}
+          {item.title || item.question?.title || '未知内容'}
         </Text>
         <Text type="secondary" style={styles.excerpt} numberOfLines={3}>
-          {item.excerpt?.replace(/<[^>]+>/g, '')}
+          {item.excerpt?.replace(/<[^>]+>/g, '') || item.content?.replace(/<[^>]+>/g, '').substring(0, 100) || ''}
         </Text>
         <View style={[styles.footer, { backgroundColor: 'transparent' }]}>
-          <Text type="secondary" style={styles.statText}>{item.voteup_count} 赞同 · {item.comment_count} 评论</Text>
-          <Text type="secondary" style={styles.statText}>{item.updated_time ? new Date(item.updated_time * 1000).toLocaleDateString() : ''}</Text>
+          <Text type="secondary" style={styles.statText}>{item.voteup_count || 0} 赞同 · {item.comment_count || 0} 评论</Text>
+          <Text type="secondary" style={styles.statText}>{item.updated_time ? new Date(item.updated_time * 1000).toLocaleDateString() : (item.created_time ? new Date(item.created_time * 1000).toLocaleDateString() : '')}</Text>
         </View>
       </View>
     </Pressable>
