@@ -24,7 +24,7 @@ export default function AnswerDetailScreen() {
   const { data: answer, isLoading } = useQuery({
     queryKey: ['answer-detail', id],
     queryFn: async () => {
-      const include = 'content,voteup_count,comment_count,author.headline,author.follower_count,author.badge,question.title';
+      const include = 'content,voteup_count,comment_count,author.headline,author.follower_count,author.badge,question.title,relationship.voting';
       const res = await apiClient.get(`/answers/${id}?include=${include}`);
       return res.data;
     }
@@ -105,7 +105,11 @@ export default function AnswerDetailScreen() {
         {/* 底部吸底交互栏 - 核心灵魂 */}
         <View type="surface" style={[styles.footer, { borderTopColor: borderColor }]}>
           <View style={[styles.voteBox, { backgroundColor: 'transparent' }]}>
-            <LikeButton count={answer?.voteup_count || 0} />
+            <LikeButton
+              id={answer?.id}
+              count={answer?.voteup_count || 0}
+              voted={answer?.relationship?.voting}
+            />
             <View style={[styles.downvote, { backgroundColor: borderColor }]}>
               <Ionicons name="caret-down" size={20} color="#0084ff" />
             </View>

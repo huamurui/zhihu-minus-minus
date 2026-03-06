@@ -19,7 +19,8 @@ apiClient.interceptors.request.use(async (config) => {
     config.headers['Cookie'] = cookie;
     const dc0 = getDc0(cookie);
     if (dc0) {
-      const zse96 = signRequest96(config.url || '', null, ZSE_VERSION, dc0);
+      const body = config.data ? (typeof config.data === 'string' ? config.data : JSON.stringify(config.data)) : null;
+      const zse96 = signRequest96(config.url || '', body, ZSE_VERSION, dc0);
       config.headers['x-zse-96'] = zse96;
       config.headers['x-zse-93'] = ZSE_VERSION;
       config.headers['x-requested-with'] = 'fetch';

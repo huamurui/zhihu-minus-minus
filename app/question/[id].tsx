@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
@@ -64,7 +64,11 @@ const AnswerItem = ({ item }: { item: any }) => {
       {/* 3. 底部交互栏 */}
       <View style={[styles.footer, { backgroundColor: 'transparent' }]}>
         <View style={styles.voteGroup}>
-          <LikeButton count={item.voteup_count} />
+          <LikeButton
+            id={item.id}
+            count={item.voteup_count}
+            voted={item.relationship?.voting}
+          />
           <View style={[styles.downvoteBtn, { backgroundColor: borderColor }]}>
             <Ionicons name="caret-down" size={18} color="#0084ff" />
           </View>
@@ -87,8 +91,10 @@ const AnswerItem = ({ item }: { item: any }) => {
 export default function QuestionDetail() {
   const { id } = useLocalSearchParams();
   const borderColor = useThemeColor({}, 'border');
+  const [sortBy, setSortBy] = useState<'default' | 'created'>('default');
+
   // 1. 获取问题详情
-  const { data: question, isLoading: qLoading, error: qError } = useQuery({
+  const { data: question, isLoading: qLoading } = useQuery({
     queryKey: ['question', id],
     queryFn: async () => {
       try {
@@ -101,20 +107,39 @@ export default function QuestionDetail() {
     }
   });
 
-  // 2. 获取回答列表
-  const { data: answers, isLoading: aLoading } = useQuery({
-    queryKey: ['question-answers', id],
-    queryFn: async () => {
+  // 2. 获取回答列表 (Infinite Query)
+  const {
+    data: answersData,
+    isLoading: aLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch,
+    isRefetching
+  } = useInfiniteQuery({
+    queryKey: ['question-answers', id, sortBy],
+    queryFn: async ({ pageParam = 0 }) => {
       try {
-        const include = 'data[*].content,voteup_count,comment_count,author.name,author.avatar_url,author.headline';
-        const res = await client.get(`/questions/${id}/answers?include=${include}&limit=20`);
-        return res.data.data || [];
+        const include = 'data[*].content,voteup_count,comment_count,author.name,author.avatar_url,author.headline,relationship.voting';
+        const url = `/questions/${id}/answers?include=${include}&limit=20&offset=${pageParam}&sort_by=${sortBy}`;
+        const res = await client.get(url);
+        return res.data;
       } catch (err) {
         console.error('获取回答列表失败:', err);
-        return [];
+        return { data: [], paging: { is_end: true } };
       }
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => {
+      if (!lastPage || lastPage.paging?.is_end) return undefined;
+      const nextUrl = lastPage.paging?.next;
+      if (!nextUrl) return undefined;
+      const match = nextUrl.match(/offset=(\d+)/);
+      return match ? parseInt(match[1]) : undefined;
     }
   });
+
+  const answers = answersData?.pages.flatMap(page => page.data) || [];
 
   if (qLoading || aLoading) {
     return (
@@ -141,11 +166,45 @@ export default function QuestionDetail() {
               <Text style={styles.qStatText}>
                 {question?.answer_count || 0} 个回答
               </Text>
+
+              <View style={styles.sortContainer}>
+                <Pressable
+                  onPress={() => setSortBy('default')}
+                  style={[styles.sortBtn, sortBy === 'default' && styles.sortBtnActive]}
+                >
+                  <Text style={[styles.sortText, sortBy === 'default' && styles.sortTextActive]}>默认</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setSortBy('created')}
+                  style={[styles.sortBtn, sortBy === 'created' && styles.sortBtnActive]}
+                >
+                  <Text style={[styles.sortText, sortBy === 'created' && styles.sortTextActive]}>时间</Text>
+                </Pressable>
+              </View>
             </View>
           </View>
         }
         renderItem={({ item }: { item: any }) => <AnswerItem item={item} />}
         keyExtractor={(item: any) => item.id.toString()}
+        onEndReached={() => {
+          if (hasNextPage && !isFetchingNextPage) {
+            fetchNextPage();
+          }
+        }}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          isFetchingNextPage ? (
+            <ActivityIndicator style={{ marginVertical: 20 }} color="#0084ff" />
+          ) : (
+            answers.length > 0 && !hasNextPage ? (
+              <Text type="secondary" style={{ textAlign: 'center', marginVertical: 20, fontSize: 13 }}>
+                — 没有更多回答了 —
+              </Text>
+            ) : null
+          )
+        }
+        onRefresh={refetch}
+        refreshing={isRefetching}
       />
     </View>
   );
@@ -158,8 +217,13 @@ const styles = StyleSheet.create({
   header: { padding: 20, marginBottom: 8 },
   title: { fontSize: 21, fontWeight: 'bold', lineHeight: 28 },
   qExcerpt: { marginTop: 10, fontSize: 14, lineHeight: 20 },
-  qStats: { marginTop: 15, borderTopWidth: 0.5, paddingTop: 12 },
+  qStats: { marginTop: 15, borderTopWidth: 0.5, paddingTop: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   qStatText: { color: '#0084ff', fontWeight: 'bold' },
+  sortContainer: { flexDirection: 'row', alignItems: 'center' },
+  sortBtn: { marginLeft: 15, paddingVertical: 2, paddingHorizontal: 4 },
+  sortBtnActive: { borderBottomWidth: 2, borderBottomColor: '#0084ff' },
+  sortText: { fontSize: 13, color: '#888' },
+  sortTextActive: { color: '#0084ff', fontWeight: 'bold' },
   // 回答卡片
   card: { padding: 15, marginBottom: 2, borderBottomWidth: 0.5 },
   authorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },

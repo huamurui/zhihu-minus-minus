@@ -107,6 +107,8 @@ function parseRecommendData(item: any) {
     image: target.thumbnail || (target.content_img?.length > 0 ? target.content_img[0] : null),
     voteCount: target.voteup_count || 0,
     commentCount: target.comment_count || 0,
+    voted: target.relationship?.voting || 0,
+    type: target.type === 'answer' ? 'answers' : target.type === 'article' ? 'articles' : 'answers',
   };
 }
 
@@ -115,6 +117,7 @@ function parseHotData(item: any, index: number) {
   const target = item.target || item;
   return {
     id: target.id?.toString() || Math.random().toString(),
+    questionId: target.id?.toString() || "",
     rank: index + 1,
     title: target.title || "无标题",
     excerpt: target.excerpt || "",

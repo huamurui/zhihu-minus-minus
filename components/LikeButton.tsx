@@ -1,47 +1,87 @@
+import apiClient from '@/api/client';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { Text, useThemeColor } from './Themed';
 
-export const LikeButton = ({ count }: { count: number }) => {
-  const [liked, setLiked] = useState(false);
+export const LikeButton = ({
+  id,
+  count: initialCount,
+  voted: initialVoted = 0,
+  type = 'answers'
+}: {
+  id: string | number;
+  count: number;
+  voted?: number;
+  type?: 'answers' | 'articles' | 'questions'
+}) => {
+  const [voted, setVoted] = useState(initialVoted);
+  const [count, setCount] = useState(initialCount);
+  const [loading, setLoading] = useState(false);
   const scale = useSharedValue(1);
 
   const tintColor = useThemeColor({}, 'tint');
   const borderColor = useThemeColor({}, 'border');
 
+  const isUpvoted = voted === 1;
+
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }]
   }));
 
-  const handlePress = () => {
-    // 动画逻辑：先放大再弹回
+  const handlePress = async () => {
+    if (loading) return;
+
+    // 动画效果
     scale.value = withSequence(
       withTiming(1.4, { duration: 100 }),
       withSpring(1)
     );
-    setLiked(!liked);
+
+    const nextVoted = isUpvoted ? 0 : 1;
+    const voteType = nextVoted === 1 ? 'up' : 'neutral';
+
+    setLoading(true);
+    try {
+      // 知乎投票接口：POST /api/v4/{type}/{id}/voters
+      await apiClient.post(`/${type}/${id}/voters`, { type: voteType });
+
+      // 更新状态
+      setVoted(nextVoted);
+      setCount(prev => isUpvoted ? prev - 1 : prev + 1);
+    } catch (err) {
+      console.error('投票失败:', err);
+      // 如果报错是 401，通常需要登录，这里简单提示
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <Pressable
       onPress={handlePress}
+      disabled={loading}
       style={[
         styles.btn,
-        { backgroundColor: liked ? tintColor : borderColor },
-        liked && styles.likedBtn
+        { backgroundColor: isUpvoted ? tintColor : borderColor },
+        isUpvoted && styles.likedBtn,
+        loading && { opacity: 0.7 }
       ]}
     >
-      <Animated.View style={animatedStyle}>
-        <Ionicons
-          name={liked ? "caret-up" : "caret-up-outline"}
-          size={18}
-          color={liked ? "#fff" : tintColor}
-        />
-      </Animated.View>
-      <Text style={[styles.text, { color: liked ? "#fff" : tintColor }]}>
-        {liked ? count + 1 : count} 赞同
+      {loading ? (
+        <ActivityIndicator size="small" color={isUpvoted ? "#fff" : tintColor} style={{ marginRight: 4 }} />
+      ) : (
+        <Animated.View style={animatedStyle}>
+          <Ionicons
+            name={isUpvoted ? "caret-up" : "caret-up-outline"}
+            size={18}
+            color={isUpvoted ? "#fff" : tintColor}
+          />
+        </Animated.View>
+      )}
+      <Text style={[styles.text, { color: isUpvoted ? "#fff" : tintColor }]}>
+        {count} 赞同
       </Text>
     </Pressable>
   );

@@ -39,7 +39,12 @@ export const FeedCard = ({ item }: { item: any }) => {
 
       {/* 热区4：底部操作栏 */}
       <View style={[styles.footer, { backgroundColor: 'transparent' }]}>
-        <LikeButton count={item.voteCount} />
+        <LikeButton
+          id={item.id}
+          count={item.voteCount}
+          voted={item.voted}
+          type={item.type}
+        />
 
         {/* 点击评论按钮 -> 评论页 */}
         <Pressable
