@@ -1,5 +1,7 @@
 # 🐱 知乎 -- (Zhihu Minus Minus)
 
+![zhihu--](./assets/images/favicon.svg)
+
 一款轻量级、纯净、无广告的第三方知乎客户端，基于 **React Native (Expo)** 构建。旨在回归阅读本质，提供极致丝滑的知乎浏览体验。
 
 ## ✨ 特性
@@ -12,7 +14,6 @@
   - **日报**: 完整集成知乎日报，回顾过往精彩。
   - **详情**: 优雅的问题展示、回答/文章详情、评论交互（支持二级回复）。
   - **个人**: 我的主页、个人点赞/收藏、浏览历史记录。
-  - **消息**: 实时消息通知。
 - **现代化架构**: 全面拥抱 Expo Router、TanStack Query V5、Tailwind CSS (NativeWind) 和 Zustand。
 
 ## 🛠️ 技术栈
@@ -74,7 +75,7 @@
 ## 🤝 贡献与声明
 
 - **免责声明**: 本项目仅供学习交流使用，不建议用于商业用途。
-- **License**: MIT
+- **License**: GPL-3.0 license
 
 ---
 **Author**: [huamurui](https://github.com/huamurui) & [Antigravity Agent] 🐱
