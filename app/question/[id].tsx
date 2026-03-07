@@ -2,13 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import RenderHtml from 'react-native-render-html';
 
 import client from '@/api/client';
 import { LikeButton } from '@/components/LikeButton';
 import { Text, View, useThemeColor } from '@/components/Themed';
+import { useNavigation } from 'expo-router';
 
 // 单个回答组件：处理内部的“展开/折叠”逻辑
 const AnswerItem = ({ item }: { item: any }) => {
@@ -90,8 +91,13 @@ const AnswerItem = ({ item }: { item: any }) => {
 
 export default function QuestionDetail() {
   const { id } = useLocalSearchParams();
+  const navigation = useNavigation();
   const borderColor = useThemeColor({}, 'border');
   const [sortBy, setSortBy] = useState<'default' | 'created'>('default');
+
+  useEffect(() => {
+    navigation.setOptions({ title: '问题' });
+  }, [navigation]);
 
   // 1. 获取问题详情
   const { data: question, isLoading: qLoading } = useQuery({

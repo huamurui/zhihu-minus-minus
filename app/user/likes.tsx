@@ -3,13 +3,19 @@ import { CreationCard } from '@/components/CreationCard';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import React, { useState } from 'react';
+import { useNavigation } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 
 export default function MyLikesScreen() {
+    const navigation = useNavigation();
     const [activeTab, setActiveTab] = useState<'answers' | 'articles'>('answers');
     const primaryColor = '#0084ff';
     const borderColor = useThemeColor({}, 'border');
+
+    useEffect(() => {
+        navigation.setOptions({ title: '我的点赞' });
+    }, [navigation]);
 
     const {
         data,

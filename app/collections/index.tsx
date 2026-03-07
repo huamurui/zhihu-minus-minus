@@ -3,14 +3,19 @@ import { Text, View, useThemeColor } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
-import React from 'react';
+import { useNavigation, useRouter } from 'expo-router';
+import React, { useEffect } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 
 export default function MyCollectionsScreen() {
     const router = useRouter();
+    const navigation = useNavigation();
     const primaryColor = '#0084ff';
     const borderColor = useThemeColor({}, 'border');
+
+    useEffect(() => {
+        navigation.setOptions({ title: '我的收藏夹' });
+    }, [navigation]);
 
     const {
         data,

@@ -3,8 +3,8 @@ import { LikeButton } from '@/components/LikeButton';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useRef } from 'react';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import React, { useEffect, useRef } from 'react';
 import { Animated, Image, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import RenderHtml from 'react-native-render-html';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,6 +12,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function AnswerDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    navigation.setOptions({ title: '回答' });
+  }, [navigation]);
   const { width } = useWindowDimensions();
   const scrollY = useRef(new Animated.Value(0)).current;
 

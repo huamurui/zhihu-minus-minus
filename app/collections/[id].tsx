@@ -3,14 +3,19 @@ import { CreationCard } from '@/components/CreationCard';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { useLocalSearchParams } from 'expo-router';
-import React from 'react';
+import { useLocalSearchParams, useNavigation } from 'expo-router';
+import React, { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet } from 'react-native';
 
 export default function CollectionDetailScreen() {
     const { id } = useLocalSearchParams();
+    const navigation = useNavigation();
     const primaryColor = '#0084ff';
     const borderColor = useThemeColor({}, 'border');
+
+    useEffect(() => {
+        navigation.setOptions({ title: '收藏夹' });
+    }, [navigation]);
 
     // 1. 获取收藏夹基本信息
     const { data: collection } = useQuery({

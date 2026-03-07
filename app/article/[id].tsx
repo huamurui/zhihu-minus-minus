@@ -1,7 +1,7 @@
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
-import { useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import React from 'react';
 import { Image, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import RenderHtml from 'react-native-render-html';
@@ -24,6 +24,7 @@ export default function ArticleDetail() {
 
   return (
     <ScrollView style={styles.container}>
+      <Stack.Screen options={{ title: '文章' }} />
       {/* 顶部大图 */}
       <View style={styles.header}>
         <Image source={{ uri: data.image }} style={styles.topImage} />

@@ -3,16 +3,21 @@ import { CreationCard } from '@/components/CreationCard';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
 
 export default function UserDetailScreen() {
     const { id } = useLocalSearchParams();
     const router = useRouter();
+    const navigation = useNavigation();
     const [activeTab, setActiveTab] = useState<'activities' | 'answers' | 'questions' | 'articles' | 'pins'>('activities');
     const [sortBy, setSortBy] = useState<'created' | 'voteups'>('created');
     const [followLoading, setFollowLoading] = useState(false);
+
+    useEffect(() => {
+        navigation.setOptions({ title: '个人主页' });
+    }, [navigation]);
 
     const borderColor = useThemeColor({}, 'border');
     const primaryColor = '#0084ff';
