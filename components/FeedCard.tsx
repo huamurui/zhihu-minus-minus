@@ -9,6 +9,13 @@ export const FeedCard = ({ item }: { item: any }) => {
 
   return (
     <View type="surface" style={styles.card}>
+      {/* 动态动作提示 (针对关注流) */}
+      {item.actionText && (
+        <Text type="secondary" style={styles.actionTextRow}>
+          {item.actionText}
+        </Text>
+      )}
+
       {/* 热区1：点击作者头像/姓名 -> 用户页 */}
       <Pressable
         onPress={() => router.push(`/user/${item.author.url_token || item.author.id}`)}
@@ -76,5 +83,6 @@ const styles = StyleSheet.create({
   footer: { flexDirection: 'row', marginTop: 15, alignItems: 'center' },
   commentBtn: { flexDirection: 'row', alignItems: 'center', marginLeft: 20 },
   actionText: { color: '#888', marginLeft: 4, fontSize: 13 },
+  actionTextRow: { fontSize: 13, marginBottom: 8, color: '#999' },
   moreBtn: { marginLeft: 'auto' }
 });

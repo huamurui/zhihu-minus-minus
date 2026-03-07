@@ -11,13 +11,14 @@ import { HotCard, HotItem } from '@/components/HotCard';
 import { Text, View, useThemeColor } from '@/components/Themed';
 
 const API_CONFIG = {
+  following: 'https://www.zhihu.com/api/v3/moments?limit=10',
   recommend: 'https://www.zhihu.com/api/v3/feed/topstory/recommend?limit=10',
   hot: 'https://www.zhihu.com/api/v3/feed/topstory/hot-lists/total?limit=50'
 };
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'recommend' | 'hot'>('recommend');
+  const [activeTab, setActiveTab] = useState<'following' | 'recommend' | 'hot'>('recommend');
   const tintColor = useThemeColor({}, 'tint');
   const borderBottomColor = useThemeColor({}, 'border');
 
@@ -29,7 +30,9 @@ export default function HomeScreen() {
         const rawItems = res.data.data || [];
 
         let items;
-        if (activeTab === 'recommend') {
+        if (activeTab === 'following') {
+          items = rawItems.map((item: any) => parseFollowingData(item)).filter(Boolean);
+        } else if (activeTab === 'recommend') {
           items = rawItems.map((item: any) => parseRecommendData(item));
         } else {
           items = rawItems.map((item: any, index: number) => parseHotData(item, index));
@@ -54,7 +57,7 @@ export default function HomeScreen() {
     <View style={styles.container}>
       {/* 顶部 Tab 导航 */}
       <View type="surface" style={[styles.topNav, { borderBottomColor }]}>
-        {(['recommend', 'hot'] as const).map((tab) => (
+        {(['following', 'recommend', 'hot'] as const).map((tab) => (
           <Pressable key={tab} onPress={() => setActiveTab(tab)} style={styles.navItem}>
             <Text
               style={[
@@ -63,7 +66,7 @@ export default function HomeScreen() {
               ]}
               type={activeTab === tab ? 'default' : 'secondary'}
             >
-              {tab === 'recommend' ? '推荐' : '热榜'}
+              {tab === 'following' ? '关注' : tab === 'recommend' ? '推荐' : '热榜'}
             </Text>
             {activeTab === tab && <View style={[styles.activeLine, { backgroundColor: tintColor }]} />}
           </Pressable>
@@ -87,6 +90,31 @@ export default function HomeScreen() {
       />
     </View>
   );
+}
+
+// 关注流数据解析
+function parseFollowingData(item: any) {
+  const target = item.target;
+  if (!target) return null;
+
+  return {
+    id: target.id?.toString() || Math.random().toString(),
+    title: target.question?.title || target.title || "无标题内容",
+    questionId: target.question?.id || (target.type === 'question' ? target.id : ""),
+    actionText: item.action_text,
+    author: {
+      id: target.author?.id || "",
+      url_token: target.author?.url_token || "",
+      name: target.author?.name || "匿名用户",
+      avatar: target.author?.avatar_url || "https://picx.zhimg.com/v2-abed1a8c04700ba7d72b45195223e0ff_l.jpg",
+    },
+    excerpt: target.excerpt || "",
+    image: target.thumbnail || (target.content_img?.length > 0 ? target.content_img[0] : null),
+    voteCount: target.voteup_count || 0,
+    commentCount: target.comment_count || 0,
+    voted: target.relationship?.voting || 0,
+    type: target.type === 'answer' ? 'answers' : target.type === 'article' ? 'articles' : 'answers',
+  };
 }
 
 // 推荐流数据解析
