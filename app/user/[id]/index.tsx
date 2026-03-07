@@ -258,7 +258,7 @@ export default function UserDetailScreen() {
             <FlashList
                 data={listItems}
                 renderItem={renderItem}
-                estimatedItemSize={120}
+                {...({ estimatedItemSize: 120 } as any)}
                 keyExtractor={(item: any, index: number) => {
                     const itemId = item.id || item.target?.id || index;
                     return `${activeTab}-${itemId}-${index}`;

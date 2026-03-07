@@ -1,34 +1,116 @@
-import { Text, View } from '@/components/Themed';
+import apiClient from '@/api/client';
+import { Text, View, useThemeColor } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
+import { FlashList } from '@shopify/flash-list';
+import { useInfiniteQuery } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import React from 'react';
-import { FlatList, StyleSheet } from 'react-native';
-
-const MOCK_NOTIFS = [
-  { id: '1', type: 'like', user: '李四', target: '你的回答：如何学习 RN', time: '10分钟前' },
-  { id: '2', type: 'comment', user: '王五', target: '太深刻了！', time: '1小时前' },
-];
+import { ActivityIndicator, Image, Pressable, StyleSheet } from 'react-native';
 
 export default function NotificationScreen() {
+  const router = useRouter();
+  const primaryColor = '#0084ff';
+  const borderColor = useThemeColor({}, 'border');
+
+  const {
+    data,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch,
+    isRefetching
+  } = useInfiniteQuery({
+    queryKey: ['notifications'],
+    queryFn: async ({ pageParam = '' }) => {
+      // 知乎通知 API
+      const url = pageParam || '/notifications/v3/timeline?limit=20';
+      const res = await apiClient.get(url);
+      return res.data;
+    },
+    initialPageParam: '',
+    getNextPageParam: (lastPage) => {
+      if (!lastPage || lastPage.paging?.is_end) return undefined;
+      return lastPage.paging?.next;
+    }
+  });
+
+  const notifications = data?.pages.flatMap(page => page.data) || [];
+
+  const renderIcon = (type: string) => {
+    switch (type) {
+      case 'MOMENT_VOTE_UP_ANSWER':
+      case 'VOTE_UP_ANSWER':
+      case 'VOTE_UP_ARTICLE':
+        return <Ionicons name="heart" size={18} color="#f44336" />;
+      case 'ANSWER_COMMENT':
+      case 'ARTICLE_COMMENT':
+      case 'COMMENT_REPLY':
+        return <Ionicons name="chatbubble" size={18} color="#0084ff" />;
+      case 'FOLLOW_USER':
+        return <Ionicons name="person-add" size={18} color="#4caf50" />;
+      default:
+        return <Ionicons name="notifications" size={18} color="#888" />;
+    }
+  };
+
+  const renderItem = ({ item }: { item: any }) => {
+    const actor = item.actors?.[0] || {};
+    const target = item.target || {};
+    const time = new Date(item.created * 1000).toLocaleString();
+
+    return (
+      <Pressable
+        style={({ pressed }) => [styles.card, { borderBottomColor: borderColor }, pressed && { opacity: 0.7 }]}
+        onPress={() => {
+          if (target.type === 'answer') {
+            router.push(`/answer/${target.id}`);
+          } else if (target.type === 'article') {
+            router.push(`/article/${target.id}`);
+          } else if (target.type === 'member') {
+            router.push(`/user/${target.id}`);
+          }
+        }}
+      >
+        <Image source={{ uri: actor.avatar_url }} style={styles.avatar} />
+        <View style={[styles.content, { backgroundColor: 'transparent' }]}>
+          <View style={[styles.titleRow, { backgroundColor: 'transparent' }]}>
+            <Text style={styles.actorName}>{actor.name}</Text>
+            <View style={styles.badge}>{renderIcon(item.verb)}</View>
+          </View>
+          <Text style={styles.actionText}>
+            {typeof item.content === 'string'
+              ? item.content
+              : (item.content?.text || item.content?.title || item.content?.sub_text || '新的动态')}
+          </Text>
+          <Text type="secondary" style={styles.time}>{time}</Text>
+        </View>
+      </Pressable>
+    );
+  };
+
   return (
     <View style={styles.container}>
-      <FlatList
-        data={MOCK_NOTIFS}
-        renderItem={({ item }: { item: any }) => (
-          <View type="surface" style={styles.card}>
-            <Ionicons
-              name={item.type === 'like' ? 'heart' : 'chatbubble'}
-              size={20}
-              color={item.type === 'like' ? '#f44336' : '#0084ff'}
-            />
-            <View style={[styles.content, { backgroundColor: 'transparent' }]}>
-              <Text>
-                <Text style={{ fontWeight: 'bold' }}>{item.user}</Text>
-                {item.type === 'like' ? ' 赞同了你' : ' 评论了你'}
-              </Text>
-              <Text type="secondary" style={styles.target} numberOfLines={1}>{item.target}</Text>
-              <Text type="secondary" style={styles.time}>{item.time}</Text>
-            </View>
+      <FlashList
+        data={notifications}
+        renderItem={renderItem}
+        {...({ estimatedItemSize: 100 } as any)}
+        onEndReached={() => {
+          if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+        }}
+        onRefresh={refetch}
+        refreshing={isRefetching}
+        ListEmptyComponent={() => (
+          <View style={styles.empty}>
+            {isLoading ? (
+              <ActivityIndicator color={primaryColor} />
+            ) : (
+              <Text type="secondary">暂无通知喵</Text>
+            )}
           </View>
+        )}
+        ListFooterComponent={() => (
+          isFetchingNextPage ? <ActivityIndicator style={{ margin: 20 }} color={primaryColor} /> : null
         )}
       />
     </View>
@@ -37,8 +119,13 @@ export default function NotificationScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  card: { flexDirection: 'row', padding: 15, marginBottom: 1, alignItems: 'center' },
-  content: { marginLeft: 15, flex: 1 },
-  target: { fontSize: 13, marginTop: 4 },
-  time: { fontSize: 11, marginTop: 4 }
+  card: { flexDirection: 'row', padding: 15, borderBottomWidth: StyleSheet.hairlineWidth },
+  avatar: { width: 44, height: 44, borderRadius: 22 },
+  content: { marginLeft: 12, flex: 1 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  actorName: { fontWeight: 'bold', fontSize: 16 },
+  badge: { width: 24, height: 24, justifyContent: 'center', alignItems: 'center' },
+  actionText: { fontSize: 14, marginTop: 4, lineHeight: 20 },
+  time: { fontSize: 12, marginTop: 6 },
+  empty: { flex: 1, padding: 100, alignItems: 'center' }
 });
