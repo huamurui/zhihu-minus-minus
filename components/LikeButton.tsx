@@ -9,12 +9,14 @@ export const LikeButton = ({
   id,
   count: initialCount,
   voted: initialVoted = 0,
-  type = 'answers'
+  type = 'answers',
+  variant = 'default'
 }: {
   id: string | number;
   count: number;
   voted?: number;
-  type?: 'answers' | 'articles' | 'questions'
+  type?: 'answers' | 'articles' | 'questions' | 'pins' | 'comments';
+  variant?: 'default' | 'ghost';
 }) => {
   const [voted, setVoted] = useState(initialVoted);
   const [count, setCount] = useState(initialCount);
@@ -40,19 +42,25 @@ export const LikeButton = ({
     );
 
     const nextVoted = isUpvoted ? 0 : 1;
-    const voteType = nextVoted === 1 ? 'up' : 'neutral';
 
     setLoading(true);
     try {
-      // 知乎投票接口：POST /api/v4/{type}/{id}/voters
-      await apiClient.post(`/${type}/${id}/voters`, { type: voteType });
+      if (type === 'pins') {
+        if (nextVoted === 1) {
+          await apiClient.post(`/pins/${id}/reactions`, { type: 'like' });
+        } else {
+          await apiClient.delete(`/pins/${id}/reactions`);
+        }
+      } else {
+        const voteType = nextVoted === 1 ? 'up' : 'neutral';
+        await apiClient.post(`/${type}/${id}/voters`, { type: voteType });
+      }
 
       // 更新状态
       setVoted(nextVoted);
       setCount(prev => isUpvoted ? prev - 1 : prev + 1);
     } catch (err) {
       console.error('投票失败:', err);
-      // 如果报错是 401，通常需要登录，这里简单提示
     } finally {
       setLoading(false);
     }
@@ -63,9 +71,9 @@ export const LikeButton = ({
       onPress={handlePress}
       disabled={loading}
       style={[
-        styles.btn,
-        { backgroundColor: isUpvoted ? tintColor : borderColor },
-        isUpvoted && styles.likedBtn,
+        variant === 'default' ? styles.btn : styles.ghostBtn,
+        variant === 'default' && { backgroundColor: isUpvoted ? tintColor : borderColor },
+        isUpvoted && variant === 'default' && styles.likedBtn,
         loading && { opacity: 0.7 }
       ]}
     >
@@ -75,13 +83,17 @@ export const LikeButton = ({
         <Animated.View style={animatedStyle}>
           <Ionicons
             name={isUpvoted ? "caret-up" : "caret-up-outline"}
-            size={18}
-            color={isUpvoted ? "#fff" : tintColor}
+            size={variant === 'default' ? 18 : 16}
+            color={isUpvoted ? (variant === 'default' ? "#fff" : tintColor) : (variant === 'default' ? tintColor : "#888")}
           />
         </Animated.View>
       )}
-      <Text style={[styles.text, { color: isUpvoted ? "#fff" : tintColor }]}>
-        {count} 赞同
+      <Text style={[
+        styles.text,
+        { color: isUpvoted ? (variant === 'default' ? "#fff" : tintColor) : (variant === 'default' ? tintColor : "#888") },
+        variant === 'ghost' && { fontSize: 12, marginLeft: 2 }
+      ]}>
+        {count > 0 ? count : (variant === 'default' ? '0 赞同' : '赞')}
       </Text>
     </Pressable>
   );
@@ -89,6 +101,7 @@ export const LikeButton = ({
 
 const styles = StyleSheet.create({
   btn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, marginRight: 10 },
+  ghostBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'transparent', paddingVertical: 4 },
   likedBtn: { elevation: 2, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 2 },
   text: { marginLeft: 4, fontSize: 13, fontWeight: '600' },
 });

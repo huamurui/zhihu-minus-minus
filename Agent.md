@@ -81,5 +81,5 @@
 
 --- 
 
-获取 webview httpOnly cookie 要用的 "@react-native-cookies/cookies" 这种库... 它和 expo 可能没有贴贴的很好，所以用了这个之后不能扫码看结果开发了...  
+获取 webview httpOnly cookie 要用的 "@react-native-cookies/cookies" 这种库... 它和 expo 可能没有贴贴的很好，所以用了这个之后不能扫码看结果开发了...  要接 adb 或者模拟安卓机
 

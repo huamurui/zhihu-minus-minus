@@ -1,7 +1,9 @@
 import { Text, View } from '@/components/Themed';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { Pressable, StyleSheet } from 'react-native';
+import { LikeButton } from './LikeButton';
 
 export const CreationCard = ({ item, type, onPress, excerpt }: {
   item: any,
@@ -82,8 +84,8 @@ export const CreationCard = ({ item, type, onPress, excerpt }: {
   const showExpandButton = !expanded && getFullContent().length > 100;
 
   return (
-    <Pressable onPress={handlePress}>
-      <View type="surface" style={styles.card}>
+    <View type="surface" style={styles.card}>
+      <Pressable onPress={handlePress}>
         <Text style={styles.title} numberOfLines={expanded ? undefined : 2}>
           {getTitle()}
         </Text>
@@ -102,21 +104,41 @@ export const CreationCard = ({ item, type, onPress, excerpt }: {
             </Pressable>
           )}
         </View>
-        <View style={[styles.footer, { backgroundColor: 'transparent' }]}>
+      </Pressable>
+
+      <View style={[styles.footer, { backgroundColor: 'transparent' }]}>
+        {type !== 'question' && type !== 'video' ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'transparent' }}>
+            <LikeButton
+              id={item.id}
+              count={item.voteup_count || item.reaction_count || 0}
+              voted={item.relationship?.voting || 0}
+              type={type === 'article' ? 'articles' : type === 'pin' ? 'pins' : 'answers'}
+            />
+            <Pressable
+              onPress={() => router.push(`/comments/${item.id}`)}
+              style={styles.commentBtn}
+            >
+              <Ionicons name="chatbubble-outline" size={16} color="#888" />
+              <Text style={styles.actionText}>{item.comment_count || 0} 评论</Text>
+            </Pressable>
+          </View>
+        ) : (
           <Text type="secondary" style={styles.statText}>
             {type === 'question'
               ? `${item.answer_count || 0} 回答 · ${item.follower_count || 0} 关注`
-              : `${item.voteup_count || item.reaction_count || 0} 赞同 · ${item.comment_count || 0} 评论`
+              : `${item.voteup_count || 0} 赞同 · ${item.comment_count || 0} 评论`
             }
           </Text>
-          <Text type="secondary" style={styles.statText}>
-            {item.updated_time || item.updated || item.created_time || item.created
-              ? new Date((item.updated_time || item.updated || item.created_time || item.created) * 1000).toLocaleDateString()
-              : ''}
-          </Text>
-        </View>
+        )}
+
+        <Text type="secondary" style={[styles.statText, { marginLeft: 'auto' }]}>
+          {item.updated_time || item.updated || item.created_time || item.created
+            ? new Date((item.updated_time || item.updated || item.created_time || item.created) * 1000).toLocaleDateString()
+            : ''}
+        </Text>
       </View>
-    </Pressable>
+    </View>
   );
 };
 
@@ -124,8 +146,10 @@ const styles = StyleSheet.create({
   card: { padding: 15, marginBottom: 2, marginTop: 1 },
   title: { fontSize: 16, fontWeight: 'bold', marginBottom: 8, lineHeight: 22 },
   excerpt: { fontSize: 14, lineHeight: 20 },
-  footer: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 },
-  statText: { fontSize: 12 },
+  footer: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 15, alignItems: 'center' },
+  statText: { fontSize: 12, color: '#999' },
+  commentBtn: { flexDirection: 'row', alignItems: 'center', marginLeft: 10 },
+  actionText: { color: '#888', marginLeft: 4, fontSize: 13 },
   expandBtn: { marginTop: 8 },
   expandText: { fontSize: 14, color: '#007AFF' }
 });

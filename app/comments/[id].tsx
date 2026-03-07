@@ -1,5 +1,7 @@
 import apiClient from '@/api/client';
+import { LikeButton } from '@/components/LikeButton';
 import { Text, View, useThemeColor } from '@/components/Themed';
+import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -11,6 +13,8 @@ export default function CommentScreen() {
   const { id } = useLocalSearchParams(); // Answer ID
   const router = useRouter();
   const [inputText, setInputText] = useState('');
+  const [replyTo, setReplyTo] = useState<{ id: string, name: string } | null>(null);
+  const inputRef = React.useRef<TextInput>(null);
   const queryClient = useQueryClient();
 
   const insets = useSafeAreaInsets();
@@ -30,17 +34,27 @@ export default function CommentScreen() {
 
   const comments = data?.data || [];
 
-  // 2. 真实发布评论 Mutation
+  // 2. 发布评论/回复 Mutation
   const mutation = useMutation({
     mutationFn: async (content: string) => {
-      return await apiClient.post(`/answers/${id}/comments`, {
-        content: content,
-        type: 'comment'
-      });
+      if (replyTo) {
+        // 回复评论
+        return await apiClient.post(`/comments/${replyTo.id}/replies`, {
+          content: content,
+          type: 'comment'
+        });
+      } else {
+        // 发布根评论
+        return await apiClient.post(`/answers/${id}/comments`, {
+          content: content,
+          type: 'comment'
+        });
+      }
     },
     onSuccess: () => {
-      Alert.alert('发布成功喵！');
+      Alert.alert(replyTo ? '回复成功喵！' : '发布成功喵！');
       setInputText('');
+      setReplyTo(null);
       refetch(); // 刷新列表
     },
     onError: (err: any) => {
@@ -86,11 +100,27 @@ export default function CommentScreen() {
 
             <View style={styles.commentFooter}>
               <Text type="secondary" style={styles.time}>
-                {item.created_time ? new Date(item.created_time * 1000).toLocaleDateString() : ''} · 赞 {item.vote_count || 0}
+                {item.created_time ? new Date(item.created_time * 1000).toLocaleDateString() : ''}
               </Text>
-              <Pressable onPress={() => Alert.alert('提示', '回复功能开发中...')}>
-                <Text style={styles.replyAction}>回复</Text>
-              </Pressable>
+
+              <View style={styles.actionRow}>
+                <LikeButton
+                  id={item.id}
+                  count={item.vote_count || 0}
+                  voted={item.relationship?.voting || 0}
+                  type="comments"
+                  variant="ghost"
+                />
+                <Pressable
+                  onPress={() => {
+                    setReplyTo({ id: item.id, name: item.author.member.name });
+                    inputRef.current?.focus();
+                  }}
+                  style={styles.replyBtn}
+                >
+                  <Text style={styles.replyAction}>回复</Text>
+                </Pressable>
+              </View>
             </View>
           </View>
         </View>
@@ -127,17 +157,28 @@ export default function CommentScreen() {
           />
         </View>
 
+        {/* 输入栏环境提示 */}
+        {replyTo && (
+          <View type="surface" style={[styles.replyHeader, { borderTopColor: borderColor }]}>
+            <Text type="secondary" style={styles.replyHint}>正在回复 {replyTo.name}</Text>
+            <Pressable onPress={() => setReplyTo(null)}>
+              <Ionicons name="close-circle" size={18} color="#999" />
+            </Pressable>
+          </View>
+        )}
+
         {/* 输入框外层容器，用于处理键盘弹起 */}
         <View type="surface" style={[
           styles.inputBar,
           {
-            borderTopColor: borderColor,
+            borderTopColor: replyTo ? 'transparent' : borderColor,
             paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 20) : 10
           }
         ]}>
           <TextInput
+            ref={inputRef}
             style={[styles.input, { backgroundColor: borderColor, color: textColor }]}
-            placeholder="既然来了，就留下点什么吧..."
+            placeholder={replyTo ? `回复 ${replyTo.name}...` : "既然来了，就留下点什么吧..."}
             placeholderTextColor="#999"
             value={inputText}
             onChangeText={setInputText}
@@ -192,9 +233,13 @@ const styles = StyleSheet.create({
   name: { fontWeight: 'bold', fontSize: 14, marginRight: 8 },
   headline: { fontSize: 12, flex: 1 },
   content: { fontSize: 15, lineHeight: 22, color: '#333' },
-  commentFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },
-  time: { fontSize: 12 },
-  replyAction: { fontSize: 12, color: '#0084ff', paddingHorizontal: 10, paddingVertical: 5 },
+  commentFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
+  actionRow: { flexDirection: 'row', alignItems: 'center' },
+  time: { fontSize: 12, color: '#999' },
+  replyBtn: { marginLeft: 15 },
+  replyAction: { fontSize: 12, color: '#888', paddingVertical: 5 },
+  replyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15, paddingTop: 10 },
+  replyHint: { fontSize: 12 },
   replyPreview: { marginTop: 10, padding: 10, borderRadius: 8 },
   replyText: { fontSize: 14, lineHeight: 20, marginBottom: 5 },
   bold: { fontWeight: 'bold', color: '#666' },

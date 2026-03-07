@@ -11,12 +11,13 @@ export default function UserDetailScreen() {
     const { id } = useLocalSearchParams();
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<'activities' | 'answers' | 'questions' | 'articles' | 'pins'>('activities');
+    const [sortBy, setSortBy] = useState<'created' | 'voteups'>('created');
     const [followLoading, setFollowLoading] = useState(false);
 
     const borderColor = useThemeColor({}, 'border');
     const primaryColor = '#0084ff';
 
-    // 0. 获取 "我" 的信息，用于判断是否是自己
+    // 0. 获取 "我" 的信息 (用于判断是否是自己)
     const { data: me } = useQuery({
         queryKey: ['me'],
         queryFn: async () => {
@@ -41,7 +42,6 @@ export default function UserDetailScreen() {
                     const res = await apiClient.get(`/members/${id}?include=${fallbackInclude}`);
                     return res.data;
                 }
-                console.error('获取用户信息失败:', err);
                 return null;
             }
         }
@@ -57,12 +57,12 @@ export default function UserDetailScreen() {
         refetch: refetchList,
         isRefetching
     } = useInfiniteQuery({
-        queryKey: ['user-list', id, activeTab],
+        queryKey: ['user-list', id, activeTab, sortBy],
         queryFn: async ({ pageParam = 0 }) => {
             try {
                 const targetId = user?.url_token || id;
                 if (activeTab === 'activities') {
-                    // 使用新的 v3 动态 API
+                    // 动态 API
                     const url = `https://www.zhihu.com/api/v3/moments/${targetId}/activities?limit=20&offset=${pageParam}`;
                     const res = await apiClient.get(url, {
                         headers: {
@@ -76,15 +76,15 @@ export default function UserDetailScreen() {
                 let include = '';
 
                 if (activeTab === 'answers') {
-                    include = 'data[*].content,voteup_count,comment_count,created_time,updated_time,excerpt,question.title';
+                    endpoint = `/members/${targetId}/answers?sort_by=${sortBy}`;
+                    include = 'data[*].content,voteup_count,comment_count,created_time,updated_time,excerpt,question.title,relationship.voting,relationship.is_thanked';
                 } else if (activeTab === 'questions') {
-                    include = 'data[*].created,answer_count,follower_count,author,admin_closed_comment';
+                    include = 'data[*].created,answer_count,follower_count,author,admin_closed_comment,relationship.is_following';
                 } else if (activeTab === 'articles') {
-                    include = 'data[*].comment_count,content,voteup_count,created,updated,title,excerpt';
+                    include = 'data[*].comment_count,content,voteup_count,created,updated,title,excerpt,relationship.voting';
                 } else if (activeTab === 'pins') {
-                    // 想法使用专门的 moments 接口
-                    endpoint = `https://www.zhihu.com/api/v4/v2/pins/${targetId}/moments`;
-                    include = 'data[*].reaction_count,comment_count,created,content';
+                    endpoint = `/members/${targetId}/pins`;
+                    include = 'data[*].content,reaction_count,comment_count,created,relationship.voting';
                 }
 
                 const res = await apiClient.get(`${endpoint}${endpoint.includes('?') ? '&' : '?'}limit=20&offset=${pageParam}&include=${include}`);
@@ -100,7 +100,6 @@ export default function UserDetailScreen() {
             const nextUrl = lastPage.paging?.next;
             if (!nextUrl) return undefined;
             const match = nextUrl.match(/offset=(\d+)/);
-            // 动态使用的是 ID 作为 offset, creations 和 voteups 使用的是数字
             return match ? match[1] : undefined;
         }
     });
@@ -128,7 +127,10 @@ export default function UserDetailScreen() {
 
     const renderHeader = () => (
         <View style={{ backgroundColor: 'transparent' }}>
-            <Image source={{ uri: user?.cover_url || 'https://picx.zhimg.com/v2-3975ba668e1c6670e309228892697843_b.jpg' }} style={styles.cover} />
+            <Image
+                source={{ uri: user?.cover_url || 'https://picx.zhimg.com/v2-3975ba668e1c6670e309228892697843_b.jpg' }}
+                style={styles.cover}
+            />
             <View type="surface" style={styles.infoSection}>
                 <View style={styles.avatarRow}>
                     <Image source={{ uri: user?.avatar_url }} style={styles.avatar} />
@@ -159,7 +161,6 @@ export default function UserDetailScreen() {
                     </Text>
                 ) : null}
 
-                {/* 共同关注入口 */}
                 {!isMe && (user?.mutual_followees_count || 0) > 0 && (
                     <Pressable
                         style={styles.mutualRow}
@@ -172,7 +173,6 @@ export default function UserDetailScreen() {
                             source={{ uri: 'https://pic1.zhimg.com/v2-abed1a8c04702bc9e7ba3d3d82bc7591_s.jpg' }}
                             style={styles.mutualAvatar}
                         />
-                        <ActivityIndicator size="small" color="#ccc" style={{ marginLeft: 'auto', transform: [{ scale: 0.8 }] }} />
                     </Pressable>
                 )}
 
@@ -192,8 +192,7 @@ export default function UserDetailScreen() {
                 </View>
             </View>
 
-            {/* 切换 Tab */}
-            <View type="surface" style={{ borderTopColor: borderColor, borderBottomColor: borderColor, borderBottomWidth: 0.5 }}>
+            <View type="surface" style={{ borderTopWidth: 0.5, borderTopColor: borderColor, borderBottomWidth: 0.5, borderBottomColor: borderColor }}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabBar}>
                     {[
                         { key: 'activities', label: '动态' },
@@ -213,16 +212,30 @@ export default function UserDetailScreen() {
                         </Pressable>
                     ))}
                 </ScrollView>
+                {activeTab === 'answers' && (
+                    <View style={styles.sortBar}>
+                        {[
+                            { key: 'created', label: '最新' },
+                            { key: 'voteups', label: '赞同' },
+                        ].map((item) => (
+                            <Pressable
+                                key={item.key}
+                                onPress={() => setSortBy(item.key as any)}
+                                style={[styles.sortItem, sortBy === item.key && styles.activeSortItem]}
+                            >
+                                <Text style={[styles.sortText, sortBy === item.key && { color: primaryColor, fontWeight: 'bold' }]}>
+                                    {item.label}
+                                </Text>
+                            </Pressable>
+                        ))}
+                    </View>
+                )}
             </View>
         </View>
     );
 
-
     const renderItem = ({ item }: { item: any }) => {
         let displayItem = item;
-        let verb = item.verb;
-        let actionText = item.action_text;
-
         if (activeTab === 'activities') {
             displayItem = item.target || item;
         }
@@ -236,24 +249,22 @@ export default function UserDetailScreen() {
         else if (itemType === 'question') type = 'question';
         else if (itemType === 'pin') type = 'pin';
         else if (itemType === 'zvideo' || itemType === 'video') type = 'video';
+
         return <CreationCard item={displayItem} type={type} />;
     };
-
 
     return (
         <View style={styles.container}>
             <FlashList
                 data={listItems}
                 renderItem={renderItem}
-                {...({ estimatedItemSize: 120 } as any)}
+                estimatedItemSize={120}
                 keyExtractor={(item: any, index: number) => {
-                    const id = item.id || item.target?.id || index;
-                    return `${activeTab}-${id}-${index}`;
+                    const itemId = item.id || item.target?.id || index;
+                    return `${activeTab}-${itemId}-${index}`;
                 }}
                 onEndReached={() => {
-                    if (hasNextPage && !isFetchingNextPage) {
-                        fetchNextPage();
-                    }
+                    if (hasNextPage && !isFetchingNextPage) fetchNextPage();
                 }}
                 onEndReachedThreshold={0.5}
                 ListHeaderComponent={renderHeader}
@@ -313,4 +324,25 @@ const styles = StyleSheet.create({
     },
     mutualText: { fontSize: 13, color: '#666' },
     mutualAvatar: { width: 20, height: 20, borderRadius: 10, marginLeft: 8 },
+    sortBar: {
+        flexDirection: 'row',
+        paddingHorizontal: 15,
+        paddingVertical: 10,
+        backgroundColor: 'rgba(0,0,0,0.01)',
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: '#eee'
+    },
+    sortItem: {
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        marginRight: 10,
+        borderRadius: 4,
+    },
+    activeSortItem: {
+        backgroundColor: 'rgba(0,132,255,0.08)',
+    },
+    sortText: {
+        fontSize: 13,
+        color: '#888',
+    },
 });
