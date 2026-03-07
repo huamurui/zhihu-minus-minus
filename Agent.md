@@ -1,94 +1,72 @@
-这是一份为您整理的项目总结文档 `Agent.md`。它记录了我们从零开始构建这个 **“知乎猫咪版” (Zhihu-RN-Client)** 的所有核心技术细节、架构设计以及填坑指南。
+# 🐱 Agent.md | 项目技术内核与开发手册
 
-你可以将此文档保存在项目根目录下，作为你后续开发或重构的“航海日志”喵！
-
----
-
-# 🐱 Zhihu-RN-Client | 项目开发手册
-
-这是一个基于 **React Native (Expo)** 构建的第三方知乎客户端。项目旨在提供纯净、无广告的阅读体验，并深度适配亮暗模式。
-
-## 🛠 技术栈
-*   **框架**: Expo (SDK 50+) + React Native
-*   **路由**: Expo Router (基于文件系统的强类型路由)
-*   **数据流**: TanStack Query v5 (原 React Query)
-*   **网络**: Axios (配置 Cookie 拦截与 User-Agent 伪装)
-*   **状态管理**: Zustand (持久化存储主题状态)
-*   **性能列表**: @shopify/flash-list (高性能丝滑滚动)
-*   **动画**: React Native Reanimated (点赞缩放、平滑过渡)
-*   **样式**: StyleSheet (知乎蓝品牌色: `#0084ff`)
-
-## 📂 项目结构
-```text
-/
-├── app/                    # Expo Router 路由目录
-│   ├── (tabs)/             # 底部 Tab 组 (首页、日报、我的)
-│   ├── article/            # 知乎日报详情页 [id].tsx
-│   ├── question/           # 问题详情页 [id].tsx
-│   ├── answer/             # 回答详情页 [id].tsx
-│   ├── user/               # 用户主页 [id].tsx
-│   ├── comments/           # 评论列表与二级回复
-│   ├── login.tsx           # WebView 登录拦截页
-│   └── _layout.tsx         # 全局 Providers 与路由栈配置
-├── src/
-│   ├── api/                # Axios 实例与请求拦截器
-│   ├── components/         # 公共组件 (FeedCard, LikeButton 等)
-│   ├── store/              # Zustand 主题存储
-│   └── constants/          # 颜色、API 地址常量
-└── Agent.md                # 本开发手册
-```
-
-## 🔐 核心逻辑实现
-
-### 1. 登录与 Cookie 拦截
-*   **实现方式**: 使用 `react-native-webview` 加载知乎登录页。
-*   **逻辑**: 注入 JavaScript 定时抓取 `document.cookie`，检测到 `z_c0` (Token) 后使用 `expo-secure-store` 持久化，并自动 `router.back()`。
-*   **关键点**: `x-xsrf-token` 需从 Cookie 中动态提取，用于 `POST` 评论等操作。
-
-### 2. API 适配与绕过 403/404
-*   **404 修复**: 区分 `Question ID` 与 `Answer ID`。在首页解析时，确保点击标题跳转时使用的是 `target.question.id`。
-*   **403 规避**: 
-    *   伪装 `User-Agent` 为真实移动端浏览器。
-    *   配置 `Referer: https://www.zhihu.com/`。
-    *   精简 `include` 查询参数，避免触发 `x-zse-96` 高级签名校验。
-
-### 3. 全局主题切换 (Theming)
-*   **状态管理**: Zustand 监听系统配色并支持手动开关。
-
-### 4. 交互细节
-*   **FeedCard**: 采用多热区点击设计（头像->用户、标题->问题、内容->回答）。
-*   **LikeButton**: 基于 Reanimated 的 `withSequence` 实现点赞震动反馈与缩放动画。
-*   **评论系统**: 支持展示 `child_comments` 及其对应的回复关系。
-
-## 🚀 快速启动指南
-2.  **路径别名**:
-    确保 `tsconfig.json` 配置了 `"@/*": ["./src/*"]`。
-3.  **启动项目**:
-    ```bash
-    npx expo start -c
-    ```
----
-**Status**: 核心阅读功能已完成（v0.5-alpha）
-**Author**: 猫咪程序员与他的 Agent 助手 🐱
+本文档是 **Zhihu--** (Zhihu Minus Minus) 项目的核心知识库，也是 Antigravity 与人类合作伙伴共同演进的“航海日志”。它为全系项目的后续维护、功能扩展及 Agent 协助开发提供最高优先级的参考指引。
 
 ---
 
-**Next Step**:  
- - zse 加密接口实现
- - 看看有没有办法拿到那个 httpOnly cookie... z_c0
- - 各页面及交互功能继续补充，实现搜索
- 
+## 🧭 项目架构蓝图
 
---- 
+### 1. 通信枢纽 (Networking)
+- **核心引擎**: `Axios` + `React Query V5`。
+- **签名逻辑**: 集成 `x-zse-96` 签名算法与 `x-zse-93` (ZSE_VERSION: `101_3_3.0`)。拦截器位于 `api/client.ts`。
+- **Cookie 策略**: 使用 `react-native-cookies` 在 iOS/Android 原生层拦截 `z_c0` (身份令牌) 与 `d_c0` (设备/加签因子)。
+- **User-Agent**: 精确模拟移动端 Chrome 146.0+，以规避大部分 403 频率限制。
 
-获取 webview httpOnly cookie 要用的 "@react-native-cookies/cookies" 这种库... 它和 expo 可能没有贴贴的那么好，或者这个功能需要更原生的支持，反正用了这个之后不能扫码看结果开发了...  要接 adb 或者模拟安卓机
+### 2. 状态指挥部 (State Management)
+- **Zustand (Global)**:
+  - `useAuthStore`: 管理登录凭据与全局身份态。
+  - `useThemeStore`: 控制亮/暗模式（自动跟随系统及手动覆盖）。
 
-todo:
-- 首页热榜的跳转有的信息能跳有的不行，不知道为啥
-- 许多接口还在 403 乃至 404
-  - 个人页面的回答(最新/赞同)
-  - 我的收藏我的点赞
-  - 评论区的交互
-- 关注列表相关
-- 消息通知
-- 搜索功能
+### 3. UI 施工指南 (Design System)
+- **NativeWind**: 统一的原子化样式方案。配置文件位于 `tailwind.config.js`。
+- **FlashList**: 强制要求在所有 Feed、评论、通知列表项目中使用 `FlashList`，以保证列表帧率。
+- **Colors**: 色彩定义详见 `constants/Colors.ts`，主色调知乎蓝 `#0084ff`。
+
+---
+
+## 🛠️ 关键业务逻辑拆解
+
+### 🔐 自动登录与绕过
+- **原理**: 嵌入式 `WebView` 捕获拦截。
+- **链路**: 
+  - 用户手动进入 `login/` 路由。
+  - 登录完成后，拦截器检测到 Cookie 重载或 `z_c0` 存在。
+  - 通过 `expo-secure-store` 存储 `user_cookies`。
+  - 后续请求自动注入 `Cookie`, `Referer: https://www.zhihu.com/`。
+
+### 🧩 资源 ID 与路由解析
+- 在解析首页/推荐 Feed 时，需从 `target` 对象中动态探测类型：
+  - `question`: 跳转路径 `/question/[id]`
+  - `answer`: 跳转路径 `/answer/[id]` (需携带 `question_id`)
+  - `article`: 跳转路径 `https://zhuanlan.zhihu.com/p/[id]`
+- **核心规则**: 始终优先通过 `target.question.id` 进行跳转，防止 404 失效 ID。
+
+---
+
+## 🏛️ 项目演进里程碑 (Changelog)
+
+- **v0.5.0**: 重构 `user/` 模块，新增“我的收藏”、“我的点赞”及通知聚合。
+- **v0.4.5**: 完成浏览历史持久化 (`history.tsx`)。
+- **v0.4.0**: X-ZSE-96 加签逻辑首发上线，修复大部分 403 错误。
+- **v0.3.x**: 实现评论二级架构与触感反馈集成。
+
+---
+
+## 📝 开发者/Agent 待办 (TODO)
+
+- [ ] **搜索增强**: 适配 ZSE 加签的搜索接口封装。
+- [ ] **富文本对齐**: 修复 `react-native-render-html` 在暗黑模式下某些 HTML 实体的配色冲突。
+- [ ] **离线化**: 针对知乎日报实现更激进的 `React Query` 持久化缓存。
+- [ ] **打包优化**: 针对 Android AAB 精简无用 Native Modules。
+
+---
+
+## ⚠️ 避坑锦囊 (Gotchas)
+
+1. **403 Forbidden**: 如果签名逻辑正常，检查 `include` 参数。复杂的 `include` 可能会触发更严格的 ZSE 校验位。
+2. **FlashList Layout**: 如果列表底部留白异常，检查 `contentContainerStyle` 与 `paddingBottom`。
+3. **Cookie Sync**: `WebView` 与 `Axios` 的 Cookie 同步在部分 Android 版本上有延迟，建议手动触发一次 `SecureStore` 重刷。
+
+---
+**Status**: 🚀 开发阶段 v0.6-Beta  
+**Last Updated**: 2026-03-07  
