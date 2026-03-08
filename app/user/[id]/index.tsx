@@ -1,11 +1,12 @@
-import { followMember, getMe, getMember, getMemberActivities, getMemberRelations, unfollowMember } from '@/api/zhihu';
+import { followMember, getMe, getMember, getMemberActivities, getMemberRelations, searchContent, unfollowMember } from '@/api/zhihu';
 import { CreationCard } from '@/components/CreationCard';
 import { Text, useThemeColor, View } from '@/components/Themed';
+import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 
 export default function UserDetailScreen() {
     const { id } = useLocalSearchParams();
@@ -14,6 +15,15 @@ export default function UserDetailScreen() {
     const [activeTab, setActiveTab] = useState<'activities' | 'answers' | 'questions' | 'articles' | 'pins'>('activities');
     const [sortBy, setSortBy] = useState<'created' | 'voteups'>('created');
     const [followLoading, setFollowLoading] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchQuery(searchQuery);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
 
     useEffect(() => {
         navigation.setOptions({ title: '个人主页' });
@@ -97,6 +107,62 @@ export default function UserDetailScreen() {
     });
 
     const listItems = listData?.pages.flatMap(page => page.data) || [];
+
+    // 3. 搜索创作 (Infinite Query)
+    const {
+        data: searchResults,
+        fetchNextPage: fetchNextSearchPage,
+        hasNextPage: hasNextSearchPage,
+        isFetchingNextPage: isFetchingNextSearchPage,
+        isLoading: searchLoading,
+        refetch: refetchSearch
+    } = useInfiniteQuery({
+        queryKey: ['user-creations-search', user?.id, debouncedSearchQuery],
+        queryFn: ({ pageParam = 0 }) => searchContent(debouncedSearchQuery, pageParam as number, 20, 'general', {
+            restricted_scene: 'member',
+            restricted_field: 'member_hash_id',
+            restricted_value: user?.id
+        }),
+        enabled: debouncedSearchQuery.length > 0 && !!user?.id,
+        initialPageParam: 0,
+        getNextPageParam: (lastPage) => {
+            if (lastPage.paging?.is_end) return undefined;
+            const nextUrl = lastPage.paging?.next;
+            const match = nextUrl?.match(/offset=(\d+)/);
+            return match ? parseInt(match[1]) : undefined;
+        }
+    });
+
+    const isSearching = debouncedSearchQuery.length > 0;
+    const currentListItems = isSearching
+        ? searchResults?.pages.flatMap(page => page.data || []) || []
+        : listItems;
+
+    const HighlightText = (text: string, highlightColor: string = primaryColor) => {
+        if (!text) return '';
+        const decodedText = text
+            .replace(/&lt;em&gt;/g, '[[EM]]').replace(/&lt;\/em&gt;/g, '[[/EM]]')
+            .replace(/<em>/g, '[[EM]]').replace(/<\/em>/g, '[[/EM]]')
+            .replace(/&quot;/g, '"').replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+            .replace(/&nbsp;/g, ' ');
+
+        const parts = decodedText.split(/(\[\[EM\]\].*?\[\[\/EM\]\])/gs);
+        return (
+            <React.Fragment>
+                {parts.map((part, i) => {
+                    if (part.startsWith('[[EM]]') && part.endsWith('[[/EM]]')) {
+                        return (
+                            <Text key={i} style={{ color: highlightColor, fontWeight: 'bold' }}>
+                                {part.replace(/\[\[\/?EM\]\]/g, '')}
+                            </Text>
+                        );
+                    }
+                    return part;
+                })}
+            </React.Fragment>
+        );
+    };
 
     const handleFollow = async () => {
         if (followLoading) return;
@@ -184,8 +250,28 @@ export default function UserDetailScreen() {
                 </View>
             </View>
 
+            {/* 创作搜索栏 */}
+            <View type="surface" style={styles.searchBarRow}>
+                <View style={[styles.searchBarContainer, { backgroundColor: borderColor + '22' }]}>
+                    <Ionicons name="search" size={16} color="#999" style={{ marginLeft: 10 }} />
+                    <TextInput
+                        style={[styles.searchInput, { color: useThemeColor({}, 'text') }]}
+                        placeholder={`搜索 ${user?.name || '用户'} 的创作...`}
+                        placeholderTextColor="#999"
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        returnKeyType="search"
+                    />
+                    {searchQuery.length > 0 && (
+                        <Pressable onPress={() => setSearchQuery('')} style={{ marginRight: 10 }}>
+                            <Ionicons name="close-circle" size={16} color="#ccc" />
+                        </Pressable>
+                    )}
+                </View>
+            </View>
+
             <View type="surface" style={{ borderTopWidth: 0.5, borderTopColor: borderColor, borderBottomWidth: 0.5, borderBottomColor: borderColor }}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabBar}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.tabBar, isSearching && { opacity: 0.5 }]}>
                     {[
                         { key: 'activities', label: '动态' },
                         { key: 'answers', label: '回答', count: user?.answer_count },
@@ -195,16 +281,23 @@ export default function UserDetailScreen() {
                     ].map((tab) => (
                         <Pressable
                             key={tab.key}
-                            onPress={() => setActiveTab(tab.key as any)}
-                            style={[styles.tabItem, activeTab === tab.key && { borderBottomWidth: 2, borderBottomColor: primaryColor }]}
+                            onPress={() => {
+                                if (!isSearching) setActiveTab(tab.key as any);
+                            }}
+                            style={[styles.tabItem, !isSearching && activeTab === tab.key && { borderBottomWidth: 2, borderBottomColor: primaryColor }]}
                         >
-                            <Text style={[styles.tabText, activeTab === tab.key && { color: primaryColor }]}>
+                            <Text style={[styles.tabText, !isSearching && activeTab === tab.key && { color: primaryColor }]}>
                                 {tab.label} {tab.count !== undefined && tab.count > 0 ? tab.count : ''}
                             </Text>
                         </Pressable>
                     ))}
                 </ScrollView>
-                {activeTab === 'answers' && (
+                {isSearching && (
+                    <View style={styles.searchHeader}>
+                        <Text style={{ fontSize: 13, fontWeight: 'bold', color: primaryColor }}>搜索结果</Text>
+                    </View>
+                )}
+                {!isSearching && activeTab === 'answers' && (
                     <View style={styles.sortBar}>
                         {[
                             { key: 'created', label: '最新' },
@@ -227,6 +320,33 @@ export default function UserDetailScreen() {
     );
 
     const renderItem = ({ item }: { item: any }) => {
+        if (isSearching) {
+            const obj = item.object;
+            const highlight = item.highlight || {};
+            if (!obj) return null;
+
+            let type: 'answer' | 'article' | 'question' | 'pin' | 'video' = 'answer';
+            if (obj.type === 'article') type = 'article';
+            else if (obj.type === 'question') type = 'question';
+            else if (obj.type === 'pin') type = 'pin';
+            else if (obj.type === 'zvideo') type = 'video';
+
+            // 如果有高亮，则构造一个带标题和内容的项
+            const displayItem = {
+                ...obj,
+                // 为了让 CreationCard 显示标题，如果原 object 里没有 title，尝试从 highlight 里拿，虽然 CreationCard 也是按这个逻辑
+                title: highlight.title ? highlight.title.replace(/<[^>]+>/g, '') : obj.title
+            };
+
+            return (
+                <CreationCard
+                    item={displayItem}
+                    type={type}
+                    excerpt={highlight.description ? HighlightText(highlight.description) as any : undefined}
+                />
+            );
+        }
+
         let displayItem = item;
         if (activeTab === 'activities') {
             displayItem = item.target || item;
@@ -248,7 +368,7 @@ export default function UserDetailScreen() {
     return (
         <View style={styles.container}>
             <FlashList
-                data={listItems}
+                data={currentListItems}
                 renderItem={renderItem}
                 {...({ estimatedItemSize: 120 } as any)}
                 keyExtractor={(item: any, index: number) => {
@@ -256,30 +376,34 @@ export default function UserDetailScreen() {
                     return `${activeTab}-${itemId}-${index}`;
                 }}
                 onEndReached={() => {
-                    if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+                    if (isSearching) {
+                        if (hasNextSearchPage && !isFetchingNextSearchPage) fetchNextSearchPage();
+                    } else {
+                        if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+                    }
                 }}
                 onEndReachedThreshold={0.5}
                 ListHeaderComponent={renderHeader}
                 ListFooterComponent={() => (
-                    isFetchingNextPage ? (
+                    (isFetchingNextPage || isFetchingNextSearchPage) ? (
                         <ActivityIndicator style={{ margin: 20 }} color={primaryColor} />
                     ) : (
-                        listItems.length > 0 && !hasNextPage ? (
+                        currentListItems.length > 0 && !(isSearching ? hasNextSearchPage : hasNextPage) ? (
                             <Text type="secondary" style={styles.footerMsg}>— 已经到底了喵 —</Text>
                         ) : null
                     )
                 )}
                 ListEmptyComponent={() => (
                     <View style={styles.empty}>
-                        {listLoading ? (
+                        {listLoading || searchLoading ? (
                             <ActivityIndicator size="small" color={primaryColor} />
                         ) : (
-                            <Text type="secondary">这里空空如也喵</Text>
+                            <Text type="secondary">{isSearching ? '没有找到匹配的创作' : '这里空空如也喵'}</Text>
                         )}
                     </View>
                 )}
-                onRefresh={refetchList}
-                refreshing={isRefetching}
+                onRefresh={isSearching ? refetchSearch : refetchList}
+                refreshing={isSearching ? false : isRefetching}
             />
         </View>
     );
@@ -337,4 +461,28 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: '#888',
     },
+    searchBarRow: {
+        paddingHorizontal: 15,
+        paddingBottom: 15,
+        paddingTop: 5,
+    },
+    searchBarContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        height: 36,
+        borderRadius: 18,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 14,
+        paddingHorizontal: 10,
+        height: '100%',
+    },
+    searchHeader: {
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: '#eee',
+        backgroundColor: 'rgba(0,132,255,0.05)',
+    }
 });
