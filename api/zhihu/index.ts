@@ -9,4 +9,6 @@ export * from './member';
 export * from './notification';
 export * from './search';
 export * from './voters';
+export * from './question';
+
 

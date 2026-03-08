@@ -1,4 +1,4 @@
-import { createAnswerComment, createCommentReply, getAnswerComments } from '@/api/zhihu';
+import { createAnswerComment, createQuestionComment, createCommentReply, getAnswerComments, getQuestionComments } from '@/api/zhihu';
 import { LikeButton } from '@/components/LikeButton';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,7 +10,7 @@ import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressa
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function CommentScreen() {
-  const { id } = useLocalSearchParams(); // Answer ID
+  const { id, type } = useLocalSearchParams(); // Content ID and Type ('question' or 'answer')
   const router = useRouter();
   const [inputText, setInputText] = useState('');
   const [replyTo, setReplyTo] = useState<{ id: string, name: string } | null>(null);
@@ -24,8 +24,13 @@ export default function CommentScreen() {
 
   // 1. 获取评论数据
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ['comments', id],
-    queryFn: () => getAnswerComments(id as string)
+    queryKey: ['comments', id, type],
+    queryFn: () => {
+      if (type === 'question') {
+        return getQuestionComments(id as string);
+      }
+      return getAnswerComments(id as string);
+    }
   });
 
   const comments = data?.data || [];
@@ -38,6 +43,9 @@ export default function CommentScreen() {
         return createCommentReply(replyTo.id, content);
       } else {
         // 发布根评论
+        if (type === 'question') {
+          return createQuestionComment(id as string, content);
+        }
         return createAnswerComment(id as string, content);
       }
     },

@@ -14,6 +14,12 @@ function getDc0(cookie: string) {
   return match ? match[1] : null;
 }
 
+function getXsrf(cookie: string) {
+  const match = cookie.match(/_xsrf=([^;]+)/);
+  return match ? match[1] : null;
+}
+
+
 apiClient.interceptors.request.use(async (config) => {
   // 优先从 AuthStore 获取，如果没有再尝试从 SecureStore (向下兼容)
   const cookie = useAuthStore.getState().cookies || (await SecureStore.getItemAsync('user_cookies')) || '';
@@ -22,7 +28,12 @@ apiClient.interceptors.request.use(async (config) => {
     config.headers['Cookie'] = cookie;
     const dc0 = getDc0(cookie);
     if (dc0) {
+      const xsrf = getXsrf(cookie);
+      if (xsrf) {
+        config.headers['x-xsrftoken'] = xsrf;
+      }
       const body = config.data ? (typeof config.data === 'string' ? config.data : JSON.stringify(config.data)) : null;
+
       const fullUrl = apiClient.getUri(config);
       const zse96 = await signRequest96(fullUrl, body, cookie);
       config.headers['x-zse-96'] = zse96;

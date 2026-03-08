@@ -44,3 +44,16 @@ export const voteComment = async (id: string | number, type: 'up' | 'neutral') =
         return res.data;
     }
 };
+export const getQuestionComments = async (id: string | number, limit = 20, offset = 0) => {
+    const include = 'data[*].author,content,child_comment_count,child_comments,vote_count,created_time';
+    const res = await apiClient.get(`/questions/${id}/root_comments?limit=${limit}&offset=${offset}&include=${include}`);
+    return res.data;
+};
+
+export const createQuestionComment = async (id: string | number, content: string) => {
+    const res = await apiClient.post(`/questions/${id}/comments`, {
+        content,
+        type: 'comment'
+    });
+    return res.data;
+};
