@@ -1,6 +1,6 @@
+import { getDailyDetail } from '@/api/zhihu';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { useQuery } from '@tanstack/react-query';
-import axios from 'axios';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import React from 'react';
 import { Image, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
@@ -14,10 +14,7 @@ export default function ArticleDetail() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['article', id],
-    queryFn: async () => {
-      const res = await axios.get(`https://news-at.zhihu.com/api/4/news/${id}`);
-      return res.data;
-    }
+    queryFn: () => getDailyDetail(id as string)
   });
 
   if (isLoading) return <View style={styles.center}><Text>正赶往知识的荒原...喵</Text></View>;

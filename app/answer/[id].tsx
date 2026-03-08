@@ -1,4 +1,4 @@
-import apiClient from '@/api/client';
+import { getAnswer } from '@/api/zhihu';
 import { LikeButton } from '@/components/LikeButton';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,11 +28,7 @@ export default function AnswerDetailScreen() {
   // 1. 扩充 API 请求：一次性拿齐问题标题、作者详情、回答内容
   const { data: answer, isLoading } = useQuery({
     queryKey: ['answer-detail', id],
-    queryFn: async () => {
-      const include = 'content,voteup_count,comment_count,author.headline,author.follower_count,author.badge,question.title,relationship.voting';
-      const res = await apiClient.get(`/answers/${id}?include=${include}`);
-      return res.data;
-    }
+    queryFn: () => getAnswer(id as string)
   });
 
   if (isLoading) return (

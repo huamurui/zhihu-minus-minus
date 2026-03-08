@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 
 // 导入我们之前定义的组件和 Store
-import apiClient from '@/api/client';
+import { getMe } from '@/api/zhihu';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { useThemeStore } from '@/store/useThemeStore';
 import CookieManager from '@react-native-cookies/cookies';
@@ -29,14 +29,7 @@ export default function ProfileScreen() {
   // 1. 获取个人详细信息 (使用 API 抓取真实数据)
   const { data: me, isLoading, refetch } = useQuery({
     queryKey: ['me'],
-    queryFn: async () => {
-      try {
-        const res = await apiClient.get('/me?include=url_token,answer_count,articles_count,follower_count,following_count,headline,description,voteup_count,thanked_count');
-        return res.data;
-      } catch (e) {
-        return null;
-      }
-    },
+    queryFn: () => getMe()
   });
 
   useFocusEffect(

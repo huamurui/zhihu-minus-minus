@@ -1,4 +1,4 @@
-import apiClient from '@/api/client';
+import { getMemberFollowing } from '@/api/zhihu';
 import { Text, View } from '@/components/Themed';
 import { UserCard } from '@/components/UserCard';
 import { FlashList } from '@shopify/flash-list';
@@ -21,11 +21,7 @@ export default function FollowingScreen() {
         isRefetching
     } = useInfiniteQuery({
         queryKey: ['user-following', id],
-        queryFn: async ({ pageParam = 0 }) => {
-            // 知乎关注的人接口通常是 followees
-            const res = await apiClient.get(`/members/${id}/followees?limit=20&offset=${pageParam}`);
-            return res.data;
-        },
+        queryFn: ({ pageParam = 0 }) => getMemberFollowing(id as string, 20, pageParam as number),
         initialPageParam: 0,
         getNextPageParam: (lastPage) => {
             if (!lastPage || lastPage.paging?.is_end) return undefined;

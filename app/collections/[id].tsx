@@ -1,4 +1,4 @@
-import apiClient from '@/api/client';
+import { getCollection, getCollectionDetail } from '@/api/zhihu';
 import { CreationCard } from '@/components/CreationCard';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { FlashList } from '@shopify/flash-list';
@@ -20,10 +20,7 @@ export default function CollectionDetailScreen() {
     // 1. 获取收藏夹基本信息
     const { data: collection } = useQuery({
         queryKey: ['collection-detail', id],
-        queryFn: async () => {
-            const res = await apiClient.get(`/collections/${id}`);
-            return res.data;
-        }
+        queryFn: () => getCollection(id as string)
     });
 
     // 2. 获取收藏夹内容
@@ -37,10 +34,7 @@ export default function CollectionDetailScreen() {
         isRefetching
     } = useInfiniteQuery({
         queryKey: ['collection-contents', id],
-        queryFn: async ({ pageParam = 0 }) => {
-            const res = await apiClient.get(`/collections/${id}/contents?limit=20&offset=${pageParam}&include=data[*].content,voteup_count,comment_count,created_time,updated_time,excerpt,question.title,relationship.voting`);
-            return res.data;
-        },
+        queryFn: ({ pageParam = 0 }) => getCollectionDetail(id as string, 20, pageParam as number),
         initialPageParam: 0,
         getNextPageParam: (lastPage) => {
             if (!lastPage || lastPage.paging?.is_end) return undefined;

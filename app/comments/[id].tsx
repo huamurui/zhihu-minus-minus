@@ -1,4 +1,4 @@
-import apiClient from '@/api/client';
+import { createAnswerComment, createCommentReply, getAnswerComments } from '@/api/zhihu';
 import { LikeButton } from '@/components/LikeButton';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,30 +25,20 @@ export default function CommentScreen() {
   // 1. 获取评论数据
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['comments', id],
-    queryFn: async () => {
-      // 增加 include 参数以获取更多信息
-      const res = await apiClient.get(`/answers/${id}/root_comments?limit=20&include=data[*].author,content,child_comment_count,child_comments,vote_count,created_time`);
-      return res.data;
-    }
+    queryFn: () => getAnswerComments(id as string)
   });
 
   const comments = data?.data || [];
 
   // 2. 发布评论/回复 Mutation
   const mutation = useMutation({
-    mutationFn: async (content: string) => {
+    mutationFn: (content: string) => {
       if (replyTo) {
         // 回复评论
-        return await apiClient.post(`/comments/${replyTo.id}/replies`, {
-          content: content,
-          type: 'comment'
-        });
+        return createCommentReply(replyTo.id, content);
       } else {
         // 发布根评论
-        return await apiClient.post(`/answers/${id}/comments`, {
-          content: content,
-          type: 'comment'
-        });
+        return createAnswerComment(id as string, content);
       }
     },
     onSuccess: () => {

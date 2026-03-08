@@ -1,4 +1,4 @@
-import apiClient from '@/api/client';
+import { getMyLikes } from '@/api/zhihu';
 import { CreationCard } from '@/components/CreationCard';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { FlashList } from '@shopify/flash-list';
@@ -27,11 +27,7 @@ export default function MyLikesScreen() {
         isRefetching
     } = useInfiniteQuery({
         queryKey: ['my-likes', activeTab],
-        queryFn: async ({ pageParam = 0 }) => {
-            const endpoint = activeTab === 'answers' ? 'voted_answers' : 'voted_articles';
-            const res = await apiClient.get(`/members/me/${endpoint}?limit=20&offset=${pageParam}&include=data[*].content,voteup_count,comment_count,created_time,updated_time,excerpt,question.title,relationship.voting`);
-            return res.data;
-        },
+        queryFn: ({ pageParam = 0 }) => getMyLikes(activeTab, 20, pageParam as number),
         initialPageParam: 0,
         getNextPageParam: (lastPage) => {
             if (!lastPage || lastPage.paging?.is_end) return undefined;

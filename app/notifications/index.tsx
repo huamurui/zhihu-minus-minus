@@ -1,4 +1,4 @@
-import apiClient from '@/api/client';
+import { getNotifications } from '@/api/zhihu';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
@@ -27,12 +27,7 @@ export default function NotificationScreen() {
     isRefetching
   } = useInfiniteQuery({
     queryKey: ['notifications'],
-    queryFn: async ({ pageParam = '' }) => {
-      // 知乎通知 API
-      const url = pageParam || '/notifications/v3/timeline?limit=20';
-      const res = await apiClient.get(url);
-      return res.data;
-    },
+    queryFn: ({ pageParam = '' }) => getNotifications(pageParam as string),
     initialPageParam: '',
     getNextPageParam: (lastPage) => {
       if (!lastPage || lastPage.paging?.is_end) return undefined;

@@ -1,4 +1,4 @@
-import apiClient from '@/api/client';
+import { voteContent } from '@/api/zhihu';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
@@ -45,16 +45,11 @@ export const LikeButton = ({
 
     setLoading(true);
     try {
-      if (type === 'pins') {
-        if (nextVoted === 1) {
-          await apiClient.post(`/pins/${id}/reactions`, { type: 'like' });
-        } else {
-          await apiClient.delete(`/pins/${id}/reactions`);
-        }
-      } else {
-        const voteType = nextVoted === 1 ? 'up' : 'neutral';
-        await apiClient.post(`/${type}/${id}/voters`, { type: voteType });
-      }
+      const voteType = type === 'pins'
+        ? (nextVoted === 1 ? 'like' : 'unlike')
+        : (nextVoted === 1 ? 'up' : 'neutral');
+
+      await voteContent(id, type, voteType as any);
 
       // 更新状态
       setVoted(nextVoted);

@@ -5,16 +5,10 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 
 // 使用 @ 别名导入组件
-import apiClient from '@/api/client';
+import { FEED_URLS, getFeed } from '@/api/zhihu';
 import { FeedCard } from '@/components/FeedCard';
 import { HotCard, HotItem } from '@/components/HotCard';
 import { Text, View, useThemeColor } from '@/components/Themed';
-
-const API_CONFIG = {
-  following: 'https://www.zhihu.com/api/v3/moments?limit=10',
-  recommend: 'https://www.zhihu.com/api/v3/feed/topstory/recommend?limit=10',
-  hot: 'https://www.zhihu.com/api/v3/feed/topstory/hot-lists/total?limit=50'
-};
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -24,10 +18,10 @@ export default function HomeScreen() {
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, refetch } = useInfiniteQuery({
     queryKey: ['zhihu-feed', activeTab],
-    queryFn: async ({ pageParam = API_CONFIG[activeTab] }) => {
+    queryFn: async ({ pageParam = FEED_URLS[activeTab] }) => {
       try {
-        const res = await apiClient.get(pageParam);
-        const rawItems = res.data.data || [];
+        const data = await getFeed(pageParam as string);
+        const rawItems = data.data || [];
 
         let items;
         if (activeTab === 'following') {
@@ -40,14 +34,14 @@ export default function HomeScreen() {
 
         return {
           items,
-          nextUrl: res.data.paging?.next?.replace('http://', 'https://')
+          nextUrl: data.paging?.next?.replace('http://', 'https://')
         };
       } catch (e: any) {
         console.log(`❌ API ${activeTab} 失败:`, e.response?.status || e.message);
         return { items: [], nextUrl: null };
       }
     },
-    initialPageParam: API_CONFIG[activeTab],
+    initialPageParam: FEED_URLS[activeTab],
     getNextPageParam: (lastPage) => lastPage.nextUrl,
   });
 

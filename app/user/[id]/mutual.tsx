@@ -1,4 +1,4 @@
-import apiClient from '@/api/client';
+import { getMemberMutual } from '@/api/zhihu';
 import { Text, View } from '@/components/Themed';
 import { UserCard } from '@/components/UserCard';
 import { FlashList } from '@shopify/flash-list';
@@ -21,11 +21,7 @@ export default function MutualFollowersScreen() {
         isRefetching
     } = useInfiniteQuery({
         queryKey: ['user-mutual', id],
-        queryFn: async ({ pageParam = 0 }) => {
-            // 共同关注接口使用 mutual-followees
-            const res = await apiClient.get(`/members/${id}/mutual-followees?limit=20&offset=${pageParam}`);
-            return res.data;
-        },
+        queryFn: ({ pageParam = 0 }) => getMemberMutual(id as string, 20, pageParam as number),
         initialPageParam: 0,
         getNextPageParam: (lastPage) => {
             if (!lastPage || lastPage.paging?.is_end) return undefined;

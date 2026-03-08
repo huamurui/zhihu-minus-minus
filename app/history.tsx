@@ -1,4 +1,4 @@
-import apiClient from '@/api/client';
+import { getReadHistory } from '@/api/zhihu';
 import { Text, View } from '@/components/Themed';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery } from '@tanstack/react-query';
@@ -18,11 +18,7 @@ export default function HistoryScreen() {
         isRefetching
     } = useInfiniteQuery({
         queryKey: ['read-history'],
-        queryFn: async ({ pageParam = 0 }) => {
-            // 知乎最近浏览接口
-            const res = await apiClient.get(`/unify-consumption/read_history?limit=20&offset=${pageParam}`);
-            return res.data;
-        },
+        queryFn: ({ pageParam = 0 }) => getReadHistory(20, pageParam as number),
         initialPageParam: 0,
         getNextPageParam: (lastPage: any) => {
             if (!lastPage || lastPage.paging?.is_end) return undefined;

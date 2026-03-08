@@ -1,7 +1,7 @@
+import { getDailyBefore, getDailyLatest } from '@/api/zhihu';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { FlashList } from "@shopify/flash-list";
 import { useInfiniteQuery } from '@tanstack/react-query';
-import axios from 'axios';
 import { useRouter } from 'expo-router';
 import React, { useMemo } from 'react';
 import { Dimensions, Image, Pressable, StyleSheet } from 'react-native';
@@ -47,10 +47,11 @@ export default function DailyScreen() {
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, refetch } = useInfiniteQuery({
     queryKey: ['zhihu-daily'],
-    queryFn: async ({ pageParam = '' }) => {
-      const url = pageParam ? `https://news-at.zhihu.com/api/4/news/before/${pageParam}` : `https://news-at.zhihu.com/api/4/news/latest`;
-      const res = await axios.get(url);
-      return res.data;
+    queryFn: ({ pageParam = '' }) => {
+      if (pageParam) {
+        return getDailyBefore(pageParam as string);
+      }
+      return getDailyLatest();
     },
     initialPageParam: '',
     getNextPageParam: (lastPage) => lastPage.date,

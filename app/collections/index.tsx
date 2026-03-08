@@ -1,4 +1,4 @@
-import apiClient from '@/api/client';
+import { getMyCollections } from '@/api/zhihu';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
@@ -27,10 +27,7 @@ export default function MyCollectionsScreen() {
         isRefetching
     } = useInfiniteQuery({
         queryKey: ['my-collections'],
-        queryFn: async ({ pageParam = 0 }) => {
-            const res = await apiClient.get(`/members/me/collections?limit=20&offset=${pageParam}`);
-            return res.data;
-        },
+        queryFn: ({ pageParam = 0 }) => getMyCollections(20, pageParam as number),
         initialPageParam: 0,
         getNextPageParam: (lastPage) => {
             if (!lastPage || lastPage.paging?.is_end) return undefined;

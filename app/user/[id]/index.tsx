@@ -1,6 +1,6 @@
-import apiClient from '@/api/client';
+import { followMember, getMe, getMember, getMemberActivities, getMemberRelations, unfollowMember } from '@/api/zhihu';
 import { CreationCard } from '@/components/CreationCard';
-import { Text, View, useThemeColor } from '@/components/Themed';
+import { Text, useThemeColor, View } from '@/components/Themed';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
@@ -25,27 +25,21 @@ export default function UserDetailScreen() {
     // 0. 获取 "我" 的信息 (用于判断是否是自己)
     const { data: me } = useQuery({
         queryKey: ['me'],
-        queryFn: async () => {
-            const res = await apiClient.get('/me');
-            return res.data;
-        }
+        queryFn: () => getMe()
     });
 
     const isMe = me?.id === id;
 
     // 1. 获取用户信息
-    const userInclude = 'url_token,answer_count,articles_count,question_count,pins_count,follower_count,following_count,headline,cover_url,description,voteup_count,thanked_count,favorited_count,is_following,mutual_followees_count';
     const { data: user, refetch: refetchUser } = useQuery({
         queryKey: ['user-detail', id],
         queryFn: async () => {
             try {
-                const res = await apiClient.get(`/members/${id}?include=${userInclude}`);
-                return res.data;
+                return await getMember(id as string);
             } catch (err: any) {
                 if (err.response?.status === 403) {
                     const fallbackInclude = 'follower_count,headline,cover_url,description,answer_count,articles_count';
-                    const res = await apiClient.get(`/members/${id}?include=${fallbackInclude}`);
-                    return res.data;
+                    return await getMember(id as string, fallbackInclude);
                 }
                 return null;
             }
@@ -67,33 +61,26 @@ export default function UserDetailScreen() {
             try {
                 const targetId = user?.url_token || id;
                 if (activeTab === 'activities') {
-                    // 动态 API
-                    const url = `https://www.zhihu.com/api/v3/moments/${targetId}/activities?limit=20&offset=${pageParam}`;
-                    const res = await apiClient.get(url, {
-                        headers: {
-                            'x-api-version': '3.0.40'
-                        }
-                    });
-                    return res.data;
+                    return await getMemberActivities(targetId, 20, pageParam as number);
                 }
 
-                let endpoint = `/members/${targetId}/${activeTab}`;
                 let include = '';
-
                 if (activeTab === 'answers') {
-                    endpoint = `/members/${targetId}/answers?sort_by=${sortBy}`;
                     include = 'data[*].content,voteup_count,comment_count,created_time,updated_time,excerpt,question.title,relationship.voting,relationship.is_thanked';
                 } else if (activeTab === 'questions') {
                     include = 'data[*].created,answer_count,follower_count,author,admin_closed_comment,relationship.is_following';
                 } else if (activeTab === 'articles') {
                     include = 'data[*].comment_count,content,voteup_count,created,updated,title,excerpt,relationship.voting';
                 } else if (activeTab === 'pins') {
-                    endpoint = `/members/${targetId}/pins`;
                     include = 'data[*].content,reaction_count,comment_count,created,relationship.voting';
                 }
 
-                const res = await apiClient.get(`${endpoint}${endpoint.includes('?') ? '&' : '?'}limit=20&offset=${pageParam}&include=${include}`);
-                return res.data;
+                return await getMemberRelations(targetId, activeTab, {
+                    limit: 20,
+                    offset: pageParam as number,
+                    include,
+                    sort_by: activeTab === 'answers' ? sortBy : undefined
+                });
             } catch (err) {
                 console.error(`获取${activeTab}列表失败:`, err);
                 return { data: [], paging: { is_end: true } };
@@ -117,9 +104,9 @@ export default function UserDetailScreen() {
         try {
             const targetId = user?.url_token || id;
             if (user?.is_following) {
-                await apiClient.delete(`/members/${targetId}/followers/`);
+                await unfollowMember(targetId);
             } else {
-                await apiClient.post(`/members/${targetId}/followers/`);
+                await followMember(targetId);
             }
             refetchUser();
         } catch (err) {

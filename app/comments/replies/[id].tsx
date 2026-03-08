@@ -1,4 +1,4 @@
-import apiClient from '@/api/client';
+import { createCommentReply, getChildComments } from '@/api/zhihu';
 import { LikeButton } from '@/components/LikeButton';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,20 +23,16 @@ export default function ReplyDetailScreen() {
   const { data: replies, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['replies', id],
     queryFn: async () => {
-      const res = await apiClient.get(`/comments/${id}/child_comments?limit=20&include=data[*].author,vote_count,content,created_time,reply_to_author`);
-      return res.data.data;
+      const data = await getChildComments(id as string);
+      return data.data;
     }
   });
 
   // 2. 发布回复 Mutation
   const mutation = useMutation({
-    mutationFn: async (content: string) => {
+    mutationFn: (content: string) => {
       // 统一发送到根评论下
-      return await apiClient.post(`/comments/${id}/replies`, {
-        content: content,
-        type: 'comment',
-        ...(replyTo ? { reply_to_comment_id: replyTo.id } : {})
-      });
+      return createCommentReply(id as string, content, replyTo ? { reply_to_comment_id: replyTo.id } : {});
     },
     onSuccess: () => {
       Alert.alert('发布成功喵！');
