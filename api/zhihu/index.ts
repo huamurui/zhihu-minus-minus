@@ -7,5 +7,6 @@ export * from './history';
 export * from './me';
 export * from './member';
 export * from './notification';
+export * from './search';
 export * from './voters';
 

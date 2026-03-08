@@ -34,8 +34,7 @@ apiClient.interceptors.request.use(async (config) => {
 });
 
 apiClient.interceptors.response.use(response => response, error => {
-  console.error('API 请求错误:', error.response?.status, error.response?.data || error.message);
-  console.error('请求配置:', error.config);
+  console.error('API 请求错误:', error.response?.status, error.response?.data || error.message, '请求配置:', error.config);
   return Promise.reject(error);
 });
 

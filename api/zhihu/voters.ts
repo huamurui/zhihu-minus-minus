@@ -6,11 +6,19 @@ export const voteContent = async (
     voteType: 'up' | 'neutral' | 'down' | 'like'
 ) => {
     if (type === 'pins') {
-        if (voteType === 'like') {
+        if (voteType === 'like' || voteType === 'up') {
             const res = await apiClient.post(`/pins/${id}/reactions`, { type: 'like' });
             return res.data;
         } else {
             const res = await apiClient.delete(`/pins/${id}/reactions`);
+            return res.data;
+        }
+    } else if (type === 'comments') {
+        if (voteType === 'up' || voteType === 'like') {
+            const res = await apiClient.post(`/comments/${id}/like`);
+            return res.data;
+        } else {
+            const res = await apiClient.delete(`/comments/${id}/like`);
             return res.data;
         }
     } else {

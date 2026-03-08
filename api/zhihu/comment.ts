@@ -36,6 +36,11 @@ export const createCommentReply = async (id: string | number, content: string, e
 };
 
 export const voteComment = async (id: string | number, type: 'up' | 'neutral') => {
-    const res = await apiClient.post(`/comments/${id}/voters`, { type });
-    return res.data;
+    if (type === 'up') {
+        const res = await apiClient.post(`/comments/${id}/like`);
+        return res.data;
+    } else {
+        const res = await apiClient.delete(`/comments/${id}/like`);
+        return res.data;
+    }
 };

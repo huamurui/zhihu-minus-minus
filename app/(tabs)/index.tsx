@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
@@ -15,6 +16,7 @@ export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState<'following' | 'recommend' | 'hot'>('recommend');
   const tintColor = useThemeColor({}, 'tint');
   const borderBottomColor = useThemeColor({}, 'border');
+  const textColor = useThemeColor({}, 'text');
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, refetch } = useInfiniteQuery({
     queryKey: ['zhihu-feed', activeTab],
@@ -51,20 +53,32 @@ export default function HomeScreen() {
     <View style={styles.container}>
       {/* 顶部 Tab 导航 */}
       <View type="surface" style={[styles.topNav, { borderBottomColor }]}>
-        {(['following', 'recommend', 'hot'] as const).map((tab) => (
-          <Pressable key={tab} onPress={() => setActiveTab(tab)} style={styles.navItem}>
-            <Text
-              style={[
-                styles.navText,
-                activeTab === tab && { fontWeight: 'bold' }
-              ]}
-              type={activeTab === tab ? 'default' : 'secondary'}
-            >
-              {tab === 'following' ? '关注' : tab === 'recommend' ? '推荐' : '热榜'}
-            </Text>
-            {activeTab === tab && <View style={[styles.activeLine, { backgroundColor: tintColor }]} />}
-          </Pressable>
-        ))}
+        <View style={{ flexDirection: 'row', flex: 1, backgroundColor: 'transparent' }}>
+          {(['following', 'recommend', 'hot'] as const).map((tab) => (
+            <Pressable key={tab} onPress={() => setActiveTab(tab)} style={styles.navItem}>
+              <Text
+                style={[
+                  styles.navText,
+                  activeTab === tab && { fontWeight: 'bold' }
+                ]}
+                type={activeTab === tab ? 'default' : 'secondary'}
+              >
+                {tab === 'following' ? '关注' : tab === 'recommend' ? '推荐' : '热榜'}
+              </Text>
+              {activeTab === tab && <View style={[styles.activeLine, { backgroundColor: tintColor }]} />}
+            </Pressable>
+          ))}
+        </View>
+        <Pressable
+          onPress={() => router.push('/search')}
+          style={({ pressed }) => ({
+            opacity: pressed ? 0.5 : 1,
+            paddingBottom: 10,
+            justifyContent: 'center'
+          })}
+        >
+          <Ionicons name="search" size={22} color={textColor} />
+        </Pressable>
       </View>
 
       <FlashList
@@ -114,7 +128,6 @@ function parseFollowingData(item: any) {
 // 推荐流数据解析
 function parseRecommendData(item: any) {
   const target = item.target || item;
-  console.log(target.question?.id);
   return {
     id: target.id?.toString() || Math.random().toString(),
     title: target.question?.title || target.title || "无标题内容",
@@ -150,7 +163,7 @@ function parseHotData(item: any, index: number) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  topNav: { flexDirection: 'row', paddingTop: 60, paddingHorizontal: 20, borderBottomWidth: 0.5 },
+  topNav: { flexDirection: 'row', alignItems: 'flex-end', paddingTop: 50, paddingHorizontal: 20, borderBottomWidth: 0.5 },
   navItem: { marginRight: 30, paddingBottom: 10, alignItems: 'center' },
   navText: { fontSize: 16 },
   activeLine: { width: 20, height: 3, borderRadius: 2, marginTop: 4 },
