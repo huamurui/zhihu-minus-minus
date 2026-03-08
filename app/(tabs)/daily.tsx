@@ -42,7 +42,10 @@ const SkeletonCard = () => {
   );
 };
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 export default function DailyScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, refetch } = useInfiniteQuery({
@@ -87,6 +90,10 @@ export default function DailyScreen() {
         onEndReachedThreshold={0.5}
         onRefresh={refetch}
         refreshing={isLoading}
+        contentContainerStyle={{
+          paddingTop: insets.top + 50, // 为透明 Header 留出空间
+          paddingBottom: 80 // 为底部 Tab 留出空间
+        }}
         renderItem={({ item }: { item: any }) => {
           if (item.type === 'date') {
             return <View style={{ backgroundColor: 'transparent' }}><Text type="secondary" style={styles.dateHeader}>{formatDate(item.date)}</Text></View>;

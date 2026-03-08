@@ -1,7 +1,9 @@
+import { useColorScheme } from '@/components/useColorScheme';
 import { useAuthStore } from '@/store/useAuthStore';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery } from '@tanstack/react-query';
+import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
@@ -12,7 +14,11 @@ import { FeedCard } from '@/components/FeedCard';
 import { HotCard, HotItem } from '@/components/HotCard';
 import { Text, View, useThemeColor } from '@/components/Themed';
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
+  const colorScheme = useColorScheme();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'following' | 'recommend' | 'hot'>('recommend');
   const tintColor = useThemeColor({}, 'tint');
@@ -58,35 +64,41 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* 顶部 Tab 导航 */}
-      <View type="surface" style={[styles.topNav, { borderBottomColor }]}>
-        <View style={{ flexDirection: 'row', flex: 1, backgroundColor: 'transparent' }}>
-          {(['following', 'recommend', 'hot'] as const).map((tab) => (
-            <Pressable key={tab} onPress={() => setActiveTab(tab)} style={styles.navItem}>
-              <Text
-                style={[
-                  styles.navText,
-                  activeTab === tab && { fontWeight: 'bold' }
-                ]}
-                type={activeTab === tab ? 'default' : 'secondary'}
-              >
-                {tab === 'following' ? '关注' : tab === 'recommend' ? '推荐' : '热榜'}
-              </Text>
-              {activeTab === tab && <View style={[styles.activeLine, { backgroundColor: tintColor }]} />}
-            </Pressable>
-          ))}
+      {/* 顶部 Tab 导航：带毛玻璃效果 */}
+      <BlurView
+        intensity={80}
+        tint={colorScheme}
+        style={[styles.topNavContainer, { borderBottomColor }]}
+      >
+        <View style={[styles.topNav, { paddingTop: insets.top + 5 }]}>
+          <View style={{ flexDirection: 'row', flex: 1, backgroundColor: 'transparent' }}>
+            {(['following', 'recommend', 'hot'] as const).map((tab) => (
+              <Pressable key={tab} onPress={() => setActiveTab(tab)} style={styles.navItem}>
+                <Text
+                  style={[
+                    styles.navText,
+                    activeTab === tab && { fontWeight: 'bold' }
+                  ]}
+                  type={activeTab === tab ? 'default' : 'secondary'}
+                >
+                  {tab === 'following' ? '关注' : tab === 'recommend' ? '推荐' : '热榜'}
+                </Text>
+                {activeTab === tab && <View style={[styles.activeLine, { backgroundColor: tintColor }]} />}
+              </Pressable>
+            ))}
+          </View>
+          <Pressable
+            onPress={() => router.push('/search')}
+            style={({ pressed }) => ({
+              opacity: pressed ? 0.5 : 1,
+              paddingBottom: 10,
+              justifyContent: 'center'
+            })}
+          >
+            <Ionicons name="search" size={22} color={textColor} />
+          </Pressable>
         </View>
-        <Pressable
-          onPress={() => router.push('/search')}
-          style={({ pressed }) => ({
-            opacity: pressed ? 0.5 : 1,
-            paddingBottom: 10,
-            justifyContent: 'center'
-          })}
-        >
-          <Ionicons name="search" size={22} color={textColor} />
-        </Pressable>
-      </View>
+      </BlurView>
 
       {!cookies ? (
         <View style={styles.loginPrompt}>
@@ -108,6 +120,10 @@ export default function HomeScreen() {
           onEndReachedThreshold={0.5}
           onRefresh={refetch}
           refreshing={isLoading}
+          contentContainerStyle={{
+            paddingTop: insets.top + 55, // 动态偏移，确保内容不被覆盖
+            paddingBottom: 60
+          }}
           renderItem={({ item }: { item: any }) => {
             if (activeTab === 'hot') {
               return <HotCard item={item as HotItem} />;
@@ -184,7 +200,20 @@ function parseHotData(item: any, index: number) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  topNav: { flexDirection: 'row', alignItems: 'flex-end', paddingTop: 50, paddingHorizontal: 20, borderBottomWidth: 0.5 },
+  topNavContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+    borderBottomWidth: 0.5,
+  },
+  topNav: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 20,
+    backgroundColor: 'transparent',
+  },
   navItem: { marginRight: 30, paddingBottom: 10, alignItems: 'center' },
   navText: { fontSize: 16 },
   activeLine: { width: 20, height: 3, borderRadius: 2, marginTop: 4 },

@@ -1,8 +1,10 @@
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons'; // 通用图标库
+import { BlurView } from 'expo-blur';
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { StyleSheet } from 'react-native';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -12,15 +14,25 @@ export default function TabLayout() {
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme].tint,
         tabBarInactiveTintColor: Colors[colorScheme].textSecondary,
-        // 让 TabBar 看起来更高级：加点阴影或边框
+        // 让 TabBar 看起来更高级：使用半透明模糊背景
         tabBarStyle: {
-          backgroundColor: Colors[colorScheme].surface,
-          borderTopWidth: 0.5,
-          borderTopColor: Colors[colorScheme].border,
+          position: 'absolute',
+          backgroundColor: 'transparent',
+          borderTopWidth: 0, // 移除顶部边框以增强通透感
           elevation: 0,
           height: 60,
           paddingBottom: 8,
+          bottom: 0,
+          left: 0,
+          right: 0,
         },
+        tabBarBackground: () => (
+          <BlurView
+            intensity={80}
+            tint={colorScheme}
+            style={StyleSheet.absoluteFill}
+          />
+        ),
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '500',
@@ -48,10 +60,15 @@ export default function TabLayout() {
           ),
           headerShown: true, // 日报页可以保留原生 Header
           headerTitle: '知乎日报',
+          headerTransparent: true, // 让 Header 背景透明以便使用 BlurView
+          headerBackground: () => (
+            <BlurView
+              intensity={80}
+              tint={colorScheme}
+              style={StyleSheet.absoluteFill}
+            />
+          ),
           headerStyle: {
-            backgroundColor: Colors[colorScheme].surface,
-            borderBottomWidth: 0.5,
-            borderBottomColor: Colors[colorScheme].border,
             elevation: 0,
             shadowOpacity: 0,
           },

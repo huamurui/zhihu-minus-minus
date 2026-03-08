@@ -151,7 +151,7 @@ export default function ProfileScreen() {
         </Pressable>
       )}
 
-      <View style={{ height: 50, backgroundColor: 'transparent' }} />
+      <View style={{ height: 100, backgroundColor: 'transparent' }} />
     </ScrollView>
   );
 }
