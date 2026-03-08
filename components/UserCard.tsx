@@ -35,10 +35,21 @@ export const UserCard = ({ user }: { user: any }) => {
         >
             <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
             <View style={styles.content}>
-                <Text style={styles.name} numberOfLines={1}>{user.name}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'transparent' }}>
+                    <Text style={styles.name} numberOfLines={1}>{user.name}</Text>
+                    {user.badge?.find((b: any) => b.type === 'best_answerer') && (
+                        <View style={styles.badge}>
+                            <Text style={styles.badgeText}>优秀回答者</Text>
+                        </View>
+                    )}
+                </View>
                 <Text type="secondary" style={styles.headline} numberOfLines={1}>
                     {user.headline || '这个用户很神秘喵'}
                 </Text>
+                <View style={{ flexDirection: 'row', marginTop: 4, backgroundColor: 'transparent' }}>
+                    <Text type="secondary" style={styles.stats}>{user.follower_count || 0} 粉丝</Text>
+                    <Text type="secondary" style={[styles.stats, { marginLeft: 12 }]}>{user.answer_count || 0} 回答</Text>
+                </View>
             </View>
             <Pressable
                 onPress={handleFollow}
@@ -97,6 +108,23 @@ const styles = StyleSheet.create({
     },
     followedBtn: {
         backgroundColor: '#f6f6f6',
+    },
+    stats: {
+        fontSize: 12,
+    },
+    badge: {
+        backgroundColor: '#fffbe6',
+        borderColor: '#ffe58f',
+        borderWidth: 0.5,
+        borderRadius: 4,
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        marginLeft: 6,
+    },
+    badgeText: {
+        fontSize: 10,
+        color: '#d48806',
+        fontWeight: 'bold',
     },
     followText: {
         fontSize: 13,

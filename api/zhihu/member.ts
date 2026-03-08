@@ -34,16 +34,19 @@ export const unfollowMember = async (id: string | number) => {
 };
 
 export const getMemberFollowers = async (id: string | number, limit = 20, offset = 0) => {
-    const res = await apiClient.get(`/members/${id}/followers?limit=${limit}&offset=${offset}`);
+    const include = 'data[*].answer_count,articles_count,gender,follower_count,is_followed,is_following,badge[?(type=best_answerer)].topics';
+    const res = await apiClient.get(`/members/${id}/followers?include=${include}&limit=${limit}&offset=${offset}`);
     return res.data;
 };
 
 export const getMemberFollowing = async (id: string | number, limit = 20, offset = 0) => {
-    const res = await apiClient.get(`/members/${id}/followees?limit=${limit}&offset=${offset}`);
+    const include = 'data[*].answer_count,articles_count,gender,follower_count,is_followed,is_following,badge[?(type=best_answerer)].topics';
+    const res = await apiClient.get(`/members/${id}/followees?include=${include}&limit=${limit}&offset=${offset}`);
     return res.data;
 };
 
 export const getMemberMutual = async (id: string | number, limit = 20, offset = 0) => {
-    const res = await apiClient.get(`/members/${id}/mutual-followees?limit=${limit}&offset=${offset}`);
+    const include = 'data[*].answer_count,articles_count,gender,follower_count,is_followed,is_following,badge[?(type=best_answerer)].topics';
+    const res = await apiClient.get(`/members/${id}/relations/mutuals?include=${include}&limit=${limit}&offset=${offset}`);
     return res.data;
 };

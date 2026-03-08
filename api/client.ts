@@ -24,7 +24,7 @@ apiClient.interceptors.request.use(async (config) => {
     if (dc0) {
       const body = config.data ? (typeof config.data === 'string' ? config.data : JSON.stringify(config.data)) : null;
       const fullUrl = apiClient.getUri(config);
-      const zse96 = signRequest96(fullUrl, body, cookie);
+      const zse96 = await signRequest96(fullUrl, body, cookie);
       config.headers['x-zse-96'] = zse96;
       config.headers['x-zse-93'] = ZSE_VERSION;
       config.headers['x-requested-with'] = 'fetch';
