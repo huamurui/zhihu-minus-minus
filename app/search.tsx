@@ -1,6 +1,7 @@
 import { getSearchSuggest, searchContent } from '@/api/zhihu';
 import { FeedCard } from '@/components/FeedCard';
 import { Text, View, useThemeColor } from '@/components/Themed';
+import { UserCard } from '@/components/UserCard';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
@@ -14,12 +15,14 @@ export default function SearchScreen() {
     const inputRef = useRef<TextInput>(null);
     const [query, setQuery] = useState('');
     const [debouncedQuery, setDebouncedQuery] = useState('');
+    const [searchType, setSearchType] = useState('general'); // 'general' | 'people'
     const [isSearching, setIsSearching] = useState(false);
 
     const tintColor = useThemeColor({}, 'tint');
     const backgroundColor = useThemeColor({}, 'background');
     const surfaceColor = useThemeColor({ light: '#f5f5f5', dark: '#1a1a1a' }, 'surface');
     const textColor = useThemeColor({}, 'text');
+    const borderColor = useThemeColor({ light: '#eeeeee', dark: '#333333' }, 'border');
 
     useEffect(() => {
         const handler = setTimeout(() => {
@@ -41,8 +44,8 @@ export default function SearchScreen() {
         isFetchingNextPage,
         isLoading
     } = useInfiniteQuery({
-        queryKey: ['search-results', debouncedQuery],
-        queryFn: ({ pageParam = 0 }) => searchContent(debouncedQuery, pageParam as number),
+        queryKey: ['search-results', debouncedQuery, searchType],
+        queryFn: ({ pageParam = 0 }) => searchContent(debouncedQuery, pageParam as number, 20, searchType),
         enabled: isSearching && debouncedQuery.length > 0,
         initialPageParam: 0,
         getNextPageParam: (lastPage) => {
@@ -61,18 +64,32 @@ export default function SearchScreen() {
         }
     };
 
-    const renderSuggestion = ({ item }: { item: any }) => (
-        <Pressable
-            style={styles.suggestionItem}
-            onPress={() => {
-                setQuery(item.query);
-                setIsSearching(true);
-            }}
-        >
-            <Ionicons name="search-outline" size={16} color="#888" style={styles.suggestionIcon} />
-            <Text style={styles.suggestionText}>{item.query}</Text>
-        </Pressable>
-    );
+    const renderSuggestion = ({ item }: { item: any }) => {
+        const text = item.query;
+        if (!query) return null;
+
+        // 对搜索历史/建议中的关键字进行高亮
+        const parts = text.split(new RegExp(`(${query})`, 'gi'));
+
+        return (
+            <Pressable
+                style={styles.suggestionItem}
+                onPress={() => {
+                    setQuery(item.query);
+                    setIsSearching(true);
+                }}
+            >
+                <Ionicons name="search-outline" size={16} color="#888" style={styles.suggestionIcon} />
+                <Text style={styles.suggestionText}>
+                    {parts.map((p: string, i: number) => (
+                        p.toLowerCase() === query.toLowerCase() ?
+                            <Text key={i} style={{ color: tintColor, fontWeight: 'bold' }}>{p}</Text> :
+                            p
+                    ))}
+                </Text>
+            </Pressable>
+        );
+    };
 
     const HighlightText = (text: string, highlightColor: string) => {
         if (!text) return '';
@@ -135,8 +152,38 @@ export default function SearchScreen() {
     };
 
     const flattenedResults = searchResults?.pages.flatMap(page =>
-        page.data?.map((item: any) => parseSearchResult(item)).filter(Boolean)
+        page.data?.map((item: any) => {
+            if (searchType === 'people') {
+                return item; // people search usually returns users directly or in object
+            }
+            return parseSearchResult(item);
+        }).filter(Boolean)
     ) || [];
+
+    const SearchTabs = () => (
+        <View style={[styles.tabs, { borderBottomColor: borderColor, backgroundColor }]}>
+            {[
+                { label: '综合', value: 'general' },
+                { label: '用户', value: 'people' },
+            ].map((tab) => (
+                <Pressable
+                    key={tab.value}
+                    onPress={() => setSearchType(tab.value)}
+                    style={[
+                        styles.tabItem,
+                        searchType === tab.value && { borderBottomColor: tintColor }
+                    ]}
+                >
+                    <Text style={[
+                        styles.tabText,
+                        searchType === tab.value && { color: tintColor, fontWeight: 'bold' }
+                    ]}>
+                        {tab.label}
+                    </Text>
+                </Pressable>
+            ))}
+        </View>
+    );
 
     return (
         <View style={styles.container}>
@@ -195,6 +242,8 @@ export default function SearchScreen() {
                 </View>
             </View>
 
+            {isSearching && <SearchTabs />}
+
             {!isSearching && suggestions?.suggest && suggestions.suggest.length > 0 ? (
                 <FlashList
                     data={suggestions.suggest}
@@ -204,9 +253,22 @@ export default function SearchScreen() {
             ) : isSearching ? (
                 <FlashList
                     data={flattenedResults}
-                    renderItem={({ item }) => <FeedCard item={item} />}
+                    key={searchType} // 切换类型时重新渲染以保证列表状态正确
+                    renderItem={({ item }: { item: any }) => {
+                        if (searchType === 'people') {
+                            const userObj = item.object || item;
+                            const highlight = item.highlight || {};
+                            const displayUser = {
+                                ...userObj,
+                                name: HighlightText(highlight.title || userObj.name || '', tintColor),
+                                headline: HighlightText(highlight.description || userObj.headline || '', tintColor),
+                            };
+                            return <UserCard user={displayUser} />;
+                        }
+                        return <FeedCard item={item} />;
+                    }}
                     {...({
-                        estimatedItemSize: 150,
+                        estimatedItemSize: searchType === 'people' ? 80 : 150,
                         onEndReached: () => hasNextPage && !isFetchingNextPage && fetchNextPage(),
                         onEndReachedThreshold: 0.5,
                         ListFooterComponent: isFetchingNextPage ? <ActivityIndicator style={{ padding: 20 }} /> : null,
@@ -265,5 +327,20 @@ const styles = StyleSheet.create({
     },
     suggestionIcon: { marginRight: 15 },
     suggestionText: { fontSize: 16 },
-    empty: { flex: 1, justifyContent: 'center', alignItems: 'center' }
+    empty: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    tabs: {
+        flexDirection: 'row',
+        paddingHorizontal: 15,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    tabItem: {
+        paddingVertical: 12,
+        marginRight: 25,
+        borderBottomWidth: 2,
+        borderBottomColor: 'transparent',
+    },
+    tabText: {
+        fontSize: 15,
+        color: '#666',
+    },
 });

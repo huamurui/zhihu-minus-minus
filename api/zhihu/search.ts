@@ -5,9 +5,9 @@ export const getSearchSuggest = async (query: string) => {
     return res.data;
 };
 
-export const searchContent = async (query: string, offset = 0, limit = 20) => {
+export const searchContent = async (query: string, offset = 0, limit = 20, type = 'general') => {
     const params = new URLSearchParams({
-        t: 'general',
+        t: type,
         q: query,
         correction: '1',
         offset: offset.toString(),
