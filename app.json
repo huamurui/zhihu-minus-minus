@@ -13,7 +13,8 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.huamu013.ZhihuMinusMinus"
     },
     "android": {
       "adaptiveIcon": {
