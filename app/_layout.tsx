@@ -52,7 +52,7 @@ export default function RootLayout() {
 
           {/* 登录页：建议做成从底部弹出的 Modal */}
           <Stack.Screen
-            name="login"
+            name="login/index"
             options={{
               presentation: 'modal',
               headerTitle: '登录知乎',

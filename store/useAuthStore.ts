@@ -10,17 +10,19 @@ const secureStorage = {
 };
 
 interface AuthState {
-  token: string | null;
-  setToken: (token: string) => void;
+  cookies: string | null;
+  setCookies: (cookies: string) => void;
   logout: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
-      token: null,
-      setToken: (token) => set({ token }),
-      logout: () => set({ token: null }),
+      cookies: null,
+      setCookies: (cookies) => set({ cookies }),
+      logout: () => {
+        set({ cookies: null });
+      },
     }),
     {
       name: 'auth-storage',

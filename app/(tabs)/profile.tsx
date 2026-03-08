@@ -17,6 +17,7 @@ import {
 // 导入我们之前定义的组件和 Store
 import { getMe } from '@/api/zhihu';
 import { Text, View, useThemeColor } from '@/components/Themed';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useThemeStore } from '@/store/useThemeStore';
 import CookieManager from '@react-native-cookies/cookies';
 
@@ -26,16 +27,20 @@ export default function ProfileScreen() {
   const { isDark, toggleTheme } = useThemeStore();
   const accentColor = useThemeColor({}, 'tint');
 
+  const { cookies } = useAuthStore();
   // 1. 获取个人详细信息 (使用 API 抓取真实数据)
   const { data: me, isLoading, refetch } = useQuery({
     queryKey: ['me'],
-    queryFn: () => getMe()
+    queryFn: () => getMe(),
+    enabled: !!cookies, // 只有在已登录（有 cookie）时才触发请求
   });
 
   useFocusEffect(
     useCallback(() => {
-      refetch();
-    }, [])
+      if (cookies) {
+        refetch();
+      }
+    }, [cookies, refetch])
   );
 
   const handleLogout = () => {
@@ -48,7 +53,7 @@ export default function ProfileScreen() {
           await SecureStore.deleteItemAsync('user_cookies');
           // webview 中的登录也要退出
           await CookieManager.clearAll();
-
+          useAuthStore.getState().logout();
           queryClient.setQueryData(['me'], null);
           router.replace('/login');
         },

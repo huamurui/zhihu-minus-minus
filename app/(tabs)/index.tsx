@@ -1,3 +1,4 @@
+import { useAuthStore } from '@/store/useAuthStore';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery } from '@tanstack/react-query';
@@ -18,9 +19,14 @@ export default function HomeScreen() {
   const borderBottomColor = useThemeColor({}, 'border');
   const textColor = useThemeColor({}, 'text');
 
+  const { cookies } = useAuthStore();
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, refetch } = useInfiniteQuery({
     queryKey: ['zhihu-feed', activeTab],
     queryFn: async ({ pageParam = FEED_URLS[activeTab] }) => {
+      // 如果没有 cookie，理论上 enabled 已经阻止了调用，但这里加一层保护
+      if (!cookies && activeTab === 'following') {
+        return { items: [], nextUrl: null };
+      }
       try {
         const data = await getFeed(pageParam as string);
         const rawItems = data.data || [];
@@ -45,6 +51,7 @@ export default function HomeScreen() {
     },
     initialPageParam: FEED_URLS[activeTab],
     getNextPageParam: (lastPage) => lastPage.nextUrl,
+    enabled: !!cookies, // 首页三个 tab 均在登录后触发，避免未登录时的 401 或无效请求
   });
 
   const flattenedData = data?.pages.flatMap((page) => page.items) ?? [];
@@ -81,21 +88,35 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
-      <FlashList
-        data={flattenedData}
-        {...({ estimatedItemSize: activeTab === 'recommend' ? 180 : 100 } as any)}
-        onEndReached={() => hasNextPage && !isFetchingNextPage && fetchNextPage()}
-        onEndReachedThreshold={0.5}
-        onRefresh={refetch}
-        refreshing={isLoading}
-        renderItem={({ item }: { item: any }) => {
-          if (activeTab === 'hot') {
-            return <HotCard item={item as HotItem} />;
-          }
-          return <FeedCard item={item} />;
-        }}
-        ListFooterComponent={isFetchingNextPage ? <ActivityIndicator style={{ margin: 20 }} /> : null}
-      />
+      {!cookies ? (
+        <View style={styles.loginPrompt}>
+          <Text style={styles.loginText} type="secondary">
+            登录后才能看这里哦
+          </Text>
+          <Pressable
+            style={[styles.loginBtn, { backgroundColor: tintColor }]}
+            onPress={() => router.push('/login' as any)}
+          >
+            <Text style={styles.loginBtnText}>去登录</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <FlashList
+          data={flattenedData}
+          {...({ estimatedItemSize: activeTab === 'recommend' ? 180 : 100 } as any)}
+          onEndReached={() => hasNextPage && !isFetchingNextPage && fetchNextPage()}
+          onEndReachedThreshold={0.5}
+          onRefresh={refetch}
+          refreshing={isLoading}
+          renderItem={({ item }: { item: any }) => {
+            if (activeTab === 'hot') {
+              return <HotCard item={item as HotItem} />;
+            }
+            return <FeedCard item={item} />;
+          }}
+          ListFooterComponent={isFetchingNextPage ? <ActivityIndicator style={{ margin: 20 }} /> : null}
+        />
+      )}
     </View>
   );
 }
@@ -167,4 +188,8 @@ const styles = StyleSheet.create({
   navItem: { marginRight: 30, paddingBottom: 10, alignItems: 'center' },
   navText: { fontSize: 16 },
   activeLine: { width: 20, height: 3, borderRadius: 2, marginTop: 4 },
+  loginPrompt: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 100 },
+  loginText: { fontSize: 16, marginTop: 20, marginBottom: 30 },
+  loginBtn: { paddingHorizontal: 40, paddingVertical: 12, borderRadius: 25 },
+  loginBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 });

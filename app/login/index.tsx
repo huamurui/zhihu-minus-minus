@@ -1,4 +1,5 @@
 import { Text, View, useThemeColor } from '@/components/Themed';
+import { useAuthStore } from '@/store/useAuthStore';
 import CookieManager from '@react-native-cookies/cookies';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
@@ -32,16 +33,15 @@ export default function LoginScreen() {
         console.log(`📊 Cookie 状态: d_c0=${hasDc0}, z_c0=${hasZc0}`);
 
         await SecureStore.setItemAsync('user_cookies', cookieString);
-        console.log('✅ 登录 Cookie 已保存至 SecureStore');
+        useAuthStore.getState().setCookies(cookieString);
+        console.log('✅ 登录 Cookie 已保存至 SecureStore 和 AuthStore');
 
         // 成功后延迟跳转，确保存储生效
-        setTimeout(() => {
-          if (router.canGoBack()) {
-            router.back();
-          } else {
-            router.replace('/(tabs)/profile');
-          }
-        }, 800);
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          router.replace('/(tabs)/profile');
+        }
       }
     } catch (error) {
       console.error('❌ 获取 Cookie 失败:', error);
