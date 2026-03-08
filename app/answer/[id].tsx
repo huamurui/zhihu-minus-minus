@@ -1,11 +1,12 @@
-import { getAnswer } from '@/api/zhihu';
+import { deleteAnswer, getAnswer } from '@/api/zhihu';
+import { followMember, unfollowMember } from '@/api/zhihu/member';
 import { LikeButton } from '@/components/LikeButton';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useRef } from 'react';
-import { ActivityIndicator, Animated, Image, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Image, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import RenderHtml from 'react-native-render-html';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -15,6 +16,7 @@ export default function AnswerDetailScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
 
+  const queryClient = useQueryClient();
   const textColor = useThemeColor({}, 'text');
   const borderColor = useThemeColor({}, 'border');
   const surfaceColor = useThemeColor({}, 'surface');
@@ -65,10 +67,53 @@ export default function AnswerDetailScreen() {
     scrollY.setValue(currentY);
   };
 
-  const { data: answer, isLoading } = useQuery({
+  const { data: answer, isLoading, refetch } = useQuery({
     queryKey: ['answer-detail', id],
     queryFn: () => getAnswer(id as string)
   });
+
+  const followMutation = useMutation({
+    mutationFn: async () => {
+      if (answer?.author?.is_following) {
+        return unfollowMember(answer.author.url_token || answer.author.id);
+      } else {
+        return followMember(answer.author.url_token || answer.author.id);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['answer-detail', id] });
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteAnswer(id as string),
+    onSuccess: () => {
+      Alert.alert('删除成功', '你的回答已删除喵！');
+      router.back();
+    },
+    onError: (err: any) => {
+      console.error(err.response?.data);
+      Alert.alert('删除失败', err.response?.data?.error?.message || '无法删除回答');
+    }
+  });
+
+  const handleDelete = () => {
+    Alert.alert(
+      '确认删除',
+      '确定要删除这个回答吗？此操作不可撤销喵！',
+      [
+        { text: '取消', style: 'cancel' },
+        { text: '确认删除', style: 'destructive', onPress: () => deleteMutation.mutate() }
+      ]
+    );
+  };
+
+  const goToProfile = () => {
+    const token = answer?.author?.url_token || answer?.author?.id;
+    if (token) {
+      router.push(`/user/${token}`);
+    }
+  };
 
   if (isLoading) return (
     <View type="default" style={styles.center}>
@@ -101,10 +146,10 @@ export default function AnswerDetailScreen() {
       >
         <View style={styles.stickyHeaderContent}>
           <View style={{ width: 40 }} />
-          <View style={styles.stickyAuthor}>
+          <Pressable onPress={goToProfile} style={styles.stickyAuthor}>
             <Image source={{ uri: answer?.author?.avatar_url }} style={styles.stickyAvatar} />
             <Text style={styles.stickyName} numberOfLines={1}>{answer?.author?.name}</Text>
-          </View>
+          </Pressable>
           <View style={{ width: 40 }} />
         </View>
       </Animated.View>
@@ -139,15 +184,21 @@ export default function AnswerDetailScreen() {
 
         {/* 作者信息栏 */}
         <View style={styles.authorSection}>
-          <Pressable onPress={() => router.push(`/user/${answer?.author?.id}`)} style={styles.authorMain}>
+          <Pressable onPress={goToProfile} style={styles.authorMain}>
             <Image source={{ uri: answer?.author?.avatar_url }} style={styles.avatar} />
             <View style={styles.authorInfo}>
               <Text style={styles.authorName}>{answer?.author?.name}</Text>
               <Text type="secondary" style={styles.authorHeadline} numberOfLines={1}>{answer?.author?.headline}</Text>
             </View>
           </Pressable>
-          <Pressable style={styles.followBtn}>
-            <Text style={styles.followBtnText}>关注</Text>
+          <Pressable
+            style={[styles.followBtn, answer?.author?.is_following && styles.followBtnActive]}
+            onPress={() => followMutation.mutate()}
+            disabled={followMutation.isPending}
+          >
+            <Text style={[styles.followBtnText, answer?.author?.is_following && styles.followBtnTextActive]}>
+              {answer?.author?.is_following ? '已关注' : '关注'}
+            </Text>
           </Pressable>
         </View>
 
@@ -173,7 +224,7 @@ export default function AnswerDetailScreen() {
             }}
           />
           <Text type="secondary" style={styles.publishDate}>
-            发布于 {answer?.created_time_name || '不久前'} · 著作权归作者所有
+            发布于 {answer?.created_time ? new Date(answer.created_time * 1000).toLocaleDateString() : (answer?.created_time_name || '不久前')} · 著作权归作者所有
           </Text>
         </View>
       </ScrollView>
@@ -201,7 +252,7 @@ export default function AnswerDetailScreen() {
         </View>
 
         <View style={styles.footerRight}>
-          <Pressable style={styles.footerAction} onPress={() => router.push(`/comments/${id}`)}>
+          <Pressable style={styles.footerAction} onPress={() => router.push(`/comments/${id}?type=answer`)}>
             <Ionicons name="chatbubble-outline" size={22} color="#888" />
             <Text type="secondary" style={styles.actionCount}>{answer?.comment_count}</Text>
           </Pressable>
@@ -211,6 +262,11 @@ export default function AnswerDetailScreen() {
           <Pressable style={styles.footerAction}>
             <Ionicons name="share-social-outline" size={22} color="#888" />
           </Pressable>
+          {answer?.relationship?.is_author && (
+            <Pressable style={styles.footerAction} onPress={handleDelete} disabled={deleteMutation.isPending}>
+              <Ionicons name="trash-outline" size={22} color="#ff4d4f" />
+            </Pressable>
+          )}
         </View>
       </View>
     </View>
@@ -247,9 +303,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#0084ff15',
     paddingHorizontal: 15,
     paddingVertical: 6,
-    borderRadius: 6
+    borderRadius: 20
+  },
+  followBtnActive: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#eee'
   },
   followBtnText: { color: '#0084ff', fontWeight: 'bold', fontSize: 14 },
+  followBtnTextActive: { color: '#999' },
   // 正文
   contentBody: { paddingHorizontal: 20 },
   publishDate: { color: '#bbb', fontSize: 13, marginTop: 30, fontStyle: 'italic', paddingBottom: 20 },

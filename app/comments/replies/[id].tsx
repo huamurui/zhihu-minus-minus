@@ -58,9 +58,10 @@ export default function ReplyDetailScreen() {
               <Text type="secondary" style={styles.replyToText}> 回复 {item.reply_to_author.member.name}</Text>
             )}
           </Text>
-          <Text style={styles.content}>
+          <Text style={[styles.content, { color: textColor }]}>
             {cleanContent}
           </Text>
+
 
           <View style={styles.footerRow}>
             <Text type="secondary" style={styles.time}>
@@ -168,7 +169,7 @@ const styles = StyleSheet.create({
   contentBox: { flex: 1, marginLeft: 12 },
   authorName: { fontWeight: 'bold', fontSize: 13, marginBottom: 4 },
   replyToText: { fontWeight: 'normal', color: '#999' },
-  content: { fontSize: 15, lineHeight: 22, color: '#333' },
+  content: { fontSize: 15, lineHeight: 22 },
   footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
   time: { fontSize: 12, color: '#999' },
   actionRow: { flexDirection: 'row', alignItems: 'center' },

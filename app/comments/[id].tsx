@@ -78,7 +78,7 @@ export default function CommentScreen() {
                 </Text>
               )}
             </View>
-            <Text style={styles.content}>{cleanContent}</Text>
+            <Text style={[styles.content, { color: textColor }]}>{cleanContent}</Text>
 
             {/* 子评论预览区域 */}
             {item.child_comment_count > 0 && (
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
   nameRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   name: { fontWeight: 'bold', fontSize: 14, marginRight: 8 },
   headline: { fontSize: 12, flex: 1 },
-  content: { fontSize: 15, lineHeight: 22, color: '#333' },
+  content: { fontSize: 15, lineHeight: 22, marginTop: 4 },
   commentFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
   actionRow: { flexDirection: 'row', alignItems: 'center' },
   time: { fontSize: 12, color: '#999' },

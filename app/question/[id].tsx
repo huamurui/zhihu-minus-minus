@@ -3,7 +3,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Image, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Animated, Image, LayoutAnimation, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import RenderHtml from 'react-native-render-html';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -16,19 +16,20 @@ import { Text, View, useThemeColor } from '@/components/Themed';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Alert } from 'react-native';
 
-// 单个回答组件：处理内部的“展开/折叠”逻辑
 const AnswerItem = ({ item }: { item: any }) => {
-  const [expanded, setExpanded] = useState(false);
   const { width } = useWindowDimensions();
   const router = useRouter();
-
   const textColor = useThemeColor({}, 'text');
-  const borderColor = useThemeColor({}, 'border');
-
-  // 简单去除 HTML 标签获取纯文本摘要
-  const excerpt = item.content?.replace(/<[^>]+>/g, '').substring(0, 100) + '...';
-
   const queryClient = useQueryClient();
+
+  // 改进摘要逻辑：如果正文本身就很短，则无需折叠
+  const rawText = item.content?.replace(/<[^>]+>/g, '') || '';
+  const isLongContent = rawText.length > 120;
+  const excerpt = isLongContent ? rawText.substring(0, 100) + '...' : rawText;
+
+  // 初始状态：如果内容短，直接展开
+  const [expanded, setExpanded] = useState(!isLongContent);
+
   const followMutation = useMutation({
     mutationFn: async () => {
       if (item.author?.is_following) {
@@ -38,7 +39,6 @@ const AnswerItem = ({ item }: { item: any }) => {
       }
     },
     onSuccess: () => {
-      // 简单刷新
       queryClient.invalidateQueries({ queryKey: ['question-answers'] });
     }
   });
@@ -66,17 +66,32 @@ const AnswerItem = ({ item }: { item: any }) => {
     );
   };
 
+  const toggleExpand = () => {
+    if (!isLongContent) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpanded(!expanded);
+  };
+
+  const goToProfile = () => {
+    const token = item.author?.url_token || item.author?.id;
+    if (token) {
+      router.push(`/user/${token}`);
+    }
+  };
+
   return (
     <View type="surface" style={[styles.card]}>
       {/* 1. 作者信息栏 */}
       <View style={styles.authorRow}>
-        <Image source={{ uri: item.author?.avatar_url }} style={styles.avatar} />
-        <View style={styles.authorInfo} >
-          <Text style={styles.authorName}>{item.author?.name}</Text>
-          <Text type="secondary" style={styles.authorHeadline} numberOfLines={1}>
-            {item.author?.headline}
-          </Text>
-        </View>
+        <Pressable onPress={goToProfile} style={{ flexDirection: 'row', flex: 1, alignItems: 'center' }}>
+          <Image source={{ uri: item.author?.avatar_url }} style={styles.avatar} />
+          <View style={styles.authorInfo} >
+            <Text style={styles.authorName}>{item.author?.name}</Text>
+            <Text type="secondary" style={styles.authorHeadline} numberOfLines={1}>
+              {item.author?.headline}
+            </Text>
+          </View>
+        </Pressable>
         <Pressable
           style={[styles.followBtn, item.author?.is_following && styles.followBtnActive]}
           onPress={() => followMutation.mutate()}
@@ -89,9 +104,8 @@ const AnswerItem = ({ item }: { item: any }) => {
       </View>
 
       {/* 2. 内容部分 */}
-      <Pressable onPress={() => setExpanded(!expanded)} style={styles.contentContainer}>
+      <Pressable onPress={toggleExpand} style={styles.contentContainer}>
         {expanded ? (
-          // 展开状态：显示富文本
           <RenderHtml
             contentWidth={width - 30}
             source={{ html: item.content }}
@@ -103,10 +117,9 @@ const AnswerItem = ({ item }: { item: any }) => {
             }}
           />
         ) : (
-          // 折叠状态：显示纯文本摘要
           <Text style={styles.excerpt}>
             {excerpt}
-            <Text style={styles.expandLabel}> 展开全文</Text>
+            {isLongContent && <Text style={styles.expandLabel}> 展开全文</Text>}
           </Text>
         )}
       </Pressable>
@@ -147,6 +160,7 @@ const AnswerItem = ({ item }: { item: any }) => {
     </View>
   );
 };
+
 
 export default function QuestionDetail() {
   const { id } = useLocalSearchParams();
@@ -270,7 +284,7 @@ export default function QuestionDetail() {
     queryKey: ['question-answers', id, sortBy],
     queryFn: async ({ pageParam = 0 }) => {
       try {
-        const include = 'data[*].content,voteup_count,comment_count,author.name,author.avatar_url,author.headline,author.is_following,relationship.voting,relationship.is_author';
+        const include = 'data[*].content,voteup_count,comment_count,author.name,author.avatar_url,author.headline,author.is_following,relationship.voting,relationship.is_author,created_time';
         const url = `/questions/${id}/answers?include=${include}&limit=20&offset=${pageParam}&sort_by=${sortBy}`;
         const res = await client.get(url);
         return res.data;
