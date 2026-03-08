@@ -1,4 +1,4 @@
-import apiClient from '@/api/client';
+import { followMember, unfollowMember } from '@/api/zhihu';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet } from 'react-native';
@@ -7,6 +7,7 @@ import { Text, View } from './Themed';
 export const UserCard = ({ user }: { user: any }) => {
     const router = useRouter();
     const [isFollowing, setIsFollowing] = useState(user.is_following);
+    const [followerCount, setFollowerCount] = useState(user.follower_count || 0);
     const [loading, setLoading] = useState(false);
 
     const handleFollow = async () => {
@@ -15,11 +16,13 @@ export const UserCard = ({ user }: { user: any }) => {
         setLoading(true);
         try {
             if (isFollowing) {
-                await apiClient.delete(`/members/${targetId}/followers/`);
+                const data = await unfollowMember(targetId);
                 setIsFollowing(false);
+                if (data.follower_count !== undefined) setFollowerCount(data.follower_count);
             } else {
-                await apiClient.post(`/members/${targetId}/followers/`);
+                const data = await followMember(targetId);
                 setIsFollowing(true);
+                if (data.follower_count !== undefined) setFollowerCount(data.follower_count);
             }
         } catch (err) {
             console.error('关注操作失败:', err);
@@ -47,7 +50,7 @@ export const UserCard = ({ user }: { user: any }) => {
                     {user.headline || '这个用户很神秘喵'}
                 </Text>
                 <View style={{ flexDirection: 'row', marginTop: 4, backgroundColor: 'transparent' }}>
-                    <Text type="secondary" style={styles.stats}>{user.follower_count || 0} 关注者</Text>
+                    <Text type="secondary" style={styles.stats}>{followerCount} 关注者</Text>
                     <Text type="secondary" style={[styles.stats, { marginLeft: 12 }]}>{user.answer_count || 0} 回答</Text>
                 </View>
             </View>

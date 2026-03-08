@@ -24,12 +24,12 @@ export const getMemberRelations = async (id: string | number, type: 'answers' | 
 };
 
 export const followMember = async (id: string | number) => {
-    const res = await apiClient.post(`/members/${id}/followers/`);
+    const res = await apiClient.post(`/members/${id}/followers`);
     return res.data;
 };
 
 export const unfollowMember = async (id: string | number) => {
-    const res = await apiClient.delete(`/members/${id}/followers/`);
+    const res = await apiClient.delete(`/members/${id}/followers`);
     return res.data;
 };
 
