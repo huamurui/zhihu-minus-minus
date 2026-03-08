@@ -24,7 +24,7 @@ const AnswerItem = ({ item }: { item: any }) => {
   const excerpt = item.content?.replace(/<[^>]+>/g, '').substring(0, 100) + '...';
 
   return (
-    <View type="surface" style={[styles.card, { borderBottomColor: borderColor }]}>
+    <View type="surface" style={[styles.card]}>
       {/* 1. 作者信息栏 */}
       <View style={styles.authorRow}>
         <Image source={{ uri: item.author?.avatar_url }} style={styles.avatar} />
@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
   header: { padding: 20, marginBottom: 8 },
   title: { fontSize: 21, fontWeight: 'bold', lineHeight: 28 },
   qExcerpt: { marginTop: 10, fontSize: 14, lineHeight: 20 },
-  qStats: { marginTop: 15, borderTopWidth: 0.5, paddingTop: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  qStats: { marginTop: 15, paddingTop: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   qStatText: { color: '#0084ff', fontWeight: 'bold' },
   sortContainer: { flexDirection: 'row', alignItems: 'center' },
   sortBtn: { marginLeft: 15, paddingVertical: 2, paddingHorizontal: 4 },
@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
   sortText: { fontSize: 13, color: '#888' },
   sortTextActive: { color: '#0084ff', fontWeight: 'bold' },
   // 回答卡片
-  card: { padding: 15, marginBottom: 2, borderBottomWidth: 0.5 },
+  card: { padding: 15, marginBottom: 6, },
   authorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   avatar: { width: 34, height: 34, borderRadius: 17 },
   authorInfo: { flex: 1, marginLeft: 10 },
@@ -338,8 +338,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#eee',
   },
   stickyHeaderContent: {
     height: 50,
