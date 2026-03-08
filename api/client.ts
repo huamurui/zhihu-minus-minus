@@ -1,14 +1,13 @@
 import { useAuthStore } from '@/store/useAuthStore';
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
-import { signRequest96 } from './zse96/x';
+import { signRequest96, ZSE_VERSION } from './zse96/index';
 
 const apiClient = axios.create({
   baseURL: 'https://www.zhihu.com/api/v4',
   timeout: 10000,
 });
 
-const ZSE_VERSION = '101_3_3.0';
 
 function getDc0(cookie: string) {
   const match = cookie.match(/d_c0=([^;]+)/);
@@ -25,7 +24,7 @@ apiClient.interceptors.request.use(async (config) => {
     if (dc0) {
       const body = config.data ? (typeof config.data === 'string' ? config.data : JSON.stringify(config.data)) : null;
       const fullUrl = apiClient.getUri(config);
-      const zse96 = signRequest96(fullUrl, body, ZSE_VERSION, dc0);
+      const zse96 = signRequest96(fullUrl, body, cookie);
       config.headers['x-zse-96'] = zse96;
       config.headers['x-zse-93'] = ZSE_VERSION;
       config.headers['x-requested-with'] = 'fetch';
@@ -42,7 +41,7 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       console.warn('请登陆后再尝试');
     }
-    console.error('API 请求错误:', error.response?.status, error.response?.data || error.message);
+    console.error('API 请求错误:', error.response?.status, error.response?.data || error.message, "请求配置:", error.config);
     return Promise.reject(error);
   }
 );
