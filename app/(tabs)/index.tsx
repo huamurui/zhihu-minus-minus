@@ -5,8 +5,10 @@ import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
+import PagerView from 'react-native-pager-view';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // 使用 @ 别名导入组件
 import { FEED_URLS, getFeed } from '@/api/zhihu';
@@ -14,53 +16,26 @@ import { FeedCard } from '@/components/FeedCard';
 import { HotCard, HotItem } from '@/components/HotCard';
 import { Text, View, useThemeColor } from '@/components/Themed';
 
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+const TABS = ['following', 'recommend', 'hot'] as const;
+type TabType = typeof TABS[number];
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'following' | 'recommend' | 'hot'>('recommend');
+  const [activeTab, setActiveTab] = useState<TabType>('recommend');
+  const pagerRef = useRef<PagerView>(null);
+
   const tintColor = useThemeColor({}, 'tint');
   const borderBottomColor = useThemeColor({}, 'border');
   const textColor = useThemeColor({}, 'text');
 
   const { cookies } = useAuthStore();
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, refetch } = useInfiniteQuery({
-    queryKey: ['zhihu-feed', activeTab],
-    queryFn: async ({ pageParam = FEED_URLS[activeTab] }) => {
-      // 如果没有 cookie，理论上 enabled 已经阻止了调用，但这里加一层保护
-      if (!cookies && activeTab === 'following') {
-        return { items: [], nextUrl: null };
-      }
-      try {
-        const data = await getFeed(pageParam as string);
-        const rawItems = data.data || [];
 
-        let items;
-        if (activeTab === 'following') {
-          items = rawItems.map((item: any) => parseFollowingData(item)).filter(Boolean);
-        } else if (activeTab === 'recommend') {
-          items = rawItems.map((item: any) => parseRecommendData(item));
-        } else {
-          items = rawItems.map((item: any, index: number) => parseHotData(item, index));
-        }
-
-        return {
-          items,
-          nextUrl: data.paging?.next?.replace('http://', 'https://')
-        };
-      } catch (e: any) {
-        console.log(`❌ API ${activeTab} 失败:`, e.response?.status || e.message);
-        return { items: [], nextUrl: null };
-      }
-    },
-    initialPageParam: FEED_URLS[activeTab],
-    getNextPageParam: (lastPage) => lastPage.nextUrl,
-    enabled: !!cookies, // 首页三个 tab 均在登录后触发，避免未登录时的 401 或无效请求
-  });
-
-  const flattenedData = data?.pages.flatMap((page) => page.items) ?? [];
+  const handleTabPress = (tab: TabType, index: number) => {
+    setActiveTab(tab);
+    pagerRef.current?.setPage(index);
+  };
 
   return (
     <View style={styles.container}>
@@ -72,8 +47,12 @@ export default function HomeScreen() {
       >
         <View style={[styles.topNav, { paddingTop: insets.top + 5 }]}>
           <View style={{ flexDirection: 'row', flex: 1, backgroundColor: 'transparent' }}>
-            {(['following', 'recommend', 'hot'] as const).map((tab) => (
-              <Pressable key={tab} onPress={() => setActiveTab(tab)} style={styles.navItem}>
+            {TABS.map((tab, index) => (
+              <Pressable
+                key={tab}
+                onPress={() => handleTabPress(tab, index)}
+                style={styles.navItem}
+              >
                 <Text
                   style={[
                     styles.navText,
@@ -113,27 +92,84 @@ export default function HomeScreen() {
           </Pressable>
         </View>
       ) : (
-        <FlashList
-          data={flattenedData}
-          {...({ estimatedItemSize: activeTab === 'recommend' ? 180 : 100 } as any)}
-          onEndReached={() => hasNextPage && !isFetchingNextPage && fetchNextPage()}
-          onEndReachedThreshold={0.5}
-          onRefresh={refetch}
-          refreshing={isLoading}
-          contentContainerStyle={{
-            paddingTop: insets.top + 55, // 动态偏移，确保内容不被覆盖
-            paddingBottom: 60
-          }}
-          renderItem={({ item }: { item: any }) => {
-            if (activeTab === 'hot') {
-              return <HotCard item={item as HotItem} />;
-            }
-            return <FeedCard item={item} />;
-          }}
-          ListFooterComponent={isFetchingNextPage ? <ActivityIndicator style={{ margin: 20 }} /> : null}
-        />
+        <PagerView
+          ref={pagerRef}
+          style={styles.pager}
+          initialPage={1}
+          onPageSelected={(e) => setActiveTab(TABS[e.nativeEvent.position])}
+        >
+          {TABS.map((tab) => (
+            <View key={tab} style={{ flex: 1, backgroundColor: 'transparent' }}>
+              <FeedList tab={tab} insets={insets} />
+            </View>
+          ))}
+        </PagerView>
       )}
     </View>
+  );
+}
+
+// 抽取列表组件
+function FeedList({ tab, insets }: { tab: TabType; insets: any }) {
+  const { cookies } = useAuthStore();
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, refetch } = useInfiniteQuery({
+    queryKey: ['zhihu-feed', tab],
+    queryFn: async ({ pageParam = FEED_URLS[tab] }) => {
+      if (!cookies && tab === 'following') return { items: [], nextUrl: null };
+      try {
+        const data = await getFeed(pageParam as string);
+        const rawItems = data.data || [];
+
+        let items;
+        if (tab === 'following') {
+          items = rawItems.map((item: any) => parseFollowingData(item)).filter(Boolean);
+        } else if (tab === 'recommend') {
+          items = rawItems.map((item: any) => parseRecommendData(item));
+        } else {
+          items = rawItems.map((item: any, index: number) => parseHotData(item, index));
+        }
+
+        return {
+          items,
+          nextUrl: data.paging?.next?.replace('http://', 'https://')
+        };
+      } catch (e: any) {
+        console.log(`❌ API ${tab} 失败:`, e.response?.status || e.message);
+        return { items: [], nextUrl: null };
+      }
+    },
+    initialPageParam: FEED_URLS[tab],
+    getNextPageParam: (lastPage) => lastPage.nextUrl,
+    enabled: !!cookies,
+  });
+
+  const flattenedData = data?.pages.flatMap((page) => page.items) ?? [];
+
+  return (
+    <FlashList
+      data={flattenedData}
+      {...({ estimatedItemSize: tab === 'recommend' ? 180 : 100 } as any)}
+      onEndReached={() => hasNextPage && !isFetchingNextPage && fetchNextPage()}
+      onEndReachedThreshold={0.5}
+      onRefresh={refetch}
+      refreshing={isLoading}
+      contentContainerStyle={{
+        paddingTop: insets.top + 55,
+        paddingBottom: 80
+      }}
+      renderItem={({ item }: { item: any }) => {
+        if (tab === 'hot') {
+          return <HotCard item={item as HotItem} />;
+        }
+        return <FeedCard item={item} />;
+      }}
+      ListEmptyComponent={isLoading ? null : (
+        <View style={{ flex: 1, alignItems: 'center', paddingTop: 100, backgroundColor: 'transparent' }}>
+          <Text type="secondary">暂无内容</Text>
+        </View>
+      )}
+      ListFooterComponent={isFetchingNextPage ? <ActivityIndicator style={{ margin: 20 }} /> : null}
+    />
   );
 }
 
@@ -200,6 +236,7 @@ function parseHotData(item: any, index: number) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  pager: { flex: 1 },
   topNavContainer: {
     position: 'absolute',
     top: 0,
