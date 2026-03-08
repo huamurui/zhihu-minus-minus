@@ -1,15 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Image, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import RenderHtml from 'react-native-render-html';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import client from '@/api/client';
 import { LikeButton } from '@/components/LikeButton';
 import { Text, View, useThemeColor } from '@/components/Themed';
-import { useNavigation } from 'expo-router';
 
 // 单个回答组件：处理内部的“展开/折叠”逻辑
 const AnswerItem = ({ item }: { item: any }) => {
@@ -28,7 +28,7 @@ const AnswerItem = ({ item }: { item: any }) => {
       {/* 1. 作者信息栏 */}
       <View style={[styles.authorRow, { backgroundColor: 'transparent' }]}>
         <Image source={{ uri: item.author?.avatar_url }} style={styles.avatar} />
-        <View style={styles.authorInfo}>
+        <View style={styles.authorInfo} >
           <Text style={styles.authorName}>{item.author?.name}</Text>
           <Text type="secondary" style={styles.authorHeadline} numberOfLines={1}>
             {item.author?.headline}
@@ -70,7 +70,7 @@ const AnswerItem = ({ item }: { item: any }) => {
             count={item.voteup_count}
             voted={item.relationship?.voting}
           />
-          <View style={[styles.downvoteBtn, { backgroundColor: borderColor }]}>
+          <View style={[styles.downvoteBtn, { backgroundColor: 'transparent' }]}>
             <Ionicons name="caret-down" size={18} color="#0084ff" />
           </View>
         </View>
@@ -91,13 +91,59 @@ const AnswerItem = ({ item }: { item: any }) => {
 
 export default function QuestionDetail() {
   const { id } = useLocalSearchParams();
-  const navigation = useNavigation();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
   const borderColor = useThemeColor({}, 'border');
+  const backgroundColor = useThemeColor({}, 'background');
+  const textColor = useThemeColor({}, 'text');
   const [sortBy, setSortBy] = useState<'default' | 'created'>('default');
 
-  useEffect(() => {
-    navigation.setOptions({ title: '问题' });
-  }, [navigation]);
+  // 动画相关
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const lastScrollY = useRef(0);
+  const headerVisible = useRef(new Animated.Value(0)).current;
+  const isHeaderShowRef = useRef(false); // 使用 ref 避免频繁触发 re-render
+
+  const handleScroll = (event: any) => {
+    const currentY = event.nativeEvent.contentOffset.y;
+    const diff = currentY - lastScrollY.current;
+
+    // 联动滚动逻辑
+    if (currentY > 400) {
+      if (diff < -15) { // 较大幅度向上滑才触发显示
+        if (!isHeaderShowRef.current) {
+          isHeaderShowRef.current = true;
+          Animated.timing(headerVisible, {
+            toValue: 1,
+            duration: 250,
+            useNativeDriver: true,
+          }).start();
+        }
+      } else if (diff > 5) { // 向下滑即隐藏
+        if (isHeaderShowRef.current) {
+          isHeaderShowRef.current = false;
+          Animated.timing(headerVisible, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          }).start();
+        }
+      }
+    } else if (currentY <= 100) {
+      // 回到顶部区域强制隐藏
+      if (isHeaderShowRef.current) {
+        isHeaderShowRef.current = false;
+        Animated.timing(headerVisible, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }).start();
+      }
+    }
+
+    lastScrollY.current = currentY;
+    scrollY.setValue(currentY);
+  };
 
   // 1. 获取问题详情
   const { data: question, isLoading: qLoading } = useQuery({
@@ -157,18 +203,56 @@ export default function QuestionDetail() {
 
   return (
     <View style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      {/* 1. 浮动手动 Header */}
+      <Animated.View
+        style={[
+          styles.stickyHeader,
+          {
+            backgroundColor,
+            paddingTop: insets.top,
+            opacity: headerVisible,
+            transform: [{
+              translateY: headerVisible.interpolate({
+                inputRange: [0, 1],
+                outputRange: [-insets.top - 50, 0]
+              })
+            }],
+            zIndex: 10,
+          }
+        ]}
+      >
+        <View style={styles.stickyHeaderContent}>
+          <View style={{ width: 40 }} />
+          <Text style={styles.stickyTitle} numberOfLines={1}>
+            {question?.title}
+          </Text>
+          <View style={{ width: 40 }} />
+        </View>
+      </Animated.View>
+
+      {/* 2. 始终显示的返回按钮 (层级最高) */}
+      <Pressable
+        onPress={() => router.back()}
+        style={[styles.floatingBackBtn, { top: insets.top + 8 }]}
+      >
+        <Ionicons name="chevron-back" size={28} color={textColor} />
+      </Pressable>
+
       <FlashList
+        onScroll={handleScroll}
         data={answers || []}
         {...({ estimatedItemSize: 200 } as any)}
         ListHeaderComponent={
-          <View type="surface" style={styles.header}>
+          <View type="surface" style={[styles.header, { paddingTop: insets.top + 50 }]}>
             <Text style={styles.title}>{question?.title || '加载失败'}</Text>
             {question?.excerpt ? (
               <Text type="secondary" style={styles.qExcerpt}>
                 {question.excerpt.replace(/<[^>]+>/g, '')}
               </Text>
             ) : null}
-            <View style={[styles.qStats, { borderTopColor: borderColor }]}>
+            <View style={[styles.qStats]}>
               <Text style={styles.qStatText}>
                 {question?.answer_count || 0} 个回答
               </Text>
@@ -223,9 +307,9 @@ const styles = StyleSheet.create({
   header: { padding: 20, marginBottom: 8 },
   title: { fontSize: 21, fontWeight: 'bold', lineHeight: 28 },
   qExcerpt: { marginTop: 10, fontSize: 14, lineHeight: 20 },
-  qStats: { marginTop: 15, borderTopWidth: 0.5, paddingTop: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  qStats: { backgroundColor: 'transparent', marginTop: 15, borderTopWidth: 0.5, paddingTop: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   qStatText: { color: '#0084ff', fontWeight: 'bold' },
-  sortContainer: { flexDirection: 'row', alignItems: 'center' },
+  sortContainer: { backgroundColor: 'transparent', flexDirection: 'row', alignItems: 'center' },
   sortBtn: { marginLeft: 15, paddingVertical: 2, paddingHorizontal: 4 },
   sortBtnActive: { borderBottomWidth: 2, borderBottomColor: '#0084ff' },
   sortText: { fontSize: 13, color: '#888' },
@@ -237,7 +321,7 @@ const styles = StyleSheet.create({
   authorInfo: { flex: 1, marginLeft: 10 },
   authorName: { fontSize: 15, fontWeight: 'bold' },
   authorHeadline: { fontSize: 12, marginTop: 2 },
-  followBtn: { backgroundColor: '#0084ff15', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 4 },
+  followBtn: { backgroundColor: 'transparent', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 4 },
   followText: { color: '#0084ff', fontSize: 13, fontWeight: 'bold' },
   // 内容
   contentContainer: { marginVertical: 5 },
@@ -249,4 +333,33 @@ const styles = StyleSheet.create({
   downvoteBtn: { width: 34, height: 34, borderRadius: 4, justifyContent: 'center', alignItems: 'center', marginLeft: 4 },
   commentBtn: { flexDirection: 'row', alignItems: 'center', marginLeft: 20 },
   commentCount: { marginLeft: 5, fontSize: 13 },
+  // 动效 Header 样式
+  stickyHeader: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#eee',
+  },
+  stickyHeaderContent: {
+    height: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 15,
+  },
+  stickyTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  floatingBackBtn: {
+    position: 'absolute',
+    left: 10,
+    zIndex: 100,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });
