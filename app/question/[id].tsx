@@ -26,7 +26,7 @@ const AnswerItem = ({ item }: { item: any }) => {
   return (
     <View type="surface" style={[styles.card, { borderBottomColor: borderColor }]}>
       {/* 1. 作者信息栏 */}
-      <View style={[styles.authorRow, { backgroundColor: 'transparent' }]}>
+      <View style={styles.authorRow}>
         <Image source={{ uri: item.author?.avatar_url }} style={styles.avatar} />
         <View style={styles.authorInfo} >
           <Text style={styles.authorName}>{item.author?.name}</Text>
@@ -63,14 +63,14 @@ const AnswerItem = ({ item }: { item: any }) => {
       </Pressable>
 
       {/* 3. 底部交互栏 */}
-      <View style={[styles.footer, { backgroundColor: 'transparent' }]}>
+      <View style={styles.footer}>
         <View style={styles.voteGroup}>
           <LikeButton
             id={item.id}
             count={item.voteup_count}
             voted={item.relationship?.voting}
           />
-          <View style={[styles.downvoteBtn, { backgroundColor: 'transparent' }]}>
+          <View style={styles.downvoteBtn}>
             <Ionicons name="caret-down" size={18} color="#0084ff" />
           </View>
         </View>
@@ -202,7 +202,7 @@ export default function QuestionDetail() {
   }
 
   return (
-    <View style={styles.container}>
+    <View type="default" style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* 1. 浮动手动 Header */}
@@ -307,9 +307,9 @@ const styles = StyleSheet.create({
   header: { padding: 20, marginBottom: 8 },
   title: { fontSize: 21, fontWeight: 'bold', lineHeight: 28 },
   qExcerpt: { marginTop: 10, fontSize: 14, lineHeight: 20 },
-  qStats: { backgroundColor: 'transparent', marginTop: 15, borderTopWidth: 0.5, paddingTop: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  qStats: { marginTop: 15, borderTopWidth: 0.5, paddingTop: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   qStatText: { color: '#0084ff', fontWeight: 'bold' },
-  sortContainer: { backgroundColor: 'transparent', flexDirection: 'row', alignItems: 'center' },
+  sortContainer: { flexDirection: 'row', alignItems: 'center' },
   sortBtn: { marginLeft: 15, paddingVertical: 2, paddingHorizontal: 4 },
   sortBtnActive: { borderBottomWidth: 2, borderBottomColor: '#0084ff' },
   sortText: { fontSize: 13, color: '#888' },
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
   authorInfo: { flex: 1, marginLeft: 10 },
   authorName: { fontSize: 15, fontWeight: 'bold' },
   authorHeadline: { fontSize: 12, marginTop: 2 },
-  followBtn: { backgroundColor: 'transparent', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 4 },
+  followBtn: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 4 },
   followText: { color: '#0084ff', fontSize: 13, fontWeight: 'bold' },
   // 内容
   contentContainer: { marginVertical: 5 },

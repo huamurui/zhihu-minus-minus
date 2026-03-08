@@ -39,9 +39,14 @@ export function Text(props: TextProps & { type?: 'default' | 'secondary' }) {
 }
 
 export function View(props: ViewProps & { type?: 'default' | 'surface' | 'border' }) {
-  const { style, lightColor, darkColor, type = 'default', ...otherProps } = props;
-  const colorName = type === 'surface' ? 'surface' : type === 'border' ? 'border' : 'background';
-  const backgroundColor = useThemeColor({ light: lightColor, dark: darkColor }, colorName);
+  const { style, lightColor, darkColor, type, ...otherProps } = props;
+
+  let backgroundColor: string | undefined;
+
+  if (type) {
+    const colorName = type === 'surface' ? 'surface' : type === 'border' ? 'border' : 'background';
+    backgroundColor = useThemeColor({ light: lightColor, dark: darkColor }, colorName);
+  }
 
   return <DefaultView style={[{ backgroundColor }, style]} {...otherProps} />;
 }
