@@ -35,6 +35,12 @@ export default function ProfileScreen() {
     enabled: !!cookies, // 只有在已登录（有 cookie）时才触发请求
   });
 
+  const unreadCount =
+    (me?.default_notifications_count || 0) +
+    (me?.follow_notifications_count || 0) +
+    (me?.vote_thank_notifications_count || 0) +
+    (me?.messages_count || 0);
+
   useFocusEffect(
     useCallback(() => {
       if (cookies) {
@@ -139,7 +145,17 @@ export default function ProfileScreen() {
           />
         </View>
 
-        <MenuItem icon="notifications-outline" title="消息通知" onPress={() => router.push('/notifications' as any)} />
+        <MenuItem
+          icon="notifications-outline"
+          title="消息通知"
+          onPress={() => router.push('/notifications' as any)}
+          right={unreadCount > 0 ? (
+            <View style={styles.badgeContainer}>
+              <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+              <Ionicons name="chevron-forward" size={16} color="#ccc" />
+            </View>
+          ) : undefined}
+        />
         <MenuItem icon="settings-outline" title="更多设置" />
         <MenuItem icon="help-circle-outline" title="反馈与建议" />
       </View>
@@ -281,5 +297,21 @@ const styles = StyleSheet.create({
     color: '#ff4d4f',
     fontSize: 16,
     fontWeight: '600',
+  },
+  badgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  badgeText: {
+    backgroundColor: '#ff4d4f',
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginRight: 4,
   },
 });

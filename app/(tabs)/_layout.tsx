@@ -1,6 +1,9 @@
+import { getMe } from '@/api/zhihu';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons'; // 通用图标库
+import { useQuery } from '@tanstack/react-query';
 import { BlurView } from 'expo-blur';
 import { Tabs } from 'expo-router';
 import React from 'react';
@@ -8,6 +11,20 @@ import { StyleSheet } from 'react-native';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const { cookies } = useAuthStore();
+
+  // 获取个人信息以显示未读消息红点
+  const { data: me } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => getMe(),
+    enabled: !!cookies,
+    refetchInterval: 30000, // 每 30 秒轮询一次未读数
+  });
+
+  const unreadCount = (me?.default_notifications_count || 0) +
+    (me?.follow_notifications_count || 0) +
+    (me?.vote_thank_notifications_count || 0) +
+    (me?.messages_count || 0);
 
   return (
     <Tabs
@@ -93,3 +110,5 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({});
