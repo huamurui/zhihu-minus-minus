@@ -35,7 +35,7 @@ export default function FollowersScreen() {
 
     return (
         <View style={styles.container}>
-            <Stack.Screen options={{ title: '粉丝列表' }} />
+            <Stack.Screen options={{ title: '关注者列表' }} />
             <FlashList
                 data={users}
                 renderItem={({ item }) => <UserCard user={item} />}
@@ -45,7 +45,7 @@ export default function FollowersScreen() {
                 refreshing={isRefetching}
                 ListEmptyComponent={() => (
                     <View style={styles.empty}>
-                        {isLoading ? <ActivityIndicator color="#0084ff" /> : <Text type="secondary">还没有粉丝喵</Text>}
+                        {isLoading ? <ActivityIndicator color="#0084ff" /> : <Text type="secondary">还没有关注者喵</Text>}
                     </View>
                 )}
                 ListFooterComponent={() => isFetchingNextPage ? <ActivityIndicator style={{ margin: 20 }} color="#0084ff" /> : null}

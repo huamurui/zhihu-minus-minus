@@ -47,7 +47,7 @@ export const UserCard = ({ user }: { user: any }) => {
                     {user.headline || '这个用户很神秘喵'}
                 </Text>
                 <View style={{ flexDirection: 'row', marginTop: 4, backgroundColor: 'transparent' }}>
-                    <Text type="secondary" style={styles.stats}>{user.follower_count || 0} 粉丝</Text>
+                    <Text type="secondary" style={styles.stats}>{user.follower_count || 0} 关注者</Text>
                     <Text type="secondary" style={[styles.stats, { marginLeft: 12 }]}>{user.answer_count || 0} 回答</Text>
                 </View>
             </View>

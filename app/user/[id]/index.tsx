@@ -171,7 +171,7 @@ export default function UserDetailScreen() {
                 <View style={[styles.statsRow, { backgroundColor: 'transparent' }]}>
                     <Pressable style={styles.statItem} onPress={() => router.push(`/user/${user?.url_token || id}/followers`)}>
                         <Text style={styles.stat}>{user?.follower_count || 0}</Text>
-                        <Text type="secondary" style={styles.label}>粉丝</Text>
+                        <Text type="secondary" style={styles.label}>关注者</Text>
                     </Pressable>
                     <Pressable style={styles.statItem} onPress={() => router.push(`/user/${user?.url_token || id}/following`)}>
                         <Text style={styles.stat}>{user?.following_count || 0}</Text>
