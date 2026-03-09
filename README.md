@@ -19,21 +19,40 @@
   - **日报**: 完整集成知乎日报。
   - **详情**: 优雅的问题展示、回答/文章详情、评论交互（支持二级回复）。
   - **个人**: 我的主页、个人点赞/收藏、浏览历史记录、粉丝/关注列表。
-- **现代化架构**: 全面拥抱 Expo Router、TanStack Query V5、Tailwind CSS (NativeWind) 和 Zustand。
+- **现代化架构**: 全面拥抱 Expo Router、TanStack Query V5、Tailwind CSS (NativeWind)(todo，这个还没有拥抱) 和 Zustand。
 
-## 🛠️ 技术栈
+## 📸 界面预览
 
-- **框架**: [Expo SDK 55](https://expo.dev/) (React Native 0.83+)
-- **路由**: Expo Router (Typed Routes) 基于文件系统的强类型路由。
-- **数据**: TanStack Query (React Query) + Axios (自校验签名拦截)。
-- **样式**: NativeWind (Tailwind CSS for React Native)。
-- **状态**: Zustand (持久化全局配置)。
-- **动效**: React Native Reanimated + Expo Haptics 触感反馈。
-- **Cookie**: `@react-native-cookies/cookies` & `react-native-nitro-cookies`。
+<div align="center">
+  <table style="border-collapse: separate; border-spacing: 15px;">
+    <tr>
+      <td align="center" valign="top">
+        <img src="./screenshot/photo_7_2026-03-09_01-45-47.jpg" width="160" style="border-radius: 16px; border: 1px solid #eee; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
+        <br /><br />
+        <b>搜索</b><br />
+      </td>
+      <td align="center" valign="top">
+        <img src="./screenshot/photo_5_2026-03-09_01-45-47.jpg" width="160" style="border-radius: 16px; border: 1px solid #eee; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
+        <br /><br />
+        <b>问题</b><br />
+      </td>
+      <td align="center" valign="top">
+        <img src="./screenshot/photo_9_2026-03-09_01-45-47.jpg" width="160" style="border-radius: 16px; border: 1px solid #eee; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
+        <br /><br />
+        <b>夜间模式</b><br />
+      </td>
+      <td align="center" valign="top">
+        <img src="./screenshot/photo_3_2026-03-09_01-45-47.jpg" width="160" style="border-radius: 16px; border: 1px solid #eee; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
+        <br /><br />
+        <b>消息</b><br />
+      </td>
+    </tr>
+  </table>
+
 
 ## 🚀 快速开始
 
-本项目涉及到原生 Cookie 管理库，推荐使用 **Development Build** 进行开发。
+本项目涉及到一些原生库，推荐使用 **Development Build** 进行开发。
 
 1. **准备环境**
    ```bash
