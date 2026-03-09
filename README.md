@@ -3,6 +3,7 @@
 > [!IMPORTANT]
 > **🚧 项目声明**：本项目目前仍处于**极早期开发阶段**，部分功能可能不完整且存在不稳定的 API。
 
+快去看看 <https://github.com/zhihulite/Hydrogen> 和 <https://github.com/zly2006/zhihu-plus-plus>
 
 ![zhihu--](./assets/images/favicon.svg)
 
@@ -55,24 +56,24 @@
 本项目涉及到一些原生库，推荐使用 **Development Build** 进行开发。
 
 1. **准备环境**
-   ```bash
-   npm install -g expo-cli
-   ```
+```bash
+npm install -g expo-cli
+```
 
 2. **安装依赖**
-   ```bash
-   npm install
-   ```
+```bash
+npm install
+```
 
 3. **运行 Android** (需要 ADB 或模拟器环境)
-   ```bash
-   npm run android
-   ```
+```bash
+npm run android
+```
 
 4. **运行 iOS** (需要 Mac 且安装 Xcode)
-   ```bash
-   npm run ios
-   ```
+```bash
+npm run ios
+```
 
 ## 🔐 登录说明
 
