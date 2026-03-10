@@ -20,7 +20,7 @@ export default function PublishScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + 60 }]}>
       <Text style={styles.header}>发布内容</Text>
-      
+
       <View style={styles.grid}>
         {PUBLISH_OPTIONS.map((item) => (
           <Pressable
@@ -41,13 +41,6 @@ export default function PublishScreen() {
           </Pressable>
         ))}
       </View>
-
-      <Pressable 
-        style={styles.closeBtn} 
-        onPress={() => router.back()}
-      >
-        <Ionicons name="close" size={30} color="#999" />
-      </Pressable>
     </View>
   );
 }

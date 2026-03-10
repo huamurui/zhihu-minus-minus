@@ -89,7 +89,7 @@ export default function TabLayout() {
               styles.iconWrapper,
               focused && { backgroundColor: Colors[colorScheme].tint + '15' }
             ]}>
-              <Ionicons name={focused ? "add-circle" : "add"} size={24} color={color} />
+              <Ionicons name={focused ? "add-circle" : "add"} size={focused ? 26 : 24} color={color} />
             </View>
           ),
         }}
