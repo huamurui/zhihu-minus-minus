@@ -43,7 +43,8 @@ export default function LoginScreen() {
       // 只有当包含 z_c0 (登录 Token) 时且不为空时才认为是有效的登录 Cookie
       // 额外检查 __zse_ck 以确保环境验证成功 (知乎反爬字段)
       const hasZc0 = !!mergedCookies['z_c0'];
-      const hasZseCk = !!mergedCookies['__zse_ck'];
+      // const hasZseCk = !!mergedCookies['__zse_ck'];
+      const hasZseCk = true;
       const hasDc0 = !!mergedCookies['d_c0'];
 
       console.log(`📊 Cookie 状态: d_c0=${hasDc0}, z_c0=${hasZc0}, __zse_ck=${hasZseCk}`);
@@ -113,10 +114,11 @@ export default function LoginScreen() {
           // 如果到达了目标验证页面，等待 JS 执行完成后抓取 Cookie
           if (url.includes('question/11474985081')) {
             console.log('🎯 已到达验证页面，等待获取 __zse_ck...');
+            // todo，目前加密还有问题，zse-ck 的 cookie 并没有帮助解开更多 api 限制，故先不管这里。
             // 延迟 3-5 秒，确保 知乎的 zse-ck 脚本运行完毕并设置了 Cookie
-            setTimeout(() => {
-              webViewRef.current?.injectJavaScript(`window.ReactNativeWebView.postMessage(document.cookie)`);
-            }, 4000);
+            // setTimeout(() => {
+            webViewRef.current?.injectJavaScript(`window.ReactNativeWebView.postMessage(document.cookie)`);
+            // }, 4000);
           }
         }}
         onLoadStart={() => setLoading(true)}

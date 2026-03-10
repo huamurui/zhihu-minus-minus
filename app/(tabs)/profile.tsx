@@ -39,15 +39,15 @@ export default function ProfileScreen() {
     (me?.default_notifications_count || 0) +
     (me?.follow_notifications_count || 0) +
     (me?.vote_thank_notifications_count || 0) +
-    (me?.messages_count || 0);
+    // (me?.messages_count || 0);
 
-  useFocusEffect(
-    useCallback(() => {
-      if (cookies) {
-        refetch();
-      }
-    }, [cookies, refetch])
-  );
+    useFocusEffect(
+      useCallback(() => {
+        if (cookies) {
+          refetch();
+        }
+      }, [cookies, refetch])
+    );
 
   const handleLogout = () => {
     Alert.alert('退出登录', '确定要退出当前账号吗喵？', [
@@ -156,8 +156,11 @@ export default function ProfileScreen() {
             </View>
           ) : undefined}
         />
-        <MenuItem icon="settings-outline" title="更多设置" />
-        <MenuItem icon="help-circle-outline" title="反馈与建议" />
+        <MenuItem
+          icon="help-circle-outline"
+          title="反馈与建议"
+          onPress={() => router.push('/feedback')}
+        />
       </View>
 
       {/* 5. 退出登录按钮 */}

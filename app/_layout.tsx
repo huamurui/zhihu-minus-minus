@@ -56,7 +56,15 @@ export default function RootLayout() {
             options={{
               presentation: 'modal',
               headerTitle: '登录知乎',
-              headerLeft: () => null, // 登录页左侧通常留空或放“取消”
+              headerLeft: () => null,
+            }}
+          />
+
+          <Stack.Screen
+            name="feedback/index"
+            options={{
+              headerShown: false,
+              presentation: 'card',
             }}
           />
 
