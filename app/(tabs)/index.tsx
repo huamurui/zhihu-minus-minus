@@ -223,13 +223,14 @@ function parseRecommendData(item: any) {
 // 热榜数据解析
 function parseHotData(item: any, index: number) {
   const target = item.target || item;
+  const questionId = target.url.split('/').pop();
   return {
     id: target.id?.toString() || Math.random().toString(),
-    questionId: target.id?.toString() || "",
+    questionId: questionId,
     rank: index + 1,
     title: target.title || "无标题",
     excerpt: target.excerpt || "",
-    image: target.children?.[0]?.thumbnail || target.image_url || null,
+    image: item.children?.[0]?.thumbnail || item.image_url || null,
     hotValue: target.detail_text || "",
   };
 }
