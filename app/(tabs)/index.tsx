@@ -17,7 +17,7 @@ import { HotCard, HotItem } from '@/components/HotCard';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { DailyList } from '@/components/DailyList';
 
-const TABS = ['following', 'recommend', 'daily', 'hot'] as const;
+const TABS = ['following', 'recommend', 'hot', 'daily'] as const;
 type TabType = typeof TABS[number];
 
 export default function HomeScreen() {
