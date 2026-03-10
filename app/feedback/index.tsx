@@ -33,7 +33,7 @@ export default function FeedbackScreen() {
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>找到我们</Text>
                     <Text style={[styles.description, { color: textColor, opacity: 0.7 }]}>
-                        知乎 Minus Minus 是一个开源项目。如果您在使用过程中遇到任何问题，或者有好的功能建议，欢迎通过以下方式反馈给我。
+                        「知乎--」是一个开源项目。如果您在使用过程中遇到任何问题，或者有好的功能建议，欢迎通过以下方式反馈给我。
                     </Text>
 
                     <View style={[styles.infoCard, { backgroundColor: surfaceColor, borderColor: borderColor }]}>

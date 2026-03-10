@@ -131,7 +131,7 @@ export default function ProfileScreen() {
       {/* 3. 我的资产 (收纳盒) */}
       <View type="surface" style={[styles.menuSection, { marginTop: 12 }]}>
         <MenuItem icon="bookmark-outline" title="我的收藏" color="#ff9800" onPress={() => router.push('/collections' as any)} />
-        <MenuItem icon="heart-outline" title="我的点赞" color="#f44336" onPress={() => router.push('/user/likes' as any)} />
+        {/* <MenuItem icon="heart-outline" title="我的点赞" color="#f44336" onPress={() => router.push('/user/likes' as any)} /> */}
         <MenuItem icon="time-outline" title="最近浏览" color="#2196f3" onPress={() => router.push('/history' as any)} />
       </View>
 
