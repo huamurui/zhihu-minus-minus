@@ -32,9 +32,9 @@ const SkeletonCard = () => {
   const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
 
   return (
-    <View type="surface" style={styles.card}>
-      <Animated.View style={[styles.image, { backgroundColor: skeletonBg }, animatedStyle]} />
-      <View style={[styles.textContainer, { backgroundColor: 'transparent' }]}>
+    <View type="surface" style={styles_daily.card}>
+      <Animated.View style={[styles_daily.image, { backgroundColor: skeletonBg }, animatedStyle]} />
+      <View style={[styles_daily.textContainer, { backgroundColor: 'transparent' }]}>
         <Animated.View style={[{ width: '90%', height: 20, backgroundColor: skeletonBg, marginBottom: 10 }, animatedStyle]} />
         <Animated.View style={[{ width: '40%', height: 14, backgroundColor: skeletonBg }, animatedStyle]} />
       </View>
@@ -42,10 +42,7 @@ const SkeletonCard = () => {
   );
 };
 
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-export default function DailyScreen() {
-  const insets = useSafeAreaInsets();
+export function DailyList({ insets }: { insets: any }) {
   const router = useRouter();
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, refetch } = useInfiniteQuery({
@@ -74,14 +71,14 @@ export default function DailyScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
+      <View style={styles_daily.container}>
         {[1, 2, 3, 4, 5].map((i) => <SkeletonCard key={i} />)}
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={styles_daily.container}>
       <FlashList
         data={flattenedData}
         keyExtractor={(item: any, index: number) => (item.type === 'date' ? item.date : item.data.id.toString() + index)}
@@ -91,12 +88,12 @@ export default function DailyScreen() {
         onRefresh={refetch}
         refreshing={isLoading}
         contentContainerStyle={{
-          paddingTop: insets.top + 50, // 为透明 Header 留出空间
-          paddingBottom: 80 // 为底部 Tab 留出空间
+          paddingTop: insets.top + 70, // 统一首页列表的 paddingTop
+          paddingBottom: 110
         }}
         renderItem={({ item }: { item: any }) => {
           if (item.type === 'date') {
-            return <View style={{ backgroundColor: 'transparent' }}><Text type="secondary" style={styles.dateHeader}>{formatDate(item.date)}</Text></View>;
+            return <View style={{ backgroundColor: 'transparent' }}><Text type="secondary" style={styles_daily.dateHeader}>{formatDate(item.date)}</Text></View>;
           }
           const story = item.data;
           return (
@@ -104,23 +101,23 @@ export default function DailyScreen() {
               style={({ pressed }) => [pressed && { opacity: 0.7 }]}
               onPress={() => router.push(`/article/${story.id}`)}
             >
-              <View type="surface" style={styles.card}>
-                <Image source={{ uri: story.images?.[0] }} style={styles.image} />
-                <View style={[styles.textContainer, { backgroundColor: 'transparent' }]}>
-                  <Text style={styles.title} numberOfLines={2}>{story.title}</Text>
-                  <Text type="secondary" style={styles.hint}>{story.hint}</Text>
+              <View type="surface" style={styles_daily.card}>
+                <Image source={{ uri: story.images?.[0] }} style={styles_daily.image} />
+                <View style={[styles_daily.textContainer, { backgroundColor: 'transparent' }]}>
+                  <Text style={styles_daily.title} numberOfLines={2}>{story.title}</Text>
+                  <Text type="secondary" style={styles_daily.hint}>{story.hint}</Text>
                 </View>
               </View>
             </Pressable>
           );
         }}
-        ListFooterComponent={isFetchingNextPage ? <Text type="secondary" style={styles.loadingText}>加载中...喵</Text> : null}
+        ListFooterComponent={isFetchingNextPage ? <Text type="secondary" style={styles_daily.loadingText}>加载中...</Text> : null}
       />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const styles_daily = StyleSheet.create({
   container: { flex: 1 },
   dateHeader: { padding: 15, fontSize: 14, fontWeight: '600' },
   card: { flexDirection: 'row', marginHorizontal: 12, marginBottom: 12, padding: 12, borderRadius: 12 },

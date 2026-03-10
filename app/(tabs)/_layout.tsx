@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { BlurView } from 'expo-blur';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -21,28 +21,40 @@ export default function TabLayout() {
     refetchInterval: 30000, // 每 30 秒轮询一次未读数
   });
 
-  const unreadCount = (me?.default_notifications_count || 0) +
-    (me?.follow_notifications_count || 0) +
-    (me?.vote_thank_notifications_count || 0) +
-    (me?.messages_count || 0);
-
   return (
     <Tabs
       screenOptions={{
+        // 1. 正确关掉文字
+        tabBarShowLabel: false,
+        // 2. 核心：让每个单元格内容完全居中
+        tabBarItemStyle: {
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: 64, // 保持和 tabBarStyle 高度一致
+        },
         tabBarActiveTintColor: Colors[colorScheme].tint,
         tabBarInactiveTintColor: Colors[colorScheme].textSecondary,
-        // 让 TabBar 看起来更高级：使用半透明模糊背景
+        // 3. 整个背板样式
         tabBarStyle: {
           position: 'absolute',
           backgroundColor: 'transparent',
-          borderTopWidth: 0, // 移除顶部边框以增强通透感
+          borderTopWidth: 0,
           elevation: 0,
-          height: 60,
-          paddingBottom: 8,
-          bottom: 0,
-          left: 0,
-          right: 0,
+          height: 58,
+          bottom: 24, // 稍微拉高一点，更有悬浮感
+          left: 20,
+          right: 20,
+          borderRadius: 32,
+          margin: 12,
+          paddingBottom: 0, // 关键：去除默认的底部边距
+          overflow: 'hidden',
+          // 给悬浮窗加点投影
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.1,
+          shadowRadius: 12,
         },
+        // 4. 背景模糊
         tabBarBackground: () => (
           <BlurView
             intensity={80}
@@ -50,11 +62,6 @@ export default function TabLayout() {
             style={StyleSheet.absoluteFill}
           />
         ),
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '500',
-        },
-        // 首页我们自己写了顶部导航，所以把原生的 Header 关掉
         headerShown: false,
       }}>
 
@@ -63,37 +70,28 @@ export default function TabLayout() {
         options={{
           title: '首页',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
+            <View style={[
+              styles.iconWrapper,
+              focused && { backgroundColor: Colors[colorScheme].tint + '15' }
+            ]}>
+              <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
+            </View>
           ),
         }}
       />
 
       <Tabs.Screen
-        name="daily"
+        name="publish"
         options={{
-          title: '日报',
+          title: '',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "newspaper" : "newspaper-outline"} size={24} color={color} />
+            <View style={[
+              styles.iconWrapper,
+              focused && { backgroundColor: Colors[colorScheme].tint + '15' }
+            ]}>
+              <Ionicons name={focused ? "add-circle" : "add"} size={24} color={color} />
+            </View>
           ),
-          headerShown: true, // 日报页可以保留原生 Header
-          headerTitle: '知乎日报',
-          headerTransparent: true, // 让 Header 背景透明以便使用 BlurView
-          headerBackground: () => (
-            <BlurView
-              intensity={80}
-              tint={colorScheme}
-              style={StyleSheet.absoluteFill}
-            />
-          ),
-          headerStyle: {
-            elevation: 0,
-            shadowOpacity: 0,
-          },
-          headerTitleStyle: {
-            fontWeight: 'bold',
-            color: Colors[colorScheme].text,
-          },
-          headerTintColor: Colors[colorScheme].tint,
         }}
       />
 
@@ -102,13 +100,27 @@ export default function TabLayout() {
         options={{
           title: '我的',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "person" : "person-outline"} size={24} color={color} />
+            <View style={[
+              styles.iconWrapper,
+              focused && { backgroundColor: Colors[colorScheme].tint + '15' }
+            ]}>
+              <Ionicons name={focused ? "person" : "person-outline"} size={24} color={color} />
+            </View>
           ),
-          headerShown: false, // 个人中心通常自研沉浸式头部
         }}
       />
     </Tabs>
   );
 }
 
-const styles = StyleSheet.create({});
+const styles = StyleSheet.create({
+  iconWrapper: {
+    width: 100,
+    height: 48,
+    borderRadius: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    top: 10,
+  }
+});
