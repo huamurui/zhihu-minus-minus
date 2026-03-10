@@ -1,4 +1,5 @@
 import { deleteAnswer, getAnswer } from '@/api/zhihu';
+import { fastCollectAnswer, getAnswerCollectionStatus, removeFromCollection } from '@/api/zhihu/collection';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
 import { LikeButton } from '@/components/LikeButton';
 import { Text, View, useThemeColor } from '@/components/Themed';
@@ -107,6 +108,38 @@ export default function AnswerDetailScreen() {
       ]
     );
   };
+
+  // 收藏相关
+  const { data: collectionStatus, refetch: refetchCollectionStatus } = useQuery({
+    queryKey: ['answer-collection-status', id],
+    queryFn: () => getAnswerCollectionStatus(id as string),
+    enabled: !!id,
+  });
+
+  const isCollected = collectionStatus?.data?.some((item: any) => item.is_favorited);
+  const favoritedCollection = collectionStatus?.data?.find((item: any) => item.is_favorited);
+
+  const collectMutation = useMutation({
+    mutationFn: async () => {
+      if (isCollected && favoritedCollection) {
+        return removeFromCollection(favoritedCollection.id, id as string);
+      } else {
+        return fastCollectAnswer(id as string);
+      }
+    },
+    onSuccess: (res) => {
+      refetchCollectionStatus();
+      if (!isCollected) {
+        Alert.alert('收藏成功', `已收藏到「${res?.collection?.title || '我的收藏'}」喵！`);
+      } else {
+        // Alert.alert('已取消收藏', '喵！');
+      }
+    },
+    onError: (err: any) => {
+      console.error(err);
+      Alert.alert('操作失败', err.response?.data?.error?.message || '无法处理收藏请求');
+    }
+  });
 
   const goToProfile = () => {
     const token = answer?.author?.url_token || answer?.author?.id;
@@ -256,8 +289,16 @@ export default function AnswerDetailScreen() {
             <Ionicons name="chatbubble-outline" size={22} color="#888" />
             <Text type="secondary" style={styles.actionCount}>{answer?.comment_count}</Text>
           </Pressable>
-          <Pressable style={styles.footerAction}>
-            <Ionicons name="star-outline" size={22} color="#888" />
+          <Pressable
+            style={styles.footerAction}
+            onPress={() => collectMutation.mutate()}
+            disabled={collectMutation.isPending}
+          >
+            <Ionicons
+              name={isCollected ? "star" : "star-outline"}
+              size={22}
+              color={isCollected ? "#ff9800" : "#888"}
+            />
           </Pressable>
           <Pressable style={styles.footerAction}>
             <Ionicons name="share-social-outline" size={22} color="#888" />

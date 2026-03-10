@@ -40,3 +40,50 @@ export const deleteCollection = async (id: string | number) => {
     const res = await apiClient.delete(`/collections/${id}`);
     return res.data;
 };
+
+/**
+ * 获取回答被收藏的状态及所属收藏夹列表
+ * GET /collections/contents/answer/{answer_id}
+ */
+export const getAnswerCollectionStatus = async (answerId: string | number, limit = 5, offset = 0) => {
+    const res = await apiClient.get(`/collections/contents/answer/${answerId}`, {
+        params: { limit, offset }
+    });
+    return res.data;
+};
+
+/**
+ * 添加到收藏夹
+ * POST /collections/{collection_id}/contents?content_id={answer_id}&content_type=answer
+ */
+export const addToCollection = async (collectionId: string | number, answerId: string | number) => {
+    const res = await apiClient.post(`/collections/${collectionId}/contents`, null, {
+        params: {
+            content_id: answerId,
+            content_type: 'answer'
+        }
+    });
+    return res.data;
+};
+
+/**
+ * 从收藏夹中删除
+ * DELETE /collections/{collection_id}/contents/{answer_id}?content_type=answer
+ */
+export const removeFromCollection = async (collectionId: string | number, answerId: string | number) => {
+    const res = await apiClient.delete(`/collections/${collectionId}/contents/${answerId}`, {
+        params: {
+            content_type: 'answer'
+        }
+    });
+    return res.data;
+};
+
+/**
+ * 快速收藏到默认收藏夹
+ * POST /collections/contents/answer/{answer_id}
+ */
+export const fastCollectAnswer = async (answerId: string | number) => {
+    const res = await apiClient.post(`/collections/contents/answer/${answerId}`);
+    return res.data;
+};
