@@ -33,7 +33,7 @@ export default function PublishScreen() {
     <View style={styles.container}>
       {/* 顶部指示器 */}
       <View style={[styles.headerSection, { paddingTop: insets.top + 40 }]}>
-        <Text style={styles.header}>发布内容</Text>
+        <Text style={styles.header}>发布内容(WIP)</Text>
         <Text style={styles.subHeader} type="secondary">让世界看到你的思考</Text>
       </View>
 

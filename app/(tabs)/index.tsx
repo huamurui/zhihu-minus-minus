@@ -9,6 +9,12 @@ import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { 
+  useSharedValue, 
+  useAnimatedStyle, 
+  interpolate, 
+  Extrapolate 
+} from 'react-native-reanimated';
 
 // 使用 @ 别名导入组件
 import { FEED_URLS, getFeed } from '@/api/zhihu';
@@ -26,6 +32,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>('daily');
   const pagerRef = useRef<PagerView>(null);
+  const scrollX = useSharedValue(3); // 初始在日报 (index 3)
 
   const tintColor = useThemeColor({}, 'tint');
   const borderBottomColor = useThemeColor({}, 'border');
@@ -48,17 +55,29 @@ export default function HomeScreen() {
           style={styles.blurWrapper}
         >
           <View style={styles.topNav}>
-            <View style={{ flexDirection: 'row', flex: 1, backgroundColor: 'transparent', alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', flex: 1, backgroundColor: 'transparent', alignItems: 'center', position: 'relative' }}>
+              {/* 实时追踪的背景胶囊 */}
+              <Animated.View 
+                style={[
+                  styles.animatedPill,
+                  { backgroundColor: tintColor + '15' },
+                  useAnimatedStyle(() => {
+                    // 假设每个 tab 宽度约为 60px (包含 margin)，这里做简单线性的移动
+                    // 实际项目中可以用 onLayout 获取精确位置，此处 2 字符 tab 宽度相对固定
+                    const tabWidth = 58; 
+                    return {
+                      transform: [{ translateX: scrollX.value * tabWidth }]
+                    };
+                  })
+                ]} 
+              />
               {TABS.map((tab, index) => {
                 const isActive = activeTab === tab;
                 return (
                   <Pressable
                     key={tab}
                     onPress={() => handleTabPress(tab, index)}
-                    style={[
-                      styles.navItem,
-                      isActive && { backgroundColor: tintColor + '15' }
-                    ]}
+                    style={styles.navItem}
                   >
                     <Text
                       style={[
@@ -67,7 +86,7 @@ export default function HomeScreen() {
                       ]}
                       type={isActive ? 'default' : 'secondary'}
                     >
-                      {tab === 'following' ? '关注' : tab === 'recommend' ? '推荐' : tab === 'daily' ? '日报' : '热榜'}
+                      {tab === 'following' ? '关注' : tab === 'recommend' ? '推荐' : tab === 'hot' ? '热榜' : '日报'}
                     </Text>
                   </Pressable>
                 );
@@ -94,7 +113,10 @@ export default function HomeScreen() {
       <PagerView
         ref={pagerRef}
         style={styles.pager}
-        initialPage={2} // Daily is index 2
+        initialPage={3} // Daily is index 3
+        onPageScroll={(e) => {
+          scrollX.value = e.nativeEvent.position + e.nativeEvent.offset;
+        }}
         onPageSelected={(e) => setActiveTab(TABS[e.nativeEvent.position])}
       >
         {TABS.map((tab) => (
@@ -300,4 +322,11 @@ const styles = StyleSheet.create({
   loginText: { fontSize: 16, marginTop: 20, marginBottom: 30 },
   loginBtn: { paddingHorizontal: 40, paddingVertical: 12, borderRadius: 25 },
   loginBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  animatedPill: {
+    position: 'absolute',
+    width: 54, // 略小于 navItem 以留出边距感
+    height: 34,
+    borderRadius: 17,
+    left: 0,
+  }
 });
