@@ -43,7 +43,7 @@ export default function HomeScreen() {
       {/* 顶部 Tab 导航：带毛玻璃效果 */}
       <View style={[styles.topNavContainer, { top: insets.top + 10, paddingHorizontal: 16 }]}>
         <BlurView
-          intensity={200}
+          intensity={100}
           tint={colorScheme}
           style={styles.blurWrapper}
         >

@@ -57,7 +57,7 @@ export default function TabLayout() {
         // 4. 背景模糊
         tabBarBackground: () => (
           <BlurView
-            intensity={80}
+            intensity={130}
             tint={colorScheme}
             style={StyleSheet.absoluteFill}
           />
