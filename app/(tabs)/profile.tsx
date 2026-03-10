@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 
 // 导入我们之前定义的组件和 Store
-import { getMe } from '@/api/zhihu';
+import { getMe, getMember } from '@/api/zhihu';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useThemeStore } from '@/store/useThemeStore';
@@ -29,24 +29,41 @@ export default function ProfileScreen() {
 
   const { cookies, setMe } = useAuthStore();
   // 1. 获取个人详细信息 (使用 API 抓取真实数据)
-  const { data: me, isLoading, refetch } = useQuery({
+  const { data: me, isLoading: isMeLoading, refetch: refetchMe } = useQuery({
     queryKey: ['me'],
     queryFn: () => getMe(),
     enabled: !!cookies, // 只有在已登录（有 cookie）时才触发请求
   });
 
+  // 2. 获取更详细的用户信息 (包含粉丝、关注等)
+  const { data: member, isLoading: isMemberLoading, refetch: refetchMember } = useQuery({
+    queryKey: ['me-detail', me?.url_token || me?.id],
+    queryFn: () => getMember(me?.url_token || me?.id || 'me'),
+    enabled: !!me,
+  });
+
+  // 合并数据：优先使用 member (更详细)，兜底使用 me
+  const profile = member || me;
+
   // 成功获取数据后，储存到全局 store
   React.useEffect(() => {
-    if (me) {
-      setMe(me);
+    if (profile) {
+      setMe(profile);
     }
-  }, [me, setMe]);
+  }, [profile, setMe]);
+
+  const isLoading = isMeLoading || isMemberLoading;
+  const refetch = () => {
+    refetchMe();
+    refetchMember();
+  };
 
   const unreadCount =
-    (me?.default_notifications_count || 0) +
-    (me?.follow_notifications_count || 0) +
-    (me?.vote_thank_notifications_count || 0) +
+    (profile?.default_notifications_count || 0) +
+    (profile?.follow_notifications_count || 0) +
+    (profile?.vote_thank_notifications_count || 0) +
     // (me?.messages_count || 0);
+
 
     useFocusEffect(
       useCallback(() => {
@@ -113,17 +130,25 @@ export default function ProfileScreen() {
 
         {/* 2. 数据战绩统计 */}
         <View style={[styles.statsGrid, { backgroundColor: 'transparent' }]}>
-          <StatItem count={me?.answer_count || 0} label="回答" />
-          <StatItem count={me?.articles_count || 0} label="文章" />
           <StatItem
-            count={me?.following_count || 0}
-            label="关注"
-            onPress={() => me && router.push(`/user/${me.url_token || me.id}/following`)}
+            count={profile?.answer_count || 0}
+            label="回答"
+            onPress={() => profile && router.push(`/user/${profile.url_token || profile.id}`)}
           />
           <StatItem
-            count={me?.follower_count || 0}
+            count={profile?.articles_count || 0}
+            label="文章"
+            onPress={() => profile && router.push(`/user/${profile.url_token || profile.id}`)}
+          />
+          <StatItem
+            count={profile?.following_count || 0}
+            label="关注"
+            onPress={() => profile && router.push(`/user/${profile.url_token || profile.id}/following`)}
+          />
+          <StatItem
+            count={profile?.follower_count || 0}
             label="粉丝"
-            onPress={() => me && router.push(`/user/${me.url_token || me.id}/followers`)}
+            onPress={() => profile && router.push(`/user/${profile.url_token || profile.id}/followers`)}
           />
         </View>
       </View>
