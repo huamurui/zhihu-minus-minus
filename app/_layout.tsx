@@ -68,6 +68,24 @@ export default function RootLayout() {
             }}
           />
 
+          {/* 发布相关页面：使用全屏 Modal */}
+          <Stack.Screen
+            name="publish/answer"
+            options={{ presentation: 'fullScreenModal', headerShown: false }}
+          />
+          <Stack.Screen
+            name="publish/article"
+            options={{ presentation: 'fullScreenModal', headerShown: false }}
+          />
+          <Stack.Screen
+            name="publish/pin"
+            options={{ presentation: 'fullScreenModal', headerShown: false }}
+          />
+          <Stack.Screen
+            name="publish/question"
+            options={{ presentation: 'fullScreenModal', headerShown: false }}
+          />
+
           {/* 其他 Modal 弹窗 */}
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: '提示' }} />
         </Stack>
