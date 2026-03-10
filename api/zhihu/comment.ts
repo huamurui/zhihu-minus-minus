@@ -57,3 +57,62 @@ export const createQuestionComment = async (id: string | number, content: string
     });
     return res.data;
 };
+
+/**
+ * Zhihu Comment V5 APIs
+ */
+
+export const getAnswerCommentsV5 = async (id: string | number, limit = 20, offset: string | number = 0) => {
+    const res = await apiClient.get(`/comment_v5/answers/${id}/root_comment?order_by=score&limit=${limit}&offset=${offset}`);
+    res.data.data = (res.data.data || []).map(normalizeComment);
+    return res.data;
+};
+
+export const getQuestionCommentsV5 = async (id: string | number, limit = 20, offset: string | number = 0) => {
+    const res = await apiClient.get(`/comment_v5/questions/${id}/root_comment?order_by=score&limit=${limit}&offset=${offset}`);
+    res.data.data = (res.data.data || []).map(normalizeComment);
+    return res.data;
+};
+
+export const getChildCommentsV5 = async (id: string | number, limit = 20, offset: string | number = 0) => {
+    const res = await apiClient.get(`/comment_v5/comments/${id}/child_comment?limit=${limit}&offset=${offset}`);
+    res.data.data = (res.data.data || []).map(normalizeComment);
+    return res.data;
+};
+
+/**
+ * 格式化评论数据，兼容 v4 和 v5 结构
+ */
+const normalizeComment = (comment: any) => {
+    if (!comment) return comment;
+
+    // 1. 处理作者结构 (V5 扁平化了)
+    if (comment.author && !comment.author.member) {
+        comment.author = { member: { ...comment.author } };
+    }
+
+    // 2. 处理回复对象的作者结构
+    if (comment.reply_to_author && !comment.reply_to_author.member) {
+        comment.reply_to_author = { member: { ...comment.reply_to_author } };
+    }
+
+    // 3. 处理点赞数 (V5 是 like_count)
+    if (comment.vote_count === undefined && comment.like_count !== undefined) {
+        comment.vote_count = comment.like_count;
+    }
+
+    // 4. 处理点赞状态 (V5 是 liked)
+    if (!comment.relationship && comment.liked !== undefined) {
+        comment.relationship = {
+            voting: comment.liked ? 1 : 0
+        };
+    }
+
+    // 5. 递归处理子评论 (V5 有时候会自带部分子评论)
+    if (comment.child_comments && Array.isArray(comment.child_comments)) {
+        comment.child_comments = comment.child_comments.map(normalizeComment);
+    }
+
+    return comment;
+};
+

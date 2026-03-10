@@ -61,6 +61,12 @@ export default function CommentScreen() {
     }
   });
 
+  const goToProfile = (urlToken: string | number) => {
+    if (urlToken) {
+      router.push(`/user/${urlToken}`);
+    }
+  };
+
   const renderComment = ({ item }: { item: any }) => {
     // 过滤 HTML 标签
     const cleanContent = item.content?.replace(/<[^>]+>/g, '').trim() || '';
@@ -68,16 +74,20 @@ export default function CommentScreen() {
     return (
       <View style={[styles.commentBox, { borderBottomColor: borderColor, backgroundColor: 'transparent' }]}>
         <View style={[styles.mainRow, { backgroundColor: 'transparent' }]}>
-          <Image source={{ uri: item.author.member.avatar_url }} style={styles.avatar} />
+          <Pressable onPress={() => goToProfile(item.author.member.url_token || item.author.member.id)}>
+            <Image source={{ uri: item.author.member.avatar_url }} style={styles.avatar} />
+          </Pressable>
           <View style={[styles.right, { backgroundColor: 'transparent' }]}>
-            <View style={styles.nameRow}>
-              <Text style={styles.name}>{item.author.member.name}</Text>
-              {item.author.member.headline && (
-                <Text type="secondary" style={styles.headline} numberOfLines={1}>
-                  {item.author.member.headline}
-                </Text>
-              )}
-            </View>
+            <Pressable onPress={() => goToProfile(item.author.member.url_token || item.author.member.id)}>
+              <View style={styles.nameRow}>
+                <Text style={styles.name}>{item.author.member.name}</Text>
+                {item.author.member.headline && (
+                  <Text type="secondary" style={styles.headline} numberOfLines={1}>
+                    {item.author.member.headline}
+                  </Text>
+                )}
+              </View>
+            </Pressable>
             <Text style={[styles.content, { color: textColor }]}>{cleanContent}</Text>
 
             {/* 子评论预览区域 */}

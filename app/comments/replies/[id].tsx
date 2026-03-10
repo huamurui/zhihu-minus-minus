@@ -4,7 +4,7 @@ import { Text, View, useThemeColor } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +14,7 @@ export default function ReplyDetailScreen() {
   const [inputText, setInputText] = useState('');
   const [replyTo, setReplyTo] = useState<{ id: string, name: string } | null>(null);
   const inputRef = useRef<TextInput>(null);
+  const router = useRouter();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const borderColor = useThemeColor({}, 'border');
@@ -45,17 +46,27 @@ export default function ReplyDetailScreen() {
     }
   });
 
+  const goToProfile = (urlToken: string | number) => {
+    if (urlToken) {
+      router.push(`/user/${urlToken}`);
+    }
+  };
+
   const renderReply = ({ item }: { item: any }) => {
     const cleanContent = item.content?.replace(/<[^>]+>/g, '').trim() || '';
 
     return (
       <View style={[styles.replyRow, { borderBottomColor: borderColor, backgroundColor: 'transparent' }]}>
-        <Image source={{ uri: item.author.member.avatar_url }} style={styles.avatar} />
+        <Pressable onPress={() => goToProfile(item.author.member.url_token || item.author.member.id)}>
+          <Image source={{ uri: item.author.member.avatar_url }} style={styles.avatar} />
+        </Pressable>
         <View style={[styles.contentBox, { backgroundColor: 'transparent' }]}>
           <Text style={styles.authorName}>
-            {item.author.member.name}
+            <Text onPress={() => goToProfile(item.author.member.url_token || item.author.member.id)}>
+              {item.author.member.name}
+            </Text>
             {item.reply_to_author && (
-              <Text type="secondary" style={styles.replyToText}> 回复 {item.reply_to_author.member.name}</Text>
+              <Text type="secondary" style={styles.replyToText}> 回复 <Text style={styles.replyTargetName} onPress={() => goToProfile(item.reply_to_author.member.url_token || item.reply_to_author.member.id)}>{item.reply_to_author.member.name}</Text></Text>
             )}
           </Text>
           <Text style={[styles.content, { color: textColor }]}>
@@ -169,6 +180,7 @@ const styles = StyleSheet.create({
   contentBox: { flex: 1, marginLeft: 12 },
   authorName: { fontWeight: 'bold', fontSize: 13, marginBottom: 4 },
   replyToText: { fontWeight: 'normal', color: '#999' },
+  replyTargetName: { color: '#0084ff' },
   content: { fontSize: 15, lineHeight: 22 },
   footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
   time: { fontSize: 12, color: '#999' },

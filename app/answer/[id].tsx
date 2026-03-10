@@ -1,6 +1,7 @@
 import { deleteAnswer, getAnswer } from '@/api/zhihu';
 import { fastCollectAnswer, getAnswerCollectionStatus, removeFromCollection } from '@/api/zhihu/collection';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
+import { DownvoteButton } from '@/components/DownvoteButton';
 import { LikeButton } from '@/components/LikeButton';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
@@ -279,9 +280,10 @@ export default function AnswerDetailScreen() {
             count={answer?.voteup_count || 0}
             voted={answer?.relationship?.voting}
           />
-          <View style={styles.downvote}>
-            <Ionicons name="caret-down" size={20} color="#0084ff" />
-          </View>
+          <DownvoteButton
+            id={answer?.id}
+            voted={answer?.relationship?.voting}
+          />
         </View>
 
         <View style={styles.footerRight}>
