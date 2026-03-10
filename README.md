@@ -92,6 +92,7 @@ npm run ios
 - [x] 自动签名算法 (X-ZSE-96)
 - [x] 点赞/收藏管理
 - [x] 深度搜索功能 (Search)
+- [x] 评论区全面升级 (Clickable Avatars & V5 API)
 - [ ] 动态发表与富文本编辑
 - [ ] 图片/视频全屏预览优化
 
@@ -104,3 +105,4 @@ npm run ios
 
 ---
 **Author**: [huamurui](https://github.com/huamurui) & [Antigravity Agent] 🐱
+**Version**: v0.0.2 | **Last Updated**: 2026-03-10
