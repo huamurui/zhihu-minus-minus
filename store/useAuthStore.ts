@@ -11,7 +11,9 @@ const secureStorage = {
 
 interface AuthState {
   cookies: string | null;
+  me: any | null; // 存储个人详细信息
   setCookies: (cookies: string) => void;
+  setMe: (me: any) => void;
   logout: () => void;
 }
 
@@ -19,9 +21,11 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       cookies: null,
+      me: null,
       setCookies: (cookies) => set({ cookies }),
+      setMe: (me) => set({ me }),
       logout: () => {
-        set({ cookies: null });
+        set({ cookies: null, me: null });
       },
     }),
     {

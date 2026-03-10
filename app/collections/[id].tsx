@@ -58,10 +58,13 @@ export default function CollectionDetailScreen() {
             <FlashList
                 data={contents}
                 renderItem={({ item }: { item: any }) => {
+                    const content = item.content;
+                    if (!content) return null;
+
                     let type: 'answer' | 'article' | 'pin' = 'answer';
-                    if (item.type === 'article') type = 'article';
-                    else if (item.type === 'pin') type = 'pin';
-                    return <CreationCard item={item} type={type} />;
+                    if (content.type === 'article') type = 'article';
+                    else if (content.type === 'pin') type = 'pin';
+                    return <CreationCard item={content} type={type} />;
                 }}
                 {...({ estimatedItemSize: 150 } as any)}
                 onEndReached={() => {

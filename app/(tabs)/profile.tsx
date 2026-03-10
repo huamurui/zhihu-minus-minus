@@ -27,13 +27,20 @@ export default function ProfileScreen() {
   const { isDark, toggleTheme } = useThemeStore();
   const accentColor = useThemeColor({}, 'tint');
 
-  const { cookies } = useAuthStore();
+  const { cookies, setMe } = useAuthStore();
   // 1. 获取个人详细信息 (使用 API 抓取真实数据)
   const { data: me, isLoading, refetch } = useQuery({
     queryKey: ['me'],
     queryFn: () => getMe(),
     enabled: !!cookies, // 只有在已登录（有 cookie）时才触发请求
   });
+
+  // 成功获取数据后，储存到全局 store
+  React.useEffect(() => {
+    if (me) {
+      setMe(me);
+    }
+  }, [me, setMe]);
 
   const unreadCount =
     (me?.default_notifications_count || 0) +
