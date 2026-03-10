@@ -3,7 +3,7 @@ import apiClient from '../client';
 export const voteContent = async (
     id: string | number,
     type: 'answers' | 'articles' | 'questions' | 'pins' | 'comments',
-    voteType: 'up' | 'neutral' | 'down' | 'like'
+    voteType: 'up' | 'neutral' | 'down' | 'like' | 'unlike'
 ) => {
     if (type === 'pins') {
         if (voteType === 'like' || voteType === 'up') {

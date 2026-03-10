@@ -178,10 +178,17 @@ function parseFollowingData(item: any) {
   const target = item.target;
   if (!target) return null;
 
+  const type = target.type;
+  let appType: 'answers' | 'articles' | 'pins' | 'questions' = 'answers';
+  if (type === 'answer') appType = 'answers';
+  else if (type === 'article') appType = 'articles';
+  else if (type === 'pin') appType = 'pins';
+  else if (type === 'question') appType = 'questions';
+
   return {
     id: target.id?.toString() || Math.random().toString(),
-    title: target.question?.title || target.title || "无标题内容",
-    questionId: target.question?.id || (target.type === 'question' ? target.id : ""),
+    title: target.question?.title || target.title || "",
+    questionId: target.question?.id?.toString() || (type === 'question' ? target.id?.toString() : ""),
     actionText: item.action_text,
     author: {
       id: target.author?.id || "",
@@ -189,34 +196,42 @@ function parseFollowingData(item: any) {
       name: target.author?.name || "匿名用户",
       avatar: target.author?.avatar_url || "https://picx.zhimg.com/v2-abed1a8c04700ba7d72b45195223e0ff_l.jpg",
     },
-    excerpt: target.excerpt || "",
+    excerpt: target.excerpt || target.content?.[0]?.content || "",
     image: target.thumbnail || (target.content_img?.length > 0 ? target.content_img[0] : null),
-    voteCount: target.voteup_count || 0,
+    voteCount: target.voteup_count || target.like_count || 0,
     commentCount: target.comment_count || 0,
     voted: target.relationship?.voting || 0,
-    type: target.type === 'answer' ? 'answers' : target.type === 'article' ? 'articles' : 'answers',
+    type: appType,
   };
 }
 
 // 推荐流数据解析
 function parseRecommendData(item: any) {
   const target = item.target || item;
+  const type = target.type;
+  
+  let appType: 'answers' | 'articles' | 'pins' | 'questions' = 'answers';
+  if (type === 'answer') appType = 'answers';
+  else if (type === 'article') appType = 'articles';
+  else if (type === 'pin') appType = 'pins';
+  else if (type === 'question') appType = 'questions';
+
   return {
     id: target.id?.toString() || Math.random().toString(),
-    title: target.question?.title || target.title || "无标题内容",
-    questionId: target.question?.id || "",
+    title: target.question?.title || target.title || "",
+    questionId: target.question?.id?.toString() || (type === 'question' ? target.id?.toString() : ""),
     author: {
       id: target.author?.id || "",
       name: target.author?.name || "匿名用户",
       avatar: target.author?.avatar_url || "https://picx.zhimg.com/v2-abed1a8c04700ba7d72b45195223e0ff_l.jpg",
       headline: target.author?.headline || ""
     },
-    excerpt: target.excerpt || "",
+    excerpt: target.excerpt || target.content?.[0]?.content || "",
     image: target.thumbnail || (target.content_img?.length > 0 ? target.content_img[0] : null),
-    voteCount: target.voteup_count || 0,
+    voteCount: target.voteup_count || target.like_count || 0,
     commentCount: target.comment_count || 0,
     voted: target.relationship?.voting || 0,
-    type: target.type === 'answer' ? 'answers' : target.type === 'article' ? 'articles' : 'answers',
+    type: appType,
   };
 }
 

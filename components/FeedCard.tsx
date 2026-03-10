@@ -6,9 +6,10 @@ import { Text, View } from './Themed';
 
 export const FeedCard = ({ item }: { item: any }) => {
   const router = useRouter();
+  const isQuestionType = item.type === 'questions';
 
   return (
-    <View type="surface" style={styles.card}>
+    <View type="surface" style={[styles.card, isQuestionType && { paddingBottom: 10 }]}>
       {/* 动态动作提示 (针对关注流) */}
       {item.actionText && (
         <Text type="secondary" style={styles.actionTextRow}>
@@ -18,24 +19,39 @@ export const FeedCard = ({ item }: { item: any }) => {
 
       {/* 热区1：点击作者头像/姓名 -> 用户页 */}
       <Pressable
-        onPress={() => router.push(`/user/${item.author.url_token || item.author.id}`)}
+        onPress={() => router.push(`/user/${item.author.url_token || item.author.id}` as any)}
         style={styles.authorRow}
       >
         <Image source={{ uri: item.author.avatar }} style={styles.avatar} />
         <Text type="secondary" style={styles.authorName}>{item.author.name}</Text>
       </Pressable>
-      {/* 热区2：点击标题 -> 问题详情页 */}
-      {/* todo
-        questionId 可能在不同接口里字段名不一样，需要适配,有些地方可能不存在，要好好找存在的，现在应用里使用的接口乱七八糟，之后考虑重新一个个看看知乎的接口
-      */}
-      <Pressable onPress={() => router.push(`/question/${item.questionId}`)} style={styles.titleRow}>
-        <Text style={styles.title} numberOfLines={2}>
-          {item.title}
-        </Text>
-      </Pressable>
 
-      {/* 热区3：点击内容摘要 -> 回答详情页 */}
-      <Pressable onPress={() => router.push(`/answer/${item.id}`)} style={styles.contentRow}>
+      {/* 热区2：点击标题 -> 详情页 */}
+      {item.title ? (
+        <Pressable 
+          onPress={() => {
+            if (isQuestionType || !item.questionId) {
+              router.push(`/question/${item.id}` as any);
+            } else {
+              router.push(`/question/${item.questionId}` as any);
+            }
+          }} 
+          style={styles.titleRow}
+        >
+          <Text style={styles.title} numberOfLines={2}>
+            {item.title}
+          </Text>
+        </Pressable>
+      ) : null}
+
+      {/* 热区3：点击内容摘要 -> 详情页 */}
+      <Pressable 
+        onPress={() => {
+          const routeType = item.type.slice(0, -1); // answers -> answer, pins -> pin etc.
+          router.push(`/${routeType}/${item.id}` as any);
+        }} 
+        style={styles.contentRow}
+      >
         <View style={{ flex: 1, backgroundColor: 'transparent' }}>
           <Text type="secondary" style={styles.excerpt} numberOfLines={3}>
             {item.excerpt}
@@ -44,28 +60,30 @@ export const FeedCard = ({ item }: { item: any }) => {
         {item.image && <Image source={{ uri: item.image }} style={styles.cover} />}
       </Pressable>
 
-      {/* 热区4：底部操作栏 */}
-      <View style={[styles.footer, { backgroundColor: 'transparent' }]}>
-        <LikeButton
-          id={item.id}
-          count={item.voteCount}
-          voted={item.voted}
-          type={item.type}
-        />
+      {/* 热区4：底部操作栏 - 问题关注类动态不显示 */}
+      {!isQuestionType && (
+        <View style={[styles.footer, { backgroundColor: 'transparent' }]}>
+          <LikeButton
+            id={item.id}
+            count={item.voteCount}
+            voted={item.voted}
+            type={item.type}
+          />
 
-        {/* 点击评论按钮 -> 评论页 */}
-        <Pressable
-          onPress={() => router.push(`/comments/${item.id}`)}
-          style={styles.commentBtn}
-        >
-          <Ionicons name="chatbubble-outline" size={16} color="#888" />
-          <Text style={styles.actionText}>{item.commentCount} 评论</Text>
-        </Pressable>
+          {/* 点击评论按钮 -> 评论页 */}
+          <Pressable
+            onPress={() => router.push(`/comments/${item.id}` as any)}
+            style={styles.commentBtn}
+          >
+            <Ionicons name="chatbubble-outline" size={16} color="#888" />
+            <Text style={styles.actionText}>{item.commentCount} 评论</Text>
+          </Pressable>
 
-        <Pressable style={styles.moreBtn}>
-          <Ionicons name="ellipsis-horizontal" size={16} color="#888" />
-        </Pressable>
-      </View>
+          <Pressable style={styles.moreBtn}>
+            <Ionicons name="ellipsis-horizontal" size={16} color="#888" />
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 };
