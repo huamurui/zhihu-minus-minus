@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Image, LayoutAnimation, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
@@ -10,10 +10,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import client from '@/api/client';
 import { deleteAnswer } from '@/api/zhihu/answer';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
-import { followQuestion, QUESTION_INCLUDE, unfollowQuestion } from '@/api/zhihu/question';
+import { followQuestion, getQuestion, QUESTION_INCLUDE, unfollowQuestion } from '@/api/zhihu/question';
 import { LikeButton } from '@/components/LikeButton';
 import { Text, View, useThemeColor } from '@/components/Themed';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Alert } from 'react-native';
 
 const AnswerItem = ({ item }: { item: any }) => {
@@ -223,15 +222,7 @@ export default function QuestionDetail() {
   // 1. 获取问题详情
   const { data: question, isLoading: qLoading } = useQuery({
     queryKey: ['question', id],
-    queryFn: async () => {
-      try {
-        const res = await client.get(`/questions/${id}?include=${QUESTION_INCLUDE}`);
-        return res.data || null;
-      } catch (err) {
-        console.error('获取问题详情失败:', err);
-        return null;
-      }
-    }
+    queryFn: async () => await getQuestion(id as string)
   });
 
   // 关注/取关问题的 Mutation
@@ -356,98 +347,97 @@ export default function QuestionDetail() {
         onScroll={handleScroll}
         data={answers || []}
         {...({ estimatedItemSize: 200 } as any)}
-        ListHeaderComponent={
-          <View type="surface" style={[styles.header, { paddingTop: insets.top + 50 }]}>
-            {/* 话题标签 */}
-            {question?.topics && question.topics.length > 0 && (
-              <View style={styles.topicsRow}>
-                {question.topics.map((topic: any) => (
-                  <View key={topic.id} style={styles.topicBadge}>
-                    <Text style={styles.topicText}>{topic.name}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            <Text style={styles.title}>{question?.title || '加载失败'}</Text>
-
-            {question?.excerpt ? (
-              <Text type="secondary" style={styles.qExcerpt}>
-                {question.excerpt.replace(/<[^>]+>/g, '')}
-              </Text>
-            ) : null}
-
-            {/* 关注与浏览人数 */}
-            <View style={styles.qMetaRow}>
-              <Text type="secondary" style={styles.qMetaText}>
-                {question?.follower_count || 0} 关注 · {question?.visit_count || 0} 浏览
-              </Text>
+        ListHeaderComponent={() => (<View type="surface" style={[styles.header, { paddingTop: insets.top + 50 }]}>
+          {/* 话题标签 */}
+          {question?.topics && question.topics.length > 0 && (
+            <View style={styles.topicsRow}>
+              {question.topics.map((topic: any) => (
+                <View key={topic.id} style={styles.topicBadge}>
+                  <Text style={styles.topicText}>{topic.name}</Text>
+                </View>
+              ))}
             </View>
+          )}
 
-            {/* 交互按钮 */}
-            <View style={styles.qActionRow}>
-              <Pressable
-                style={[
-                  styles.qActionBtn,
-                  question?.relationship?.is_following && styles.qActionBtnActive
-                ]}
-                onPress={() => followMutation.mutate()}
-                disabled={followMutation.isPending}
-              >
-                <Ionicons
-                  name={question?.relationship?.is_following ? "checkmark" : "add"}
-                  size={18}
-                  color={question?.relationship?.is_following ? "#888" : "#0084ff"}
-                />
-                <Text style={[
-                  styles.qActionBtnText,
-                  question?.relationship?.is_following && styles.qActionBtnTextActive
-                ]}>
-                  {question?.relationship?.is_following ? '已关注' : '关注问题'}
-                </Text>
-              </Pressable>
+          <Text style={styles.title}>{question?.title || '加载失败'}</Text>
 
-              <Pressable
-                style={styles.qActionBtn}
-                onPress={() => router.push(`/comments/${id}?type=question`)}
-              >
-                <Ionicons name="chatbubble-outline" size={18} color="#0084ff" />
-                <Text style={styles.qActionBtnText}>
-                  {question?.comment_count || 0} 条评论
-                </Text>
-              </Pressable>
+          {question?.excerpt ? (
+            <Text type="secondary" style={styles.qExcerpt}>
+              {question.excerpt.replace(/<[^>]+>/g, '')}
+            </Text>
+          ) : null}
 
-              <Pressable
-                style={styles.qActionBtn}
-                onPress={() => router.push(`/question/write/${id}`)}
-              >
-                <Ionicons name="create-outline" size={18} color="#0084ff" />
-                <Text style={styles.qActionBtnText}>写回答</Text>
-              </Pressable>
+          {/* 关注与浏览人数 */}
+          <View style={styles.qMetaRow}>
+            <Text type="secondary" style={styles.qMetaText}>
+              {question?.follower_count || 0} 关注 · {question?.visit_count || 0} 浏览
+            </Text>
+          </View>
 
-            </View>
-
-            <View style={[styles.qStats]}>
-              <Text style={styles.qStatText}>
-                {question?.answer_count || 0} 个回答
+          {/* 交互按钮 */}
+          <View style={styles.qActionRow}>
+            <Pressable
+              style={[
+                styles.qActionBtn,
+                question?.relationship?.is_following && styles.qActionBtnActive
+              ]}
+              onPress={() => followMutation.mutate()}
+              disabled={followMutation.isPending}
+            >
+              <Ionicons
+                name={question?.relationship?.is_following ? "checkmark" : "add"}
+                size={18}
+                color={question?.relationship?.is_following ? "#888" : "#0084ff"}
+              />
+              <Text style={[
+                styles.qActionBtnText,
+                question?.relationship?.is_following && styles.qActionBtnTextActive
+              ]}>
+                {question?.relationship?.is_following ? '已关注' : '关注问题'}
               </Text>
+            </Pressable>
 
-              <View style={styles.sortContainer}>
-                <Pressable
-                  onPress={() => setSortBy('default')}
-                  style={[styles.sortBtn, sortBy === 'default' && styles.sortBtnActive]}
-                >
-                  <Text style={[styles.sortText, sortBy === 'default' && styles.sortTextActive]}>默认</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => setSortBy('created')}
-                  style={[styles.sortBtn, sortBy === 'created' && styles.sortBtnActive]}
-                >
-                  <Text style={[styles.sortText, sortBy === 'created' && styles.sortTextActive]}>时间</Text>
-                </Pressable>
-              </View>
+            <Pressable
+              style={styles.qActionBtn}
+              onPress={() => router.push(`/comments/${id}?type=question`)}
+            >
+              <Ionicons name="chatbubble-outline" size={18} color="#0084ff" />
+              <Text style={styles.qActionBtnText}>
+                {question?.comment_count || 0} 条评论
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.qActionBtn}
+              onPress={() => router.push(`/question/write/${id}`)}
+            >
+              <Ionicons name="create-outline" size={18} color="#0084ff" />
+              <Text style={styles.qActionBtnText}>写回答</Text>
+            </Pressable>
+
+          </View>
+
+          <View style={[styles.qStats]}>
+            <Text style={styles.qStatText}>
+              {question?.answer_count || 0} 个回答
+            </Text>
+
+            <View style={styles.sortContainer}>
+              <Pressable
+                onPress={() => setSortBy('default')}
+                style={[styles.sortBtn, sortBy === 'default' && styles.sortBtnActive]}
+              >
+                <Text style={[styles.sortText, sortBy === 'default' && styles.sortTextActive]}>默认</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setSortBy('created')}
+                style={[styles.sortBtn, sortBy === 'created' && styles.sortBtnActive]}
+              >
+                <Text style={[styles.sortText, sortBy === 'created' && styles.sortTextActive]}>时间</Text>
+              </Pressable>
             </View>
           </View>
+        </View>)
         }
         renderItem={({ item }: { item: any }) => <AnswerItem item={item} />}
         keyExtractor={(item: any) => item.id.toString()}
@@ -457,7 +447,8 @@ export default function QuestionDetail() {
           }
         }}
         onEndReachedThreshold={0.5}
-        ListFooterComponent={
+        ListFooterComponent={() => (
+
           isFetchingNextPage ? (
             <ActivityIndicator style={{ marginVertical: 20 }} color="#0084ff" />
           ) : (
@@ -467,6 +458,7 @@ export default function QuestionDetail() {
               </Text>
             ) : null
           )
+        )
         }
         onRefresh={refetch}
         refreshing={isRefetching}
