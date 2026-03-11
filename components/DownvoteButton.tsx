@@ -8,15 +8,22 @@ import { useThemeColor } from './Themed';
 export const DownvoteButton = ({
     id,
     voted: initialVoted = 0,
-    type = 'answers'
+    type = 'answers',
+    variant = 'default'
 }: {
     id: string | number;
     voted?: number;
     type?: 'answers' | 'articles' | 'questions' | 'pins' | 'comments';
+    variant?: 'default' | 'minimal';
 }) => {
     const [voted, setVoted] = useState(initialVoted);
     const [loading, setLoading] = useState(false);
     const scale = useSharedValue(1);
+
+    // 同步外部传入的初始值
+    React.useEffect(() => {
+        setVoted(initialVoted);
+    }, [initialVoted]);
 
     const tintColor = useThemeColor({}, 'tint');
 
@@ -54,19 +61,19 @@ export const DownvoteButton = ({
             onPress={handlePress}
             disabled={loading}
             style={[
-                styles.btn,
-                { backgroundColor: isDownvoted ? tintColor : '#0084ff10' },
+                variant === 'default' ? styles.btn : styles.minimalBtn,
+                variant === 'default' && { backgroundColor: isDownvoted ? tintColor : '#0084ff10' },
                 loading && { opacity: 0.7 }
             ]}
         >
             {loading ? (
-                <ActivityIndicator size="small" color={isDownvoted ? "#fff" : tintColor} />
+                <ActivityIndicator size="small" color={isDownvoted || variant === 'minimal' ? tintColor : (variant === 'default' ? "#fff" : tintColor)} />
             ) : (
                 <Animated.View style={animatedStyle}>
                     <Ionicons
-                        name={isDownvoted ? "caret-down" : "caret-down"}
-                        size={20}
-                        color={isDownvoted ? "#fff" : tintColor}
+                        name={isDownvoted ? "caret-down" : "caret-down-outline"}
+                        size={variant === 'minimal' ? 28 : 20}
+                        color={variant === 'minimal' ? (isDownvoted ? tintColor : '#888') : (isDownvoted ? "#fff" : tintColor)}
                     />
                 </Animated.View>
             )}
@@ -82,5 +89,12 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginLeft: 6
+    },
+    minimalBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'transparent',
+        paddingHorizontal: 4
     }
 });

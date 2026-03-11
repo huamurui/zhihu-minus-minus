@@ -8,10 +8,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useRef } from 'react';
-import { ActivityIndicator, Alert, Animated, Image, LayoutAnimation, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert, AlertButton, Animated, Image, LayoutAnimation, Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import Reanimated, { SharedTransition } from 'react-native-reanimated';
 import RenderHtml from 'react-native-render-html';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
+import { useColorScheme } from '@/components/useColorScheme';
 
 const slowTransition = SharedTransition.duration(600);
 
@@ -22,6 +24,8 @@ export default function AnswerDetailScreen() {
   const { width } = useWindowDimensions();
 
   const queryClient = useQueryClient();
+  const colorScheme = useColorScheme();
+  const tintColor = useThemeColor({}, 'tint');
   const textColor = useThemeColor({}, 'text');
   const borderColor = useThemeColor({}, 'border');
   const surfaceColor = useThemeColor({}, 'surface');
@@ -32,6 +36,10 @@ export default function AnswerDetailScreen() {
   const lastScrollY = useRef(0);
   const headerVisible = useRef(new Animated.Value(0)).current;
   const isHeaderShowRef = useRef(false);
+
+  // 本地喜欢状态 (Heart)
+  const [isLiked, setIsLiked] = React.useState(false);
+  const [menuVisible, setMenuVisible] = React.useState(false);
 
   const handleScroll = (event: any) => {
     const currentY = event.nativeEvent.contentOffset.y;
@@ -152,6 +160,34 @@ export default function AnswerDetailScreen() {
     }
   };
 
+  const handleMore = () => {
+    const options: AlertButton[] = [
+      {
+        text: isLiked ? '❤️ 已喜欢' : '🤍 喜欢',
+        onPress: () => setIsLiked(!isLiked),
+      },
+      {
+        text: isCollected ? '🌟 已收藏' : '⭐ 收藏',
+        onPress: () => collectMutation.mutate(),
+      },
+      {
+        text: '📤 分享',
+        onPress: () => {/* 分享逻辑 */ },
+      },
+    ];
+
+    if (answer?.relationship?.is_author) {
+      options.push({
+        text: '🗑️ 删除回答',
+        onPress: handleDelete,
+      });
+    }
+
+    options.push({ text: '取消', style: 'cancel' });
+
+    Alert.alert('更多操作', undefined, options);
+  };
+
   const isLoading = queryLoading;
 
   return (
@@ -209,7 +245,7 @@ export default function AnswerDetailScreen() {
           onPress={() => router.push(`/question/${answer?.question?.id || questionId}`)}
         >
           {/* 这里的 Reanimated 负责接管动效 */}
-          <Reanimated.View 
+          <Reanimated.View
             sharedTransitionTag={`title-${questionId || id}`}
             sharedTransitionStyle={slowTransition}
           >
@@ -276,55 +312,96 @@ export default function AnswerDetailScreen() {
         )}
       </ScrollView>
 
-      {/* 3. 底部吸底交互栏 */}
-      <View
-        type="surface"
-        style={[
-          styles.footer,
-          {
-            paddingBottom: insets.bottom > 0 ? insets.bottom : 10,
-            height: 60 + (insets.bottom > 0 ? insets.bottom : 15)
-          }
-        ]}
-      >
-        <View style={styles.voteBox}>
-          <LikeButton
-            id={answer?.id}
-            count={answer?.voteup_count || 0}
-            voted={answer?.relationship?.voting}
-          />
-          <DownvoteButton
-            id={answer?.id}
-            voted={answer?.relationship?.voting}
-          />
-        </View>
+      {/* 3. 底部吸底交互栏 (采用首页同款悬浮设计) */}
+      <View style={[styles.footerContainer, { bottom: insets.bottom + 20 }]}>
+        <BlurView intensity={130} tint={colorScheme} style={styles.footerBlur}>
+          <View style={styles.footerContent}>
+            {/* 左侧：赞同(含数量)和反对 */}
+            <View style={styles.footerLeft}>
+              <LikeButton
+                id={answer?.id}
+                count={answer?.voteup_count || '-'}
+                voted={answer?.relationship?.voting}
+                variant="minimal"
+              />
+              <View style={{ width: 10 }} />
+              <DownvoteButton
+                id={answer?.id}
+                voted={answer?.relationship?.voting}
+                variant="minimal"
+              />
+            </View>
 
-        <View style={styles.footerRight}>
-          <Pressable style={styles.footerAction} onPress={() => router.push(`/comments/${id}?type=answer`)}>
-            <Ionicons name="chatbubble-outline" size={22} color="#888" />
-            <Text type="secondary" style={styles.actionCount}>{answer?.comment_count}</Text>
-          </Pressable>
-          <Pressable
-            style={styles.footerAction}
-            onPress={() => collectMutation.mutate()}
-            disabled={collectMutation.isPending}
-          >
-            <Ionicons
-              name={isCollected ? "star" : "star-outline"}
-              size={22}
-              color={isCollected ? "#ff9800" : "#888"}
-            />
-          </Pressable>
-          <Pressable style={styles.footerAction}>
-            <Ionicons name="share-social-outline" size={22} color="#888" />
-          </Pressable>
-          {answer?.relationship?.is_author && (
-            <Pressable style={styles.footerAction} onPress={handleDelete} disabled={deleteMutation.isPending}>
-              <Ionicons name="trash-outline" size={22} color="#ff4d4f" />
-            </Pressable>
-          )}
-        </View>
+            {/* 右侧：评论 + 更多 */}
+            <View style={styles.footerRight}>
+              <Pressable style={styles.footerAction} onPress={() => router.push(`/comments/${id}?type=answer`)}>
+                <Ionicons name="chatbubble-outline" size={24} color="#888" />
+                {answer?.comment_count > 0 && (
+                  <Text type="secondary" style={styles.actionCount}>{answer?.comment_count}</Text>
+                )}
+              </Pressable>
+
+              <Pressable style={styles.footerAction} onPress={() => setMenuVisible(true)}>
+                <Ionicons name="ellipsis-horizontal" size={24} color="#888" />
+              </Pressable>
+            </View>
+          </View>
+        </BlurView>
       </View>
+
+      {/* 4. 自定义更多操作菜单 (Bottom Sheet 风格) */}
+      <Modal
+        visible={menuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setMenuVisible(false)}
+        >
+          <View style={[styles.menuSheet, { backgroundColor: surfaceColor, paddingBottom: insets.bottom + 20 }]}>
+            <View style={styles.menuHeader}>
+              <View style={styles.menuKnob} />
+            </View>
+
+            <View style={styles.menuOptions}>
+              <MenuOption
+                icon={isLiked ? "heart" : "heart-outline"}
+                label={isLiked ? "取消喜欢" : "加入喜欢"}
+                color={isLiked ? "#ff4d4f" : undefined}
+                onPress={() => { setIsLiked(!isLiked); setMenuVisible(false); }}
+              />
+              <MenuOption
+                icon={isCollected ? "star" : "star-outline"}
+                label={isCollected ? "取消收藏" : "移至收藏"}
+                color={isCollected ? "#ffb400" : undefined}
+                onPress={() => { collectMutation.mutate(); setMenuVisible(false); }}
+              />
+              <MenuOption
+                icon="share-social-outline"
+                label="分享回答"
+                onPress={() => setMenuVisible(false)}
+              />
+              {answer?.relationship?.is_author && (
+                <View style={styles.menuDivider} />
+              )}
+              {answer?.relationship?.is_author && (
+                <MenuOption
+                  icon="trash-outline"
+                  label="删除回答"
+                  color="#ff4d4f"
+                  onPress={() => { handleDelete(); setMenuVisible(false); }}
+                />
+              )}
+            </View>
+
+            <Pressable style={styles.menuCancel} onPress={() => setMenuVisible(false)}>
+              <Text style={styles.menuCancelText}>取消</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -402,37 +479,125 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // 底部工具栏
-  footer: {
+  // 底部悬浮工具栏 (首页同款)
+  footerContainer: {
     position: 'absolute',
-    bottom: 0,
-    width: '100%',
+    left: 20,
+    right: 20,
+    zIndex: 1000,
+    // 增加阴影提升悬浮感
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  footerBlur: {
+    borderRadius: 32,
+    overflow: 'hidden',
+    height: 64,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(150,150,150,0.1)',
+  },
+  footerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 15,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#eee',
-    elevation: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
+    paddingHorizontal: 20,
+    height: '100%',
   },
-  voteBox: { flexDirection: 'row', alignItems: 'center' },
-  downvote: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    justifyContent: 'center',
+  voteBox: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 6,
-    backgroundColor: '#0084ff10'
+    backgroundColor: 'transparent'
   },
-  footerRight: { flex: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' },
+  footerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'transparent'
+  },
+  footerRight: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    backgroundColor: 'transparent'
+  },
   footerAction: {
     alignItems: 'center',
-    marginLeft: 22,
-    flexDirection: 'row'
+    marginLeft: 20,
+    flexDirection: 'row',
+    backgroundColor: 'transparent'
   },
-  actionCount: { marginLeft: 4, color: '#888', fontSize: 13 }
+  actionCount: { marginLeft: 4, color: '#888', fontSize: 13, fontWeight: '500' },
+  // 底部菜单
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  menuSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+  },
+  menuHeader: {
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  menuKnob: {
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#ddd',
+  },
+  menuOptions: {
+    paddingVertical: 10,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 10,
+  },
+  menuIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(150,150,150,0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 0,
+    marginRight: 15,
+  },
+  menuLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  menuDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(150,150,150,0.15)',
+    marginVertical: 5,
+  },
+  menuCancel: {
+    paddingVertical: 18,
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  menuCancelText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  }
 });
+
+function MenuOption({ icon, label, onPress, color }: any) {
+  const textColor = useThemeColor({}, 'text');
+  return (
+    <Pressable style={styles.menuItem} onPress={onPress}>
+      <View style={styles.menuIcon}>
+        <Ionicons name={icon} size={26} color={color || textColor} />
+      </View>
+      <Text style={[styles.menuLabel, { color: textColor }]}>{label}</Text>
+    </Pressable>
+  );
+}
