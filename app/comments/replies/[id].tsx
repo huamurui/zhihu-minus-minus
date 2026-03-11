@@ -5,6 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { BlurView } from 'expo-blur';
+import { useColorScheme } from '@/components/useColorScheme';
 import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,8 +19,10 @@ export default function ReplyDetailScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
+  const colorScheme = useColorScheme();
   const borderColor = useThemeColor({}, 'border');
   const textColor = useThemeColor({}, 'text');
+  const tintColor = useThemeColor({}, 'tint');
 
   // 1. 获取回复列表
   const { data: replies, isLoading, refetch, isFetching } = useQuery({
@@ -105,16 +109,13 @@ export default function ReplyDetailScreen() {
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: '所有回复' }} />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-        style={styles.flex}
-        keyboardVerticalOffset={90}
-      >
+      <View style={StyleSheet.absoluteFill}>
         <FlashList
           data={replies}
           renderItem={renderReply}
           keyExtractor={(item: any) => item.id.toString()}
           {...({ estimatedItemSize: 100 } as any)}
+          contentContainerStyle={{ paddingBottom: 160 }}
           onRefresh={refetch}
           refreshing={isFetching}
           keyboardDismissMode="on-drag"
@@ -126,46 +127,48 @@ export default function ReplyDetailScreen() {
             )
           }
         />
-
-        {/* 输入栏环境提示 */}
-        {replyTo && (
-          <View type="surface" style={[styles.replyHeaderTip, { borderTopColor: borderColor }]}>
-            <Text type="secondary" style={styles.replyHintText}>正在回复 {replyTo.name}</Text>
-            <Pressable onPress={() => setReplyTo(null)}>
-              <Ionicons name="close-circle" size={18} color="#999" />
-            </Pressable>
-          </View>
-        )}
-
-        {/* 输入框 */}
-        <View type="surface" style={[
-          styles.inputBar,
-          {
-            borderTopColor: replyTo ? 'transparent' : borderColor,
-            paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 20) : 15
-          }
-        ]}>
-          <TextInput
-            ref={inputRef}
-            style={[styles.input, { backgroundColor: borderColor, color: textColor }]}
-            placeholder={replyTo ? `回复 ${replyTo.name}...` : "说点什么吧..."}
-            placeholderTextColor="#999"
-            value={inputText}
-            onChangeText={setInputText}
-            multiline
-            maxLength={1000}
-          />
-          <Pressable
-            disabled={!inputText.trim() || mutation.isPending}
-            onPress={() => mutation.mutate(inputText.trim())}
-            style={styles.sendBtn}
-          >
-            {mutation.isPending ? (
-              <ActivityIndicator size="small" color="#0084ff" />
-            ) : (
-              <Text style={[styles.sendText, { opacity: inputText.trim() ? 1 : 0.5 }]}>发布</Text>
+      </View>
+      
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        style={styles.floatingKAV}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        pointerEvents="box-none"
+      >
+        <View style={styles.floatingInputWrapper} pointerEvents="box-none">
+          <BlurView intensity={80} tint={colorScheme} style={[styles.blurWrapper, { borderColor }]}>
+            {replyTo && (
+              <View style={styles.replyHeaderFloating}>
+                <Text type="secondary" style={styles.replyHintText}>正在回复 {replyTo.name}</Text>
+                <Pressable onPress={() => setReplyTo(null)}>
+                  <Ionicons name="close-circle" size={16} color="#999" />
+                </Pressable>
+              </View>
             )}
-          </Pressable>
+            <View style={styles.inputPill}>
+              <TextInput
+                ref={inputRef}
+                style={[styles.input, { color: textColor }]}
+                placeholder={replyTo ? `回复 ${replyTo.name}...` : "说点什么吧..."}
+                placeholderTextColor="#999"
+                value={inputText}
+                onChangeText={setInputText}
+                multiline
+                maxLength={1000}
+              />
+              <Pressable
+                disabled={!inputText.trim() || mutation.isPending}
+                onPress={() => mutation.mutate(inputText.trim())}
+                style={styles.sendBtn}
+              >
+                {mutation.isPending ? (
+                  <ActivityIndicator size="small" color={tintColor} />
+                ) : (
+                  <Text style={[styles.sendText, { color: tintColor, opacity: inputText.trim() ? 1 : 0.5 }]}>发布</Text>
+                )}
+              </Pressable>
+            </View>
+          </BlurView>
         </View>
       </KeyboardAvoidingView>
     </View>
@@ -188,25 +191,49 @@ const styles = StyleSheet.create({
   replyBtn: { marginLeft: 15 },
   replyActionText: { fontSize: 12, color: '#888', paddingVertical: 5 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 50 },
-  inputBar: {
+  inputPill: {
     flexDirection: 'row',
     alignItems: 'flex-end',
+    paddingHorizontal: 5,
+    paddingVertical: 4,
+  },
+  floatingKAV: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
+  },
+  floatingInputWrapper: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    paddingHorizontal: 15,
+    paddingBottom: 20
+  },
+  blurWrapper: {
+    borderRadius: 30,
+    overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 5,
+  },
+  replyHeaderFloating: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 15,
     paddingTop: 10,
-    borderTopWidth: 0.5
+    paddingBottom: 2,
   },
   input: {
     flex: 1,
     minHeight: 40,
     maxHeight: 100,
-    borderRadius: 20,
-    paddingHorizontal: 15,
+    paddingHorizontal: 12,
     paddingTop: 10,
     paddingBottom: 10,
-    marginRight: 10
   },
-  sendBtn: { height: 40, justifyContent: 'center', paddingHorizontal: 5 },
-  sendText: { color: '#0084ff', fontWeight: 'bold', fontSize: 16 },
+  sendBtn: { height: 40, justifyContent: 'center', paddingHorizontal: 15 },
+  sendText: { fontWeight: 'bold', fontSize: 16 },
   replyHeaderTip: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15, paddingTop: 10 },
   replyHintText: { fontSize: 12 }
 });
