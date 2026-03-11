@@ -116,10 +116,16 @@ export const AnswerContent: React.FC<AnswerContentProps> = ({ content, segmentIn
       }
     };
 
+    const isActive = activeSegment?.pid === pid && modalVisible;
+
     return (
       <Pressable 
         onPress={handlePress}
-        style={styles.paragraphContainer}
+        style={[
+          styles.paragraphContainer,
+          isActive && styles.activeParagraph,
+          !isActive && isLiked && { backgroundColor: 'rgba(0, 132, 255, 0.05)' }
+        ]}
       >
         <TDefaultRenderer {...props} />
       </Pressable>
@@ -133,11 +139,10 @@ export const AnswerContent: React.FC<AnswerContentProps> = ({ content, segmentIn
   const classesStyles = {
     'segment-interactable': {
       textDecorationLine: 'underline',
-      textDecorationColor: '#0084ff88',
-      // Android supports dashed if defined in CSS, but let's be safe
+      textDecorationColor: 'rgba(0, 132, 255, 0.25)', // 调浅划线颜色
     },
     'segment-liked': {
-      backgroundColor: 'rgba(0, 132, 255, 0.08)',
+      // 在 P_Renderer 里处理背景色更灵活，这里可以留空
     }
   };
 
@@ -225,7 +230,9 @@ export const AnswerContent: React.FC<AnswerContentProps> = ({ content, segmentIn
                     style={styles.statItem}
                     onPress={() => {
                       setModalVisible(false);
-                      router.push(`/comments/${answerId}?type=answer`); // 应该跳到段落评论，但此处逻辑略复杂
+                      const { seg_ids } = activeSegment || {};
+                      const segId = Array.isArray(seg_ids) ? seg_ids[0] : seg_ids;
+                      router.push(`/comments/${answerId}?type=answer${segId ? `&segmentId=${segId}` : ''}`);
                     }}
                   >
                     <Ionicons name="chatbubble-outline" size={22} color="#0084ff" />
@@ -260,9 +267,19 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     backgroundColor: 'transparent',
     overflow: 'visible',
-    borderRadius: 8,
-    paddingVertical: 2,
-    marginVertical: 2,
+    borderRadius: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    marginHorizontal: -8,
+    marginVertical: 4,
+  },
+  activeParagraph: {
+    backgroundColor: 'rgba(0, 132, 255, 0.1)',
+    shadowColor: '#0084ff',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   modalOverlay: {
     flex: 1,

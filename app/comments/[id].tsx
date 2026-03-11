@@ -10,7 +10,7 @@ import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressa
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function CommentScreen() {
-  const { id, type } = useLocalSearchParams(); // Content ID and Type ('question' or 'answer')
+  const { id, type, segmentId } = useLocalSearchParams(); // Content ID, Type, and optional Segment ID
   const router = useRouter();
   const [inputText, setInputText] = useState('');
   const [replyTo, setReplyTo] = useState<{ id: string, name: string } | null>(null);
@@ -24,8 +24,12 @@ export default function CommentScreen() {
 
   // 1. 获取评论数据
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ['comments', id, type],
-    queryFn: () => {
+    queryKey: ['comments', id, type, segmentId],
+    queryFn: async () => {
+      if (segmentId) {
+        const { getSegmentComments } = await import('@/api/zhihu/answer');
+        return getSegmentComments(id as string, segmentId as string);
+      }
       if (type === 'question') {
         return getQuestionComments(id as string);
       }

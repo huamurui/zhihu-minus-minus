@@ -94,5 +94,20 @@ export const getSegmentComments = async (
     offset = ''
 ) => {
     const res = await apiClient.get(`/comment_v5/answers/${answerId}/segment/root_comment?segment_id=${segmentId}&order_by=score&limit=${limit}&offset=${offset}`);
+    // 基础标准化 (V5 扁平化了作者结构)
+    if (res.data?.data) {
+        res.data.data = res.data.data.map((comment: any) => {
+            if (comment.author && !comment.author.member) {
+                comment.author = { member: { ...comment.author } };
+            }
+            if (!comment.relationship && comment.liked !== undefined) {
+                comment.relationship = { voting: comment.liked ? 1 : 0 };
+            }
+            if (comment.vote_count === undefined && comment.like_count !== undefined) {
+                comment.vote_count = comment.like_count;
+            }
+            return comment;
+        });
+    }
     return res.data;
 };
