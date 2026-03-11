@@ -176,11 +176,11 @@ export default function CommentScreen() {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
         style={styles.floatingKAV}
-        keyboardVerticalOffset={90}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         pointerEvents="box-none"
       >
         <View style={styles.floatingInputWrapper} pointerEvents="box-none">
-          <BlurView intensity={80} tint={colorScheme} style={[styles.blurWrapper, { borderColor }]}>
+          <View type="surface" style={[styles.capsuleWrapper, { borderColor }]}>
             {replyTo && (
               <View style={styles.replyHeaderFloating}>
                 <Text type="secondary" style={styles.replyHint}>正在回复 {replyTo.name}</Text>
@@ -212,7 +212,7 @@ export default function CommentScreen() {
                 )}
               </Pressable>
             </View>
-          </BlurView>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </View>
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingBottom: 20,
   },
-  blurWrapper: {
+  capsuleWrapper: {
     borderRadius: 30,
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
