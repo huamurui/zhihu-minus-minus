@@ -1,7 +1,7 @@
 import apiClient from '../client';
 
 export const getAnswer = async (id: string | number, include?: string) => {
-    const defaultInclude = 'content,voteup_count,comment_count,author.headline,author.follower_count,author.badge,author.is_following,question.title,relationship.voting,relationship.is_author,created_time,updated_time';
+    const defaultInclude = 'content,voteup_count,comment_count,author.headline,author.follower_count,author.badge,author.is_following,question.title,relationship.voting,relationship.is_author,created_time,updated_time,segment_infos';
     const res = await apiClient.get(`/answers/${id}?include=${include || defaultInclude}`);
     return res.data;
 };
@@ -56,5 +56,43 @@ export const createAnswer = async (questionId: string | number, text: string) =>
 
 export const deleteAnswer = async (id: string | number) => {
     const res = await apiClient.delete(`/answers/${id}`);
+    return res.data;
+};
+
+export const reactAnswerSegment = async (
+    answerId: string | number,
+    segId: string,
+    content: string,
+    paragraphId: string,
+    startOffset: number,
+    endOffset: number
+) => {
+    const payload = {
+        seg_id: segId,
+        content: content,
+        position: {
+            start: { paragraph_id: paragraphId, offset: startOffset },
+            end: { paragraph_id: paragraphId, offset: endOffset }
+        }
+    };
+    const res = await apiClient.post(`/reaction/answers/${answerId}/segment_reaction`, payload);
+    return res.data;
+};
+
+export const unreactAnswerSegment = async (answerId: string | number, segId: string) => {
+    // 根据抓包，这里 body 是 seg_ids 且为字符串
+    const res = await apiClient.delete(`/reaction/answers/${answerId}/segment_reaction`, {
+        data: { seg_ids: segId }
+    });
+    return res.data;
+};
+
+export const getSegmentComments = async (
+    answerId: string | number,
+    segmentId: string,
+    limit = 20,
+    offset = ''
+) => {
+    const res = await apiClient.get(`/comment_v5/answers/${answerId}/segment/root_comment?segment_id=${segmentId}&order_by=score&limit=${limit}&offset=${offset}`);
     return res.data;
 };

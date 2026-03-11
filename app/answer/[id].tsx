@@ -1,6 +1,7 @@
 import { deleteAnswer, getAnswer } from '@/api/zhihu';
 import { fastCollectAnswer, getAnswerCollectionStatus, removeFromCollection } from '@/api/zhihu/collection';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
+import { AnswerContent } from '@/components/AnswerContent';
 import { DownvoteButton } from '@/components/DownvoteButton';
 import { LikeButton } from '@/components/LikeButton';
 import { Text, View, useThemeColor } from '@/components/Themed';
@@ -10,7 +11,6 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useRef } from 'react';
 import { ActivityIndicator, Alert, AlertButton, Animated, Image, LayoutAnimation, Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import Reanimated, { SharedTransition } from 'react-native-reanimated';
-import RenderHtml from 'react-native-render-html';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -285,24 +285,11 @@ export default function AnswerDetailScreen() {
 
             {/* 回答正文 */}
             <View style={styles.contentBody}>
-              <RenderHtml
-                contentWidth={width - 40}
-                source={{ html: answer?.content || '' }}
-                tagsStyles={{
-                  p: { color: textColor, fontSize: 18, lineHeight: 28, marginBottom: 20 },
-                  b: { color: '#0084ff', fontWeight: 'bold' },
-                  img: { borderRadius: 12, marginVertical: 10 },
-                  blockquote: {
-                    borderLeftWidth: 4,
-                    borderLeftColor: '#0084ff',
-                    paddingLeft: 15,
-                    backgroundColor: surfaceColor,
-                    paddingVertical: 10,
-                    color: textColor
-                  },
-                  span: { color: textColor },
-                  div: { color: textColor },
-                }}
+              <AnswerContent 
+                content={answer?.content || ''} 
+                segmentInfos={answer?.segment_infos} 
+                answerId={id as string}
+                onRefresh={refetch}
               />
               <Text type="secondary" style={styles.publishDate}>
                 发布于 {answer?.created_time ? new Date(answer.created_time * 1000).toLocaleDateString() : (answer?.created_time_name || '不久前')} · 著作权归作者所有
