@@ -2,12 +2,13 @@ import { getSearchSuggest, searchContent } from '@/api/zhihu';
 import { FeedCard } from '@/components/FeedCard';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { UserCard } from '@/components/UserCard';
+import { useSearchStore } from '@/store/useSearchStore';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Stack, useNavigation, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Keyboard, Pressable, StyleSheet, TextInput } from 'react-native';
+import { ActivityIndicator, Keyboard, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 
 export default function SearchScreen() {
     const router = useRouter();
@@ -17,6 +18,8 @@ export default function SearchScreen() {
     const [debouncedQuery, setDebouncedQuery] = useState('');
     const [searchType, setSearchType] = useState('general'); // 'general' | 'people'
     const [isSearching, setIsSearching] = useState(false);
+
+    const { history, addHistory, clearHistory, removeHistory } = useSearchStore();
 
     const tintColor = useThemeColor({}, 'tint');
     const backgroundColor = useThemeColor({}, 'background');
@@ -59,8 +62,10 @@ export default function SearchScreen() {
 
     const handleSearch = () => {
         if (query.trim()) {
+            addHistory(query.trim());
             setIsSearching(true);
             setDebouncedQuery(query);
+            Keyboard.dismiss();
         }
     };
 
@@ -76,7 +81,9 @@ export default function SearchScreen() {
                 style={styles.suggestionItem}
                 onPress={() => {
                     setQuery(item.query);
+                    addHistory(item.query);
                     setIsSearching(true);
+                    Keyboard.dismiss();
                 }}
             >
                 <Ionicons name="search-outline" size={16} color="#888" style={styles.suggestionIcon} />
@@ -280,10 +287,51 @@ export default function SearchScreen() {
                     } as any)}
                 />
             ) : (
-                <View style={styles.empty}>
-                    <Ionicons name="search" size={64} color={surfaceColor} />
-                    <Text type="secondary" style={{ marginTop: 10 }}>搜索你想知道的内容</Text>
-                </View>
+                <ScrollView
+                    style={{ flex: 1 }}
+                    keyboardShouldPersistTaps="handled"
+                    contentContainerStyle={{ padding: 15 }}
+                >
+                    {history.length > 0 ? (
+                        <View>
+                            <View style={styles.historyHeader}>
+                                <Text style={styles.historyTitle}>搜索历史</Text>
+                                <Pressable onPress={clearHistory} hitSlop={10}>
+                                    <Ionicons name="trash-outline" size={18} color="#999" />
+                                </Pressable>
+                            </View>
+                            <View style={styles.historyTags}>
+                                {history.map((item, index) => (
+                                    <View key={index} style={[styles.tagContainer, { backgroundColor: surfaceColor }]}>
+                                        <Pressable
+                                            onPress={() => {
+                                                setQuery(item);
+                                                addHistory(item);
+                                                setIsSearching(true);
+                                                Keyboard.dismiss();
+                                            }}
+                                            style={styles.tagTextBtn}
+                                        >
+                                            <Text style={styles.tagText}>{item}</Text>
+                                        </Pressable>
+                                        <Pressable
+                                            onPress={() => removeHistory(item)}
+                                            style={styles.tagRemoveBtn}
+                                            hitSlop={5}
+                                        >
+                                            <Ionicons name="close" size={14} color="#999" />
+                                        </Pressable>
+                                    </View>
+                                ))}
+                            </View>
+                        </View>
+                    ) : (
+                        <View style={[styles.empty, { marginTop: 100 }]}>
+                            <Ionicons name="search" size={64} color={surfaceColor} />
+                            <Text type="secondary" style={{ marginTop: 10 }}>搜索你想知道的内容</Text>
+                        </View>
+                    )}
+                </ScrollView>
             )}
         </View>
     );
@@ -342,5 +390,38 @@ const styles = StyleSheet.create({
     tabText: {
         fontSize: 15,
         color: '#666',
+    },
+    historyHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 15,
+    },
+    historyTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    historyTags: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+    },
+    tagContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: 15,
+        paddingLeft: 12,
+        paddingRight: 8,
+        paddingVertical: 6,
+        marginRight: 10,
+        marginBottom: 10,
+    },
+    tagTextBtn: {
+        marginRight: 4,
+    },
+    tagText: {
+        fontSize: 14,
+    },
+    tagRemoveBtn: {
+        padding: 2,
     },
 });
