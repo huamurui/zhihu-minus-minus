@@ -7,9 +7,10 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
+import Reanimated from 'react-native-reanimated';
 
 export default function UserDetailScreen() {
-    const { id } = useLocalSearchParams();
+    const { id, avatar: initialAvatar } = useLocalSearchParams();
     const router = useRouter();
     const navigation = useNavigation();
     const [activeTab, setActiveTab] = useState<'activities' | 'answers' | 'questions' | 'articles' | 'pins'>('activities');
@@ -191,7 +192,11 @@ export default function UserDetailScreen() {
             />
             <View type="surface" style={styles.infoSection}>
                 <View style={styles.avatarRow}>
-                    <Image source={{ uri: user?.avatar_url }} style={styles.avatar} />
+                    <Reanimated.Image 
+                        source={{ uri: user?.avatar_url || initialAvatar as string }} 
+                        style={styles.avatar} 
+                        sharedTransitionTag={`avatar-${user?.url_token || id}`}
+                    />
                     {!isMe && (
                         <Pressable
                             onPress={handleFollow}

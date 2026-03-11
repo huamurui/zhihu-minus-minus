@@ -8,12 +8,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useRef } from 'react';
-import { ActivityIndicator, Alert, Animated, Image, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Image, LayoutAnimation, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import Reanimated, { SharedTransition } from 'react-native-reanimated';
 import RenderHtml from 'react-native-render-html';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+const slowTransition = SharedTransition.duration(600);
+
 export default function AnswerDetailScreen() {
-  const { id } = useLocalSearchParams();
+  const { id, title: initialTitle, questionId } = useLocalSearchParams();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -69,7 +72,7 @@ export default function AnswerDetailScreen() {
     scrollY.setValue(currentY);
   };
 
-  const { data: answer, isLoading, refetch } = useQuery({
+  const { data: answer, isLoading: queryLoading, refetch } = useQuery({
     queryKey: ['answer-detail', id],
     queryFn: () => getAnswer(id as string)
   });
@@ -149,12 +152,7 @@ export default function AnswerDetailScreen() {
     }
   };
 
-  if (isLoading) return (
-    <View type="default" style={styles.center}>
-      <ActivityIndicator size="large" color="#0084ff" />
-      <Text type="secondary" style={{ marginTop: 10 }}>正在斟酌文字...喵</Text>
-    </View>
-  );
+  const isLoading = queryLoading;
 
   return (
     <View type="default" style={styles.container}>
@@ -182,7 +180,7 @@ export default function AnswerDetailScreen() {
           <View style={{ width: 40 }} />
           <Pressable onPress={goToProfile} style={styles.stickyAuthor}>
             <Image source={{ uri: answer?.author?.avatar_url }} style={styles.stickyAvatar} />
-            <Text style={styles.stickyName} numberOfLines={1}>{answer?.author?.name}</Text>
+            <Text style={styles.stickyName} numberOfLines={1}>{answer?.author?.name || '知乎用户'}</Text>
           </Pressable>
           <View style={{ width: 40 }} />
         </View>
@@ -208,59 +206,74 @@ export default function AnswerDetailScreen() {
         {/* 顶部问题连接 */}
         <Pressable
           style={styles.questionHeader}
-          onPress={() => router.push(`/question/${answer?.question?.id}`)}
+          onPress={() => router.push(`/question/${answer?.question?.id || questionId}`)}
         >
-          <Text style={styles.questionTitle}>
-            {answer?.question?.title}
-          </Text>
-          <Ionicons name="chevron-forward" size={18} color="#999" />
+          {/* 这里的 Reanimated 负责接管动效 */}
+          <Reanimated.View 
+            sharedTransitionTag={`title-${questionId || id}`}
+            sharedTransitionStyle={slowTransition}
+          >
+            <Text style={styles.questionTitle}>
+              {answer?.question?.title || initialTitle || '加载中...'}
+            </Text>
+          </Reanimated.View>
+          {!isLoading && <Ionicons name="chevron-forward" size={18} color="#999" />}
         </Pressable>
 
-        {/* 作者信息栏 */}
-        <View style={styles.authorSection}>
-          <Pressable onPress={goToProfile} style={styles.authorMain}>
-            <Image source={{ uri: answer?.author?.avatar_url }} style={styles.avatar} />
-            <View style={styles.authorInfo}>
-              <Text style={styles.authorName}>{answer?.author?.name}</Text>
-              <Text type="secondary" style={styles.authorHeadline} numberOfLines={1}>{answer?.author?.headline}</Text>
+        {isLoading ? (
+          <View style={{ height: 200, justifyContent: 'center', alignItems: 'center' }}>
+            <ActivityIndicator size="small" color="#0084ff" />
+            <Text type="secondary" style={{ marginTop: 15 }}>正在斟酌文字...喵</Text>
+          </View>
+        ) : (
+          <>
+            {/* 作者信息栏 */}
+            <View style={styles.authorSection}>
+              <Pressable onPress={goToProfile} style={styles.authorMain}>
+                <Image source={{ uri: answer?.author?.avatar_url }} style={styles.avatar} />
+                <View style={styles.authorInfo}>
+                  <Text style={styles.authorName}>{answer?.author?.name}</Text>
+                  <Text type="secondary" style={styles.authorHeadline} numberOfLines={1}>{answer?.author?.headline}</Text>
+                </View>
+              </Pressable>
+              <Pressable
+                style={[styles.followBtn, answer?.author?.is_following && styles.followBtnActive]}
+                onPress={() => followMutation.mutate()}
+                disabled={followMutation.isPending}
+              >
+                <Text style={[styles.followBtnText, answer?.author?.is_following && styles.followBtnTextActive]}>
+                  {answer?.author?.is_following ? '已关注' : '关注'}
+                </Text>
+              </Pressable>
             </View>
-          </Pressable>
-          <Pressable
-            style={[styles.followBtn, answer?.author?.is_following && styles.followBtnActive]}
-            onPress={() => followMutation.mutate()}
-            disabled={followMutation.isPending}
-          >
-            <Text style={[styles.followBtnText, answer?.author?.is_following && styles.followBtnTextActive]}>
-              {answer?.author?.is_following ? '已关注' : '关注'}
-            </Text>
-          </Pressable>
-        </View>
 
-        {/* 回答正文 */}
-        <View style={styles.contentBody}>
-          <RenderHtml
-            contentWidth={width - 40}
-            source={{ html: answer?.content || '' }}
-            tagsStyles={{
-              p: { color: textColor, fontSize: 18, lineHeight: 28, marginBottom: 20 },
-              b: { color: '#0084ff', fontWeight: 'bold' },
-              img: { borderRadius: 12, marginVertical: 10 },
-              blockquote: {
-                borderLeftWidth: 4,
-                borderLeftColor: '#0084ff',
-                paddingLeft: 15,
-                backgroundColor: surfaceColor,
-                paddingVertical: 10,
-                color: textColor
-              },
-              span: { color: textColor },
-              div: { color: textColor },
-            }}
-          />
-          <Text type="secondary" style={styles.publishDate}>
-            发布于 {answer?.created_time ? new Date(answer.created_time * 1000).toLocaleDateString() : (answer?.created_time_name || '不久前')} · 著作权归作者所有
-          </Text>
-        </View>
+            {/* 回答正文 */}
+            <View style={styles.contentBody}>
+              <RenderHtml
+                contentWidth={width - 40}
+                source={{ html: answer?.content || '' }}
+                tagsStyles={{
+                  p: { color: textColor, fontSize: 18, lineHeight: 28, marginBottom: 20 },
+                  b: { color: '#0084ff', fontWeight: 'bold' },
+                  img: { borderRadius: 12, marginVertical: 10 },
+                  blockquote: {
+                    borderLeftWidth: 4,
+                    borderLeftColor: '#0084ff',
+                    paddingLeft: 15,
+                    backgroundColor: surfaceColor,
+                    paddingVertical: 10,
+                    color: textColor
+                  },
+                  span: { color: textColor },
+                  div: { color: textColor },
+                }}
+              />
+              <Text type="secondary" style={styles.publishDate}>
+                发布于 {answer?.created_time ? new Date(answer.created_time * 1000).toLocaleDateString() : (answer?.created_time_name || '不久前')} · 著作权归作者所有
+              </Text>
+            </View>
+          </>
+        )}
       </ScrollView>
 
       {/* 3. 底部吸底交互栏 */}

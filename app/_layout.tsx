@@ -86,6 +86,24 @@ export default function RootLayout() {
             options={{ presentation: 'fullScreenModal', headerShown: false }}
           />
 
+          {/* 问题详情页 */}
+          <Stack.Screen
+            name="question/[id]"
+            options={{
+              headerShown: false,
+              animation: 'fade',
+            }}
+          />
+
+          {/* 回答详情页 */}
+          <Stack.Screen
+            name="answer/[id]"
+            options={{
+              headerShown: false,
+              animation: 'fade',
+            }}
+          />
+
           {/* 其他 Modal 弹窗 */}
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: '提示' }} />
         </Stack>

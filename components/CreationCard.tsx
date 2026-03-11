@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { Pressable, StyleSheet } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { LikeButton } from './LikeButton';
 
 export const CreationCard = ({ item, type, onPress, excerpt }: {
@@ -24,9 +25,16 @@ export const CreationCard = ({ item, type, onPress, excerpt }: {
       return;
     }
     if (type === 'video') {
-      router.push({ pathname: '/video/[id]', params: { id: item.id } } as any);
+      router.push({ pathname: '/video/[id]', params: { id: item.id, title: item.title } } as any);
     } else {
-      router.push({ pathname: `/${type}/[id]`, params: { id: item.id } } as any);
+      router.push({ 
+        pathname: `/${type}/[id]`, 
+        params: { 
+          id: item.id, 
+          title: item.title || item.question?.title,
+          questionId: item.question?.id 
+        } 
+      } as any);
     }
   };
 
@@ -86,9 +94,11 @@ export const CreationCard = ({ item, type, onPress, excerpt }: {
   return (
     <View type="surface" style={styles.card}>
       <Pressable onPress={handlePress}>
-        <Text style={styles.title} numberOfLines={expanded ? undefined : 2}>
-          {getTitle()}
-        </Text>
+        <Animated.View sharedTransitionTag={`title-${item.question?.id || item.id}`}>
+          <Text style={styles.title} numberOfLines={expanded ? undefined : 2}>
+            {getTitle()}
+          </Text>
+        </Animated.View>
         <View style={{ backgroundColor: 'transparent' }}>
           <Text type="secondary" style={styles.excerpt} numberOfLines={expanded ? undefined : 3}>
             {content}

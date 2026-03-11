@@ -4,6 +4,7 @@ import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tansta
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Image, LayoutAnimation, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
+import Reanimated, { SharedTransition } from 'react-native-reanimated';
 import RenderHtml from 'react-native-render-html';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -161,8 +162,10 @@ const AnswerItem = ({ item }: { item: any }) => {
 };
 
 
+const slowTransition = SharedTransition.duration(600);
+
 export default function QuestionDetail() {
-  const { id } = useLocalSearchParams();
+  const { id, title: initialTitle } = useLocalSearchParams();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const borderColor = useThemeColor({}, 'border');
@@ -295,59 +298,25 @@ export default function QuestionDetail() {
   });
 
   const answers = answersData?.pages.flatMap(page => page.data) || [];
+  const isLoading = qLoading || aLoading;
 
-  if (qLoading || aLoading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#0084ff" />
-      </View>
-    );
-  }
-
-  return (
-    <View type="default" style={styles.container}>
-      <Stack.Screen options={{ headerShown: false }} />
-
-      {/* 1. 浮动手动 Header */}
-      <Animated.View
-        style={[
-          styles.stickyHeader,
-          {
-            backgroundColor,
-            paddingTop: insets.top,
-            opacity: headerVisible,
-            transform: [{
-              translateY: headerVisible.interpolate({
-                inputRange: [0, 1],
-                outputRange: [-insets.top - 50, 0]
-              })
-            }],
-            zIndex: 10,
-          }
-        ]}
+  // 提取 Header 渲染逻辑，避免匿名函数导致组件重复挂载导致加载动画跳变
+  const renderHeader = React.useMemo(() => (
+    <View type="surface" style={[styles.header, { paddingTop: insets.top + 50 }]}>
+      {/* 标题：始终由 Reanimated 接管，确保从卡片飞进来的动效不中断 */}
+      <Reanimated.View 
+        sharedTransitionTag={`title-${id}`}
+        sharedTransitionStyle={slowTransition}
       >
-        <View style={styles.stickyHeaderContent}>
-          <View style={{ width: 40 }} />
-          <Text style={styles.stickyTitle} numberOfLines={1}>
-            {question?.title}
-          </Text>
-          <View style={{ width: 40 }} />
+        <Text style={styles.title}>{question?.title || initialTitle || '加载中...'}</Text>
+      </Reanimated.View>
+
+      {qLoading ? (
+        <View style={{ height: 150, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="small" color="#0084ff" />
         </View>
-      </Animated.View>
-
-      {/* 2. 始终显示的返回按钮 (层级最高) */}
-      <Pressable
-        onPress={() => router.back()}
-        style={[styles.floatingBackBtn, { top: insets.top + 8 }]}
-      >
-        <Ionicons name="chevron-back" size={28} color={textColor} />
-      </Pressable>
-
-      <FlashList
-        onScroll={handleScroll}
-        data={answers || []}
-        {...({ estimatedItemSize: 200 } as any)}
-        ListHeaderComponent={() => (<View type="surface" style={[styles.header, { paddingTop: insets.top + 50 }]}>
+      ) : (
+        <>
           {/* 话题标签 */}
           {question?.topics && question.topics.length > 0 && (
             <View style={styles.topicsRow}>
@@ -358,8 +327,6 @@ export default function QuestionDetail() {
               ))}
             </View>
           )}
-
-          <Text style={styles.title}>{question?.title || '加载失败'}</Text>
 
           {question?.excerpt ? (
             <Text type="secondary" style={styles.qExcerpt}>
@@ -414,7 +381,6 @@ export default function QuestionDetail() {
               <Ionicons name="create-outline" size={18} color="#0084ff" />
               <Text style={styles.qActionBtnText}>写回答</Text>
             </Pressable>
-
           </View>
 
           <View style={[styles.qStats]}>
@@ -426,19 +392,73 @@ export default function QuestionDetail() {
               <Pressable
                 onPress={() => setSortBy('default')}
                 style={[styles.sortBtn, sortBy === 'default' && styles.sortBtnActive]}
+                disabled={aLoading}
               >
                 <Text style={[styles.sortText, sortBy === 'default' && styles.sortTextActive]}>默认</Text>
               </Pressable>
               <Pressable
                 onPress={() => setSortBy('created')}
                 style={[styles.sortBtn, sortBy === 'created' && styles.sortBtnActive]}
+                disabled={aLoading}
               >
                 <Text style={[styles.sortText, sortBy === 'created' && styles.sortTextActive]}>时间</Text>
               </Pressable>
             </View>
           </View>
-        </View>)
-        }
+          
+          {/* 如果回答正在刷新，在统计栏下方显示一个细微的加载提示 */}
+          {aLoading && !qLoading && (
+             <ActivityIndicator size="small" color="#0084ff" style={{ marginVertical: 10 }} />
+          )}
+        </>
+      )}
+    </View>
+  ), [qLoading, aLoading, question, id, initialTitle, insets.top, sortBy, followMutation.isPending, textColor]);
+
+  return (
+    <View type="default" style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      {/* 1. 浮动手动 Header */}
+      <Animated.View
+        style={[
+          styles.stickyHeader,
+          {
+            backgroundColor,
+            paddingTop: insets.top,
+            opacity: headerVisible,
+            transform: [{
+              translateY: headerVisible.interpolate({
+                inputRange: [0, 1],
+                outputRange: [-insets.top - 50, 0]
+              })
+            }],
+            zIndex: 10,
+          }
+        ]}
+      >
+        <View style={styles.stickyHeaderContent}>
+          <View style={{ width: 40 }} />
+          <Text style={styles.stickyTitle} numberOfLines={1}>
+            {question?.title || initialTitle}
+          </Text>
+          <View style={{ width: 40 }} />
+        </View>
+      </Animated.View>
+
+      {/* 2. 始终显示的返回按钮 (层级最高) */}
+      <Pressable
+        onPress={() => router.back()}
+        style={[styles.floatingBackBtn, { top: insets.top + 8 }]}
+      >
+        <Ionicons name="chevron-back" size={28} color={textColor} />
+      </Pressable>
+
+      <FlashList
+        onScroll={handleScroll}
+        data={qLoading ? [] : (answers || [])}
+        {...({ estimatedItemSize: 200 } as any)}
+        ListHeaderComponent={renderHeader}
         renderItem={({ item }: { item: any }) => <AnswerItem item={item} />}
         keyExtractor={(item: any) => item.id.toString()}
         onEndReached={() => {
@@ -448,7 +468,6 @@ export default function QuestionDetail() {
         }}
         onEndReachedThreshold={0.5}
         ListFooterComponent={() => (
-
           isFetchingNextPage ? (
             <ActivityIndicator style={{ marginVertical: 20 }} color="#0084ff" />
           ) : (
@@ -458,8 +477,7 @@ export default function QuestionDetail() {
               </Text>
             ) : null
           )
-        )
-        }
+        )}
         onRefresh={refetch}
         refreshing={isRefetching}
       />

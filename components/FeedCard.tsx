@@ -1,8 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Image, Pressable, StyleSheet } from 'react-native';
+import Animated, { SharedTransition } from 'react-native-reanimated';
 import { LikeButton } from './LikeButton';
 import { Text, View } from './Themed';
+
+const slowTransition = SharedTransition.duration(600);
 
 export const FeedCard = ({ item }: { item: any }) => {
   const router = useRouter();
@@ -19,10 +22,17 @@ export const FeedCard = ({ item }: { item: any }) => {
 
       {/* 热区1：点击作者头像/姓名 -> 用户页 */}
       <Pressable
-        onPress={() => router.push(`/user/${item.author.url_token || item.author.id}` as any)}
+        onPress={() => router.push({
+          pathname: `/user/${item.author.url_token || item.author.id}`,
+          params: { avatar: item.author.avatar }
+        } as any)}
         style={styles.authorRow}
       >
-        <Image source={{ uri: item.author.avatar }} style={styles.avatar} />
+        <Animated.Image 
+          source={{ uri: item.author.avatar }} 
+          style={styles.avatar} 
+          sharedTransitionTag={`avatar-${item.author.url_token || item.author.id}`}
+        />
         <Text type="secondary" style={styles.authorName}>{item.author.name}</Text>
       </Pressable>
 
@@ -30,25 +40,33 @@ export const FeedCard = ({ item }: { item: any }) => {
       {item.title ? (
         <Pressable 
           onPress={() => {
-            if (isQuestionType || !item.questionId) {
-              router.push(`/question/${item.id}` as any);
-            } else {
-              router.push(`/question/${item.questionId}` as any);
-            }
+            const id = isQuestionType || !item.questionId ? item.id : item.questionId;
+            router.push({
+              pathname: `/question/${id}`,
+              params: { title: item.title }
+            } as any);
           }} 
           style={styles.titleRow}
         >
-          <Text style={styles.title} numberOfLines={2}>
-            {item.title}
-          </Text>
+          <Animated.View 
+            sharedTransitionTag={`title-${item.questionId || item.id}`}
+            sharedTransitionStyle={slowTransition}
+          >
+            <Text style={styles.title} numberOfLines={2}>
+              {item.title}
+            </Text>
+          </Animated.View>
         </Pressable>
       ) : null}
 
       {/* 热区3：点击内容摘要 -> 详情页 */}
       <Pressable 
         onPress={() => {
-          const routeType = item.type.slice(0, -1); // answers -> answer, pins -> pin etc.
-          router.push(`/${routeType}/${item.id}` as any);
+          const routeType = item.type.slice(0, -1);
+          router.push({
+            pathname: `/${routeType}/${item.id}`,
+            params: { title: item.title, questionId: item.questionId }
+          } as any);
         }} 
         style={styles.contentRow}
       >
@@ -57,7 +75,13 @@ export const FeedCard = ({ item }: { item: any }) => {
             {item.excerpt}
           </Text>
         </View>
-        {item.image && <Image source={{ uri: item.image }} style={styles.cover} />}
+        {item.image && (
+          <Animated.Image 
+            source={{ uri: item.image }} 
+            style={styles.cover} 
+            sharedTransitionTag={`image-${item.id}`}
+          />
+        )}
       </Pressable>
 
       {/* 热区4：底部操作栏 - 问题关注类动态不显示 */}
