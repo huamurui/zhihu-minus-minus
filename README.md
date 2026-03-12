@@ -30,24 +30,29 @@
   <table style="border-collapse: separate; border-spacing: 15px;">
     <tr>
       <td align="center" valign="top">
-        <img src="./screenshot/photo_7_2026-03-09_01-45-47.jpg" width="160" style="border-radius: 16px; border: 1px solid #eee; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
+        <img src="./screenshot/v0.0.4/photo_2026-03-12_23-31-07.jpg" width="160" style="border-radius: 16px; border: 1px solid #eee; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
         <br /><br />
         <b>搜索</b><br />
       </td>
       <td align="center" valign="top">
-        <img src="./screenshot/photo_5_2026-03-09_01-45-47.jpg" width="160" style="border-radius: 16px; border: 1px solid #eee; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
+        <img src="./screenshot/v0.0.2/photo_5_2026-03-09_01-45-47.jpg" width="160" style="border-radius: 16px; border: 1px solid #eee; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
         <br /><br />
         <b>问题</b><br />
       </td>
       <td align="center" valign="top">
-        <img src="./screenshot/photo_9_2026-03-09_01-45-47.jpg" width="160" style="border-radius: 16px; border: 1px solid #eee; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
+        <img src="./screenshot/v0.0.4/photo_2026-03-12_23-33-16.jpg" width="160" style="border-radius: 16px; border: 1px solid #eee; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
         <br /><br />
         <b>夜间模式</b><br />
       </td>
       <td align="center" valign="top">
-        <img src="./screenshot/photo_3_2026-03-09_01-45-47.jpg" width="160" style="border-radius: 16px; border: 1px solid #eee; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
+        <img src="./screenshot/v0.0.2/photo_3_2026-03-09_01-45-47.jpg" width="160" style="border-radius: 16px; border: 1px solid #eee; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
         <br /><br />
         <b>消息</b><br />
+      </td>
+      <td align="center" valign="top">
+        <img src="./screenshot/v0.0.4/photo_2026-03-12_23-31-25.jpg" width="160" style="border-radius: 16px; border: 1px solid #eee; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
+        <br /><br />
+        <b>段落交互</b><br />
       </td>
     </tr>
   </table>
@@ -94,7 +99,9 @@ npm run ios
 - [x] 个人中心与历史记录 (History)
 - [x] 自动签名算法 (X-ZSE-96)
 - [x] 发布界面 (New Publish UI)
-- [x] 深度搜索功能 (Search)
+- [x] 深度搜索功能 (Search & Local History)
+- [x] 互动式内容引擎 (Paragraph interaction & Stat popovers)
+- [x] 共享元素导航动画 (Shared Transitions)
 - [ ] 动态发表功能完整实现
 - [ ] 图片/视频全屏预览优化
 
@@ -107,4 +114,4 @@ npm run ios
 
 ---
 **Author**: [huamurui](https://github.com/huamurui) & [Antigravity Agent] 🐱
-**Version**: v0.0.3 | **Last Updated**: 2026-03-10
+**Version**: v0.0.4 | **Last Updated**: 2026-03-12
