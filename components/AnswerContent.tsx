@@ -1,9 +1,9 @@
-import { StyleSheet, useWindowDimensions, Pressable, Modal, FlatList, TouchableWithoutFeedback } from 'react-native';
+import { StyleSheet, useWindowDimensions, Pressable, Modal, FlatList, TouchableWithoutFeedback, Image, TouchableOpacity } from 'react-native';
 import RenderHtml, { CustomBlockRenderer, defaultSystemFonts } from 'react-native-render-html';
 import { View, Text, useThemeColor } from './Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { reactAnswerSegment, unreactAnswerSegment } from '@/api/zhihu/answer';
 
@@ -54,6 +54,8 @@ export const AnswerContent: React.FC<AnswerContentProps> = ({ content, segmentIn
     endIndex?: number;
   } | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [viewerImage, setViewerImage] = useState<string | null>(null);
 
   const segmentMap = useMemo(() => {
     const map = new Map<string, SegmentInfo>();
@@ -107,6 +109,24 @@ export const AnswerContent: React.FC<AnswerContentProps> = ({ content, segmentIn
 
   const domVisitors = useMemo(() => ({
     onElement: (element: any) => {
+      // 修复图片逻辑
+      if (element.name === 'img') {
+        const { attribs } = element;
+        // 优先使用原图，其次是高清图，最后是当前 src
+        const actualSrc = attribs['data-actualsrc'] || attribs['data-original'] || attribs.src;
+        
+        // 如果 src 是占位图，强制替换
+        if (actualSrc && (attribs.src?.startsWith('data:image') || !attribs.src)) {
+          attribs.src = actualSrc;
+        }
+
+        // 映射属性以便渲染器使用
+        if (attribs['data-rawwidth']) attribs.width = attribs['data-rawwidth'];
+        if (attribs['data-rawheight']) attribs.height = attribs['data-rawheight'];
+        
+        console.log('Processed Image URL:', attribs.src);
+      }
+
       if (element.name === 'p') {
         const pid = element.attribs['data-pid'];
         const segment = pid ? segmentMap.get(pid) : null;
@@ -164,9 +184,54 @@ export const AnswerContent: React.FC<AnswerContentProps> = ({ content, segmentIn
     );
   };
 
-  const renderers = {
-    p: P_Renderer,
+  const IMG_Renderer: CustomBlockRenderer = ({ tnode }) => {
+    const { src, width: attrWidth, height: attrHeight } = tnode.attributes;
+    const contentWidth = width - 40;
+    
+    // 计算比例。知乎通常会提供 data-rawwidth/height，我们在 domVisitors 里已经映射到了 width/height
+    const originalWidth = parseInt(attrWidth as string) || 0;
+    const originalHeight = parseInt(attrHeight as string) || 0;
+    
+    // 调试渲染器
+    // console.log('IMG_Renderer input:', { src, originalWidth, originalHeight });
+
+    if (!src || src.startsWith('data:image/svg')) {
+      return null;
+    }
+
+    // 计算实际显示高度
+    let displayHeight = 200; // 默认高度
+    if (originalWidth > 0 && originalHeight > 0) {
+      displayHeight = (contentWidth * originalHeight) / originalWidth;
+    }
+
+    const handleImagePress = () => {
+      setViewerImage(src);
+      setViewerVisible(true);
+    };
+
+    return (
+      <View style={styles.imageWrapper}>
+        <Pressable onPress={handleImagePress}>
+          <Image
+            source={{ uri: src }}
+            style={{
+              width: contentWidth,
+              height: displayHeight,
+              borderRadius: 12,
+              backgroundColor: 'rgba(150,150,150,0.1)', // 图片加载前的占位底面
+            }}
+            resizeMode="cover"
+          />
+        </Pressable>
+      </View>
+    );
   };
+
+  const renderers = useMemo(() => ({
+    p: P_Renderer,
+    img: IMG_Renderer,
+  }), [P_Renderer, IMG_Renderer]);
 
   const classesStyles = {
     'segment-interactable': {
@@ -220,11 +285,12 @@ export const AnswerContent: React.FC<AnswerContentProps> = ({ content, segmentIn
       <RenderHtml
         contentWidth={width - 40}
         source={{ html: content }}
-        renderers={renderers}
+        renderers={renderers as any}
         tagsStyles={tagsStyles as any}
         classesStyles={classesStyles as any}
         domVisitors={domVisitors}
         systemFonts={systemFonts}
+        ignoredDomTags={['noscript']}
         defaultTextProps={{
           selectable: true,
           selectionColor: '#0084ff',
@@ -286,6 +352,35 @@ export const AnswerContent: React.FC<AnswerContentProps> = ({ content, segmentIn
           </View>
         </TouchableWithoutFeedback>
       </Modal>
+
+      {/* 图片全屏查看器 */}
+      <Modal
+        visible={viewerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewerVisible(false)}
+      >
+        <View style={styles.viewerContainer}>
+          <TouchableWithoutFeedback onPress={() => setViewerVisible(false)}>
+            <View style={styles.viewerOverlay} />
+          </TouchableWithoutFeedback>
+          
+          {viewerImage && (
+            <Image
+              source={{ uri: viewerImage }}
+              style={styles.viewerImage}
+              resizeMode="contain"
+            />
+          )}
+
+          <TouchableOpacity 
+            style={[styles.viewerCloseBtn, { top: 50 }]}
+            onPress={() => setViewerVisible(false)}
+          >
+            <Ionicons name="close" size={28} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -304,6 +399,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     marginHorizontal: -8,
     marginVertical: 4,
+  },
+  imageWrapper: {
+    marginVertical: 10,
+    alignItems: 'center',
+    width: '100%',
   },
   activeParagraph: {
     backgroundColor: 'rgba(0, 132, 255, 0.1)',
@@ -366,4 +466,29 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginRight: 4,
   },
+  // 图片查看器样式
+  viewerContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  viewerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  viewerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  viewerCloseBtn: {
+    position: 'absolute',
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  }
 });
