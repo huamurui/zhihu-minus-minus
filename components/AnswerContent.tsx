@@ -43,7 +43,16 @@ export const AnswerContent: React.FC<AnswerContentProps> = ({ content, segmentIn
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const [activeSegment, setActiveSegment] = useState<any>(null);
+  const [activeSegment, setActiveSegment] = useState<{
+    pid: string;
+    text: string;
+    is_like: boolean;
+    like_count: number;
+    comment_count: number;
+    seg_ids?: string[];
+    startIndex?: number;
+    endIndex?: number;
+  } | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
   const segmentMap = useMemo(() => {
@@ -58,12 +67,12 @@ export const AnswerContent: React.FC<AnswerContentProps> = ({ content, segmentIn
     mutationFn: async () => {
       if (!activeSegment) return;
       const { is_like, seg_ids, text, pid, startIndex, endIndex } = activeSegment;
-      const segId = Array.isArray(seg_ids) ? seg_ids[0] : seg_ids;
-      
+      const segId = Array.isArray(seg_ids) ? seg_ids[0] : (seg_ids as any);
+
       if (is_like) {
         return unreactAnswerSegment(answerId, segId);
       } else {
-        return reactAnswerSegment(answerId, segId, text, pid, startIndex, endIndex);
+        return reactAnswerSegment(answerId, segId, text, pid, startIndex || 0, endIndex || 0);
       }
     },
     onSuccess: () => {
@@ -75,14 +84,35 @@ export const AnswerContent: React.FC<AnswerContentProps> = ({ content, segmentIn
     }
   });
 
+  // 辅助函数：从复杂的 segmentInfos 中挑出最合适的交互数据
+  const findActiveInteraction = (segment: SegmentInfo | null | undefined) => {
+    const marks = segment?.marks;
+    if (!marks || marks.length === 0) return null;
+
+    // 1. 优先寻找已经点赞过的，确保 UI 能显示“已赞”且“取消点赞”能操作到正确的 ID
+    for (const mark of marks) {
+      if (mark.seg_info?.is_like) return { ...mark.seg_info, mark };
+      if (mark.master_seg_info?.is_like) return { ...mark.master_seg_info, mark };
+    }
+
+    // 2. 其次选择包含主信息的数据段
+    for (const mark of marks) {
+      if (mark.master_seg_info) return { ...mark.master_seg_info, mark };
+    }
+
+    // 3. 最后保底选第一个
+    const firstInfo = marks[0].seg_info || marks[0].master_seg_info;
+    return firstInfo ? { ...firstInfo, mark: marks[0] } : null;
+  };
+
   const domVisitors = useMemo(() => ({
     onElement: (element: any) => {
       if (element.name === 'p') {
         const pid = element.attribs['data-pid'];
         const segment = pid ? segmentMap.get(pid) : null;
-        const interaction = segment?.marks?.[0]?.seg_info || segment?.marks?.[0]?.master_seg_info;
+        const interaction = findActiveInteraction(segment);
         
-        if (interaction && (interaction.like_count > 0 || interaction.comment_count > 0)) {
+        if (interaction && (interaction.like_count > 0 || interaction.comment_count > 0 || interaction.is_like)) {
           element.attribs.class = (element.attribs.class || '') + ' segment-interactable';
           if (interaction.is_like) {
             element.attribs.class += ' segment-liked';
@@ -96,18 +126,20 @@ export const AnswerContent: React.FC<AnswerContentProps> = ({ content, segmentIn
     const pid = props.tnode.attributes['data-pid'];
     const segment = pid ? segmentMap.get(pid) : null;
 
-    // 找出该段落的交互数据 (通常取 marks 中的第一个)
-    const interaction = segment?.marks?.[0]?.seg_info || segment?.marks?.[0]?.master_seg_info;
-    const hasInteraction = interaction && (interaction.like_count > 0 || interaction.comment_count > 0);
+    // 找出该段落最合适的交互数据
+    const interaction = findActiveInteraction(segment);
+    const hasInteraction = interaction && (interaction.like_count > 0 || interaction.comment_count > 0 || interaction.is_like);
     const isLiked = interaction?.is_like;
 
     const handlePress = () => {
-      if (hasInteraction) {
-        const mark = segment?.marks?.[0];
+      if (hasInteraction && interaction) {
+        const mark = interaction.mark;
         setActiveSegment({ 
-          ...interaction, 
-          text: segment?.text, 
           pid,
+          text: segment?.text || '', 
+          is_like: !!interaction.is_like, 
+          like_count: interaction.like_count || 0,
+          comment_count: interaction.comment_count || 0,
           seg_ids: interaction.seg_ids || mark?.seg_info?.seg_ids || (mark as any)?.master_seg_info?.seg_ids,
           startIndex: mark?.start_index || 0,
           endIndex: mark?.end_index || segment?.text.length || 0
@@ -119,7 +151,7 @@ export const AnswerContent: React.FC<AnswerContentProps> = ({ content, segmentIn
     const isActive = activeSegment?.pid === pid && modalVisible;
 
     return (
-      <Pressable 
+      <Pressable
         onPress={handlePress}
         style={[
           styles.paragraphContainer,
@@ -172,10 +204,10 @@ export const AnswerContent: React.FC<AnswerContentProps> = ({ content, segmentIn
     span: { color: textColor },
     div: { color: textColor },
     a: { color: '#0084ff', textDecorationLine: 'none' },
-    code: { 
-      backgroundColor: 'rgba(150,150,150,0.1)', 
-      borderRadius: 4, 
-      paddingHorizontal: 4, 
+    code: {
+      backgroundColor: 'rgba(150,150,150,0.1)',
+      borderRadius: 4,
+      paddingHorizontal: 4,
       fontFamily: 'monospace',
       fontSize: 14,
     },
@@ -211,22 +243,22 @@ export const AnswerContent: React.FC<AnswerContentProps> = ({ content, segmentIn
             <TouchableWithoutFeedback>
               <View style={[styles.bubbleContainer, { backgroundColor: surfaceColor }]}>
                 <View style={styles.bubbleStats}>
-                  <Pressable 
-                    style={styles.statItem} 
+                  <Pressable
+                    style={styles.statItem}
                     onPress={() => toggleSegmentLikeMutation.mutate()}
                     disabled={toggleSegmentLikeMutation.isPending}
                   >
-                    <Ionicons 
-                      name={activeSegment?.is_like ? "heart" : "heart-outline"} 
-                      size={24} 
-                      color={activeSegment?.is_like ? "#ff4d4f" : textColor} 
+                    <Ionicons
+                      name={activeSegment?.is_like ? "heart" : "heart-outline"}
+                      size={24}
+                      color={activeSegment?.is_like ? "#ff4d4f" : textColor}
                     />
                     <Text style={[styles.statLabel, activeSegment?.is_like && { color: "#ff4d4f" }]}>
                       {activeSegment?.like_count || 0} 赞同
                     </Text>
                   </Pressable>
                   <View style={styles.statDivider} />
-                  <Pressable 
+                  <Pressable
                     style={styles.statItem}
                     onPress={() => {
                       setModalVisible(false);
@@ -239,8 +271,8 @@ export const AnswerContent: React.FC<AnswerContentProps> = ({ content, segmentIn
                     <Text style={styles.statLabel}>{activeSegment?.comment_count || 0} 评论</Text>
                   </Pressable>
                 </View>
-                <Pressable 
-                  style={styles.bubbleAction} 
+                <Pressable
+                  style={styles.bubbleAction}
                   onPress={() => {
                     setModalVisible(false);
                     router.push(`/comments/${answerId}?type=answer`);
