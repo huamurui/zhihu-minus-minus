@@ -37,13 +37,13 @@ interface ZhihuContentProps {
   onRefresh?: () => void;
 }
 
-export const ZhihuContent: React.FC<ZhihuContentProps> = ({ 
-  content, 
-  contentArray, 
-  segmentInfos, 
-  objectId, 
+export const ZhihuContent: React.FC<ZhihuContentProps> = ({
+  content,
+  contentArray,
+  segmentInfos,
+  objectId,
   type,
-  onRefresh 
+  onRefresh
 }) => {
   const { width } = useWindowDimensions();
   const textColor = useThemeColor({}, 'text');
@@ -123,7 +123,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
         const { attribs } = element;
         // 优先使用原图，其次是高清图，最后是当前 src
         const actualSrc = attribs['data-actualsrc'] || attribs['data-original'] || attribs.src;
-        
+
         // 如果 src 是占位图，强制替换
         if (actualSrc && (attribs.src?.startsWith('data:image') || !attribs.src)) {
           attribs.src = actualSrc;
@@ -132,15 +132,13 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
         // 映射属性以便渲染器使用
         if (attribs['data-rawwidth']) attribs.width = attribs['data-rawwidth'];
         if (attribs['data-rawheight']) attribs.height = attribs['data-rawheight'];
-        
-        console.log('Processed Image URL:', attribs.src);
       }
 
       if (element.name === 'p') {
         const pid = element.attribs['data-pid'];
         const segment = pid ? segmentMap.get(pid) : null;
         const interaction = findActiveInteraction(segment);
-        
+
         if (interaction && (interaction.like_count > 0 || interaction.comment_count > 0 || interaction.is_like)) {
           element.attribs.class = (element.attribs.class || '') + ' segment-interactable';
           if (interaction.is_like) {
@@ -163,10 +161,10 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
     const handlePress = () => {
       if (hasInteraction && interaction) {
         const mark = interaction.mark;
-        setActiveSegment({ 
+        setActiveSegment({
           pid,
-          text: segment?.text || '', 
-          is_like: !!interaction.is_like, 
+          text: segment?.text || '',
+          is_like: !!interaction.is_like,
           like_count: interaction.like_count || 0,
           comment_count: interaction.comment_count || 0,
           seg_ids: interaction.seg_ids || mark?.seg_info?.seg_ids || (mark as any)?.master_seg_info?.seg_ids,
@@ -196,11 +194,11 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
   const IMG_Renderer: CustomBlockRenderer = ({ tnode }) => {
     const { src, width: attrWidth, height: attrHeight } = tnode.attributes;
     const contentWidth = width - 40;
-    
+
     // 计算比例。知乎通常会提供 data-rawwidth/height，我们在 domVisitors 里已经映射到了 width/height
     const originalWidth = parseInt(attrWidth as string) || 0;
     const originalHeight = parseInt(attrHeight as string) || 0;
-    
+
     // 调试渲染器
     // console.log('IMG_Renderer input:', { src, originalWidth, originalHeight });
 
@@ -239,7 +237,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
 
   const LinkCard: React.FC<{ url: string; title?: string; image?: string; type?: string }> = ({ url, title, image, type }) => {
     const isInternal = url.includes('zhihu.com');
-    
+
     // 简易解析知乎链接类型
     const getLinkTypeIcon = () => {
       if (url.includes('/question/')) return 'help-circle';
@@ -354,10 +352,10 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
         return (
           <View key={index} style={styles.imageWrapper}>
             <Pressable onPress={() => { setViewerImage(item.url); setViewerVisible(true); }}>
-              <Image 
-                source={{ uri: item.url }} 
-                style={{ width: width - 40, height: 250, borderRadius: 12 }} 
-                resizeMode="cover" 
+              <Image
+                source={{ uri: item.url }}
+                style={{ width: width - 40, height: 250, borderRadius: 12 }}
+                resizeMode="cover"
               />
             </Pressable>
           </View>
@@ -456,7 +454,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
           <TouchableWithoutFeedback onPress={() => setViewerVisible(false)}>
             <View style={styles.viewerOverlay} />
           </TouchableWithoutFeedback>
-          
+
           {viewerImage && (
             <Image
               source={{ uri: viewerImage }}
@@ -465,7 +463,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
             />
           )}
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.viewerCloseBtn, { top: 50 }]}
             onPress={() => setViewerVisible(false)}
           >
