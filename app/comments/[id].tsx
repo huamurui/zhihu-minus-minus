@@ -194,7 +194,17 @@ export default function CommentScreen() {
         pointerEvents="box-none"
       >
         <View style={styles.floatingInputWrapper} pointerEvents="box-none">
-          <View type="surface" style={[styles.capsuleWrapper, { borderColor }]}>
+          <BlurView 
+            intensity={100} 
+            tint={colorScheme === 'dark' ? 'dark' : 'light'} 
+            style={[
+              styles.capsuleWrapper, 
+              { 
+                borderColor,
+                backgroundColor: colorScheme === 'dark' ? 'rgba(26,26,26,0.85)' : 'rgba(255,255,255,0.9)'
+              }
+            ]}
+          >
             {replyTo && (
               <View style={styles.replyHeaderFloating}>
                 <Text type="secondary" style={styles.replyHint}>正在回复 {replyTo.name}</Text>
@@ -226,7 +236,7 @@ export default function CommentScreen() {
                 )}
               </Pressable>
             </View>
-          </View>
+          </BlurView>
         </View>
       </KeyboardAvoidingView>
     </View>

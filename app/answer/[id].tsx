@@ -285,9 +285,9 @@ export default function AnswerDetailScreen() {
 
             {/* 回答正文 */}
             <View style={styles.contentBody}>
-              <ZhihuContent 
-                content={answer?.content || ''} 
-                segmentInfos={answer?.segment_infos} 
+              <ZhihuContent
+                content={answer?.content || ''}
+                segmentInfos={answer?.segment_infos}
                 objectId={id as string}
                 type="answer"
                 onRefresh={refetch}
@@ -302,7 +302,14 @@ export default function AnswerDetailScreen() {
 
       {/* 3. 底部吸底交互栏 (采用首页同款悬浮设计) */}
       <View style={[styles.footerContainer, { bottom: insets.bottom + 20 }]}>
-        <BlurView intensity={130} tint={colorScheme} style={styles.footerBlur}>
+        <BlurView
+          intensity={130}
+          tint={colorScheme === 'dark' ? 'dark' : 'light'}
+          style={[
+            styles.footerBlur,
+            { backgroundColor: colorScheme === 'dark' ? 'rgba(26,26,26,0.8)' : 'rgba(255,255,255,0.85)' }
+          ]}
+        >
           <View style={styles.footerContent}>
             {/* 左侧：赞同(含数量)和反对 */}
             <View style={styles.footerLeft}>

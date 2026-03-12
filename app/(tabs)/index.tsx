@@ -103,7 +103,14 @@ export default function HomeScreen() {
     <View style={styles.container}>
       {/* 1. 顶部 Tab 导航 (Home 专属) */}
       <Animated.View style={[styles.topNavContainer, { top: insets.top + 10 }, topNavAnimStyle]}>
-        <BlurView intensity={100} tint={colorScheme} style={styles.blurWrapper}>
+        <BlurView 
+          intensity={100} 
+          tint={colorScheme === 'dark' ? 'dark' : 'light'} 
+          style={[
+            styles.blurWrapper,
+            { backgroundColor: colorScheme === 'dark' ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.85)' }
+          ]}
+        >
           <View style={styles.topNav}>
             <View style={{ flexDirection: 'row', flex: 1, backgroundColor: 'transparent', alignItems: 'center', position: 'relative' }}>
               <Animated.View style={[styles.topPill, { backgroundColor: tintColor + '15' }, topIndicatorStyle]} />
@@ -158,7 +165,14 @@ export default function HomeScreen() {
 
       {/* 3. 底部悬浮导航栏 (Custom TabBar) */}
       <View style={[styles.bottomBarContainer, { bottom: insets.bottom + 20 }]}>
-        <BlurView intensity={130} tint={colorScheme} style={styles.bottomBlur}>
+        <BlurView 
+          intensity={130} 
+          tint={colorScheme === 'dark' ? 'dark' : 'light'} 
+          style={[
+            styles.bottomBlur,
+            { backgroundColor: colorScheme === 'dark' ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.85)' }
+          ]}
+        >
           <View style={styles.bottomNavItems}>
             {/* 联动指示器 */}
             <Animated.View style={[styles.bottomIndicator, { backgroundColor: tintColor + '15' }, bottomIndicatorStyle]} />

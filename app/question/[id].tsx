@@ -3,10 +3,11 @@ import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useRef, useState, useCallback, useMemo, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { ActivityIndicator, Animated, Image, LayoutAnimation, Pressable, StyleSheet, useWindowDimensions, useColorScheme, View as NativeView } from 'react-native';
+import { ActivityIndicator, Animated, Image, LayoutAnimation, Pressable, StyleSheet, useWindowDimensions, View as NativeView } from 'react-native';
 import Reanimated, { SharedTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
+import { useColorScheme } from '@/components/useColorScheme';
 
 import client from '@/api/client';
 import { deleteAnswer } from '@/api/zhihu/answer';
@@ -18,14 +19,14 @@ import { Alert } from 'react-native';
 import { ZhihuContent } from '@/components/ZhihuContent';
 
 // 使用 forwardRef 让父组件能直接测量 footer 位置
-const AnswerItem = forwardRef(({ 
-  item, 
-  isExpanded, 
-  onToggle 
-}: { 
-  item: any, 
-  isExpanded: boolean, 
-  onToggle: (id: string, expanded: boolean) => void 
+const AnswerItem = forwardRef(({
+  item,
+  isExpanded,
+  onToggle
+}: {
+  item: any,
+  isExpanded: boolean,
+  onToggle: (id: string, expanded: boolean) => void
 }, ref) => {
   const { width } = useWindowDimensions();
   const router = useRouter();
@@ -148,7 +149,7 @@ export default function QuestionDetail() {
   const headerVisible = useRef(new Animated.Value(0)).current;
   const isHeaderShowRef = useRef(false);
   const isFloatingShown = useRef(false);
-  
+
   // 核心：存储所有可见 AnswerItem 的实例引用
   const itemRefs = useRef(new Map<string, any>());
   const viewableIdsRef = useRef<string[]>([]);
@@ -169,7 +170,7 @@ export default function QuestionDetail() {
     // 更新当前主导回答
     const candidate = viewableItems[0]?.item;
     if (candidate && candidate.id !== activeItem?.id) {
-       setActiveItem(candidate);
+      setActiveItem(candidate);
     }
   }, [activeItem]);
 
@@ -199,7 +200,7 @@ export default function QuestionDetail() {
     // 2. 悬浮工具栏探测逻辑 (真空探测)
     if (now - lastCheckTime.current > 100) {
       lastCheckTime.current = now;
-      
+
       const currentViewableIds = viewableIdsRef.current;
       let anyFooterVisible = false;
       const promises: Promise<boolean>[] = [];
@@ -219,23 +220,23 @@ export default function QuestionDetail() {
 
       Promise.all(promises).then(results => {
         anyFooterVisible = results.some(r => r === true);
-        
+
         // 判定条件：
         // A. 屏幕内没有任何 footer 
         // B. 且当前主导回答是展开状态
         // C. 且已经滑出卷首一定距离
-        const shouldShow = !anyFooterVisible && 
-                           activeItem && 
-                           expandedIds.has(activeItem.id.toString()) && 
-                           currentY > 300;
+        const shouldShow = !anyFooterVisible &&
+          activeItem &&
+          expandedIds.has(activeItem.id.toString()) &&
+          currentY > 300;
 
         if (shouldShow !== isFloatingShown.current) {
           isFloatingShown.current = shouldShow;
-          Animated.spring(footerAnim, { 
-            toValue: shouldShow ? 1 : 0, 
-            useNativeDriver: true, 
-            friction: 10, 
-            tension: 50 
+          Animated.spring(footerAnim, {
+            toValue: shouldShow ? 1 : 0,
+            useNativeDriver: true,
+            friction: 10,
+            tension: 50
           }).start();
         }
       });
@@ -315,29 +316,28 @@ export default function QuestionDetail() {
   return (
     <View type="default" style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
-      
+
       {/* 顶部标题栏 */}
       <Animated.View style={[styles.stickyHeader, { backgroundColor, paddingTop: insets.top, opacity: headerVisible, transform: [{ translateY: headerVisible.interpolate({ inputRange: [0, 1], outputRange: [-insets.top - 50, 0] }) }], zIndex: 10 }]}>
         <View style={styles.stickyHeaderContent}><Text style={styles.stickyTitle} numberOfLines={1}>{question?.title || initialTitle}</Text></View>
       </Animated.View>
-      
+
       {/* 返回按钮 */}
       <Pressable onPress={() => router.back()} style={[styles.floatingBackBtn, { top: insets.top + 8 }]}><Ionicons name="chevron-back" size={28} color={textColor} /></Pressable>
-      
+
       <FlashList
         onScroll={handleScroll}
         data={qLoading ? [] : answers}
-        estimatedItemSize={250}
         ListHeaderComponent={renderHeader}
         renderItem={({ item }) => (
-          <AnswerItem 
+          <AnswerItem
             ref={(r) => {
               if (r) itemRefs.current.set(item.id.toString(), r);
               else itemRefs.current.delete(item.id.toString());
             }}
-            item={item} 
-            isExpanded={expandedIds.has(item.id.toString())} 
-            onToggle={toggleExpand} 
+            item={item}
+            isExpanded={expandedIds.has(item.id.toString())}
+            onToggle={toggleExpand}
           />
         )}
         keyExtractor={(item: any) => item.id.toString()}
@@ -350,21 +350,27 @@ export default function QuestionDetail() {
         refreshing={isRefetching}
       />
 
-      {/* 悬浮交互条 */}
       <Animated.View style={[styles.floatingFooter, { bottom: insets.bottom + 15, transform: [{ translateY: footerAnim.interpolate({ inputRange: [0, 1], outputRange: [100, 0] }) }], opacity: footerAnim }]}>
-        <BlurView intensity={95} tint={colorScheme === 'dark' ? 'dark' : 'light'} style={styles.blurContainer}>
-           <View style={styles.floatingInner}>
-              <View style={styles.floatLeft}>
-                 <LikeButton id={activeItem?.id} count={activeItem?.voteup_count || 0} voted={activeItem?.relationship?.voting} type="answers" variant="ghost" />
-                 <Pressable style={styles.floatComment} onPress={() => router.push({ pathname: '/comments/[id]', params: { id: activeItem?.id, type: 'answer', count: activeItem?.comment_count } } as any)}>
-                    <Ionicons name="chatbubble-outline" size={20} color="#0084ff" /><Text style={styles.floatStatText}>{activeItem?.comment_count || 0}</Text>
-                 </Pressable>
-              </View>
-              <View style={styles.floatDivider} />
-              <Pressable style={styles.floatCollapse} onPress={() => activeItem && toggleExpand(activeItem.id.toString(), false)}>
-                <Text style={styles.collapseHint}>收起回答</Text><Ionicons name="chevron-up" size={16} color="#0084ff" />
+        <BlurView
+          intensity={95}
+          tint={colorScheme}
+          style={[
+            styles.blurContainer,
+            { backgroundColor: colorScheme === 'dark' ? 'rgba(26,26,26,0.8)' : 'rgba(255,255,255,0.85)' }
+          ]}
+        >
+          <View style={styles.floatingInner}>
+            <View style={styles.floatLeft}>
+              <LikeButton id={activeItem?.id} count={activeItem?.voteup_count || 0} voted={activeItem?.relationship?.voting} type="answers" variant="ghost" />
+              <Pressable style={styles.floatComment} onPress={() => router.push({ pathname: '/comments/[id]', params: { id: activeItem?.id, type: 'answer', count: activeItem?.comment_count } } as any)}>
+                <Ionicons name="chatbubble-outline" size={20} color="#0084ff" /><Text style={styles.floatStatText}>{activeItem?.comment_count || 0}</Text>
               </Pressable>
-           </View>
+            </View>
+            <View style={styles.floatDivider} />
+            <Pressable style={styles.floatCollapse} onPress={() => activeItem && toggleExpand(activeItem.id.toString(), false)}>
+              <Text style={styles.collapseHint}>收起回答</Text><Ionicons name="chevron-up" size={16} color="#0084ff" />
+            </Pressable>
+          </View>
         </BlurView>
       </Animated.View>
     </View>

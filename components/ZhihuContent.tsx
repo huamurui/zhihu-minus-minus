@@ -496,12 +496,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   activeParagraph: {
-    backgroundColor: 'rgba(0, 132, 255, 0.1)',
-    shadowColor: '#0084ff',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    backgroundColor: 'rgba(0, 132, 255, 0.12)',
   },
   modalOverlay: {
     flex: 1,
