@@ -7,6 +7,8 @@ import { ActivityIndicator, Animated, Image, LayoutAnimation, Pressable, StyleSh
 import Reanimated, { SharedTransition } from 'react-native-reanimated';
 import RenderHtml from 'react-native-render-html';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
+import { useColorScheme } from 'react-native';
 
 import client from '@/api/client';
 import { deleteAnswer } from '@/api/zhihu/answer';
@@ -16,7 +18,15 @@ import { LikeButton } from '@/components/LikeButton';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { Alert } from 'react-native';
 
-const AnswerItem = ({ item }: { item: any }) => {
+const AnswerItem = ({ 
+  item, 
+  isExpanded, 
+  onToggle 
+}: { 
+  item: any, 
+  isExpanded: boolean, 
+  onToggle: (id: string, expanded: boolean) => void 
+}) => {
   const { width } = useWindowDimensions();
   const router = useRouter();
   const textColor = useThemeColor({}, 'text');
@@ -25,9 +35,6 @@ const AnswerItem = ({ item }: { item: any }) => {
   const rawText = item.content?.replace(/<[^>]+>/g, '') || '';
   const isLongContent = rawText.length > 120;
   const excerpt = isLongContent ? rawText.substring(0, 100) + '...' : rawText;
-
-  // 1. 展开状态管理
-  const [expanded, setExpanded] = useState(!isLongContent);
 
   const followMutation = useMutation({
     mutationFn: async () => {
@@ -69,7 +76,7 @@ const AnswerItem = ({ item }: { item: any }) => {
   const toggleExpand = () => {
     if (!isLongContent) return;
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpanded(!expanded);
+    onToggle(item.id.toString(), !isExpanded);
   };
 
   const goToProfile = () => {
@@ -107,7 +114,7 @@ const AnswerItem = ({ item }: { item: any }) => {
 
       {/* 2. 内容部分 - 切换展开/收起 */}
       <Pressable onPress={toggleExpand} style={styles.contentContainer}>
-        {expanded ? (
+        {isExpanded ? (
           <View style={{ flex: 1, backgroundColor: 'transparent' }}>
             <RenderHtml
               contentWidth={width - 40}
@@ -120,10 +127,10 @@ const AnswerItem = ({ item }: { item: any }) => {
               }}
             />
             {isLongContent && (
-              <Pressable onPress={toggleExpand} style={styles.collapseBtn}>
+              <View style={styles.collapseBtn}>
                 <Text style={styles.collapseText}>收起回答</Text>
                 <Ionicons name="chevron-up" size={14} color="#0084ff" />
-              </Pressable>
+              </View>
             )}
           </View>
         ) : (
@@ -195,8 +202,49 @@ export default function QuestionDetail() {
   const queryClient = useQueryClient();
   const [sortBy, setSortBy] = useState<'default' | 'created'>('default');
 
+  // --- 核心逻辑：追踪展开状态与活跃回答 ---
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [activeItem, setActiveItem] = useState<any>(null);
 
-  // 动画相关
+  const toggleExpand = (id: string, expanded: boolean) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (expanded) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  // 视口感知逻辑
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 50 // 占据屏幕 50% 以上视为活跃
+  }).current;
+
+  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
+    const dominantItem = viewableItems[0]?.item;
+    if (dominantItem && dominantItem.id) {
+       setActiveItem(dominantItem);
+    }
+  }).current;
+
+  // 动画控制器
+  const footerAnim = useRef(new Animated.Value(0)).current;
+
+  // 判断是否应该显示浮动条：
+  // 1. 有活跃回答 2. 该回答是展开状态 3. 内容足够长
+  const isExpanded = activeItem && expandedIds.has(activeItem.id.toString());
+  const shouldShowFloating = isExpanded && (activeItem.content?.length > 500);
+
+  React.useEffect(() => {
+    Animated.spring(footerAnim, {
+      toValue: shouldShowFloating ? 1 : 0,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 40,
+    }).start();
+  }, [shouldShowFloating]);
+
+  // --- 动画相关 ---
   const scrollY = useRef(new Animated.Value(0)).current;
   const lastScrollY = useRef(0);
   const headerVisible = useRef(new Animated.Value(0)).current;
@@ -483,8 +531,16 @@ export default function QuestionDetail() {
         data={qLoading ? [] : (answers || [])}
         {...({ estimatedItemSize: 200 } as any)}
         ListHeaderComponent={renderHeader}
-        renderItem={({ item }: { item: any }) => <AnswerItem item={item} />}
+        renderItem={({ item }: { item: any }) => (
+          <AnswerItem 
+            item={item} 
+            isExpanded={expandedIds.has(item.id.toString())}
+            onToggle={toggleExpand}
+          />
+        )}
         keyExtractor={(item: any) => item.id.toString()}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
         onEndReached={() => {
           if (hasNextPage && !isFetchingNextPage) {
             fetchNextPage();
@@ -505,6 +561,57 @@ export default function QuestionDetail() {
         onRefresh={refetch}
         refreshing={isRefetching}
       />
+
+      {/* 3. 浮动交互条 */}
+      <Animated.View
+        style={[
+          styles.floatingFooter,
+          {
+            bottom: insets.bottom + 15,
+            transform: [{
+              translateY: footerAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [100, 0]
+              })
+            }],
+            opacity: footerAnim
+          }
+        ]}
+      >
+        <BlurView intensity={80} tint={useColorScheme() === 'dark' ? 'dark' : 'light'} style={styles.blurContainer}>
+           <View style={styles.floatingInner}>
+              <View style={styles.floatLeft}>
+                 <LikeButton 
+                   id={activeItem?.id} 
+                   count={activeItem?.voteup_count || 0} 
+                   voted={activeItem?.relationship?.voting}
+                   type="answers"
+                   variant="ghost"
+                 />
+                 <Pressable 
+                   style={styles.floatComment}
+                   onPress={() => router.push({
+                      pathname: '/comments/[id]',
+                      params: { id: activeItem?.id, type: 'answer', count: activeItem?.comment_count }
+                   } as any)}
+                 >
+                    <Ionicons name="chatbubble-outline" size={20} color="#0084ff" />
+                    <Text style={styles.floatStatText}>{activeItem?.comment_count || 0}</Text>
+                 </Pressable>
+              </View>
+              
+              <View style={styles.floatDivider} />
+
+              <Pressable 
+                style={styles.floatCollapse}
+                onPress={() => activeItem && toggleExpand(activeItem.id.toString(), false)}
+              >
+                <Text style={styles.collapseHint}>收起回答</Text>
+                <Ionicons name="chevron-up" size={16} color="#0084ff" />
+              </Pressable>
+           </View>
+        </BlurView>
+      </Animated.View>
     </View>
   );
 }
@@ -594,4 +701,62 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // 浮动工具栏
+  floatingFooter: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    height: 54,
+    borderRadius: 27,
+    overflow: 'hidden',
+    zIndex: 1000,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  blurContainer: {
+    flex: 1,
+  },
+  floatingInner: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    justifyContent: 'space-between',
+  },
+  floatLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  floatComment: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 20,
+  },
+  floatStatText: {
+    marginLeft: 6,
+    color: '#0084ff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  floatDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: 'rgba(0,132,255,0.1)',
+    marginHorizontal: 10,
+  },
+  floatCollapse: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  collapseHint: {
+    color: '#0084ff',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginRight: 4,
+  }
 });
