@@ -99,7 +99,7 @@ export function DailyList({ insets }: { insets: any }) {
           return (
             <Pressable
               style={({ pressed }) => [pressed && { opacity: 0.7 }]}
-              onPress={() => router.push(`/article/${story.id}`)}
+              onPress={() => router.push({ pathname: `/article/${story.id}`, params: { source: 'daily' } } as any)}
             >
               <View type="surface" style={styles_daily.card}>
                 <Image source={{ uri: story.images?.[0] }} style={styles_daily.image} />

@@ -28,14 +28,23 @@ interface SegmentInfo {
   }>;
 }
 
-interface AnswerContentProps {
-  content: string;
+interface ZhihuContentProps {
+  content?: string;
+  contentArray?: any[];
   segmentInfos?: SegmentInfo[];
-  answerId: string;
+  objectId: string;
+  type: 'answer' | 'article' | 'pin';
   onRefresh?: () => void;
 }
 
-export const AnswerContent: React.FC<AnswerContentProps> = ({ content, segmentInfos, answerId, onRefresh }) => {
+export const ZhihuContent: React.FC<ZhihuContentProps> = ({ 
+  content, 
+  contentArray, 
+  segmentInfos, 
+  objectId, 
+  type,
+  onRefresh 
+}) => {
   const { width } = useWindowDimensions();
   const textColor = useThemeColor({}, 'text');
   const surfaceColor = useThemeColor({}, 'surface');
@@ -72,9 +81,9 @@ export const AnswerContent: React.FC<AnswerContentProps> = ({ content, segmentIn
       const segId = Array.isArray(seg_ids) ? seg_ids[0] : (seg_ids as any);
 
       if (is_like) {
-        return unreactAnswerSegment(answerId, segId);
+        return unreactAnswerSegment(objectId, segId);
       } else {
-        return reactAnswerSegment(answerId, segId, text, pid, startIndex || 0, endIndex || 0);
+        return reactAnswerSegment(objectId, segId, text, pid, startIndex || 0, endIndex || 0);
       }
     },
     onSuccess: () => {
@@ -219,7 +228,7 @@ export const AnswerContent: React.FC<AnswerContentProps> = ({ content, segmentIn
               width: contentWidth,
               height: displayHeight,
               borderRadius: 12,
-              backgroundColor: 'rgba(150,150,150,0.1)', // 图片加载前的占位底面
+              backgroundColor: 'rgba(150,150,150,0.1)',
             }}
             resizeMode="cover"
           />
@@ -228,10 +237,53 @@ export const AnswerContent: React.FC<AnswerContentProps> = ({ content, segmentIn
     );
   };
 
+  const LinkCard: React.FC<{ url: string; title?: string; image?: string; type?: string }> = ({ url, title, image, type }) => {
+    const isInternal = url.includes('zhihu.com');
+    
+    // 简易解析知乎链接类型
+    const getLinkTypeIcon = () => {
+      if (url.includes('/question/')) return 'help-circle';
+      if (url.includes('/answer/')) return 'chatbubble-ellipses';
+      if (url.includes('/pin/')) return 'navigate';
+      return 'link';
+    };
+
+    const handlePress = () => {
+      // TODO: 实现更精细的内部跳转逻辑
+      router.push(url as any);
+    };
+
+    return (
+      <Pressable onPress={handlePress} style={[styles.linkCard, { backgroundColor: surfaceColor }]}>
+        <View style={styles.linkCardContent}>
+          <Text style={styles.linkCardTitle} numberOfLines={2}>{title || url}</Text>
+          <View style={styles.linkCardFooter}>
+            <Ionicons name={getLinkTypeIcon() as any} size={14} color="#0084ff" />
+            <Text style={styles.linkCardSub}>{isInternal ? '知乎内部链接' : '外部链接'}</Text>
+          </View>
+        </View>
+        {image && <Image source={{ uri: image }} style={styles.linkCardImage} />}
+      </Pressable>
+    );
+  };
+
+  const A_Renderer: CustomBlockRenderer = ({ tnode, TDefaultRenderer, ...props }) => {
+    const isLinkCard = tnode.attributes.class?.includes('LinkCard') || tnode.attributes['data-draft-type'] === 'link-card';
+    const url = tnode.attributes.href;
+
+    if (isLinkCard && url) {
+      // 这里的 title 可能在子节点中
+      return <LinkCard url={url} title={tnode.attributes['data-draft-title']} />;
+    }
+
+    return <TDefaultRenderer tnode={tnode} {...props} />;
+  };
+
   const renderers = useMemo(() => ({
     p: P_Renderer,
     img: IMG_Renderer,
-  }), [P_Renderer, IMG_Renderer]);
+    a: A_Renderer,
+  }), [P_Renderer, IMG_Renderer, A_Renderer]);
 
   const classesStyles = {
     'segment-interactable': {
@@ -280,22 +332,62 @@ export const AnswerContent: React.FC<AnswerContentProps> = ({ content, segmentIn
 
   const systemFonts = [...defaultSystemFonts, 'Inter', 'Roboto'];
 
+  // 处理 Pin 内容数组的渲染
+  const renderPinContent = () => {
+    if (!contentArray) return null;
+    return contentArray.map((item, index) => {
+      if (item.type === 'text') {
+        return (
+          <RenderHtml
+            key={index}
+            contentWidth={width - 40}
+            source={{ html: `<div>${item.content}</div>` }}
+            renderers={renderers as any}
+            tagsStyles={tagsStyles as any}
+            classesStyles={classesStyles as any}
+            domVisitors={domVisitors}
+            systemFonts={systemFonts}
+          />
+        );
+      }
+      if (item.type === 'image') {
+        return (
+          <View key={index} style={styles.imageWrapper}>
+            <Pressable onPress={() => { setViewerImage(item.url); setViewerVisible(true); }}>
+              <Image 
+                source={{ uri: item.url }} 
+                style={{ width: width - 40, height: 250, borderRadius: 12 }} 
+                resizeMode="cover" 
+              />
+            </Pressable>
+          </View>
+        );
+      }
+      if (item.type === 'link_card') {
+        return <LinkCard key={index} url={item.url} title={item.data_draft_title} />;
+      }
+      return null;
+    });
+  };
+
   return (
     <View style={styles.contentWrapper}>
-      <RenderHtml
-        contentWidth={width - 40}
-        source={{ html: content }}
-        renderers={renderers as any}
-        tagsStyles={tagsStyles as any}
-        classesStyles={classesStyles as any}
-        domVisitors={domVisitors}
-        systemFonts={systemFonts}
-        ignoredDomTags={['noscript']}
-        defaultTextProps={{
-          selectable: true,
-          selectionColor: '#0084ff',
-        }}
-      />
+      {contentArray ? renderPinContent() : (
+        <RenderHtml
+          contentWidth={width - 40}
+          source={{ html: content || '' }}
+          renderers={renderers as any}
+          tagsStyles={tagsStyles as any}
+          classesStyles={classesStyles as any}
+          domVisitors={domVisitors}
+          systemFonts={systemFonts}
+          ignoredDomTags={['noscript']}
+          defaultTextProps={{
+            selectable: true,
+            selectionColor: '#0084ff',
+          }}
+        />
+      )}
 
       {/* 交互气泡弹窗 */}
       <Modal
@@ -330,7 +422,7 @@ export const AnswerContent: React.FC<AnswerContentProps> = ({ content, segmentIn
                       setModalVisible(false);
                       const { seg_ids } = activeSegment || {};
                       const segId = Array.isArray(seg_ids) ? seg_ids[0] : seg_ids;
-                      router.push(`/comments/${answerId}?type=answer${segId ? `&segmentId=${segId}` : ''}`);
+                      router.push(`/comments/${objectId}?type=${type}${segId ? `&segmentId=${segId}` : ''}`);
                     }}
                   >
                     <Ionicons name="chatbubble-outline" size={22} color="#0084ff" />
@@ -341,7 +433,7 @@ export const AnswerContent: React.FC<AnswerContentProps> = ({ content, segmentIn
                   style={styles.bubbleAction}
                   onPress={() => {
                     setModalVisible(false);
-                    router.push(`/comments/${answerId}?type=answer`);
+                    router.push(`/comments/${objectId}?type=${type}`);
                   }}
                 >
                   <Text style={styles.bubbleActionText}>查看详细讨论</Text>
@@ -479,6 +571,48 @@ const styles = StyleSheet.create({
   viewerImage: {
     width: '100%',
     height: '100%',
+  },
+  // LinkCard 样式
+  linkCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    marginVertical: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(150,150,150,0.15)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  linkCardContent: {
+    flex: 1,
+    marginRight: 10,
+    backgroundColor: 'transparent',
+  },
+  linkCardTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    lineHeight: 20,
+    marginBottom: 6,
+  },
+  linkCardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  linkCardSub: {
+    fontSize: 12,
+    color: '#999',
+    marginLeft: 4,
+  },
+  linkCardImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: 'rgba(150,150,150,0.05)',
   },
   viewerCloseBtn: {
     position: 'absolute',

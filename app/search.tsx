@@ -138,6 +138,15 @@ export default function SearchScreen() {
 
         const highlight = item.highlight || {};
 
+        if (obj.type === 'people') {
+            return {
+                ...obj,
+                type: 'peoples',
+                name: highlight.title ? HighlightText(highlight.title, tintColor) : obj.name,
+                headline: highlight.description ? HighlightText(highlight.description, tintColor) : obj.headline,
+            };
+        }
+
         // 适配 FeedCard 的数据格式
         return {
             id: obj.id,
@@ -267,11 +276,17 @@ export default function SearchScreen() {
                             const highlight = item.highlight || {};
                             const displayUser = {
                                 ...userObj,
-                                name: HighlightText(highlight.title || userObj.name || '', tintColor),
-                                headline: HighlightText(highlight.description || userObj.headline || '', tintColor),
+                                name: (typeof userObj.name === 'string') ? HighlightText(highlight.title || userObj.name || '', tintColor) : userObj.name,
+                                headline: (typeof userObj.headline === 'string') ? HighlightText(highlight.description || userObj.headline || '', tintColor) : userObj.headline,
                             };
                             return <UserCard user={displayUser} />;
                         }
+
+                        // 综合搜索中可能混杂了用户
+                        if (item.type === 'peoples') {
+                            return <UserCard user={item} />;
+                        }
+                        
                         return <FeedCard item={item} />;
                     }}
                     {...({

@@ -1,7 +1,7 @@
 import { deleteAnswer, getAnswer } from '@/api/zhihu';
 import { fastCollectAnswer, getAnswerCollectionStatus, removeFromCollection } from '@/api/zhihu/collection';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
-import { AnswerContent } from '@/components/AnswerContent';
+import { ZhihuContent } from '@/components/ZhihuContent';
 import { DownvoteButton } from '@/components/DownvoteButton';
 import { LikeButton } from '@/components/LikeButton';
 import { Text, View, useThemeColor } from '@/components/Themed';
@@ -285,10 +285,11 @@ export default function AnswerDetailScreen() {
 
             {/* 回答正文 */}
             <View style={styles.contentBody}>
-              <AnswerContent 
+              <ZhihuContent 
                 content={answer?.content || ''} 
                 segmentInfos={answer?.segment_infos} 
-                answerId={id as string}
+                objectId={id as string}
+                type="answer"
                 onRefresh={refetch}
               />
               <Text type="secondary" style={styles.publishDate}>

@@ -126,7 +126,7 @@ export const CreationCard = ({ item, type, onPress, excerpt }: {
               type={type === 'article' ? 'articles' : type === 'pin' ? 'pins' : 'answers'}
             />
             <Pressable
-              onPress={() => router.push(`/comments/${item.id}`)}
+              onPress={() => router.push(`/comments/${item.id}?type=${type}&count=${item.comment_count || 0}`)}
               style={styles.commentBtn}
             >
               <Ionicons name="chatbubble-outline" size={16} color="#888" />

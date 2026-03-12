@@ -22,20 +22,20 @@ const AnswerItem = ({ item }: { item: any }) => {
   const textColor = useThemeColor({}, 'text');
   const queryClient = useQueryClient();
 
-  // 改进摘要逻辑：如果正文本身就很短，则无需折叠
   const rawText = item.content?.replace(/<[^>]+>/g, '') || '';
   const isLongContent = rawText.length > 120;
   const excerpt = isLongContent ? rawText.substring(0, 100) + '...' : rawText;
 
-  // 初始状态：如果内容短，直接展开
+  // 1. 展开状态管理
   const [expanded, setExpanded] = useState(!isLongContent);
 
   const followMutation = useMutation({
     mutationFn: async () => {
+      const pid = item.author.url_token || item.author.id;
       if (item.author?.is_following) {
-        return unfollowMember(item.author.url_token || item.author.id);
+        return unfollowMember(pid);
       } else {
-        return followMember(item.author.url_token || item.author.id);
+        return followMember(pid);
       }
     },
     onSuccess: () => {
@@ -47,7 +47,7 @@ const AnswerItem = ({ item }: { item: any }) => {
     mutationFn: () => deleteAnswer(item.id),
     onSuccess: () => {
       Alert.alert('删除成功', '你的回答已删除喵！');
-      queryClient.invalidateQueries({ queryKey: ['question-answers', item.question?.id || item.id] });
+      queryClient.invalidateQueries({ queryKey: ['question-answers'] });
     },
     onError: (err: any) => {
       console.error(err.response?.data);
@@ -80,7 +80,7 @@ const AnswerItem = ({ item }: { item: any }) => {
   };
 
   return (
-    <View type="surface" style={[styles.card]}>
+    <View type="surface" style={styles.card}>
       {/* 1. 作者信息栏 */}
       <View style={styles.authorRow}>
         <Pressable onPress={goToProfile} style={{ flexDirection: 'row', flex: 1, alignItems: 'center' }}>
@@ -92,35 +92,54 @@ const AnswerItem = ({ item }: { item: any }) => {
             </Text>
           </View>
         </Pressable>
-        <Pressable
-          style={[styles.followBtn, item.author?.is_following && styles.followBtnActive]}
-          onPress={() => followMutation.mutate()}
-          disabled={followMutation.isPending}
-        >
-          <Text style={[styles.followText, item.author?.is_following && styles.followTextActive]}>
-            {item.author?.is_following ? '已关注' : '+ 关注'}
-          </Text>
-        </Pressable>
+        {!item.relationship?.is_author && (
+          <Pressable
+            style={[styles.followBtn, item.author?.is_following && styles.followBtnActive]}
+            onPress={() => followMutation.mutate()}
+            disabled={followMutation.isPending}
+          >
+            <Text style={[styles.followText, item.author?.is_following && styles.followTextActive]}>
+              {item.author?.is_following ? '已关注' : '+ 关注'}
+            </Text>
+          </Pressable>
+        )}
       </View>
 
-      {/* 2. 内容部分 */}
+      {/* 2. 内容部分 - 切换展开/收起 */}
       <Pressable onPress={toggleExpand} style={styles.contentContainer}>
         {expanded ? (
-          <RenderHtml
-            contentWidth={width - 30}
-            source={{ html: item.content }}
-            tagsStyles={{
-              p: { color: textColor, fontSize: 16, lineHeight: 24, marginBottom: 10 },
-              img: { borderRadius: 8, marginVertical: 8 },
-              span: { color: textColor },
-              div: { color: textColor },
-            }}
-          />
+          <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+            <RenderHtml
+              contentWidth={width - 40}
+              source={{ html: item.content }}
+              tagsStyles={{
+                p: { color: textColor, fontSize: 16, lineHeight: 24, marginBottom: 12 },
+                img: { borderRadius: 8, marginVertical: 8 },
+                span: { color: textColor },
+                div: { color: textColor },
+              }}
+            />
+            {isLongContent && (
+              <Pressable onPress={toggleExpand} style={styles.collapseBtn}>
+                <Text style={styles.collapseText}>收起回答</Text>
+                <Ionicons name="chevron-up" size={14} color="#0084ff" />
+              </Pressable>
+            )}
+          </View>
         ) : (
-          <Text style={styles.excerpt}>
-            {excerpt}
-            {isLongContent && <Text style={styles.expandLabel}> 展开全文</Text>}
-          </Text>
+          <>
+            <Text style={[styles.excerpt, { color: textColor }]}>
+              {excerpt}
+              {isLongContent && <Text style={styles.expandLabel}> 阅读全文</Text>}
+            </Text>
+            {item.thumbnail || item.content_img?.length > 0 ? (
+              <Image 
+                source={{ uri: item.thumbnail || item.content_img[0] }} 
+                style={styles.contentImage} 
+                resizeMode="cover"
+              />
+            ) : null}
+          </>
         )}
       </Pressable>
 
@@ -131,10 +150,9 @@ const AnswerItem = ({ item }: { item: any }) => {
             id={item.id}
             count={item.voteup_count}
             voted={item.relationship?.voting}
+            type="answers"
+            variant="minimal"
           />
-          <View style={styles.downvoteBtn}>
-            <Ionicons name="caret-down" size={18} color="#0084ff" />
-          </View>
         </View>
 
         <Pressable
@@ -142,10 +160,10 @@ const AnswerItem = ({ item }: { item: any }) => {
           onPress={() => router.push({
             pathname: '/comments/[id]',
             params: { id: item.id, type: 'answer', count: item.comment_count }
-          })}
+          } as any)}
         >
-          <Ionicons name="chatbubble-ellipses-outline" size={18} color="#888" />
-          <Text type="secondary" style={styles.commentCount}>{item.comment_count} 评论</Text>
+          <Ionicons name="chatbubble-outline" size={18} color="#888" />
+          <Text type="secondary" style={styles.commentCount}>{item.comment_count}</Text>
         </Pressable>
 
         {item.relationship?.is_author && (
@@ -536,15 +554,18 @@ const styles = StyleSheet.create({
   followText: { color: '#0084ff', fontSize: 13, fontWeight: 'bold' },
   followTextActive: { color: '#999' },
   // 内容
-  contentContainer: { marginVertical: 5 },
-  excerpt: { fontSize: 15, lineHeight: 24 },
+  contentContainer: { marginVertical: 5, flexDirection: 'row', alignItems: 'flex-start' },
+  excerpt: { fontSize: 15, lineHeight: 24, flex: 1 },
   expandLabel: { color: '#0084ff', fontWeight: '500' },
+  contentImage: { width: 80, height: 60, borderRadius: 4, marginLeft: 12 },
+  collapseBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, marginTop: 5 },
+  collapseText: { color: '#0084ff', fontSize: 13, fontWeight: 'bold', marginRight: 4 },
   // 底部交互
-  footer: { flexDirection: 'row', alignItems: 'center', marginTop: 15, paddingTop: 10 },
+  footer: { flexDirection: 'row', alignItems: 'center', marginTop: 12, paddingTop: 10 },
   voteGroup: { flexDirection: 'row', alignItems: 'center' },
   downvoteBtn: { width: 34, height: 34, borderRadius: 4, justifyContent: 'center', alignItems: 'center', marginLeft: 4 },
-  commentBtn: { flexDirection: 'row', alignItems: 'center', marginLeft: 20 },
-  commentCount: { marginLeft: 5, fontSize: 13 },
+  commentBtn: { flexDirection: 'row', alignItems: 'center', marginLeft: 25 },
+  commentCount: { marginLeft: 5, fontSize: 13, color: '#888' },
   deleteBtn: { marginLeft: 20, padding: 5 },
   // 动效 Header 样式
   stickyHeader: {

@@ -40,6 +40,13 @@ export const FeedCard = ({ item }: { item: any }) => {
       {item.title ? (
         <Pressable 
           onPress={() => {
+            if (item.type === 'articles') {
+              router.push({
+                pathname: `/article/${item.id}`,
+                params: { title: item.title }
+              } as any);
+              return;
+            }
             const id = isQuestionType || !item.questionId ? item.id : item.questionId;
             router.push({
               pathname: `/question/${id}`,
@@ -91,12 +98,15 @@ export const FeedCard = ({ item }: { item: any }) => {
             id={item.id}
             count={item.voteCount}
             voted={item.voted}
-            type={item.type}
+            type={item.type === 'articles' ? 'article' : (item.type === 'answers' ? 'answer' : item.type)}
           />
 
           {/* 点击评论按钮 -> 评论页 */}
           <Pressable
-            onPress={() => router.push(`/comments/${item.id}` as any)}
+            onPress={() => {
+              const type = item.type === 'articles' ? 'article' : (item.type === 'answers' ? 'answer' : item.type.slice(0, -1));
+              router.push(`/comments/${item.id}?type=${type}&count=${item.commentCount}`);
+            }}
             style={styles.commentBtn}
           >
             <Ionicons name="chatbubble-outline" size={16} color="#888" />

@@ -1,8 +1,10 @@
 import {
   createAnswerComment,
   createQuestionComment,
+  createArticleComment,
   createCommentReply,
   getAnswerComments,
+  getArticleCommentsV5 as getArticleComments,
   getQuestionCommentsV5 as getQuestionComments
 } from '@/api/zhihu';
 import { LikeButton } from '@/components/LikeButton';
@@ -43,6 +45,9 @@ export default function CommentScreen() {
       if (type === 'question') {
         return getQuestionComments(id as string);
       }
+      if (type === 'article') {
+        return getArticleComments(id as string);
+      }
       return getAnswerComments(id as string);
     }
   });
@@ -59,6 +64,9 @@ export default function CommentScreen() {
         // 发布根评论
         if (type === 'question') {
           return createQuestionComment(id as string, content);
+        }
+        if (type === 'article') {
+          return createArticleComment(id as string, content);
         }
         return createAnswerComment(id as string, content);
       }
