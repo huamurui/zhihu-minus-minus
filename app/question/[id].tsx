@@ -139,7 +139,10 @@ const AnswerItem = ({ item }: { item: any }) => {
 
         <Pressable
           style={styles.commentBtn}
-          onPress={() => router.push(`/comments/${item.id}?type=answer`)}
+          onPress={() => router.push({
+            pathname: '/comments/[id]',
+            params: { id: item.id, type: 'answer', count: item.comment_count }
+          })}
         >
           <Ionicons name="chatbubble-ellipses-outline" size={18} color="#888" />
           <Text type="secondary" style={styles.commentCount}>{item.comment_count} 评论</Text>
@@ -165,7 +168,7 @@ const AnswerItem = ({ item }: { item: any }) => {
 const slowTransition = SharedTransition.duration(600);
 
 export default function QuestionDetail() {
-  const { id, title: initialTitle } = useLocalSearchParams();
+  const { id, title: initialTitle } = useLocalSearchParams<{ id: string, title?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const borderColor = useThemeColor({}, 'border');
@@ -366,7 +369,10 @@ export default function QuestionDetail() {
 
             <Pressable
               style={styles.qActionBtn}
-              onPress={() => router.push(`/comments/${id}?type=question`)}
+              onPress={() => router.push({
+                pathname: '/comments/[id]',
+                params: { id, type: 'question', count: question?.comment_count || 0 }
+              })}
             >
               <Ionicons name="chatbubble-outline" size={18} color="#0084ff" />
               <Text style={styles.qActionBtnText}>

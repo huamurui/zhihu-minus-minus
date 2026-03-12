@@ -82,7 +82,9 @@ export const getAnswerCommentsV5 = async (id: string | number, limit = 20, offse
 
 export const getQuestionCommentsV5 = async (id: string | number, limit = 20, offset: string | number = 0) => {
     const res = await apiClient.get(`/comment_v5/questions/${id}/root_comment?order_by=score&limit=${limit}&offset=${offset}`);
+    console.log(res.data, '111111111111111')
     res.data.data = (res.data.data || []).map(normalizeComment);
+    console.log(res.data)
     return res.data;
 };
 

@@ -1,4 +1,10 @@
-import { createAnswerComment, createQuestionComment, createCommentReply, getAnswerComments, getQuestionComments } from '@/api/zhihu';
+import {
+  createAnswerComment,
+  createQuestionComment,
+  createCommentReply,
+  getAnswerComments,
+  getQuestionCommentsV5 as getQuestionComments
+} from '@/api/zhihu';
 import { LikeButton } from '@/components/LikeButton';
 import { Text, View, useThemeColor } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,7 +18,7 @@ import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressa
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function CommentScreen() {
-  const { id, type, segmentId } = useLocalSearchParams(); // Content ID, Type, and optional Segment ID
+  const { id, type, segmentId, count } = useLocalSearchParams<{ id: string, type: string, segmentId?: string, count?: string }>(); // Content ID, Type, and optional Segment ID
   const router = useRouter();
   const [inputText, setInputText] = useState('');
   const [replyTo, setReplyTo] = useState<{ id: string, name: string } | null>(null);
@@ -151,7 +157,7 @@ export default function CommentScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: surfaceColor }]}>
-      <Stack.Screen options={{ title: '评论' }} />
+      <Stack.Screen options={{ title: `评论${count ? ` (${count})` : ''}` }} />
 
       <View style={StyleSheet.absoluteFill}>
         <FlashList
