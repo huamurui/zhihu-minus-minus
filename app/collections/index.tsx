@@ -10,7 +10,7 @@ import { useColorScheme } from '@/components/useColorScheme';
 
 import Colors from '@/constants/Colors';
 export default function MyCollectionsScreen() {
-  const colorScheme = useColorScheme();
+    const colorScheme = useColorScheme();
     const router = useRouter();
     const navigation = useNavigation();
     const queryClient = useQueryClient();

@@ -403,7 +403,7 @@ export default function AnswerDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors[colorScheme].backgroundSecondary },
+  container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   // 问题连接
   questionHeader: {
@@ -583,6 +583,7 @@ const styles = StyleSheet.create({
 });
 
 function MenuOption({ icon, label, onPress, color }: any) {
+  const colorScheme = useColorScheme();
   const textColor = Colors[colorScheme].text;
   return (
     <Pressable style={styles.menuItem} onPress={onPress}>
