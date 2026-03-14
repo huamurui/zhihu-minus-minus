@@ -1,5 +1,5 @@
 import { useColorScheme } from '@/components/useColorScheme';
-import { useThemeStore } from '@/store/useThemeStore';
+import { useThemeStore, useSyncThemeWithNativeWind } from '@/store/useThemeStore';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
@@ -7,6 +7,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
+import '../global.css';
 
 // 保持启动页显示，直到资源加载完成
 SplashScreen.preventAutoHideAsync();
@@ -17,6 +18,9 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const isDark = useThemeStore((state) => state.isDark);
   const theme = isDark ? DarkTheme : DefaultTheme;
+
+  // Sync NativeWind dark mode with zustand store
+  useSyncThemeWithNativeWind();
 
   // 这里简单处理：如果以后需要加载字体，可以写在这里
   useEffect(() => {

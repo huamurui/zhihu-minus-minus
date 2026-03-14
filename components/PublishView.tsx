@@ -1,10 +1,11 @@
-import { Text, View, useThemeColor } from '@/components/Themed';
+import { Text, View } from '@/components/Themed';
+import { useColorScheme } from '@/components/useColorScheme';
+import Colors from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Pressable, StyleSheet, Dimensions } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useColorScheme } from '@/components/useColorScheme';
 
 const PUBLISH_OPTIONS = [
   { id: 'answer', title: '写回答', subtitle: '分享你的见解', icon: 'create-outline', color: '#0084ff' },
@@ -17,39 +18,38 @@ export function PublishView() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colorScheme = useColorScheme();
-  const secondaryColor = useThemeColor({}, 'textSecondary');
-  const cardBg = useThemeColor({}, 'surface');
+  const secondaryColor = Colors[colorScheme].textSecondary;
 
   const handlePublish = (id: string) => {
     router.push(`/publish/${id}` as any);
   };
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.headerSection, { paddingTop: insets.top + 60 }]}>
-        <Text style={styles.header}>发布内容(WIP)</Text>
-        <Text style={styles.subHeader} type="secondary">让世界看到你的思考</Text>
+    <View className="flex-1 px-6">
+      <View className="mb-10 items-center" style={{ paddingTop: insets.top + 60 }}>
+        <Text className="text-[28px] font-extrabold mb-2 text-foreground dark:text-foreground-dark">发布内容(WIP)</Text>
+        <Text type="secondary" className="text-base opacity-70">让世界看到你的思考</Text>
       </View>
       
-      <View style={styles.grid}>
+      <View className="w-full bg-transparent">
         {PUBLISH_OPTIONS.map((item) => (
           <Pressable
             key={item.id}
-            style={({ pressed }) => [
-              styles.item,
-              { backgroundColor: cardBg, borderColor: colorScheme === 'dark' ? '#333' : '#f0f0f0' },
-              pressed && { opacity: 0.8, scale: 0.98 } as any
+            className="flex-row items-center p-5 rounded-[20px] mb-4 border bg-surface dark:bg-surface-dark active:opacity-80"
+            style={[
+              { borderColor: colorScheme === 'dark' ? '#333' : '#f0f0f0' },
+              styles.itemShadow
             ]}
             onPress={() => handlePublish(item.id)}
           >
-            <View style={[styles.iconContainer, { backgroundColor: item.color + '15' }]}>
+            <View className="w-14 h-14 rounded-2xl justify-center items-center mr-4" style={{ backgroundColor: item.color + '15' }}>
               <Ionicons name={item.icon as any} size={32} color={item.color} />
             </View>
-            <View style={styles.textContainer}>
-              <Text style={styles.itemTitle}>{item.title}</Text>
-              <Text style={styles.itemSubtitle}>{item.subtitle}</Text>
+            <View className="flex-1 bg-transparent">
+              <Text className="text-lg font-bold mb-1 text-foreground dark:text-foreground-dark">{item.title}</Text>
+              <Text className="text-[13px] opacity-60 text-foreground dark:text-foreground-dark">{item.subtitle}</Text>
             </View>
-            <View style={styles.arrow}>
+            <View className="ml-2 bg-transparent">
               <Ionicons name="chevron-forward" size={18} color={secondaryColor} />
             </View>
           </Pressable>
@@ -60,15 +60,11 @@ export function PublishView() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 24 },
-  headerSection: { marginBottom: 40, alignItems: 'center' },
-  header: { fontSize: 28, fontWeight: '800', marginBottom: 8 },
-  subHeader: { fontSize: 16, opacity: 0.7 },
-  grid: { width: '100%' },
-  item: { flexDirection: 'row', alignItems: 'center', padding: 20, borderRadius: 20, marginBottom: 16, borderWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
-  iconContainer: { width: 56, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
-  textContainer: { flex: 1 },
-  itemTitle: { fontSize: 18, fontWeight: '700', marginBottom: 4 },
-  itemSubtitle: { fontSize: 13, opacity: 0.6 },
-  arrow: { marginLeft: 8 },
+  itemShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
 });

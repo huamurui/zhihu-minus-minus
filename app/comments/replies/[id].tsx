@@ -1,6 +1,6 @@
 import { createCommentReply, getChildComments } from '@/api/zhihu';
 import { LikeButton } from '@/components/LikeButton';
-import { Text, View, useThemeColor } from '@/components/Themed';
+import { Text, View } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -11,6 +11,7 @@ import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import Colors from '@/constants/Colors';
 export default function ReplyDetailScreen() {
   const { id } = useLocalSearchParams(); // 根评论 ID
   const [inputText, setInputText] = useState('');
@@ -20,9 +21,9 @@ export default function ReplyDetailScreen() {
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
-  const borderColor = useThemeColor({}, 'border');
-  const textColor = useThemeColor({}, 'text');
-  const tintColor = useThemeColor({}, 'tint');
+  const borderColor = Colors[colorScheme].border;
+  const textColor = Colors[colorScheme].text;
+  const tintColor = Colors[colorScheme].tint;
 
   // 1. 获取回复列表
   const { data: replies, isLoading, refetch, isFetching } = useQuery({
@@ -151,7 +152,7 @@ export default function ReplyDetailScreen() {
               <View style={styles.replyHeaderFloating}>
                 <Text type="secondary" style={styles.replyHintText}>正在回复 {replyTo.name}</Text>
                 <Pressable onPress={() => setReplyTo(null)}>
-                  <Ionicons name="close-circle" size={16} color={useThemeColor({}, 'textSecondary')} />
+                  <Ionicons name="close-circle" size={16} color={Colors[colorScheme].textSecondary} />
                 </Pressable>
               </View>
             )}

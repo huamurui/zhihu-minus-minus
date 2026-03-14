@@ -1,6 +1,6 @@
 import { followMember, getMe, getMember, getMemberActivities, getMemberRelations, searchContent, unfollowMember } from '@/api/zhihu';
 import { CreationCard } from '@/components/CreationCard';
-import { Text, useThemeColor, View } from '@/components/Themed';
+import { Text , View } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
@@ -8,8 +8,11 @@ import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 import Reanimated from 'react-native-reanimated';
+import { useColorScheme } from '@/components/useColorScheme';
 
+import Colors from '@/constants/Colors';
 export default function UserDetailScreen() {
+  const colorScheme = useColorScheme();
     const { id, avatar: initialAvatar } = useLocalSearchParams();
     const router = useRouter();
     const navigation = useNavigation();
@@ -30,7 +33,7 @@ export default function UserDetailScreen() {
         navigation.setOptions({ title: '个人主页' });
     }, [navigation]);
 
-    const borderColor = useThemeColor({}, 'border');
+    const borderColor = Colors[colorScheme].border;
     const primaryColor = '#0084ff';
 
     // 0. 获取 "我" 的信息 (用于判断是否是自己)
@@ -201,15 +204,15 @@ export default function UserDetailScreen() {
                   <Pressable 
                     style={[
                         styles.followBtn, 
-                        user?.is_following ? { backgroundColor: 'transparent', borderColor: useThemeColor({}, 'border'), borderWidth: 1 } : { backgroundColor: useThemeColor({}, 'primary') }
+                        user?.is_following ? { backgroundColor: 'transparent', borderColor: Colors[colorScheme].border, borderWidth: 1 } : { backgroundColor: Colors[colorScheme].primary }
                     ]}
                     onPress={handleFollow}
                     disabled={followLoading}
                   >
                     {followLoading ? (
-                        <ActivityIndicator size="small" color={user?.is_following ? useThemeColor({}, 'textSecondary') : "#fff"} />
+                        <ActivityIndicator size="small" color={user?.is_following ? Colors[colorScheme].textSecondary : "#fff"} />
                     ) : (
-                        <Text style={[styles.followBtnText, user?.is_following && { color: useThemeColor({}, 'textSecondary') }]}>
+                        <Text style={[styles.followBtnText, user?.is_following && { color: Colors[colorScheme].textSecondary }]}>
                             {user?.is_following ? '已关注' : '关注'}
                         </Text>
                     )}
@@ -258,19 +261,19 @@ export default function UserDetailScreen() {
 
             {/* 创作搜索栏 */}
             <View type="surface" style={styles.searchBarRow}>
-                <View style={[styles.searchBar, { backgroundColor: useThemeColor({}, 'backgroundTertiary') }]}>
-                <Ionicons name="search" size={16} color={useThemeColor({}, 'textTertiary')} style={{ marginLeft: 10 }} />
+                <View style={[styles.searchBar, { backgroundColor: Colors[colorScheme].backgroundTertiary }]}>
+                <Ionicons name="search" size={16} color={Colors[colorScheme].textTertiary} style={{ marginLeft: 10 }} />
                 <TextInput
-                    style={[styles.searchInput, { color: useThemeColor({}, 'text') }]}
+                    style={[styles.searchInput, { color: Colors[colorScheme].text }]}
                         placeholder={`搜索 ${user?.name || '用户'} 的创作...`}
-                        placeholderTextColor={useThemeColor({}, 'textTertiary')}
+                        placeholderTextColor={Colors[colorScheme].textTertiary}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         returnKeyType="search"
                     />
                   {isSearching && searchQuery.length > 0 && (
                     <Pressable onPress={() => setSearchQuery('')} style={{ padding: 5 }}>
-                        <Ionicons name="close-circle" size={16} color={useThemeColor({}, 'textTertiary')} />
+                        <Ionicons name="close-circle" size={16} color={Colors[colorScheme].textTertiary} />
                     </Pressable>
                 )}
                 </View>
@@ -392,7 +395,7 @@ export default function UserDetailScreen() {
                 ListHeaderComponent={renderHeader}
                 ListFooterComponent={() => (
                     (isFetchingNextPage || isFetchingNextSearchPage) ? (
-                        <ActivityIndicator style={{ margin: 20 }} color={useThemeColor({}, 'primary')} />
+                        <ActivityIndicator style={{ margin: 20 }} color={Colors[colorScheme].primary} />
                     ) : (
                         currentListItems.length > 0 && !(isSearching ? hasNextSearchPage : hasNextPage) ? (
                             <Text type="secondary" style={styles.footerMsg}>— 已经到底了喵 —</Text>
@@ -402,7 +405,7 @@ export default function UserDetailScreen() {
                 ListEmptyComponent={() => (
                     <View style={styles.empty}>
                         {listLoading || searchLoading ? (
-                            <ActivityIndicator size="small" color={useThemeColor({}, 'primary')} />
+                            <ActivityIndicator size="small" color={Colors[colorScheme].primary} />
                         ) : (
                             <Text type="secondary">{isSearching ? '没有找到匹配的创作' : '这里空空如也喵'}</Text>
                         )}

@@ -8,13 +8,14 @@ import Reanimated, { SharedTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { useColorScheme } from '@/components/useColorScheme';
+import Colors from '@/constants/Colors';
 
 import client from '@/api/client';
 import { deleteAnswer } from '@/api/zhihu/answer';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
 import { followQuestion, getQuestion, QUESTION_INCLUDE, unfollowQuestion } from '@/api/zhihu/question';
 import { LikeButton } from '@/components/LikeButton';
-import { Text, View, useThemeColor } from '@/components/Themed';
+import { Text, View } from '@/components/Themed';
 import { Alert } from 'react-native';
 import { ZhihuContent } from '@/components/ZhihuContent';
 
@@ -28,9 +29,10 @@ const AnswerItem = forwardRef(({
   isExpanded: boolean,
   onToggle: (id: string, expanded: boolean) => void
 }, ref) => {
+  const colorScheme = useColorScheme();
   const { width } = useWindowDimensions();
   const router = useRouter();
-  const textColor = useThemeColor({}, 'text');
+  const textColor = Colors[colorScheme].text;
   const queryClient = useQueryClient();
   const footerRef = useRef<NativeView>(null);
 
@@ -43,7 +45,7 @@ const AnswerItem = forwardRef(({
   }));
 
   const rawText = item.content?.replace(/<[^>]+>/g, '') || '';
-  const isLongContent = rawText.length > 120;
+  const isLongContent = rawText?.length > 120;
   const excerpt = isLongContent ? rawText.substring(0, 100) + '...' : rawText;
 
   const followMutation = useMutation({
@@ -81,11 +83,11 @@ const AnswerItem = forwardRef(({
           </View>
         </Pressable>
         {!item.relationship?.is_author && (
-          <Pressable 
-            style={[styles.followBtn, item.author?.is_following && { backgroundColor: 'transparent', borderColor: useThemeColor({}, 'border'), borderWidth: 1 }]} 
+          <Pressable
+            style={[styles.followBtn, item.author?.is_following && { backgroundColor: 'transparent', borderColor: Colors[colorScheme].border, borderWidth: 1 }]}
             onPress={() => followMutation.mutate()}
           >
-            <Text style={[styles.followText, item.author?.is_following && { color: useThemeColor({}, 'textSecondary') }]}>
+            <Text style={[styles.followText, item.author?.is_following && { color: Colors[colorScheme].textSecondary }]}>
               {item.author?.is_following ? '已关注' : '关注'}
             </Text>
           </Pressable>
@@ -98,7 +100,7 @@ const AnswerItem = forwardRef(({
             <ZhihuContent objectId={item.id} type="answer" content={item.content} segmentInfos={item.segment_infos} />
             {isLongContent && (
               <Pressable onPress={() => onToggle(item.id.toString(), false)} style={styles.collapseBtn}>
-                <Text type="primary" style={styles.collapseText}>收起回答</Text><Ionicons name="chevron-up" size={14} color={useThemeColor({}, 'primary')} />
+                <Text type="primary" style={styles.collapseText}>收起回答</Text><Ionicons name="chevron-up" size={14} color={Colors[colorScheme].primary} />
               </Pressable>
             )}
           </View>
@@ -115,17 +117,17 @@ const AnswerItem = forwardRef(({
       </View>
 
       {/* 使用 NativeView 确保 ref measure 可用 */}
-      <NativeView ref={footerRef} style={[styles.footer, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: useThemeColor({}, 'border'), paddingHorizontal: 4 }]}>
+      <NativeView ref={footerRef} style={[styles.footer, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors[colorScheme].border, paddingHorizontal: 4 }]}>
         <View style={styles.voteGroup}>
           <LikeButton id={item.id} count={item.voteup_count} voted={item.relationship?.voting} type="answers" variant="minimal" />
         </View>
         <Pressable style={styles.commentBtn} onPress={() => router.push({ pathname: '/comments/[id]', params: { id: item.id, type: 'answer', count: item.comment_count } } as any)}>
-          <Ionicons name="chatbubble-outline" size={18} color={useThemeColor({}, 'textSecondary')} /><Text type="secondary" style={styles.commentCount}>{item.comment_count}</Text>
+          <Ionicons name="chatbubble-outline" size={18} color={Colors[colorScheme].textSecondary} /><Text type="secondary" style={styles.commentCount}>{item.comment_count}</Text>
         </Pressable>
         {item.relationship?.is_author && (
-          <Pressable style={styles.deleteBtn} onPress={handleDelete}><Ionicons name="trash-outline" size={18} color={useThemeColor({}, 'danger')} /></Pressable>
+          <Pressable style={styles.deleteBtn} onPress={handleDelete}><Ionicons name="trash-outline" size={18} color={Colors[colorScheme].danger} /></Pressable>
         )}
-        <Ionicons name="share-social-outline" size={18} color={useThemeColor({}, 'textSecondary')} style={{ marginLeft: 'auto' }} />
+        <Ionicons name="share-social-outline" size={18} color={Colors[colorScheme].textSecondary} style={{ marginLeft: 'auto' }} />
       </NativeView>
     </View>
   );
@@ -137,10 +139,10 @@ export default function QuestionDetail() {
   const { id, title: initialTitle } = useLocalSearchParams<{ id: string, title?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const backgroundColor = useThemeColor({}, 'background');
-  const textColor = useThemeColor({}, 'text');
-  const queryClient = useQueryClient();
   const colorScheme = useColorScheme();
+  const backgroundColor = Colors[colorScheme].background;
+  const textColor = Colors[colorScheme].text;
+  const queryClient = useQueryClient();
   const { height: screenHeight } = useWindowDimensions();
 
   const [sortBy, setSortBy] = useState<'default' | 'created'>('default');
@@ -293,18 +295,18 @@ export default function QuestionDetail() {
         <Text style={styles.title}>{question?.title || initialTitle || '加载中...'}</Text>
       </Reanimated.View>
       {qLoading ? (
-        <View style={{ height: 100, justifyContent: 'center' }}><ActivityIndicator size="small" color={useThemeColor({}, 'primary')} /></View>
+        <View style={{ height: 100, justifyContent: 'center' }}><ActivityIndicator size="small" color={Colors[colorScheme].primary} /></View>
       ) : (
         <>
           {question?.topics && <View style={styles.topicsRow}>{question.topics.map((t: any) => <View key={t.id} style={styles.topicBadge}><Text style={styles.topicText}>{t.name}</Text></View>)}</View>}
           {question?.excerpt && <Text type="secondary" style={styles.qExcerpt}>{question.excerpt.replace(/<[^>]+>/g, '')}</Text>}
           <View style={styles.qMetaRow}><Text type="secondary" style={styles.qMetaText}>{question?.follower_count || 0} 关注 · {question?.visit_count || 0} 浏览</Text></View>
           <View style={styles.qActionRow}>
-            <Pressable 
-              style={[styles.qActionBtn, question?.relationship?.is_following && { backgroundColor: 'transparent', borderWidth: 1, borderColor: useThemeColor({}, 'border') }]} 
+            <Pressable
+              style={[styles.qActionBtn, question?.relationship?.is_following && { backgroundColor: 'transparent', borderWidth: 1, borderColor: Colors[colorScheme].border }]}
               onPress={() => followMutation.mutate()}
             >
-              <Text style={[styles.qActionBtnText, question?.relationship?.is_following && { color: useThemeColor({}, 'textSecondary') }]}>
+              <Text style={[styles.qActionBtnText, question?.relationship?.is_following && { color: Colors[colorScheme].textSecondary }]}>
                 {question?.relationship?.is_following ? '已关注' : '关注问题'}
               </Text>
             </Pressable>
@@ -314,8 +316,8 @@ export default function QuestionDetail() {
           <View style={styles.qStats}>
             <Text style={styles.qStatText}>{question?.answer_count || 0} 个回答</Text>
             <View style={styles.sortContainer}>
-              <Pressable onPress={() => setSortBy('default')} style={[styles.sortBtn, sortBy === 'default' && { borderBottomWidth: 2, borderBottomColor: useThemeColor({}, 'primary') }]}><Text type={sortBy === 'default' ? 'primary' : 'secondary'} style={[styles.sortText, sortBy === 'default' && { fontWeight: 'bold' }]}>默认</Text></Pressable>
-              <Pressable onPress={() => setSortBy('created')} style={[styles.sortBtn, sortBy === 'created' && { borderBottomWidth: 2, borderBottomColor: useThemeColor({}, 'primary') }]}><Text type={sortBy === 'created' ? 'primary' : 'secondary'} style={[styles.sortText, sortBy === 'created' && { fontWeight: 'bold' }]}>时间</Text></Pressable>
+              <Pressable onPress={() => setSortBy('default')} style={[styles.sortBtn, sortBy === 'default' && { borderBottomWidth: 2, borderBottomColor: Colors[colorScheme].primary }]}><Text type={sortBy === 'default' ? 'primary' : 'secondary'} style={[styles.sortText, sortBy === 'default' && { fontWeight: 'bold' }]}>默认</Text></Pressable>
+              <Pressable onPress={() => setSortBy('created')} style={[styles.sortBtn, sortBy === 'created' && { borderBottomWidth: 2, borderBottomColor: Colors[colorScheme].primary }]}><Text type={sortBy === 'created' ? 'primary' : 'secondary'} style={[styles.sortText, sortBy === 'created' && { fontWeight: 'bold' }]}>时间</Text></Pressable>
             </View>
           </View>
         </>
@@ -355,7 +357,7 @@ export default function QuestionDetail() {
         viewabilityConfig={viewabilityConfig}
         onEndReached={() => hasNextPage && !isFetchingNextPage && fetchNextPage()}
         onEndReachedThreshold={0.5}
-        ListFooterComponent={() => isFetchingNextPage ? <ActivityIndicator style={{ marginVertical: 20 }} color={useThemeColor({}, 'primary')} /> : (answers.length > 0 && !hasNextPage ? <Text type="secondary" style={{ textAlign: 'center', marginVertical: 20 }}>— 没有更多回答了 —</Text> : null)}
+        ListFooterComponent={() => isFetchingNextPage ? <ActivityIndicator style={{ marginVertical: 20 }} color={Colors[colorScheme].primary} /> : (answers?.length > 0 && !hasNextPage ? <Text type="secondary" style={{ textAlign: 'center', marginVertical: 20 }}>— 没有更多回答了 —</Text> : null)}
         onRefresh={refetch}
         refreshing={isRefetching}
       />
@@ -373,12 +375,12 @@ export default function QuestionDetail() {
             <View style={styles.floatLeft}>
               <LikeButton id={activeItem?.id} count={activeItem?.voteup_count || 0} voted={activeItem?.relationship?.voting} type="answers" variant="ghost" />
               <Pressable style={styles.floatComment} onPress={() => router.push({ pathname: '/comments/[id]', params: { id: activeItem?.id, type: 'answer', count: activeItem?.comment_count } } as any)}>
-                <Ionicons name="chatbubble-outline" size={20} color={useThemeColor({}, 'primary')} /><Text type="primary" style={styles.floatStatText}>{activeItem?.comment_count || 0}</Text>
+                <Ionicons name="chatbubble-outline" size={20} color={Colors[colorScheme].primary} /><Text type="primary" style={styles.floatStatText}>{activeItem?.comment_count || 0}</Text>
               </Pressable>
             </View>
-            <View style={[styles.floatDivider, { backgroundColor: useThemeColor({}, 'primaryTransparent') }]} />
+            <View style={[styles.floatDivider, { backgroundColor: Colors[colorScheme].primaryTransparent }]} />
             <Pressable style={styles.floatCollapse} onPress={() => activeItem && toggleExpand(activeItem.id.toString(), false)}>
-              <Text type="primary" style={styles.collapseHint}>收起回答</Text><Ionicons name="chevron-up" size={16} color={useThemeColor({}, 'primary')} />
+              <Text type="primary" style={styles.collapseHint}>收起回答</Text><Ionicons name="chevron-up" size={16} color={Colors[colorScheme].primary} />
             </Pressable>
           </View>
         </BlurView>

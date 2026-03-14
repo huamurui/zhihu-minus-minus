@@ -4,7 +4,7 @@ import { followMember, unfollowMember } from '@/api/zhihu/member';
 import { ZhihuContent } from '@/components/ZhihuContent';
 import { DownvoteButton } from '@/components/DownvoteButton';
 import { LikeButton } from '@/components/LikeButton';
-import { Text, View, useThemeColor } from '@/components/Themed';
+import { Text, View } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { useColorScheme } from '@/components/useColorScheme';
 
+import Colors from '@/constants/Colors';
 const slowTransition = SharedTransition.duration(600);
 
 export default function AnswerDetailScreen() {
@@ -25,11 +26,11 @@ export default function AnswerDetailScreen() {
 
   const queryClient = useQueryClient();
   const colorScheme = useColorScheme();
-  const tintColor = useThemeColor({}, 'tint');
-  const textColor = useThemeColor({}, 'text');
-  const borderColor = useThemeColor({}, 'border');
-  const surfaceColor = useThemeColor({}, 'surface');
-  const backgroundColor = useThemeColor({}, 'background');
+  const tintColor = Colors[colorScheme].tint;
+  const textColor = Colors[colorScheme].text;
+  const borderColor = Colors[colorScheme].border;
+  const surfaceColor = Colors[colorScheme].surface;
+  const backgroundColor = Colors[colorScheme].background;
 
   // 动画相关
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -402,7 +403,7 @@ export default function AnswerDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: useThemeColor({}, 'backgroundSecondary') },
+  container: { flex: 1, backgroundColor: Colors[colorScheme].backgroundSecondary },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   // 问题连接
   questionHeader: {
@@ -582,7 +583,7 @@ const styles = StyleSheet.create({
 });
 
 function MenuOption({ icon, label, onPress, color }: any) {
-  const textColor = useThemeColor({}, 'text');
+  const textColor = Colors[colorScheme].text;
   return (
     <Pressable style={styles.menuItem} onPress={onPress}>
       <View style={styles.menuIcon}>

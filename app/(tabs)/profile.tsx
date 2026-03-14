@@ -16,16 +16,19 @@ import {
 
 // 导入我们之前定义的组件和 Store
 import { getMe, getMember } from '@/api/zhihu';
-import { Text, View, useThemeColor } from '@/components/Themed';
+import { Text, View } from '@/components/Themed';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useThemeStore } from '@/store/useThemeStore';
 import CookieManager from '@react-native-cookies/cookies';
+import { useColorScheme } from '@/components/useColorScheme';
 
+import Colors from '@/constants/Colors';
 export default function ProfileScreen() {
+  const colorScheme = useColorScheme();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { isDark, toggleTheme } = useThemeStore();
-  const accentColor = useThemeColor({}, 'tint');
+  const accentColor = Colors[colorScheme].tint;
 
   const { cookies, setMe } = useAuthStore();
   // 1. 获取个人详细信息 (使用 API 抓取真实数据)

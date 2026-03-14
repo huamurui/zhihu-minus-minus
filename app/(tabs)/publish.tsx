@@ -1,4 +1,4 @@
-import { Text, View, useThemeColor } from '@/components/Themed';
+import { Text, View } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { useColorScheme } from '@/components/useColorScheme';
 
+import Colors from '@/constants/Colors';
 const { width } = Dimensions.get('window');
 
 const PUBLISH_OPTIONS = [
@@ -20,10 +21,10 @@ export default function PublishScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colorScheme = useColorScheme();
-  const tintColor = useThemeColor({}, 'tint');
-  const textColor = useThemeColor({}, 'text');
-  const secondaryColor = useThemeColor({}, 'textSecondary');
-  const cardBg = useThemeColor({}, 'surface');
+  const tintColor = Colors[colorScheme].tint;
+  const textColor = Colors[colorScheme].text;
+  const secondaryColor = Colors[colorScheme].textSecondary;
+  const cardBg = Colors[colorScheme].surface;
 
   const handlePublish = (id: string) => {
     router.push(`/publish/${id}` as any);

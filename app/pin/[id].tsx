@@ -1,7 +1,7 @@
 import { getPin } from '@/api/zhihu/pin';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
 import { LikeButton } from '@/components/LikeButton';
-import { Text, View, useThemeColor } from '@/components/Themed';
+import { Text, View } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -9,17 +9,20 @@ import React, { useRef } from 'react';
 import { ActivityIndicator, Animated, Image, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import RenderHtml from 'react-native-render-html';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useColorScheme } from '@/components/useColorScheme';
 
+import Colors from '@/constants/Colors';
 export default function PinDetailScreen() {
+  const colorScheme = useColorScheme();
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
 
   const queryClient = useQueryClient();
-  const textColor = useThemeColor({}, 'text');
-  const borderColor = useThemeColor({}, 'border');
-  const backgroundColor = useThemeColor({}, 'background');
+  const textColor = Colors[colorScheme].text;
+  const borderColor = Colors[colorScheme].border;
+  const backgroundColor = Colors[colorScheme].background;
 
   // 动画相关
   const scrollY = useRef(new Animated.Value(0)).current;

@@ -1,17 +1,20 @@
 import { getDailyDetail, getArticle } from '@/api/zhihu';
-import { Text, View, useThemeColor } from '@/components/Themed';
+import { Text, View } from '@/components/Themed';
 import { ZhihuContent } from '@/components/ZhihuContent';
 import { useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
 import { Image, ScrollView, StyleSheet, useWindowDimensions, ActivityIndicator, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useColorScheme } from '@/components/useColorScheme';
 
+import Colors from '@/constants/Colors';
 export default function ArticleDetail() {
+  const colorScheme = useColorScheme();
   const { id, source } = useLocalSearchParams();
   const { width } = useWindowDimensions();
-  const textColor = useThemeColor({}, 'text');
-  const surfaceColor = useThemeColor({}, 'surface');
+  const textColor = Colors[colorScheme].text;
+  const surfaceColor = Colors[colorScheme].surface;
   const router = useRouter();
 
   // 1. 获取日报详情
@@ -33,7 +36,7 @@ export default function ArticleDetail() {
 
   if (isLoading) return (
     <View style={styles.center}>
-      <ActivityIndicator size="large" color={useThemeColor({}, 'primary')} />
+      <ActivityIndicator size="large" color={Colors[colorScheme].primary} />
       <Text style={{ marginTop: 12 }}>正赶往知识的荒原...喵</Text>
     </View>
   );
@@ -87,7 +90,7 @@ export default function ArticleDetail() {
             style={[styles.commentBtn, { backgroundColor: surfaceColor }]}
             onPress={() => router.push(`/comments/${id}?type=article`)}
           >
-            <Ionicons name="chatbubble-outline" size={18} color={useThemeColor({}, 'primary')} />
+            <Ionicons name="chatbubble-outline" size={18} color={Colors[colorScheme].primary} />
             <Text type="primary" style={styles.commentBtnText}>查看全部 {data.comment_count || 0} 条评论</Text>
           </Pressable>
         </View>

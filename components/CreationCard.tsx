@@ -2,7 +2,7 @@ import { Text, View } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { LikeButton } from './LikeButton';
 
@@ -92,33 +92,33 @@ export const CreationCard = ({ item, type, onPress, excerpt }: {
   const showExpandButton = !expanded && getFullContent().length > 100;
 
   return (
-    <View type="surface" style={styles.card}>
+    <View type="surface" className="p-4 mb-0.5 mt-px">
       <Pressable onPress={handlePress}>
         <Animated.View sharedTransitionTag={`title-${item.question?.id || item.id}`}>
-          <Text style={styles.title} numberOfLines={expanded ? undefined : 2}>
+          <Text className="text-base font-bold mb-2 leading-[22px] text-foreground dark:text-foreground-dark" numberOfLines={expanded ? undefined : 2}>
             {getTitle()}
           </Text>
         </Animated.View>
-        <View style={{ backgroundColor: 'transparent' }}>
-          <Text type="secondary" style={styles.excerpt} numberOfLines={expanded ? undefined : 3}>
+        <View className="bg-transparent">
+          <Text type="secondary" className="text-sm leading-5" numberOfLines={expanded ? undefined : 3}>
             {content}
           </Text>
           {showExpandButton && (
-            <Pressable onPress={() => setExpanded(true)} style={styles.expandBtn}>
-              <Text style={styles.expandText}>展开全文</Text>
+            <Pressable onPress={() => setExpanded(true)} className="mt-2">
+              <Text className="text-sm text-primary">展开全文</Text>
             </Pressable>
           )}
           {expanded && (
-            <Pressable onPress={() => setExpanded(false)} style={styles.expandBtn}>
-              <Text style={styles.expandText}>收起</Text>
+            <Pressable onPress={() => setExpanded(false)} className="mt-2">
+              <Text className="text-sm text-primary">收起</Text>
             </Pressable>
           )}
         </View>
       </Pressable>
 
-      <View style={[styles.footer, { backgroundColor: 'transparent' }]}>
+      <View className="flex-row justify-between mt-4 items-center bg-transparent">
         {type !== 'question' && type !== 'video' ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'transparent' }}>
+          <View className="flex-row items-center bg-transparent">
             <LikeButton
               id={item.id}
               count={item.voteup_count || item.reaction_count || 0}
@@ -127,14 +127,14 @@ export const CreationCard = ({ item, type, onPress, excerpt }: {
             />
             <Pressable
               onPress={() => router.push(`/comments/${item.id}?type=${type}&count=${item.comment_count || 0}`)}
-              style={styles.commentBtn}
+              className="flex-row items-center ml-2.5"
             >
               <Ionicons name="chatbubble-outline" size={16} color="#888" />
-              <Text style={styles.actionText}>{item.comment_count || 0} 评论</Text>
+              <Text className="text-[#888] ml-1 text-[13px]">{item.comment_count || 0} 评论</Text>
             </Pressable>
           </View>
         ) : (
-          <Text type="secondary" style={styles.statText}>
+          <Text type="secondary" className="text-xs text-tertiary dark:text-tertiary-dark">
             {type === 'question'
               ? `${item.answer_count || 0} 回答 · ${item.follower_count || 0} 关注`
               : `${item.voteup_count || 0} 赞同 · ${item.comment_count || 0} 评论`
@@ -142,7 +142,7 @@ export const CreationCard = ({ item, type, onPress, excerpt }: {
           </Text>
         )}
 
-        <Text type="secondary" style={[styles.statText, { marginLeft: 'auto' }]}>
+        <Text type="secondary" className="text-xs text-tertiary dark:text-tertiary-dark ml-auto">
           {item.updated_time || item.updated || item.created_time || item.created
             ? new Date((item.updated_time || item.updated || item.created_time || item.created) * 1000).toLocaleDateString()
             : ''}
@@ -151,15 +151,3 @@ export const CreationCard = ({ item, type, onPress, excerpt }: {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  card: { padding: 15, marginBottom: 2, marginTop: 1 },
-  title: { fontSize: 16, fontWeight: 'bold', marginBottom: 8, lineHeight: 22 },
-  excerpt: { fontSize: 14, lineHeight: 20 },
-  footer: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 15, alignItems: 'center' },
-  statText: { fontSize: 12, color: '#999' },
-  commentBtn: { flexDirection: 'row', alignItems: 'center', marginLeft: 10 },
-  actionText: { color: '#888', marginLeft: 4, fontSize: 13 },
-  expandBtn: { marginTop: 8 },
-  expandText: { fontSize: 14, color: '#007AFF' }
-});

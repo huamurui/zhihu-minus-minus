@@ -1,11 +1,14 @@
 /**
- * Learn more about Light and Dark modes:
- * https://docs.expo.io/guides/color-schemes/
+ * Themed primitives.
+ * 
+ * Now that NativeWind handles dark mode via className `dark:` variants,
+ * these wrappers simply apply default colors for backward compatibility
+ * with components that still pass a `type` prop.
+ * 
+ * New components can use plain RN <Text>/<View> with className directly.
  */
 import { Text as DefaultText, View as DefaultView } from 'react-native';
-
 import { useColorScheme } from './useColorScheme';
-
 import Colors from '@/constants/Colors';
 
 type ThemeProps = {

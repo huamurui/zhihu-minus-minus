@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Image, Pressable, StyleSheet } from 'react-native';
+import { Image, Pressable } from 'react-native';
 import Animated, { SharedTransition } from 'react-native-reanimated';
 import { LikeButton } from './LikeButton';
 import { Text, View } from './Themed';
@@ -12,10 +12,10 @@ export const FeedCard = ({ item }: { item: any }) => {
   const isQuestionType = item.type === 'questions';
 
   return (
-    <View type="surface" style={[styles.card, isQuestionType && { paddingBottom: 10 }]}>
+    <View type="surface" className="p-4 mb-2" style={isQuestionType ? { paddingBottom: 10 } : undefined}>
       {/* 动态动作提示 (针对关注流) */}
       {item.actionText && (
-        <Text type="secondary" style={styles.actionTextRow}>
+        <Text type="secondary" className="text-[13px] mb-2 text-tertiary dark:text-tertiary-dark">
           {item.actionText}
         </Text>
       )}
@@ -26,14 +26,14 @@ export const FeedCard = ({ item }: { item: any }) => {
           pathname: `/user/${item.author.url_token || item.author.id}`,
           params: { avatar: item.author.avatar }
         } as any)}
-        style={styles.authorRow}
+        className="flex-row items-center mb-2"
       >
         <Animated.Image 
           source={{ uri: item.author.avatar }} 
-          style={styles.avatar} 
+          className="w-[22px] h-[22px] rounded-full"
           sharedTransitionTag={`avatar-${item.author.url_token || item.author.id}`}
         />
-        <Text type="secondary" style={styles.authorName}>{item.author.name}</Text>
+        <Text type="secondary" className="ml-2 text-[13px]">{item.author.name}</Text>
       </Pressable>
 
       {/* 热区2：点击标题 -> 详情页 */}
@@ -53,13 +53,13 @@ export const FeedCard = ({ item }: { item: any }) => {
               params: { title: item.title }
             } as any);
           }} 
-          style={styles.titleRow}
+          className="mb-1.5"
         >
           <Animated.View 
             sharedTransitionTag={`title-${item.questionId || item.id}`}
             sharedTransitionStyle={slowTransition}
           >
-            <Text style={styles.title} numberOfLines={2}>
+            <Text className="text-lg font-bold leading-6 text-foreground dark:text-foreground-dark" numberOfLines={2}>
               {item.title}
             </Text>
           </Animated.View>
@@ -75,17 +75,17 @@ export const FeedCard = ({ item }: { item: any }) => {
             params: { title: item.title, questionId: item.questionId }
           } as any);
         }} 
-        style={styles.contentRow}
+        className="flex-row mt-1"
       >
-        <View style={{ flex: 1, backgroundColor: 'transparent' }}>
-          <Text type="secondary" style={styles.excerpt} numberOfLines={3}>
+        <View className="flex-1 bg-transparent">
+          <Text type="secondary" className="text-[15px] leading-[22px]" numberOfLines={3}>
             {item.excerpt}
           </Text>
         </View>
         {item.image && (
           <Animated.Image 
             source={{ uri: item.image }} 
-            style={styles.cover} 
+            className="w-[100px] h-[70px] rounded-md ml-2.5"
             sharedTransitionTag={`image-${item.id}`}
           />
         )}
@@ -93,7 +93,7 @@ export const FeedCard = ({ item }: { item: any }) => {
 
       {/* 热区4：底部操作栏 - 问题关注类动态不显示 */}
       {!isQuestionType && (
-        <View style={[styles.footer, { backgroundColor: 'transparent' }]}>
+        <View className="flex-row mt-4 items-center bg-transparent">
           <LikeButton
             id={item.id}
             count={item.voteCount}
@@ -107,13 +107,13 @@ export const FeedCard = ({ item }: { item: any }) => {
               const type = item.type === 'articles' ? 'article' : (item.type === 'answers' ? 'answer' : item.type.slice(0, -1));
               router.push(`/comments/${item.id}?type=${type}&count=${item.commentCount}`);
             }}
-            style={styles.commentBtn}
+            className="flex-row items-center ml-5"
           >
             <Ionicons name="chatbubble-outline" size={16} color="#888" />
-            <Text style={styles.actionText}>{item.commentCount} 评论</Text>
+            <Text className="text-[#888] ml-1 text-[13px]">{item.commentCount} 评论</Text>
           </Pressable>
 
-          <Pressable style={styles.moreBtn}>
+          <Pressable className="ml-auto">
             <Ionicons name="ellipsis-horizontal" size={16} color="#888" />
           </Pressable>
         </View>
@@ -121,20 +121,3 @@ export const FeedCard = ({ item }: { item: any }) => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  card: { padding: 15, marginBottom: 8 },
-  authorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  avatar: { width: 22, height: 22, borderRadius: 11 },
-  authorName: { marginLeft: 8, fontSize: 13 },
-  titleRow: { marginBottom: 6 },
-  title: { fontSize: 18, fontWeight: 'bold', lineHeight: 24 },
-  contentRow: { flexDirection: 'row', marginTop: 4 },
-  excerpt: { fontSize: 15, lineHeight: 22 },
-  cover: { width: 100, height: 70, borderRadius: 6, marginLeft: 10 },
-  footer: { flexDirection: 'row', marginTop: 15, alignItems: 'center' },
-  commentBtn: { flexDirection: 'row', alignItems: 'center', marginLeft: 20 },
-  actionText: { color: '#888', marginLeft: 4, fontSize: 13 },
-  actionTextRow: { fontSize: 13, marginBottom: 8, color: '#999' },
-  moreBtn: { marginLeft: 'auto' }
-});

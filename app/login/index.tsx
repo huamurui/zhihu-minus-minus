@@ -1,4 +1,4 @@
-import { Text, View, useThemeColor } from '@/components/Themed';
+import { Text, View } from '@/components/Themed';
 import { useAuthStore } from '@/store/useAuthStore';
 import CookieManager from '@react-native-cookies/cookies';
 import { useRouter } from 'expo-router';
@@ -6,12 +6,15 @@ import * as SecureStore from 'expo-secure-store';
 import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { useColorScheme } from '@/components/useColorScheme';
 
+import Colors from '@/constants/Colors';
 export default function LoginScreen() {
+  const colorScheme = useColorScheme();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const webViewRef = useRef<WebView>(null);
-  const borderColor = useThemeColor({}, 'border');
+  const borderColor = Colors[colorScheme].border;
 
   const handleCookies = async (web_cookie: string) => {
     console.log(web_cookie, '1111')

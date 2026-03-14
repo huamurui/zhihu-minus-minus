@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
-import { Image, Pressable, StyleSheet } from 'react-native';
-import { Text, useThemeColor, View } from './Themed';
+import { Image, Pressable } from 'react-native';
+import { Text, View } from './Themed';
 
 export interface HotItem {
     id: string;
@@ -15,98 +15,37 @@ export interface HotItem {
 export const HotCard = ({ item }: { item: HotItem }) => {
     const router = useRouter();
 
-    const theme = useThemeColor({}, 'backgroundSecondary');
     return (
         <Pressable
-
+            className="flex-row py-3 px-4 border-b border-border dark:border-border-dark bg-surface dark:bg-surface-dark"
             onPress={() => router.push(`/question/${item.questionId}`)}
-            style={({ pressed }) => [
-                styles.card,
-                { backgroundColor: theme },
-                { opacity: pressed ? 0.7 : 1 }
-            ]}
+            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
         >
-            <View style={styles.rankContainer}>
-                <Text style={[
-                    styles.rankText,
-                    item.rank <= 3 ? styles.topRank : styles.normalRank
-                ]}>
+            <View className="w-[30px] items-start pt-0.5 bg-transparent">
+                <Text
+                    className={`text-lg font-bold ${item.rank <= 3 ? 'text-[#ff9607]' : 'text-tertiary dark:text-tertiary-dark'}`}
+                >
                     {item.rank}
                 </Text>
             </View>
 
-            <View style={styles.contentContainer}>
-                <View style={styles.textColumn}>
-                    <Text style={styles.title} numberOfLines={2}>
+            <View className="flex-1 flex-row bg-transparent">
+                <View className="flex-1 pr-2.5 bg-transparent">
+                    <Text className="text-base font-bold leading-[22px] mb-1 text-foreground dark:text-foreground-dark" numberOfLines={2}>
                         {item.title}
                     </Text>
-                    <Text type="secondary" style={styles.excerpt} numberOfLines={2}>
+                    <Text className="text-sm leading-5 mb-1 text-secondary dark:text-secondary-dark" numberOfLines={2}>
                         {item.excerpt}
                     </Text>
-                    <Text type="secondary" style={styles.hotValue}>
+                    <Text className="text-xs text-tertiary dark:text-tertiary-dark">
                         {item.hotValue}
                     </Text>
                 </View>
 
                 {item.image && (
-                    <Image source={{ uri: item.image }} style={styles.image} />
+                    <Image source={{ uri: item.image }} className="w-[100px] h-[68px] rounded bg-surface-tertiary dark:bg-surface-tertiary-dark" />
                 )}
             </View>
         </Pressable>
     );
 };
-
-const styles = StyleSheet.create({
-    card: {
-        paddingVertical: 12,
-        paddingHorizontal: 15,
-        flexDirection: 'row',
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: useThemeColor({}, 'border'),
-        backgroundColor: 'transparent',
-    },
-    rankContainer: {
-        width: 30,
-        alignItems: 'flex-start',
-        paddingTop: 2,
-    },
-    rankText: {
-        fontSize: 18,
-        fontWeight: 'bold',
-    },
-    topRank: {
-        color: '#ff9607',
-    },
-    normalRank: {
-        color: '#999',
-    },
-    contentContainer: {
-        flex: 1,
-        flexDirection: 'row',
-    },
-    textColumn: {
-        flex: 1,
-        paddingRight: 10,
-    },
-    title: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        lineHeight: 22,
-        marginBottom: 4,
-    },
-    excerpt: {
-        fontSize: 14,
-        lineHeight: 20,
-        marginBottom: 4,
-    },
-    hotValue: {
-        fontSize: 12,
-        color: '#999',
-    },
-    image: {
-        width: 100,
-        height: 68,
-        borderRadius: 4,
-        backgroundColor: '#f5f5f5',
-    },
-});

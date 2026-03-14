@@ -1,15 +1,23 @@
 import { followMember, unfollowMember } from '@/api/zhihu';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet } from 'react-native';
+import { ActivityIndicator, Image, Pressable } from 'react-native';
 import { Text, View } from './Themed';
-import { useThemeColor } from '@/components/Themed';
+import { useColorScheme } from '@/components/useColorScheme';
 
+import Colors from '@/constants/Colors';
 export const UserCard = ({ user }: { user: any }) => {
     const router = useRouter();
     const [isFollowing, setIsFollowing] = useState(user.is_following);
     const [followerCount, setFollowerCount] = useState(user.follower_count || 0);
     const [loading, setLoading] = useState(false);
+    const colorScheme = useColorScheme();
+
+    const borderColor = Colors[colorScheme].border;
+    const bgSecondary = Colors[colorScheme].backgroundSecondary;
+    const tint = Colors[colorScheme].tint;
+    const textSecondaryColor = Colors[colorScheme].textSecondary;
+    const bgColor = Colors[colorScheme].background;
 
     const handleFollow = async () => {
         if (loading) return;
@@ -34,38 +42,44 @@ export const UserCard = ({ user }: { user: any }) => {
 
     return (
         <Pressable
-            style={[styles.container, { borderBottomColor: useThemeColor({}, 'border') }]}
+            className="flex-row items-center p-4"
+            style={{ borderBottomWidth: 0.5, borderBottomColor: borderColor }}
             onPress={() => router.push(`/user/${user.url_token || user.id}`)}
         >
-            <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
-            <View style={styles.content}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'transparent' }}>
-                    <Text style={styles.name} numberOfLines={1}>{user.name}</Text>
+            <Image source={{ uri: user.avatar_url }} className="w-12 h-11 rounded-full" />
+            <View className="flex-1 ml-3 bg-transparent">
+                <View className="flex-row items-center bg-transparent">
+                    <Text className="text-base font-semibold" numberOfLines={1}>{user.name}</Text>
                     {user.badge?.find((b: any) => b.type === 'best_answerer') && (
-                        <View style={styles.badge}>
-                            <Text style={styles.badgeText}>优秀回答者</Text>
+                        <View className="ml-1.5 px-1 py-px rounded bg-[#fffbe6] border-[0.5px] border-[#ffe58f]">
+                            <Text className="text-[10px] font-bold text-[#d48806]">优秀回答者</Text>
                         </View>
                     )}
                 </View>
-                <Text type="secondary" style={styles.headline} numberOfLines={1}>
+                <Text type="secondary" className="text-[13px] mt-0.5" numberOfLines={1}>
                     {user.headline || '这个用户很神秘喵'}
                 </Text>
-                <View style={{ flexDirection: 'row', marginTop: 4, backgroundColor: 'transparent' }}>
-                    <Text type="secondary" style={styles.stats}>{followerCount} 关注者</Text>
-                    <Text type="secondary" style={[styles.stats, { marginLeft: 12 }]}>{user.answer_count || 0} 回答</Text>
+                <View className="flex-row mt-1 bg-transparent">
+                    <Text type="secondary" className="text-xs">{followerCount} 关注者</Text>
+                    <Text type="secondary" className="text-xs ml-3">{user.answer_count || 0} 回答</Text>
                 </View>
             </View>
             <Pressable
                 onPress={handleFollow}
-                style={[
-                    styles.followBtn,
-                    isFollowing ? [styles.followedBtn, { backgroundColor: useThemeColor({}, 'backgroundSecondary'), borderColor: useThemeColor({}, 'border') }] : [styles.unfollowedBtn, { backgroundColor: useThemeColor({}, 'tint') }]
-                ]}
+                className="px-4 py-1.5 rounded-2xl justify-center items-center"
+                style={
+                    isFollowing
+                        ? { backgroundColor: bgSecondary, borderColor, borderWidth: 1 }
+                        : { backgroundColor: tint }
+                }
             >
                 {loading ? (
-                    <ActivityIndicator size="small" color={isFollowing ? useThemeColor({}, 'textSecondary') : useThemeColor({}, 'background')} />
+                    <ActivityIndicator size="small" color={isFollowing ? textSecondaryColor : bgColor} />
                 ) : (
-                    <Text style={[styles.followText, isFollowing && { color: useThemeColor({}, 'textSecondary') }]}>
+                    <Text
+                        className="text-[13px] font-bold"
+                        style={{ color: isFollowing ? textSecondaryColor : '#ffffff' }}
+                    >
                         {isFollowing ? '已关注' : '关注'}
                     </Text>
                 )}
@@ -73,63 +87,3 @@ export const UserCard = ({ user }: { user: any }) => {
         </Pressable>
     );
 };
-
-const styles = StyleSheet.create({
-    container: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 15,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-    },
-    avatar: {
-        width: 48,
-        height: 44,
-        borderRadius: 22,
-    },
-    content: {
-        flex: 1,
-        marginLeft: 12,
-        backgroundColor: 'transparent',
-    },
-    name: {
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    headline: {
-        fontSize: 13,
-        marginTop: 2,
-    },
-    followBtn: {
-        paddingHorizontal: 16,
-        paddingVertical: 6,
-        borderRadius: 16,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    unfollowedBtn: {},
-    followedBtn: {
-        borderWidth: 1,
-    },
-    stats: {
-        fontSize: 12,
-    },
-    badge: {
-        backgroundColor: '#fffbe6',
-        borderColor: '#ffe58f',
-        borderWidth: 0.5,
-        borderRadius: 4,
-        paddingHorizontal: 4,
-        paddingVertical: 1,
-        marginLeft: 6,
-    },
-    badgeText: {
-        fontSize: 10,
-        color: '#d48806',
-        fontWeight: 'bold',
-    },
-    followText: {
-        fontSize: 13,
-        fontWeight: 'bold',
-        color: '#ffffff',
-    }
-});

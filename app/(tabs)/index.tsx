@@ -20,7 +20,7 @@ import Animated, {
 import { FEED_URLS, getFeed } from '@/api/zhihu';
 import { FeedCard } from '@/components/FeedCard';
 import { HotCard, HotItem } from '@/components/HotCard';
-import { Text, View, useThemeColor } from '@/components/Themed';
+import { Text, View } from '@/components/Themed';
 import { DailyList } from '@/components/DailyList';
 import { ProfileView } from '@/components/ProfileView';
 import { PublishView } from '@/components/PublishView';
@@ -43,8 +43,8 @@ export default function HomeScreen() {
   const pagerRef = useRef<PagerView>(null);
   const [currentPage, setCurrentPage] = useState(3);
 
-  const tintColor = useThemeColor({}, 'tint');
-  const textColor = useThemeColor({}, 'text');
+  const tintColor = Colors[colorScheme].tint;
+  const textColor = Colors[colorScheme].text;
   const { cookies } = useAuthStore();
 
   const handleTabPress = (index: number) => {

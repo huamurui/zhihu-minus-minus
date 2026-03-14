@@ -1,12 +1,14 @@
 import { StyleSheet, useWindowDimensions, Pressable, Modal, FlatList, TouchableWithoutFeedback, Image, TouchableOpacity } from 'react-native';
 import RenderHtml, { CustomBlockRenderer, defaultSystemFonts } from 'react-native-render-html';
-import { View, Text, useThemeColor } from './Themed';
+import { View, Text } from './Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { reactAnswerSegment, unreactAnswerSegment } from '@/api/zhihu/answer';
+import { useColorScheme } from '@/components/useColorScheme';
 
+import Colors from '@/constants/Colors';
 interface SegmentInfo {
   pid: string;
   text: string;
@@ -45,10 +47,11 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
   type,
   onRefresh
 }) => {
+  const colorScheme = useColorScheme();
   const { width } = useWindowDimensions();
-  const textColor = useThemeColor({}, 'text');
-  const surfaceColor = useThemeColor({}, 'surface');
-  const backgroundColor = useThemeColor({}, 'background');
+  const textColor = Colors[colorScheme].text;
+  const surfaceColor = Colors[colorScheme].surface;
+  const backgroundColor = Colors[colorScheme].background;
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -182,7 +185,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
         onPress={handlePress}
         style={[
           styles.paragraphContainer,
-          isActive && { backgroundColor: useThemeColor({}, 'primaryTransparent') },
+          isActive && { backgroundColor: Colors[colorScheme].primaryTransparent },
           !isActive && isLiked && { backgroundColor: 'rgba(0, 132, 255, 0.05)' }
         ]}
       >
@@ -256,11 +259,11 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
         <View style={styles.linkCardContent}>
           <Text style={styles.linkCardTitle} numberOfLines={2}>{title || url}</Text>
           <View style={styles.linkCardFooter}>
-            <Ionicons name={getLinkTypeIcon() as any} size={14} color={useThemeColor({}, 'primary')} />
+            <Ionicons name={getLinkTypeIcon() as any} size={14} color={Colors[colorScheme].primary} />
             <Text type="secondary" style={styles.linkCardSub}>{isInternal ? '知乎内部链接' : '外部链接'}</Text>
           </View>
         </View>
-        {image && <Image source={{ uri: image }} style={[styles.linkCardImage, { backgroundColor: useThemeColor({}, 'backgroundSecondary') }]} />}
+        {image && <Image source={{ uri: image }} style={[styles.linkCardImage, { backgroundColor: Colors[colorScheme].backgroundSecondary }]} />}
       </Pressable>
     );
   };
@@ -286,18 +289,18 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
   const classesStyles = useMemo(() => ({
     'segment-interactable': {
       textDecorationLine: 'underline',
-      textDecorationColor: useThemeColor({}, 'primaryTransparent'),
+      textDecorationColor: Colors[colorScheme].primaryTransparent,
     },
     'segment-liked': {}
-  }), [useThemeColor]);
+  }), [colorScheme]);
 
   const tagsStyles = useMemo(() => ({
     p: { color: textColor, fontSize: 18, lineHeight: 28, marginBottom: 20 },
-    b: { color: useThemeColor({}, 'primary'), fontWeight: 'bold' },
+    b: { color: Colors[colorScheme].primary, fontWeight: 'bold' },
     img: { borderRadius: 12, marginVertical: 10 },
     blockquote: {
       borderLeftWidth: 4,
-      borderLeftColor: useThemeColor({}, 'primary'),
+      borderLeftColor: Colors[colorScheme].primary,
       paddingLeft: 18,
       backgroundColor: surfaceColor + '80', // 添加半透明底色
       paddingVertical: 12,
@@ -316,15 +319,15 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
     figcaption: { color: '#999', fontSize: 13, marginTop: 8, textAlign: 'center', fontStyle: 'italic' },
     span: { color: textColor },
     div: { color: textColor },
-    a: { color: useThemeColor({}, 'primary'), textDecorationLine: 'none' },
+    a: { color: Colors[colorScheme].primary, textDecorationLine: 'none' },
     code: {
-      backgroundColor: useThemeColor({}, 'border'),
+      backgroundColor: Colors[colorScheme].border,
       borderRadius: 4,
       paddingHorizontal: 4,
       fontFamily: 'monospace',
       fontSize: 14,
     },
-  }), [textColor, surfaceColor, useThemeColor]);
+  }), [textColor, surfaceColor]);
 
   const systemFonts = [...defaultSystemFonts, 'Inter', 'Roboto'];
 
@@ -421,7 +424,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
                       router.push(`/comments/${objectId}?type=${type}${segId ? `&segmentId=${segId}` : ''}`);
                     }}
                   >
-                    <Ionicons name="chatbubble-outline" size={22} color={useThemeColor({}, 'primary')} />
+                    <Ionicons name="chatbubble-outline" size={22} color={Colors[colorScheme].primary} />
                     <Text style={styles.statLabel}>{activeSegment?.comment_count || 0} 评论</Text>
                   </Pressable>
                 </View>
@@ -433,7 +436,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
                   }}
                 >
                   <Text type="primary" style={styles.bubbleActionText}>查看详细讨论</Text>
-                  <Ionicons name="chevron-forward" size={16} color={useThemeColor({}, 'primary')} />
+                  <Ionicons name="chevron-forward" size={16} color={Colors[colorScheme].primary} />
                 </Pressable>
               </View>
             </TouchableWithoutFeedback>

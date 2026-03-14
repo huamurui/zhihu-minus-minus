@@ -1,12 +1,14 @@
 import { getNotifications, markAllNotificationsRead } from '@/api/zhihu';
-import { Text, View, useThemeColor } from '@/components/Themed';
+import { Text, View } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { useColorScheme } from '@/components/useColorScheme';
 
+import Colors from '@/constants/Colors';
 const NOTIFICATION_TYPES = [
     { label: '全部', value: 'all' },
     { label: '赞同', value: 'like' },
@@ -16,11 +18,12 @@ const NOTIFICATION_TYPES = [
 ];
 
 export default function NotificationScreen() {
+  const colorScheme = useColorScheme();
     const router = useRouter();
     const navigation = useNavigation();
     const queryClient = useQueryClient();
     const primaryColor = '#0084ff';
-    const borderColor = useThemeColor({}, 'border');
+    const borderColor = Colors[colorScheme].border;
     const [selectedType, setSelectedType] = useState('all');
 
     useEffect(() => {

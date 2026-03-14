@@ -1,22 +1,25 @@
 import { createAnswer, getQuestion } from '@/api/zhihu';
-import { Text, View, useThemeColor } from '@/components/Themed';
+import { Text, View } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useColorScheme } from '@/components/useColorScheme';
 
+import Colors from '@/constants/Colors';
 export default function WriteAnswerScreen() {
+  const colorScheme = useColorScheme();
     const { id } = useLocalSearchParams();
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const queryClient = useQueryClient();
     const [content, setContent] = useState('');
 
-    const textColor = useThemeColor({}, 'text');
-    const borderColor = useThemeColor({}, 'border');
-    const surfaceColor = useThemeColor({}, 'surface');
+    const textColor = Colors[colorScheme].text;
+    const borderColor = Colors[colorScheme].border;
+    const surfaceColor = Colors[colorScheme].surface;
 
     // 1. 获取问题详情以显示标题
     const { data: question, isLoading: qLoading } = useQuery({

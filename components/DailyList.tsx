@@ -1,10 +1,12 @@
 import { getDailyBefore, getDailyLatest } from '@/api/zhihu';
-import { Text, View, useThemeColor } from '@/components/Themed';
+import { Text, View } from '@/components/Themed';
+import Colors from '@/constants/Colors';
+import { useColorScheme } from '@/components/useColorScheme';
 import { FlashList } from "@shopify/flash-list";
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useMemo } from 'react';
-import { Dimensions, Image, Pressable, StyleSheet } from 'react-native';
+import { Dimensions, Image, Pressable } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
@@ -24,7 +26,8 @@ const formatDate = (dateStr: string) => {
 // --- 骨架屏组件 ---
 const SkeletonCard = () => {
   const opacity = useSharedValue(0.3);
-  const skeletonBg = useThemeColor({}, 'border');
+  const colorScheme = useColorScheme();
+  const skeletonBg = Colors[colorScheme].border;
 
   React.useEffect(() => {
     opacity.value = withRepeat(withSequence(withTiming(0.7, { duration: 800 }), withTiming(0.3, { duration: 800 })), -1);
@@ -32,9 +35,9 @@ const SkeletonCard = () => {
   const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
 
   return (
-    <View type="surface" style={styles_daily.card}>
-      <Animated.View style={[styles_daily.image, { backgroundColor: skeletonBg }, animatedStyle]} />
-      <View style={[styles_daily.textContainer, { backgroundColor: 'transparent' }]}>
+    <View type="surface" className="flex-row mx-3 mb-3 p-3 rounded-xl">
+      <Animated.View style={[{ width: 80, height: 80, borderRadius: 8, backgroundColor: skeletonBg }, animatedStyle]} />
+      <View className="flex-1 ml-3 justify-center bg-transparent">
         <Animated.View style={[{ width: '90%', height: 20, backgroundColor: skeletonBg, marginBottom: 10 }, animatedStyle]} />
         <Animated.View style={[{ width: '40%', height: 14, backgroundColor: skeletonBg }, animatedStyle]} />
       </View>
@@ -71,14 +74,14 @@ export function DailyList({ insets }: { insets: any }) {
 
   if (isLoading) {
     return (
-      <View style={styles_daily.container}>
+      <View className="flex-1">
         {[1, 2, 3, 4, 5].map((i) => <SkeletonCard key={i} />)}
       </View>
     );
   }
 
   return (
-    <View style={styles_daily.container}>
+    <View className="flex-1">
       <FlashList
         data={flattenedData}
         keyExtractor={(item: any, index: number) => (item.type === 'date' ? item.date : item.data.id.toString() + index)}
@@ -88,12 +91,16 @@ export function DailyList({ insets }: { insets: any }) {
         onRefresh={refetch}
         refreshing={isLoading}
         contentContainerStyle={{
-          paddingTop: insets.top + 70, // 统一首页列表的 paddingTop
+          paddingTop: insets.top + 70,
           paddingBottom: 110
         }}
         renderItem={({ item }: { item: any }) => {
           if (item.type === 'date') {
-            return <View style={{ backgroundColor: 'transparent' }}><Text type="secondary" style={styles_daily.dateHeader}>{formatDate(item.date)}</Text></View>;
+            return (
+              <View className="bg-transparent">
+                <Text type="secondary" className="p-4 text-sm font-semibold">{formatDate(item.date)}</Text>
+              </View>
+            );
           }
           const story = item.data;
           return (
@@ -101,29 +108,18 @@ export function DailyList({ insets }: { insets: any }) {
               style={({ pressed }) => [pressed && { opacity: 0.7 }]}
               onPress={() => router.push({ pathname: `/article/${story.id}`, params: { source: 'daily' } } as any)}
             >
-              <View type="surface" style={styles_daily.card}>
-                <Image source={{ uri: story.images?.[0] }} style={styles_daily.image} />
-                <View style={[styles_daily.textContainer, { backgroundColor: 'transparent' }]}>
-                  <Text style={styles_daily.title} numberOfLines={2}>{story.title}</Text>
-                  <Text type="secondary" style={styles_daily.hint}>{story.hint}</Text>
+              <View type="surface" className="flex-row mx-3 mb-3 p-3 rounded-xl">
+                <Image source={{ uri: story.images?.[0] }} className="w-20 h-20 rounded-lg" />
+                <View className="flex-1 ml-3 justify-center bg-transparent">
+                  <Text className="text-base font-bold mb-1.5 text-foreground dark:text-foreground-dark" numberOfLines={2}>{story.title}</Text>
+                  <Text type="secondary" className="text-xs">{story.hint}</Text>
                 </View>
               </View>
             </Pressable>
           );
         }}
-        ListFooterComponent={isFetchingNextPage ? <Text type="secondary" style={styles_daily.loadingText}>加载中...</Text> : null}
+        ListFooterComponent={isFetchingNextPage ? <Text type="secondary" className="text-center p-5">加载中...</Text> : null}
       />
     </View>
   );
 }
-
-const styles_daily = StyleSheet.create({
-  container: { flex: 1 },
-  dateHeader: { padding: 15, fontSize: 14, fontWeight: '600' },
-  card: { flexDirection: 'row', marginHorizontal: 12, marginBottom: 12, padding: 12, borderRadius: 12 },
-  image: { width: 80, height: 80, borderRadius: 8 },
-  textContainer: { flex: 1, marginLeft: 12, justifyContent: 'center' },
-  title: { fontSize: 16, fontWeight: 'bold', marginBottom: 6 },
-  hint: { fontSize: 12 },
-  loadingText: { textAlign: 'center', padding: 20 }
-});

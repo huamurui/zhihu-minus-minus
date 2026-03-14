@@ -1,17 +1,20 @@
 import { getMyLikes } from '@/api/zhihu';
 import { CreationCard } from '@/components/CreationCard';
-import { Text, View, useThemeColor } from '@/components/Themed';
+import { Text, View } from '@/components/Themed';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useNavigation } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
+import { useColorScheme } from '@/components/useColorScheme';
 
+import Colors from '@/constants/Colors';
 export default function MyLikesScreen() {
+  const colorScheme = useColorScheme();
     const navigation = useNavigation();
     const [activeTab, setActiveTab] = useState<'answers' | 'articles'>('answers');
     const primaryColor = '#0084ff';
-    const borderColor = useThemeColor({}, 'border');
+    const borderColor = Colors[colorScheme].border;
 
     useEffect(() => {
         navigation.setOptions({ title: '我的点赞' });

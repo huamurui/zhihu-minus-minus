@@ -8,15 +8,18 @@ import {
     StyleSheet,
 } from 'react-native';
 
-import { Text, View, useThemeColor } from '@/components/Themed';
+import { Text, View } from '@/components/Themed';
+import { useColorScheme } from '@/components/useColorScheme';
 
+import Colors from '@/constants/Colors';
 export default function FeedbackScreen() {
+  const colorScheme = useColorScheme();
     const router = useRouter();
 
-    const accentColor = useThemeColor({}, 'tint');
-    const borderColor = useThemeColor({}, 'border');
-    const surfaceColor = useThemeColor({ light: '#fff', dark: '#1c1c1e' }, 'background');
-    const textColor = useThemeColor({}, 'text');
+    const accentColor = Colors[colorScheme].tint;
+    const borderColor = Colors[colorScheme].border;
+    const surfaceColor = colorScheme === 'dark' ? '#1c1c1e' : '#fff';
+    const textColor = Colors[colorScheme].text;
 
     return (
         <View style={styles.container}>

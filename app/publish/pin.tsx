@@ -1,4 +1,4 @@
-import { Text, View, useThemeColor } from '@/components/Themed';
+import { Text, View } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
@@ -6,14 +6,15 @@ import { Pressable, StyleSheet, TextInput, KeyboardAvoidingView, Platform, Scrol
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/components/useColorScheme';
 
+import Colors from '@/constants/Colors';
 export default function PublishPinScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colorScheme = useColorScheme();
-  const tintColor = useThemeColor({}, 'tint');
-  const textColor = useThemeColor({}, 'text');
-  const secondaryColor = useThemeColor({}, 'textSecondary');
-  const borderCol = useThemeColor({}, 'border');
+  const tintColor = Colors[colorScheme].tint;
+  const textColor = Colors[colorScheme].text;
+  const secondaryColor = Colors[colorScheme].textSecondary;
+  const borderCol = Colors[colorScheme].border;
   
   const [content, setContent] = useState('');
 

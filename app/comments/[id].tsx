@@ -8,7 +8,7 @@ import {
   getQuestionCommentsV5 as getQuestionComments
 } from '@/api/zhihu';
 import { LikeButton } from '@/components/LikeButton';
-import { Text, View, useThemeColor } from '@/components/Themed';
+import { Text, View } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -19,6 +19,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import Colors from '@/constants/Colors';
 export default function CommentScreen() {
   const { id, type, segmentId, count } = useLocalSearchParams<{ id: string, type: string, segmentId?: string, count?: string }>(); // Content ID, Type, and optional Segment ID
   const router = useRouter();
@@ -29,10 +30,10 @@ export default function CommentScreen() {
 
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
-  const borderColor = useThemeColor({}, 'border');
-  const surfaceColor = useThemeColor({}, 'surface');
-  const textColor = useThemeColor({}, 'text');
-  const tintColor = useThemeColor({}, 'tint');
+  const borderColor = Colors[colorScheme].border;
+  const surfaceColor = Colors[colorScheme].surface;
+  const textColor = Colors[colorScheme].text;
+  const tintColor = Colors[colorScheme].tint;
 
   // 1. 获取评论数据
   const { data, isLoading, isFetching, refetch } = useQuery({
@@ -209,7 +210,7 @@ export default function CommentScreen() {
               <View style={styles.replyHeaderFloating}>
                 <Text type="secondary" style={styles.replyHint}>正在回复 {replyTo.name}</Text>
                 <Pressable onPress={() => setReplyTo(null)}>
-                  <Ionicons name="close-circle" size={16} color={useThemeColor({}, 'textSecondary')} />
+                  <Ionicons name="close-circle" size={16} color={Colors[colorScheme].textSecondary} />
                 </Pressable>
               </View>
             )}

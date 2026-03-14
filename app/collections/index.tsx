@@ -1,21 +1,24 @@
 import { createCollection, deleteCollection, getMyCollections, updateCollection } from '@/api/zhihu';
-import { Text, View, useThemeColor } from '@/components/Themed';
+import { Text, View } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigation, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, TextInput } from 'react-native';
+import { useColorScheme } from '@/components/useColorScheme';
 
+import Colors from '@/constants/Colors';
 export default function MyCollectionsScreen() {
+  const colorScheme = useColorScheme();
     const router = useRouter();
     const navigation = useNavigation();
     const queryClient = useQueryClient();
 
     const primaryColor = '#0084ff';
-    const borderColor = useThemeColor({}, 'border');
-    const surfaceColor = useThemeColor({ light: '#fff', dark: '#1c1c1e' }, 'background');
-    const tintColor = useThemeColor({}, 'tint');
+    const borderColor = Colors[colorScheme].border;
+    const surfaceColor = colorScheme === 'dark' ? '#1c1c1e' : '#fff';
+    const tintColor = Colors[colorScheme].tint;
 
     const [modalVisible, setModalVisible] = useState(false);
     const [editingItem, setEditingItem] = useState<any>(null);

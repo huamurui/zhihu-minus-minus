@@ -1,6 +1,6 @@
 import { getSearchSuggest, searchContent } from '@/api/zhihu';
 import { FeedCard } from '@/components/FeedCard';
-import { Text, View, useThemeColor } from '@/components/Themed';
+import { Text, View } from '@/components/Themed';
 import { UserCard } from '@/components/UserCard';
 import { useSearchStore } from '@/store/useSearchStore';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,8 +9,11 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Stack, useNavigation, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Keyboard, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { useColorScheme } from '@/components/useColorScheme';
 
+import Colors from '@/constants/Colors';
 export default function SearchScreen() {
+  const colorScheme = useColorScheme();
     const router = useRouter();
     const navigation = useNavigation();
     const inputRef = useRef<TextInput>(null);
@@ -21,11 +24,11 @@ export default function SearchScreen() {
 
     const { history, addHistory, clearHistory, removeHistory } = useSearchStore();
 
-    const tintColor = useThemeColor({}, 'tint');
-    const backgroundColor = useThemeColor({}, 'background');
-    const surfaceColor = useThemeColor({ light: '#f5f5f5', dark: '#1a1a1a' }, 'surface');
-    const textColor = useThemeColor({}, 'text');
-    const borderColor = useThemeColor({ light: '#eeeeee', dark: '#333333' }, 'border');
+    const tintColor = Colors[colorScheme].tint;
+    const backgroundColor = Colors[colorScheme].background;
+    const surfaceColor = colorScheme === 'dark' ? '#1a1a1a' : '#f5f5f5';
+    const textColor = Colors[colorScheme].text;
+    const borderColor = Colors[colorScheme].border;
 
     useEffect(() => {
         const handler = setTimeout(() => {
