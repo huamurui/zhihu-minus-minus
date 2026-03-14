@@ -182,7 +182,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
         onPress={handlePress}
         style={[
           styles.paragraphContainer,
-          isActive && styles.activeParagraph,
+          isActive && { backgroundColor: useThemeColor({}, 'primaryTransparent') },
           !isActive && isLiked && { backgroundColor: 'rgba(0, 132, 255, 0.05)' }
         ]}
       >
@@ -256,11 +256,11 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
         <View style={styles.linkCardContent}>
           <Text style={styles.linkCardTitle} numberOfLines={2}>{title || url}</Text>
           <View style={styles.linkCardFooter}>
-            <Ionicons name={getLinkTypeIcon() as any} size={14} color="#0084ff" />
-            <Text style={styles.linkCardSub}>{isInternal ? '知乎内部链接' : '外部链接'}</Text>
+            <Ionicons name={getLinkTypeIcon() as any} size={14} color={useThemeColor({}, 'primary')} />
+            <Text type="secondary" style={styles.linkCardSub}>{isInternal ? '知乎内部链接' : '外部链接'}</Text>
           </View>
         </View>
-        {image && <Image source={{ uri: image }} style={styles.linkCardImage} />}
+        {image && <Image source={{ uri: image }} style={[styles.linkCardImage, { backgroundColor: useThemeColor({}, 'backgroundSecondary') }]} />}
       </Pressable>
     );
   };
@@ -283,23 +283,21 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
     a: A_Renderer,
   }), [P_Renderer, IMG_Renderer, A_Renderer]);
 
-  const classesStyles = {
+  const classesStyles = useMemo(() => ({
     'segment-interactable': {
       textDecorationLine: 'underline',
-      textDecorationColor: 'rgba(0, 132, 255, 0.25)', // 调浅划线颜色
+      textDecorationColor: useThemeColor({}, 'primaryTransparent'),
     },
-    'segment-liked': {
-      // 在 P_Renderer 里处理背景色更灵活，这里可以留空
-    }
-  };
+    'segment-liked': {}
+  }), [useThemeColor]);
 
-  const tagsStyles = {
+  const tagsStyles = useMemo(() => ({
     p: { color: textColor, fontSize: 18, lineHeight: 28, marginBottom: 20 },
-    b: { color: '#0084ff', fontWeight: 'bold' },
+    b: { color: useThemeColor({}, 'primary'), fontWeight: 'bold' },
     img: { borderRadius: 12, marginVertical: 10 },
     blockquote: {
       borderLeftWidth: 4,
-      borderLeftColor: '#0084ff',
+      borderLeftColor: useThemeColor({}, 'primary'),
       paddingLeft: 18,
       backgroundColor: surfaceColor + '80', // 添加半透明底色
       paddingVertical: 12,
@@ -318,15 +316,15 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
     figcaption: { color: '#999', fontSize: 13, marginTop: 8, textAlign: 'center', fontStyle: 'italic' },
     span: { color: textColor },
     div: { color: textColor },
-    a: { color: '#0084ff', textDecorationLine: 'none' },
+    a: { color: useThemeColor({}, 'primary'), textDecorationLine: 'none' },
     code: {
-      backgroundColor: 'rgba(150,150,150,0.1)',
+      backgroundColor: useThemeColor({}, 'border'),
       borderRadius: 4,
       paddingHorizontal: 4,
       fontFamily: 'monospace',
       fontSize: 14,
     },
-  } as const;
+  }), [textColor, surfaceColor, useThemeColor]);
 
   const systemFonts = [...defaultSystemFonts, 'Inter', 'Roboto'];
 
@@ -423,7 +421,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
                       router.push(`/comments/${objectId}?type=${type}${segId ? `&segmentId=${segId}` : ''}`);
                     }}
                   >
-                    <Ionicons name="chatbubble-outline" size={22} color="#0084ff" />
+                    <Ionicons name="chatbubble-outline" size={22} color={useThemeColor({}, 'primary')} />
                     <Text style={styles.statLabel}>{activeSegment?.comment_count || 0} 评论</Text>
                   </Pressable>
                 </View>
@@ -434,8 +432,8 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
                     router.push(`/comments/${objectId}?type=${type}`);
                   }}
                 >
-                  <Text style={styles.bubbleActionText}>查看详细讨论</Text>
-                  <Ionicons name="chevron-forward" size={16} color="#0084ff" />
+                  <Text type="primary" style={styles.bubbleActionText}>查看详细讨论</Text>
+                  <Ionicons name="chevron-forward" size={16} color={useThemeColor({}, 'primary')} />
                 </Pressable>
               </View>
             </TouchableWithoutFeedback>
@@ -495,9 +493,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
   },
-  activeParagraph: {
-    backgroundColor: 'rgba(0, 132, 255, 0.12)',
-  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.1)',
@@ -546,7 +541,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   bubbleActionText: {
-    color: '#0084ff',
     fontSize: 14,
     fontWeight: 'bold',
     marginRight: 4,
@@ -598,14 +592,12 @@ const styles = StyleSheet.create({
   },
   linkCardSub: {
     fontSize: 12,
-    color: '#999',
     marginLeft: 4,
   },
   linkCardImage: {
     width: 60,
     height: 60,
     borderRadius: 8,
-    backgroundColor: 'rgba(150,150,150,0.05)',
   },
   viewerCloseBtn: {
     position: 'absolute',

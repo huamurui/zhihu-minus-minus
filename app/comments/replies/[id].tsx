@@ -60,17 +60,17 @@ export default function ReplyDetailScreen() {
     const cleanContent = item.content?.replace(/<[^>]+>/g, '').trim() || '';
 
     return (
-      <View style={[styles.replyRow, { borderBottomColor: borderColor, backgroundColor: 'transparent' }]}>
+      <View type="secondary" style={[styles.replyRow, { borderBottomColor: borderColor, backgroundColor: 'transparent' }]}>
         <Pressable onPress={() => goToProfile(item.author.member.url_token || item.author.member.id)}>
           <Image source={{ uri: item.author.member.avatar_url }} style={styles.avatar} />
         </Pressable>
-        <View style={[styles.contentBox, { backgroundColor: 'transparent' }]}>
+        <View type="secondary" style={[styles.contentBox, { backgroundColor: 'transparent' }]}>
           <Text style={styles.authorName}>
             <Text onPress={() => goToProfile(item.author.member.url_token || item.author.member.id)}>
               {item.author.member.name}
             </Text>
             {item.reply_to_author && (
-              <Text type="secondary" style={styles.replyToText}> 回复 <Text style={styles.replyTargetName} onPress={() => goToProfile(item.reply_to_author.member.url_token || item.reply_to_author.member.id)}>{item.reply_to_author.member.name}</Text></Text>
+              <Text type="secondary" style={styles.replyToText}> 回复 <Text type="primary" style={styles.replyTargetName} onPress={() => goToProfile(item.reply_to_author.member.url_token || item.reply_to_author.member.id)}>{item.reply_to_author.member.name}</Text></Text>
             )}
           </Text>
           <Text style={[styles.content, { color: textColor }]}>
@@ -97,7 +97,7 @@ export default function ReplyDetailScreen() {
                 }}
                 style={styles.replyBtn}
               >
-                <Text style={styles.replyActionText}>回复</Text>
+                <Text type="secondary" style={styles.replyActionText}>回复</Text>
               </Pressable>
             </View>
           </View>
@@ -107,7 +107,7 @@ export default function ReplyDetailScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View type="secondary" style={styles.container}>
       <Stack.Screen options={{ title: '所有回复' }} />
       <View style={StyleSheet.absoluteFill}>
         <FlashList
@@ -121,14 +121,14 @@ export default function ReplyDetailScreen() {
           keyboardDismissMode="on-drag"
           ListEmptyComponent={
             isLoading ? (
-              <View style={styles.center}><ActivityIndicator color="#0084ff" /></View>
+              <View style={[styles.center, { backgroundColor: 'transparent' }]}><ActivityIndicator color={tintColor} /></View>
             ) : (
-              <View style={styles.center}><Text type="secondary">暂无回复喵~</Text></View>
+              <View style={[styles.center, { backgroundColor: 'transparent' }]}><Text type="secondary">暂无回复喵~</Text></View>
             )
           }
         />
       </View>
-      
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
         style={styles.floatingKAV}
@@ -136,12 +136,12 @@ export default function ReplyDetailScreen() {
         pointerEvents="box-none"
       >
         <View style={styles.floatingInputWrapper} pointerEvents="box-none">
-          <BlurView 
-            intensity={100} 
-            tint={colorScheme === 'dark' ? 'dark' : 'light'} 
+          <BlurView
+            intensity={100}
+            tint={colorScheme === 'dark' ? 'dark' : 'light'}
             style={[
-              styles.capsuleWrapper, 
-              { 
+              styles.capsuleWrapper,
+              {
                 borderColor,
                 backgroundColor: colorScheme === 'dark' ? 'rgba(26,26,26,0.85)' : 'rgba(255,255,255,0.9)'
               }
@@ -151,7 +151,7 @@ export default function ReplyDetailScreen() {
               <View style={styles.replyHeaderFloating}>
                 <Text type="secondary" style={styles.replyHintText}>正在回复 {replyTo.name}</Text>
                 <Pressable onPress={() => setReplyTo(null)}>
-                  <Ionicons name="close-circle" size={16} color="#999" />
+                  <Ionicons name="close-circle" size={16} color={useThemeColor({}, 'textSecondary')} />
                 </Pressable>
               </View>
             )}
@@ -188,18 +188,18 @@ export default function ReplyDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   flex: { flex: 1 },
-  replyRow: { flexDirection: 'row', padding: 15, borderBottomWidth: 0.5 },
+  replyRow: { flexDirection: 'row', padding: 15, borderBottomWidth: StyleSheet.hairlineWidth },
   avatar: { width: 32, height: 32, borderRadius: 16 },
   contentBox: { flex: 1, marginLeft: 12 },
   authorName: { fontWeight: 'bold', fontSize: 13, marginBottom: 4 },
-  replyToText: { fontWeight: 'normal', color: '#999' },
-  replyTargetName: { color: '#0084ff' },
+  replyToText: { fontWeight: 'normal' },
+  replyTargetName: {},
   content: { fontSize: 15, lineHeight: 22 },
   footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
-  time: { fontSize: 12, color: '#999' },
+  time: { fontSize: 12 },
   actionRow: { flexDirection: 'row', alignItems: 'center' },
   replyBtn: { marginLeft: 15 },
-  replyActionText: { fontSize: 12, color: '#888', paddingVertical: 5 },
+  replyActionText: { fontSize: 12, paddingVertical: 5 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 50 },
   inputPill: {
     flexDirection: 'row',

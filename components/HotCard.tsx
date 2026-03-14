@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { Image, Pressable, StyleSheet } from 'react-native';
-import { Text, View } from './Themed';
+import { Text, useThemeColor, View } from './Themed';
 
 export interface HotItem {
     id: string;
@@ -15,11 +15,14 @@ export interface HotItem {
 export const HotCard = ({ item }: { item: HotItem }) => {
     const router = useRouter();
 
+    const theme = useThemeColor({}, 'backgroundSecondary');
     return (
         <Pressable
+
             onPress={() => router.push(`/question/${item.questionId}`)}
             style={({ pressed }) => [
                 styles.card,
+                { backgroundColor: theme },
                 { opacity: pressed ? 0.7 : 1 }
             ]}
         >
@@ -59,7 +62,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 15,
         flexDirection: 'row',
         borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: '#eee',
+        borderBottomColor: useThemeColor({}, 'border'),
         backgroundColor: 'transparent',
     },
     rankContainer: {

@@ -81,9 +81,12 @@ const AnswerItem = forwardRef(({
           </View>
         </Pressable>
         {!item.relationship?.is_author && (
-          <Pressable style={[styles.followBtn, item.author?.is_following && styles.followBtnActive]} onPress={() => followMutation.mutate()}>
-            <Text style={[styles.followText, item.author?.is_following && styles.followTextActive]}>
-              {item.author?.is_following ? '已关注' : '+ 关注'}
+          <Pressable 
+            style={[styles.followBtn, item.author?.is_following && { backgroundColor: 'transparent', borderColor: useThemeColor({}, 'border'), borderWidth: 1 }]} 
+            onPress={() => followMutation.mutate()}
+          >
+            <Text style={[styles.followText, item.author?.is_following && { color: useThemeColor({}, 'textSecondary') }]}>
+              {item.author?.is_following ? '已关注' : '关注'}
             </Text>
           </Pressable>
         )}
@@ -95,14 +98,14 @@ const AnswerItem = forwardRef(({
             <ZhihuContent objectId={item.id} type="answer" content={item.content} segmentInfos={item.segment_infos} />
             {isLongContent && (
               <Pressable onPress={() => onToggle(item.id.toString(), false)} style={styles.collapseBtn}>
-                <Text style={styles.collapseText}>收起回答</Text><Ionicons name="chevron-up" size={14} color="#0084ff" />
+                <Text type="primary" style={styles.collapseText}>收起回答</Text><Ionicons name="chevron-up" size={14} color={useThemeColor({}, 'primary')} />
               </Pressable>
             )}
           </View>
         ) : (
           <Pressable onPress={() => onToggle(item.id.toString(), true)} style={{ flexDirection: 'row', flex: 1 }}>
             <Text style={[styles.excerpt, { color: textColor }]}>
-              {excerpt}{isLongContent && <Text style={styles.expandLabel}> 阅读全文</Text>}
+              {excerpt}{isLongContent && <Text type="primary" style={styles.expandLabel}> 阅读全文</Text>}
             </Text>
             {(item.thumbnail || item.content_img?.length > 0) ? (
               <Image source={{ uri: item.thumbnail || item.content_img[0] }} style={styles.contentImage} resizeMode="cover" />
@@ -112,17 +115,17 @@ const AnswerItem = forwardRef(({
       </View>
 
       {/* 使用 NativeView 确保 ref measure 可用 */}
-      <NativeView ref={footerRef} style={[styles.footer, { borderTopWidth: 0.5, borderTopColor: '#eee', paddingHorizontal: 4 }]}>
+      <NativeView ref={footerRef} style={[styles.footer, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: useThemeColor({}, 'border'), paddingHorizontal: 4 }]}>
         <View style={styles.voteGroup}>
           <LikeButton id={item.id} count={item.voteup_count} voted={item.relationship?.voting} type="answers" variant="minimal" />
         </View>
         <Pressable style={styles.commentBtn} onPress={() => router.push({ pathname: '/comments/[id]', params: { id: item.id, type: 'answer', count: item.comment_count } } as any)}>
-          <Ionicons name="chatbubble-outline" size={18} color="#888" /><Text type="secondary" style={styles.commentCount}>{item.comment_count}</Text>
+          <Ionicons name="chatbubble-outline" size={18} color={useThemeColor({}, 'textSecondary')} /><Text type="secondary" style={styles.commentCount}>{item.comment_count}</Text>
         </Pressable>
         {item.relationship?.is_author && (
-          <Pressable style={styles.deleteBtn} onPress={handleDelete}><Ionicons name="trash-outline" size={18} color="#ff4d4f" /></Pressable>
+          <Pressable style={styles.deleteBtn} onPress={handleDelete}><Ionicons name="trash-outline" size={18} color={useThemeColor({}, 'danger')} /></Pressable>
         )}
-        <Ionicons name="share-social-outline" size={18} color="#888" style={{ marginLeft: 'auto' }} />
+        <Ionicons name="share-social-outline" size={18} color={useThemeColor({}, 'textSecondary')} style={{ marginLeft: 'auto' }} />
       </NativeView>
     </View>
   );
@@ -290,22 +293,29 @@ export default function QuestionDetail() {
         <Text style={styles.title}>{question?.title || initialTitle || '加载中...'}</Text>
       </Reanimated.View>
       {qLoading ? (
-        <View style={{ height: 100, justifyContent: 'center' }}><ActivityIndicator size="small" color="#0084ff" /></View>
+        <View style={{ height: 100, justifyContent: 'center' }}><ActivityIndicator size="small" color={useThemeColor({}, 'primary')} /></View>
       ) : (
         <>
           {question?.topics && <View style={styles.topicsRow}>{question.topics.map((t: any) => <View key={t.id} style={styles.topicBadge}><Text style={styles.topicText}>{t.name}</Text></View>)}</View>}
           {question?.excerpt && <Text type="secondary" style={styles.qExcerpt}>{question.excerpt.replace(/<[^>]+>/g, '')}</Text>}
           <View style={styles.qMetaRow}><Text type="secondary" style={styles.qMetaText}>{question?.follower_count || 0} 关注 · {question?.visit_count || 0} 浏览</Text></View>
           <View style={styles.qActionRow}>
-            <Pressable style={[styles.qActionBtn, question?.relationship?.is_following && styles.qActionBtnActive]} onPress={() => followMutation.mutate()}><Text style={[styles.qActionBtnText, question?.relationship?.is_following && styles.qActionBtnTextActive]}>{question?.relationship?.is_following ? '已关注' : '关注问题'}</Text></Pressable>
+            <Pressable 
+              style={[styles.qActionBtn, question?.relationship?.is_following && { backgroundColor: 'transparent', borderWidth: 1, borderColor: useThemeColor({}, 'border') }]} 
+              onPress={() => followMutation.mutate()}
+            >
+              <Text style={[styles.qActionBtnText, question?.relationship?.is_following && { color: useThemeColor({}, 'textSecondary') }]}>
+                {question?.relationship?.is_following ? '已关注' : '关注问题'}
+              </Text>
+            </Pressable>
             <Pressable style={styles.qActionBtn} onPress={() => router.push({ pathname: '/comments/[id]', params: { id, type: 'question', count: question?.comment_count || 0 } } as any)}><Text style={styles.qActionBtnText}>{question?.comment_count || 0} 条评论</Text></Pressable>
             <Pressable style={styles.qActionBtn} onPress={() => router.push(`/question/write/${id}`)}><Text style={styles.qActionBtnText}>写回答</Text></Pressable>
           </View>
           <View style={styles.qStats}>
             <Text style={styles.qStatText}>{question?.answer_count || 0} 个回答</Text>
             <View style={styles.sortContainer}>
-              <Pressable onPress={() => setSortBy('default')} style={[styles.sortBtn, sortBy === 'default' && styles.sortBtnActive]}><Text style={[styles.sortText, sortBy === 'default' && styles.sortTextActive]}>默认</Text></Pressable>
-              <Pressable onPress={() => setSortBy('created')} style={[styles.sortBtn, sortBy === 'created' && styles.sortBtnActive]}><Text style={[styles.sortText, sortBy === 'created' && styles.sortTextActive]}>时间</Text></Pressable>
+              <Pressable onPress={() => setSortBy('default')} style={[styles.sortBtn, sortBy === 'default' && { borderBottomWidth: 2, borderBottomColor: useThemeColor({}, 'primary') }]}><Text type={sortBy === 'default' ? 'primary' : 'secondary'} style={[styles.sortText, sortBy === 'default' && { fontWeight: 'bold' }]}>默认</Text></Pressable>
+              <Pressable onPress={() => setSortBy('created')} style={[styles.sortBtn, sortBy === 'created' && { borderBottomWidth: 2, borderBottomColor: useThemeColor({}, 'primary') }]}><Text type={sortBy === 'created' ? 'primary' : 'secondary'} style={[styles.sortText, sortBy === 'created' && { fontWeight: 'bold' }]}>时间</Text></Pressable>
             </View>
           </View>
         </>
@@ -345,7 +355,7 @@ export default function QuestionDetail() {
         viewabilityConfig={viewabilityConfig}
         onEndReached={() => hasNextPage && !isFetchingNextPage && fetchNextPage()}
         onEndReachedThreshold={0.5}
-        ListFooterComponent={() => isFetchingNextPage ? <ActivityIndicator style={{ marginVertical: 20 }} color="#0084ff" /> : (answers.length > 0 && !hasNextPage ? <Text type="secondary" style={{ textAlign: 'center', marginVertical: 20 }}>— 没有更多回答了 —</Text> : null)}
+        ListFooterComponent={() => isFetchingNextPage ? <ActivityIndicator style={{ marginVertical: 20 }} color={useThemeColor({}, 'primary')} /> : (answers.length > 0 && !hasNextPage ? <Text type="secondary" style={{ textAlign: 'center', marginVertical: 20 }}>— 没有更多回答了 —</Text> : null)}
         onRefresh={refetch}
         refreshing={isRefetching}
       />
@@ -363,12 +373,12 @@ export default function QuestionDetail() {
             <View style={styles.floatLeft}>
               <LikeButton id={activeItem?.id} count={activeItem?.voteup_count || 0} voted={activeItem?.relationship?.voting} type="answers" variant="ghost" />
               <Pressable style={styles.floatComment} onPress={() => router.push({ pathname: '/comments/[id]', params: { id: activeItem?.id, type: 'answer', count: activeItem?.comment_count } } as any)}>
-                <Ionicons name="chatbubble-outline" size={20} color="#0084ff" /><Text style={styles.floatStatText}>{activeItem?.comment_count || 0}</Text>
+                <Ionicons name="chatbubble-outline" size={20} color={useThemeColor({}, 'primary')} /><Text type="primary" style={styles.floatStatText}>{activeItem?.comment_count || 0}</Text>
               </Pressable>
             </View>
-            <View style={styles.floatDivider} />
+            <View style={[styles.floatDivider, { backgroundColor: useThemeColor({}, 'primaryTransparent') }]} />
             <Pressable style={styles.floatCollapse} onPress={() => activeItem && toggleExpand(activeItem.id.toString(), false)}>
-              <Text style={styles.collapseHint}>收起回答</Text><Ionicons name="chevron-up" size={16} color="#0084ff" />
+              <Text type="primary" style={styles.collapseHint}>收起回答</Text><Ionicons name="chevron-up" size={16} color={useThemeColor({}, 'primary')} />
             </Pressable>
           </View>
         </BlurView>
@@ -383,22 +393,22 @@ const styles = StyleSheet.create({
   title: { fontSize: 21, fontWeight: 'bold', lineHeight: 28 },
   qExcerpt: { marginTop: 10, fontSize: 14, lineHeight: 20 },
   qStats: { marginTop: 15, paddingTop: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  qStatText: { color: '#888', fontWeight: '500' },
+  qStatText: { fontWeight: '500' },
   sortContainer: { flexDirection: 'row', alignItems: 'center' },
   sortBtn: { marginLeft: 15, paddingVertical: 2, paddingHorizontal: 4 },
-  sortBtnActive: { borderBottomWidth: 2, borderBottomColor: '#0084ff' },
-  sortText: { fontSize: 13, color: '#888' },
-  sortTextActive: { color: '#0084ff', fontWeight: 'bold' },
+  sortBtnActive: {},
+  sortText: { fontSize: 13 },
+  sortTextActive: { fontWeight: 'bold' },
   topicsRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 },
   topicBadge: { backgroundColor: 'rgba(0,132,255,0.1)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 15, marginRight: 8, marginBottom: 5 },
-  topicText: { color: '#0084ff', fontSize: 12 },
+  topicText: { fontSize: 12 },
   qMetaRow: { marginTop: 12 },
   qMetaText: { fontSize: 13 },
   qActionRow: { flexDirection: 'row', marginTop: 15, gap: 10 },
   qActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,132,255,0.05)', paddingVertical: 8, borderRadius: 6 },
-  qActionBtnActive: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#eee' },
-  qActionBtnText: { color: '#0084ff', fontSize: 14, fontWeight: '500' },
-  qActionBtnTextActive: { color: '#888' },
+  qActionBtnActive: { backgroundColor: 'transparent', borderWidth: 1 },
+  qActionBtnText: { fontSize: 14, fontWeight: '500' },
+  qActionBtnTextActive: {},
   card: { padding: 15, marginBottom: 6 },
   authorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   avatar: { width: 34, height: 34, borderRadius: 17 },
@@ -406,12 +416,10 @@ const styles = StyleSheet.create({
   authorName: { fontSize: 15, fontWeight: 'bold' },
   authorHeadline: { fontSize: 12, marginTop: 2 },
   followBtn: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 15, backgroundColor: 'rgba(0,132,255,0.08)' },
-  followBtnActive: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#eee' },
-  followText: { color: '#0084ff', fontSize: 13, fontWeight: 'bold' },
-  followTextActive: { color: '#999' },
+  followText: { fontSize: 13, fontWeight: 'bold' },
   contentContainer: { marginVertical: 5 },
   excerpt: { fontSize: 15, lineHeight: 24, flex: 1 },
-  expandLabel: { color: '#0084ff', fontWeight: '500' },
+  expandLabel: { fontWeight: '500' },
   contentImage: { width: 80, height: 60, borderRadius: 4, marginLeft: 12 },
   collapseBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, marginTop: 5 },
   collapseText: { color: '#0084ff', fontSize: 13, fontWeight: 'bold', marginRight: 4 },
@@ -429,8 +437,8 @@ const styles = StyleSheet.create({
   floatingInner: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, justifyContent: 'space-between' },
   floatLeft: { flexDirection: 'row', alignItems: 'center' },
   floatComment: { flexDirection: 'row', alignItems: 'center', marginLeft: 20 },
-  floatStatText: { marginLeft: 6, color: '#0084ff', fontWeight: '600', fontSize: 14 },
-  floatDivider: { width: 1, height: 20, backgroundColor: 'rgba(0,132,255,0.1)', marginHorizontal: 10 },
+  floatStatText: { marginLeft: 6, fontWeight: '600', fontSize: 14 },
+  floatDivider: { width: 1, height: 20, marginHorizontal: 10 },
   floatCollapse: { flexDirection: 'row', alignItems: 'center' },
-  collapseHint: { color: '#0084ff', fontSize: 14, fontWeight: 'bold', marginRight: 4 }
+  collapseHint: { fontSize: 14, fontWeight: 'bold', marginRight: 4 }
 });

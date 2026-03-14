@@ -122,13 +122,13 @@ export default function CommentScreen() {
                   <View key={child.id} style={styles.childCommentRow}>
                     <Image source={{ uri: child.author?.member?.avatar_url }} style={styles.childAvatar} />
                     <Text style={styles.replyText} numberOfLines={2}>
-                      <Text style={styles.bold}>{child.author?.member?.name}：</Text>
+                      <Text type="secondary" style={styles.bold}>{child.author?.member?.name}：</Text>
                       {child.content?.replace(/<[^>]+>/g, '').trim()}
                     </Text>
                   </View>
                 ))}
                 <View style={[styles.moreRepliesBtn, { backgroundColor: borderColor }]}>
-                  <Text style={styles.moreReplies}>查看全部 {item.child_comment_count} 条回复 {'>'}</Text>
+                  <Text type="secondary" style={styles.moreReplies}>查看全部 {item.child_comment_count} 条回复 {'>'}</Text>
                 </View>
               </Pressable>
             )}
@@ -153,7 +153,7 @@ export default function CommentScreen() {
                   }}
                   style={styles.replyBtn}
                 >
-                  <Text style={styles.replyAction}>回复</Text>
+                  <Text type="secondary" style={styles.replyAction}>回复</Text>
                 </Pressable>
               </View>
             </View>
@@ -179,9 +179,9 @@ export default function CommentScreen() {
           contentContainerStyle={{ paddingBottom: 160, paddingTop: 10 }} // 预留底部空间
           ListEmptyComponent={
             isLoading ? (
-              <View style={styles.placeholder}><ActivityIndicator size="large" color="#0084ff" /></View>
+              <View style={[styles.placeholder, { backgroundColor: 'transparent' }]}><ActivityIndicator size="large" color={tintColor} /></View>
             ) : (
-              <View style={styles.placeholder}><Text type="secondary">暂无评论 喵~</Text></View>
+              <View style={[styles.placeholder, { backgroundColor: 'transparent' }]}><Text type="secondary">暂无评论 喵~</Text></View>
             )
           }
         />
@@ -209,7 +209,7 @@ export default function CommentScreen() {
               <View style={styles.replyHeaderFloating}>
                 <Text type="secondary" style={styles.replyHint}>正在回复 {replyTo.name}</Text>
                 <Pressable onPress={() => setReplyTo(null)}>
-                  <Ionicons name="close-circle" size={16} color="#999" />
+                  <Ionicons name="close-circle" size={16} color={useThemeColor({}, 'textSecondary')} />
                 </Pressable>
               </View>
             )}
@@ -299,14 +299,14 @@ const styles = StyleSheet.create({
   content: { fontSize: 15, lineHeight: 22, marginTop: 4 },
   commentFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
   actionRow: { flexDirection: 'row', alignItems: 'center' },
-  time: { fontSize: 12, color: '#999' },
+  time: { fontSize: 12 },
   replyBtn: { marginLeft: 15 },
-  replyAction: { fontSize: 12, color: '#888', paddingVertical: 5 },
+  replyAction: { fontSize: 12, paddingVertical: 5 },
   replyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15, paddingTop: 10 },
   replyHint: { fontSize: 12 },
   replyPreview: { marginTop: 10, padding: 10, borderRadius: 8 },
   replyText: { fontSize: 14, lineHeight: 20, marginBottom: 5 },
-  bold: { fontWeight: 'bold', color: '#666' },
+  bold: { fontWeight: 'bold' },
   moreRepliesBtn: {
     paddingVertical: 5,
     paddingHorizontal: 12,
@@ -314,8 +314,8 @@ const styles = StyleSheet.create({
     marginTop: 8,
     alignSelf: 'flex-start',
   },
-  moreReplies: { color: '#888', fontSize: 12, fontWeight: '500' },
-  childCommentRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8, marginRight: 10 },
+  moreReplies: { fontSize: 12, fontWeight: '500' },
+  childCommentRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8, marginRight: 10, backgroundColor: 'transparent' },
   childAvatar: { width: 18, height: 18, borderRadius: 9, marginRight: 8 },
   placeholder: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 100 }
 });

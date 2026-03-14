@@ -30,21 +30,33 @@ export function useThemeColor(
   }
 }
 
-export function Text(props: TextProps & { type?: 'default' | 'secondary' }) {
+export function Text(props: TextProps & { type?: 'default' | 'secondary' | 'tertiary' | 'primary' | 'danger' }) {
   const { style, lightColor, darkColor, type = 'default', ...otherProps } = props;
-  const colorName = type === 'secondary' ? 'textSecondary' : 'text';
+
+  let colorName: keyof typeof Colors.light & keyof typeof Colors.dark = 'text';
+  if (type === 'secondary') colorName = 'textSecondary';
+  else if (type === 'tertiary') colorName = 'textTertiary';
+  else if (type === 'primary') colorName = 'primary';
+  else if (type === 'danger') colorName = 'danger';
+
   const color = useThemeColor({ light: lightColor, dark: darkColor }, colorName);
 
   return <DefaultText style={[{ color }, style]} {...otherProps} />;
 }
 
-export function View(props: ViewProps & { type?: 'default' | 'surface' | 'border' }) {
+export function View(props: ViewProps & { type?: 'default' | 'surface' | 'border' | 'secondary' | 'tertiary' | 'divider' | 'primaryTransparent' }) {
   const { style, lightColor, darkColor, type, ...otherProps } = props;
 
   let backgroundColor: string | undefined;
 
   if (type) {
-    const colorName = type === 'surface' ? 'surface' : type === 'border' ? 'border' : 'background';
+    let colorName: keyof typeof Colors.light & keyof typeof Colors.dark = 'background';
+    if (type === 'surface' || type === 'secondary') colorName = 'backgroundSecondary';
+    else if (type === 'border') colorName = 'border';
+    else if (type === 'tertiary') colorName = 'backgroundTertiary';
+    else if (type === 'divider') colorName = 'divider';
+    else if (type === 'primaryTransparent') colorName = 'primaryTransparent';
+
     backgroundColor = useThemeColor({ light: lightColor, dark: darkColor }, colorName);
   }
 

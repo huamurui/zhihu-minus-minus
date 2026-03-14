@@ -33,7 +33,7 @@ export default function ArticleDetail() {
 
   if (isLoading) return (
     <View style={styles.center}>
-      <ActivityIndicator size="large" color="#0084ff" />
+      <ActivityIndicator size="large" color={useThemeColor({}, 'primary')} />
       <Text style={{ marginTop: 12 }}>正赶往知识的荒原...喵</Text>
     </View>
   );
@@ -87,8 +87,8 @@ export default function ArticleDetail() {
             style={[styles.commentBtn, { backgroundColor: surfaceColor }]}
             onPress={() => router.push(`/comments/${id}?type=article`)}
           >
-            <Ionicons name="chatbubble-outline" size={18} color="#0084ff" />
-            <Text style={styles.commentBtnText}>查看全部 {data.comment_count || 0} 条评论</Text>
+            <Ionicons name="chatbubble-outline" size={18} color={useThemeColor({}, 'primary')} />
+            <Text type="primary" style={styles.commentBtnText}>查看全部 {data.comment_count || 0} 条评论</Text>
           </Pressable>
         </View>
       )}
@@ -103,8 +103,8 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { width: '100%', height: 300, position: 'relative' },
   topImage: { width: '100%', height: '100%' },
-  overlay: { position: 'absolute', bottom: 0, padding: 20, width: '100%', backgroundColor: 'rgba(0,0,0,0.4)' },
-  topTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
+  overlay: { position: 'absolute', bottom: 0, padding: 20, width: '100%', backgroundColor: 'rgba(0,0,0,0.5)' },
+  topTitle: { color: '#ffffff', fontSize: 22, fontWeight: 'bold' },
   imageSource: { color: 'rgba(255,255,255,0.7)', fontSize: 10, textAlign: 'right', marginTop: 8 },
   // 知乎普通文章头部
   zhihuArticleHeader: { padding: 20, paddingTop: 30 },
@@ -113,10 +113,10 @@ const styles = StyleSheet.create({
   authorAvatar: { width: 44, height: 44, borderRadius: 22 },
   authorInfo: { marginLeft: 12, flex: 1 },
   authorName: { fontSize: 16, fontWeight: 'bold' },
-  authorHeadline: { fontSize: 13, color: '#999', marginTop: 2 },
+  authorHeadline: { fontSize: 13, marginTop: 2 },
   // 底部信息
-  footerInfo: { padding: 20, marginTop: 20, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(150,150,150,0.2)' },
+  footerInfo: { padding: 20, marginTop: 20, borderTopWidth: StyleSheet.hairlineWidth },
   statsText: { fontSize: 14, marginBottom: 15 },
   commentBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 15, borderRadius: 12 },
-  commentBtnText: { color: '#0084ff', fontWeight: 'bold', marginLeft: 8, fontSize: 15 },
+  commentBtnText: { fontWeight: 'bold', marginLeft: 8, fontSize: 15 },
 });

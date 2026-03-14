@@ -154,7 +154,7 @@ export default function UserDetailScreen() {
                 {parts.map((part, i) => {
                     if (part.startsWith('[[EM]]') && part.endsWith('[[/EM]]')) {
                         return (
-                            <Text key={i} style={{ color: highlightColor, fontWeight: 'bold' }}>
+                            <Text key={i} type="primary" style={{ fontWeight: 'bold' }}>
                                 {part.replace(/\[\[\/?EM\]\]/g, '')}
                             </Text>
                         );
@@ -198,21 +198,22 @@ export default function UserDetailScreen() {
                         sharedTransitionTag={`avatar-${user?.url_token || id}`}
                     />
                     {!isMe && (
-                        <Pressable
-                            onPress={handleFollow}
-                            style={[
-                                styles.followBtn,
-                                user?.is_following ? styles.followedBtn : { backgroundColor: primaryColor }
-                            ]}
-                        >
-                            {followLoading ? (
-                                <ActivityIndicator size="small" color={user?.is_following ? "#888" : "#fff"} />
-                            ) : (
-                                <Text style={[styles.followBtnText, user?.is_following && { color: '#888' }]}>
-                                    {user?.is_following ? '已关注' : '+ 关注'}
-                                </Text>
-                            )}
-                        </Pressable>
+                  <Pressable 
+                    style={[
+                        styles.followBtn, 
+                        user?.is_following ? { backgroundColor: 'transparent', borderColor: useThemeColor({}, 'border'), borderWidth: 1 } : { backgroundColor: useThemeColor({}, 'primary') }
+                    ]}
+                    onPress={handleFollow}
+                    disabled={followLoading}
+                  >
+                    {followLoading ? (
+                        <ActivityIndicator size="small" color={user?.is_following ? useThemeColor({}, 'textSecondary') : "#fff"} />
+                    ) : (
+                        <Text style={[styles.followBtnText, user?.is_following && { color: useThemeColor({}, 'textSecondary') }]}>
+                            {user?.is_following ? '已关注' : '关注'}
+                        </Text>
+                    )}
+                  </Pressable>
                     )}
                 </View>
                 <Text style={styles.name}>{user?.name}</Text>
@@ -257,21 +258,21 @@ export default function UserDetailScreen() {
 
             {/* 创作搜索栏 */}
             <View type="surface" style={styles.searchBarRow}>
-                <View style={[styles.searchBarContainer, { backgroundColor: borderColor + '22' }]}>
-                    <Ionicons name="search" size={16} color="#999" style={{ marginLeft: 10 }} />
-                    <TextInput
-                        style={[styles.searchInput, { color: useThemeColor({}, 'text') }]}
+                <View style={[styles.searchBar, { backgroundColor: useThemeColor({}, 'backgroundTertiary') }]}>
+                <Ionicons name="search" size={16} color={useThemeColor({}, 'textTertiary')} style={{ marginLeft: 10 }} />
+                <TextInput
+                    style={[styles.searchInput, { color: useThemeColor({}, 'text') }]}
                         placeholder={`搜索 ${user?.name || '用户'} 的创作...`}
-                        placeholderTextColor="#999"
+                        placeholderTextColor={useThemeColor({}, 'textTertiary')}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         returnKeyType="search"
                     />
-                    {searchQuery.length > 0 && (
-                        <Pressable onPress={() => setSearchQuery('')} style={{ marginRight: 10 }}>
-                            <Ionicons name="close-circle" size={16} color="#ccc" />
-                        </Pressable>
-                    )}
+                  {isSearching && searchQuery.length > 0 && (
+                    <Pressable onPress={() => setSearchQuery('')} style={{ padding: 5 }}>
+                        <Ionicons name="close-circle" size={16} color={useThemeColor({}, 'textTertiary')} />
+                    </Pressable>
+                )}
                 </View>
             </View>
 
@@ -313,7 +314,7 @@ export default function UserDetailScreen() {
                                 onPress={() => setSortBy(item.key as any)}
                                 style={[styles.sortItem, sortBy === item.key && styles.activeSortItem]}
                             >
-                                <Text style={[styles.sortText, sortBy === item.key && { color: primaryColor, fontWeight: 'bold' }]}>
+                                <Text type={sortBy === item.key ? 'primary' : 'secondary'} style={[styles.sortText, sortBy === item.key && { fontWeight: 'bold' }]}>
                                     {item.label}
                                 </Text>
                             </Pressable>
@@ -391,7 +392,7 @@ export default function UserDetailScreen() {
                 ListHeaderComponent={renderHeader}
                 ListFooterComponent={() => (
                     (isFetchingNextPage || isFetchingNextSearchPage) ? (
-                        <ActivityIndicator style={{ margin: 20 }} color={primaryColor} />
+                        <ActivityIndicator style={{ margin: 20 }} color={useThemeColor({}, 'primary')} />
                     ) : (
                         currentListItems.length > 0 && !(isSearching ? hasNextSearchPage : hasNextPage) ? (
                             <Text type="secondary" style={styles.footerMsg}>— 已经到底了喵 —</Text>
@@ -401,7 +402,7 @@ export default function UserDetailScreen() {
                 ListEmptyComponent={() => (
                     <View style={styles.empty}>
                         {listLoading || searchLoading ? (
-                            <ActivityIndicator size="small" color={primaryColor} />
+                            <ActivityIndicator size="small" color={useThemeColor({}, 'primary')} />
                         ) : (
                             <Text type="secondary">{isSearching ? '没有找到匹配的创作' : '这里空空如也喵'}</Text>
                         )}
@@ -421,10 +422,9 @@ const styles = StyleSheet.create({
     avatarRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: -40 },
     avatar: { width: 80, height: 80, borderRadius: 40, borderWidth: 3, borderColor: '#fff' },
     followBtn: { paddingHorizontal: 20, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginBottom: 5 },
-    followedBtn: { backgroundColor: '#f0f0f0' },
     followBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
     name: { fontSize: 22, fontWeight: 'bold', marginTop: 10 },
-    headline: { marginTop: 5, fontSize: 14, color: '#666' },
+    headline: { marginTop: 5, fontSize: 14 },
     description: { marginTop: 10, fontSize: 13, lineHeight: 18 },
     statsRow: { flexDirection: 'row', marginTop: 20, borderTopWidth: 0.5, borderTopColor: '#f0f0f0', paddingTop: 15 },
     statItem: { marginRight: 30, alignItems: 'center' },
@@ -433,7 +433,7 @@ const styles = StyleSheet.create({
     footerMsg: { textAlign: 'center', padding: 20, fontSize: 12 },
     tabBar: { flexDirection: 'row' },
     tabItem: { paddingHorizontal: 20, paddingVertical: 15, alignItems: 'center' },
-    tabText: { fontWeight: 'bold', color: '#999' },
+    tabText: { fontWeight: 'bold' },
     empty: { padding: 50, alignItems: 'center', backgroundColor: 'transparent' },
     mutualRow: {
         flexDirection: 'row',
@@ -443,7 +443,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.02)',
         borderRadius: 8
     },
-    mutualText: { fontSize: 13, color: '#666' },
+    mutualText: { fontSize: 13 },
     mutualAvatar: { width: 20, height: 20, borderRadius: 10, marginLeft: 8 },
     sortBar: {
         flexDirection: 'row',
@@ -464,18 +464,20 @@ const styles = StyleSheet.create({
     },
     sortText: {
         fontSize: 13,
-        color: '#888',
     },
     searchBarRow: {
         paddingHorizontal: 15,
         paddingBottom: 15,
         paddingTop: 5,
     },
-    searchBarContainer: {
+    searchBar: {
         flexDirection: 'row',
         alignItems: 'center',
+        borderRadius: 20,
+        marginHorizontal: 15,
+        marginVertical: 10,
+        paddingRight: 10,
         height: 36,
-        borderRadius: 18,
     },
     searchInput: {
         flex: 1,

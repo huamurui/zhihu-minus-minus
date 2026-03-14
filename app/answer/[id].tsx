@@ -191,7 +191,7 @@ export default function AnswerDetailScreen() {
   const isLoading = queryLoading;
 
   return (
-    <View type="default" style={styles.container}>
+    <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* 1. 动效 Header */}
@@ -402,7 +402,7 @@ export default function AnswerDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: useThemeColor({}, 'backgroundSecondary') },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   // 问题连接
   questionHeader: {
@@ -411,8 +411,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#eee',
   },
   questionTitle: { fontSize: 18, fontWeight: 'bold', flex: 1, marginRight: 10, lineHeight: 24 },
   // 作者栏
@@ -448,8 +446,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#eee',
   },
   stickyHeaderContent: {
     height: 50,

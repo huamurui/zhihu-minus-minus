@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet } from 'react-native';
 import { Text, View } from './Themed';
+import { useThemeColor } from '@/components/Themed';
 
 export const UserCard = ({ user }: { user: any }) => {
     const router = useRouter();
@@ -33,7 +34,7 @@ export const UserCard = ({ user }: { user: any }) => {
 
     return (
         <Pressable
-            style={styles.container}
+            style={[styles.container, { borderBottomColor: useThemeColor({}, 'border') }]}
             onPress={() => router.push(`/user/${user.url_token || user.id}`)}
         >
             <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
@@ -58,14 +59,14 @@ export const UserCard = ({ user }: { user: any }) => {
                 onPress={handleFollow}
                 style={[
                     styles.followBtn,
-                    isFollowing ? styles.followedBtn : styles.unfollowedBtn
+                    isFollowing ? [styles.followedBtn, { backgroundColor: useThemeColor({}, 'backgroundSecondary'), borderColor: useThemeColor({}, 'border') }] : [styles.unfollowedBtn, { backgroundColor: useThemeColor({}, 'tint') }]
                 ]}
             >
                 {loading ? (
-                    <ActivityIndicator size="small" color={isFollowing ? "#888" : "#fff"} />
+                    <ActivityIndicator size="small" color={isFollowing ? useThemeColor({}, 'textSecondary') : useThemeColor({}, 'background')} />
                 ) : (
-                    <Text style={[styles.followText, isFollowing && { color: '#888' }]}>
-                        {isFollowing ? '已关注' : '+ 关注'}
+                    <Text style={[styles.followText, isFollowing && { color: useThemeColor({}, 'textSecondary') }]}>
+                        {isFollowing ? '已关注' : '关注'}
                     </Text>
                 )}
             </Pressable>
@@ -78,11 +79,10 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         padding: 15,
-        borderBottomWidth: 0.5,
-        borderBottomColor: 'rgba(0,0,0,0.05)',
+        borderBottomWidth: StyleSheet.hairlineWidth,
     },
     avatar: {
-        width: 44,
+        width: 48,
         height: 44,
         borderRadius: 22,
     },
@@ -100,17 +100,15 @@ const styles = StyleSheet.create({
         marginTop: 2,
     },
     followBtn: {
-        paddingHorizontal: 12,
+        paddingHorizontal: 16,
         paddingVertical: 6,
-        borderRadius: 15,
-        minWidth: 70,
+        borderRadius: 16,
+        justifyContent: 'center',
         alignItems: 'center',
     },
-    unfollowedBtn: {
-        backgroundColor: '#0084ff',
-    },
+    unfollowedBtn: {},
     followedBtn: {
-        backgroundColor: '#f6f6f6',
+        borderWidth: 1,
     },
     stats: {
         fontSize: 12,
@@ -132,6 +130,6 @@ const styles = StyleSheet.create({
     followText: {
         fontSize: 13,
         fontWeight: 'bold',
-        color: '#fff',
+        color: '#ffffff',
     }
 });
