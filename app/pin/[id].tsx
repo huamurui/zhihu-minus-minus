@@ -1,7 +1,3 @@
-import { getPin } from '@/api/zhihu/pin';
-import { followMember, unfollowMember } from '@/api/zhihu/member';
-import { LikeButton } from '@/components/LikeButton';
-import { Text, View } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -16,6 +12,10 @@ import {
 } from 'react-native';
 import RenderHtml from 'react-native-render-html';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { followMember, unfollowMember } from '@/api/zhihu/member';
+import { getPin } from '@/api/zhihu/pin';
+import { LikeButton } from '@/components/LikeButton';
+import { Text, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 

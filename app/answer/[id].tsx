@@ -1,17 +1,6 @@
-import { deleteAnswer, getAnswer } from '@/api/zhihu';
-import {
-  fastCollectAnswer,
-  getAnswerCollectionStatus,
-  removeFromCollection,
-} from '@/api/zhihu/collection';
-import { followMember, unfollowMember } from '@/api/zhihu/member';
-import { ZhihuContent } from '@/components/ZhihuContent';
-import { DownvoteButton } from '@/components/DownvoteButton';
-import { LikeButton } from '@/components/LikeButton';
-import { Text, View } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { showToast } from '@/utils/toast';
+import { BlurView } from 'expo-blur';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useRef } from 'react';
 import {
@@ -28,10 +17,23 @@ import {
 } from 'react-native';
 import Reanimated, { SharedTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
+import { deleteAnswer, getAnswer } from '@/api/zhihu';
+import {
+  fastCollectAnswer,
+  getAnswerCollectionStatus,
+  removeFromCollection,
+} from '@/api/zhihu/collection';
+import { followMember, unfollowMember } from '@/api/zhihu/member';
+import { DownvoteButton } from '@/components/DownvoteButton';
+import { LikeButton } from '@/components/LikeButton';
+import { Text, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
-
+import { ZhihuContent } from '@/components/ZhihuContent';
 import Colors from '@/constants/Colors';
+import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
+import { useScrollHeaderAnim } from '@/hooks/useScrollAnimation';
+import { showToast } from '@/utils/toast';
+
 const slowTransition = SharedTransition.duration(600);
 
 export default function AnswerDetailScreen() {
@@ -49,43 +51,16 @@ export default function AnswerDetailScreen() {
   const backgroundColor = Colors[colorScheme].background;
 
   const scrollY = useRef(new Animated.Value(0)).current;
-  const lastScrollY = useRef(0);
-  const headerVisible = useRef(new Animated.Value(0)).current;
-  const isHeaderShowRef = useRef(false);
+  const { headerVisible, handleScroll: baseHandleScroll } =
+    useScrollHeaderAnim(300);
 
   const [isLiked, setIsLiked] = React.useState(false);
   const [menuVisible, setMenuVisible] = React.useState(false);
 
   const handleScroll = (event: any) => {
-    const currentY = event.nativeEvent.contentOffset.y;
-    const diff = currentY - lastScrollY.current;
-
-    if (currentY > 300) {
-      if (diff < -15 && !isHeaderShowRef.current) {
-        isHeaderShowRef.current = true;
-        Animated.timing(headerVisible, {
-          toValue: 1,
-          duration: 250,
-          useNativeDriver: true,
-        }).start();
-      } else if (diff > 5 && isHeaderShowRef.current) {
-        isHeaderShowRef.current = false;
-        Animated.timing(headerVisible, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }).start();
-      }
-    } else if (currentY <= 100 && isHeaderShowRef.current) {
-      isHeaderShowRef.current = false;
-      Animated.timing(headerVisible, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-    }
-    lastScrollY.current = currentY;
-    scrollY.setValue(currentY);
+    baseHandleScroll(event, (currentY) => {
+      scrollY.setValue(currentY);
+    });
   };
 
   const {
@@ -97,16 +72,15 @@ export default function AnswerDetailScreen() {
     queryFn: () => getAnswer(id as string),
   });
 
-  const followMutation = useMutation({
+  const followMutation = useOptimisticToggle({
     mutationFn: async () => {
       if (answer?.author?.is_following)
         return unfollowMember(answer.author.url_token || answer.author.id);
       return followMember(answer.author.url_token || answer.author.id);
     },
-    onSuccess: () => {
-      showToast(answer?.author?.is_following ? '已取消关注' : '已关注');
-      queryClient.invalidateQueries({ queryKey: ['answer-detail', id] });
-    },
+    isActive: answer?.author?.is_following,
+    successMessage: (isActive) => (isActive ? '已取消关注' : '已关注'),
+    invalidateQueries: [['answer-detail', id]],
   });
 
   const deleteMutation = useMutation({
@@ -158,8 +132,7 @@ export default function AnswerDetailScreen() {
       refetchCollectionStatus();
       if (!isCollected)
         showToast(`已收藏到「${res?.collection?.title || '我的收藏'}」`);
-      else
-        showToast('已取消收藏');
+      else showToast('已取消收藏');
     },
     onError: (err: any) =>
       showToast(err.response?.data?.error?.message || '无法处理请求'),

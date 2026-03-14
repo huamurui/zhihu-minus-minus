@@ -1,14 +1,3 @@
-import {
-  followMember,
-  getMe,
-  getMember,
-  getMemberActivities,
-  getMemberRelations,
-  searchContent,
-  unfollowMember,
-} from '@/api/zhihu';
-import { CreationCard } from '@/components/CreationCard';
-import { Text, View } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
@@ -24,6 +13,17 @@ import {
   TextInput,
 } from 'react-native';
 import Reanimated from 'react-native-reanimated';
+import {
+  followMember,
+  getMe,
+  getMember,
+  getMemberActivities,
+  getMemberRelations,
+  searchContent,
+  unfollowMember,
+} from '@/api/zhihu';
+import { CreationCard } from '@/components/CreationCard';
+import { Text, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 

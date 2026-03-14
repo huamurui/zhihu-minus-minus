@@ -1,35 +1,34 @@
-import { useColorScheme } from '@/components/useColorScheme';
-import { useAuthStore } from '@/store/useAuthStore';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
-import React, { useRef, useState, useMemo } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   Pressable,
   StyleSheet,
-  Dimensions,
 } from 'react-native';
 import PagerView from 'react-native-pager-view';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  interpolate,
   Extrapolate,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
 } from 'react-native-reanimated';
-
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // 使用 @ 别名导入组件
 import { FEED_URLS, getFeed } from '@/api/zhihu';
+import { DailyList } from '@/components/DailyList';
 import { FeedCard } from '@/components/FeedCard';
 import { HotCard, HotItem } from '@/components/HotCard';
-import { Text, View } from '@/components/Themed';
-import { DailyList } from '@/components/DailyList';
 import { ProfileView } from '@/components/ProfileView';
 import { PublishView } from '@/components/PublishView';
+import { Text, View } from '@/components/Themed';
+import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
+import { useAuthStore } from '@/store/useAuthStore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 

@@ -1,7 +1,3 @@
-import { getDailyBefore, getDailyLatest } from '@/api/zhihu';
-import { Text, View } from '@/components/Themed';
-import Colors from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
@@ -14,6 +10,10 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
+import { getDailyBefore, getDailyLatest } from '@/api/zhihu';
+import { Text, View } from '@/components/Themed';
+import { useColorScheme } from '@/components/useColorScheme';
+import Colors from '@/constants/Colors';
 
 const { width } = Dimensions.get('window');
 

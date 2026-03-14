@@ -1,11 +1,10 @@
-import { followMember, unfollowMember } from '@/api/zhihu';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Image, Pressable } from 'react-native';
-import { Text, View } from './Themed';
+import { followMember, unfollowMember } from '@/api/zhihu';
 import { useColorScheme } from '@/components/useColorScheme';
-
 import Colors from '@/constants/Colors';
+import { Text, View } from './Themed';
 export const UserCard = ({ user }: { user: any }) => {
   const router = useRouter();
   const [isFollowing, setIsFollowing] = useState(user.is_following);

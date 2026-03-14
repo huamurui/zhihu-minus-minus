@@ -1,6 +1,6 @@
-import { useAuthStore } from '@/store/useAuthStore';
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
+import { useAuthStore } from '@/store/useAuthStore';
 import { signRequest96, ZSE_VERSION } from './zse96/index';
 
 const apiClient = axios.create({

@@ -1,9 +1,9 @@
-import { Text, View } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { Pressable } from 'react-native';
 import Animated from 'react-native-reanimated';
+import { Text, View } from '@/components/Themed';
 import { LikeButton } from './LikeButton';
 
 export const CreationCard = ({

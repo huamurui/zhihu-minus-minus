@@ -1,12 +1,8 @@
-import { createCommentReply, getChildComments } from '@/api/zhihu';
-import { LikeButton } from '@/components/LikeButton';
-import { Text, View } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
-import { useColorScheme } from '@/components/useColorScheme';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -19,6 +15,10 @@ import {
   TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { createCommentReply, getChildComments } from '@/api/zhihu';
+import { LikeButton } from '@/components/LikeButton';
+import { Text, View } from '@/components/Themed';
+import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 
 export default function ReplyDetailScreen() {

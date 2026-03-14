@@ -1,13 +1,13 @@
-import { getMyLikes } from '@/api/zhihu';
-import { CreationCard } from '@/components/CreationCard';
-import { Text, View } from '@/components/Themed';
 import { FlashList } from '@shopify/flash-list';
-import { useInfiniteQuery } from '@tanstack/react-query';
 import { useNavigation } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
+import { getMyLikes } from '@/api/zhihu';
+import { CreationCard } from '@/components/CreationCard';
+import { Text, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
+import { useZhihuInfiniteQuery } from '@/hooks/useZhihuInfiniteQuery';
 
 export default function MyLikesScreen() {
   const colorScheme = useColorScheme();
@@ -28,20 +28,14 @@ export default function MyLikesScreen() {
     isFetchingNextPage,
     refetch,
     isRefetching,
-  } = useInfiniteQuery({
+  } = useZhihuInfiniteQuery({
     queryKey: ['my-likes', activeTab],
     queryFn: ({ pageParam = 0 }) =>
       getMyLikes(activeTab, 20, pageParam as number),
     initialPageParam: 0,
-    getNextPageParam: (lastPage) => {
-      if (!lastPage || lastPage.paging?.is_end) return undefined;
-      const nextUrl = lastPage.paging?.next;
-      const match = nextUrl?.match(/offset=(\d+)/);
-      return match ? parseInt(match[1]) : undefined;
-    },
   });
 
-  const listItems = data?.pages.flatMap((page) => page.data) || [];
+  const listItems = data?.pages.flatMap((page: any) => page.data) || [];
 
   return (
     <View className="flex-1">

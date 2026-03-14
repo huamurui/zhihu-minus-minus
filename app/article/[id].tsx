@@ -1,19 +1,19 @@
-import { getDailyDetail, getArticle } from '@/api/zhihu';
-import { Text, View } from '@/components/Themed';
-import { ZhihuContent } from '@/components/ZhihuContent';
+import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
 import {
+  ActivityIndicator,
   Image,
+  Pressable,
   ScrollView,
   StyleSheet,
   useWindowDimensions,
-  ActivityIndicator,
-  Pressable,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { getArticle, getDailyDetail } from '@/api/zhihu';
+import { Text, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
+import { ZhihuContent } from '@/components/ZhihuContent';
 import Colors from '@/constants/Colors';
 
 export default function ArticleDetail() {

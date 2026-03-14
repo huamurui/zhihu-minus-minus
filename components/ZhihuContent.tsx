@@ -1,27 +1,28 @@
+import { Ionicons } from '@expo/vector-icons';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
+import type React from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
-  StyleSheet,
-  useWindowDimensions,
-  Pressable,
-  Modal,
   FlatList,
-  TouchableWithoutFeedback,
   Image,
+  Modal,
+  Pressable,
+  StyleSheet,
   TouchableOpacity,
+  TouchableWithoutFeedback,
+  useWindowDimensions,
 } from 'react-native';
 import RenderHtml, {
-  CustomBlockRenderer,
+  type CustomBlockRenderer,
   defaultSystemFonts,
 } from 'react-native-render-html';
-import { View, Text } from './Themed';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useMemo, useState, useCallback } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { reactAnswerSegment, unreactAnswerSegment } from '@/api/zhihu/answer';
 import { useColorScheme } from '@/components/useColorScheme';
-import { showToast } from '@/utils/toast';
-
 import Colors from '@/constants/Colors';
+import { showToast } from '@/utils/toast';
+import { Text, View } from './Themed';
+
 interface SegmentInfo {
   pid: string;
   text: string;

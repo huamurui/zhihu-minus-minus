@@ -1,10 +1,3 @@
-import {
-  createCollection,
-  deleteCollection,
-  getMyCollections,
-  updateCollection,
-} from '@/api/zhihu';
-import { Text, View } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import {
@@ -24,6 +17,13 @@ import {
   Switch,
   TextInput,
 } from 'react-native';
+import {
+  createCollection,
+  deleteCollection,
+  getMyCollections,
+  updateCollection,
+} from '@/api/zhihu';
+import { Text, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 

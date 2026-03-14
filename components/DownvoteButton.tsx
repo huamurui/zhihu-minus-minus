@@ -1,4 +1,3 @@
-import { voteContent } from '@/api/zhihu/voters';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable } from 'react-native';
@@ -9,8 +8,9 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { useColorScheme } from './useColorScheme';
+import { voteContent } from '@/api/zhihu/voters';
 import Colors from '@/constants/Colors';
+import { useColorScheme } from './useColorScheme';
 
 export const DownvoteButton = ({
   id,

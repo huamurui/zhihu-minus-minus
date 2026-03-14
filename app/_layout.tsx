@@ -1,8 +1,3 @@
-import { useColorScheme } from '@/components/useColorScheme';
-import {
-  useThemeStore,
-  useSyncThemeWithNativeWind,
-} from '@/store/useThemeStore';
 import {
   DarkTheme,
   DefaultTheme,
@@ -13,6 +8,11 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { useColorScheme } from '@/components/useColorScheme';
+import {
+  useSyncThemeWithNativeWind,
+  useThemeStore,
+} from '@/store/useThemeStore';
 import 'react-native-reanimated';
 import '../global.css';
 

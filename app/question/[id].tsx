@@ -1,36 +1,28 @@
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
-import {
-  useInfiniteQuery,
-  useQuery,
-  useMutation,
-  useQueryClient,
-} from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { BlurView } from 'expo-blur';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, {
+  forwardRef,
+  useCallback,
+  useImperativeHandle,
+  useMemo,
   useRef,
   useState,
-  useCallback,
-  useMemo,
-  forwardRef,
-  useImperativeHandle,
 } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Image,
+  View as NativeView,
   Pressable,
   StyleSheet,
   useWindowDimensions,
-  View as NativeView,
-  Alert,
 } from 'react-native';
 import Reanimated, { SharedTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
-import { useColorScheme } from '@/components/useColorScheme';
-import Colors from '@/constants/Colors';
-
 import client from '@/api/client';
 import { deleteAnswer } from '@/api/zhihu/answer';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
@@ -41,7 +33,13 @@ import {
 } from '@/api/zhihu/question';
 import { LikeButton } from '@/components/LikeButton';
 import { Text, View } from '@/components/Themed';
+import { useColorScheme } from '@/components/useColorScheme';
 import { ZhihuContent } from '@/components/ZhihuContent';
+import Colors from '@/constants/Colors';
+import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
+import { useScrollHeaderAnim } from '@/hooks/useScrollAnimation';
+import { useViewableItems } from '@/hooks/useViewableItems';
+import { useZhihuInfiniteQuery } from '@/hooks/useZhihuInfiniteQuery';
 import { showToast } from '@/utils/toast';
 
 const AnswerItem = forwardRef(
@@ -72,16 +70,15 @@ const AnswerItem = forwardRef(
     const isLongContent = rawText?.length > 120;
     const excerpt = isLongContent ? rawText.substring(0, 100) + '...' : rawText;
 
-    const followMutation = useMutation({
+    const followMutation = useOptimisticToggle({
       mutationFn: async () => {
         const pid = item.author.url_token || item.author.id;
         if (item.author?.is_following) return unfollowMember(pid);
         return followMember(pid);
       },
-      onSuccess: () => {
-        showToast(item.author?.is_following ? '已取消关注' : '已关注');
-        queryClient.invalidateQueries({ queryKey: ['question-answers'] });
-      },
+      isActive: item.author?.is_following,
+      successMessage: (isActive) => (isActive ? '已取消关注' : '已关注'),
+      invalidateQueries: [['question-answers']],
     });
 
     const deleteMutation = useMutation({
@@ -295,15 +292,19 @@ export default function QuestionDetail() {
 
   const [sortBy, setSortBy] = useState<'default' | 'created'>('default');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [activeItem, setActiveItem] = useState<any>(null);
 
   const footerAnim = useRef(new Animated.Value(0)).current;
-  const headerVisible = useRef(new Animated.Value(0)).current;
-  const isHeaderShowRef = useRef(false);
   const isFloatingShown = useRef(false);
+  const { headerVisible, handleScroll: baseHandleScroll } =
+    useScrollHeaderAnim(400);
 
   const itemRefs = useRef(new Map<string, any>());
-  const viewableIdsRef = useRef<string[]>([]);
+  const {
+    activeItem,
+    viewableIdsRef,
+    viewabilityConfig,
+    onViewableItemsChanged,
+  } = useViewableItems<any>();
 
   const toggleExpand = useCallback((id: string, expanded: boolean) => {
     setExpandedIds((prev) => {
@@ -314,54 +315,11 @@ export default function QuestionDetail() {
     });
   }, []);
 
-  const viewabilityConfig = useRef({
-    viewAreaCoveragePercentThreshold: 20,
-  }).current;
-
-  const onViewableItemsChanged = useCallback(
-    ({ viewableItems }: any) => {
-      viewableIdsRef.current = viewableItems.map((v: any) =>
-        v.item.id.toString(),
-      );
-      const candidate = viewableItems[0]?.item;
-      if (candidate && candidate.id !== activeItem?.id)
-        setActiveItem(candidate);
-    },
-    [activeItem],
-  );
-
   const lastCheckTime = useRef(0);
 
   const handleScroll = (event: any) => {
-    const currentY = event.nativeEvent.contentOffset.y;
+    const { currentY } = baseHandleScroll(event);
     const now = Date.now();
-
-    if (currentY > 400) {
-      const diff = currentY - (event.lastY || 0);
-      if (diff < -15 && !isHeaderShowRef.current) {
-        isHeaderShowRef.current = true;
-        Animated.timing(headerVisible, {
-          toValue: 1,
-          duration: 250,
-          useNativeDriver: true,
-        }).start();
-      } else if (diff > 5 && isHeaderShowRef.current) {
-        isHeaderShowRef.current = false;
-        Animated.timing(headerVisible, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }).start();
-      }
-    } else if (currentY <= 100 && isHeaderShowRef.current) {
-      isHeaderShowRef.current = false;
-      Animated.timing(headerVisible, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-    }
-    event.lastY = currentY;
 
     if (now - lastCheckTime.current > 100) {
       lastCheckTime.current = now;
@@ -412,38 +370,25 @@ export default function QuestionDetail() {
     queryFn: async () => await getQuestion(id as string),
   });
 
-  const followMutation = useMutation({
+  const followMutation = useOptimisticToggle({
+    queryKey: ['question', id],
+    isActive: question?.relationship?.is_following,
     mutationFn: async () => {
       if (question?.relationship?.is_following)
         return unfollowQuestion(id as string);
       return followQuestion(id as string);
     },
-    onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: ['question', id] });
-      const previous = queryClient.getQueryData(['question', id]);
-      queryClient.setQueryData(['question', id], (old: any) => ({
-        ...old,
-        relationship: {
-          ...old?.relationship,
-          is_following: !old?.relationship?.is_following,
-        },
-        follower_count: old?.relationship?.is_following
-          ? old.follower_count - 1
-          : old.follower_count + 1,
-      }));
-      return { previous };
-    },
-    onError: (err, variables, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(['question', id], context.previous);
-      }
-      showToast('操作失败，请稍后重试');
-    },
-    onSuccess: () => {
-      showToast(question?.relationship?.is_following ? '已取消关注' : '已关注问题');
-    },
-    onSettled: () =>
-      queryClient.invalidateQueries({ queryKey: ['question', id] }),
+    onUpdateCache: (old: any) => ({
+      ...old,
+      relationship: {
+        ...old?.relationship,
+        is_following: !old?.relationship?.is_following,
+      },
+      follower_count: old?.relationship?.is_following
+        ? old.follower_count - 1
+        : old.follower_count + 1,
+    }),
+    successMessage: (isActive) => (isActive ? '已取消关注' : '已关注问题'),
   });
 
   const {
@@ -454,7 +399,7 @@ export default function QuestionDetail() {
     isFetchingNextPage,
     refetch,
     isRefetching,
-  } = useInfiniteQuery({
+  } = useZhihuInfiniteQuery({
     queryKey: ['question-answers', id, sortBy],
     queryFn: async ({ pageParam = 0 }) => {
       const include =
@@ -465,15 +410,10 @@ export default function QuestionDetail() {
       return res.data;
     },
     initialPageParam: 0,
-    getNextPageParam: (last) => {
-      if (!last || last.paging?.is_end) return undefined;
-      const match = last.paging?.next?.match(/offset=(\d+)/);
-      return match ? parseInt(match[1]) : undefined;
-    },
   });
 
   const answers = useMemo(
-    () => answersData?.pages.flatMap((p) => p.data) || [],
+    () => answersData?.pages.flatMap((p: any) => p.data) || [],
     [answersData],
   );
 

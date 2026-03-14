@@ -8,8 +8,8 @@
  * New components can use plain RN <Text>/<View> with className directly.
  */
 import { Text as DefaultText, View as DefaultView } from 'react-native';
-import { useColorScheme } from './useColorScheme';
 import Colors from '@/constants/Colors';
+import { useColorScheme } from './useColorScheme';
 
 type ThemeProps = {
   lightColor?: string;

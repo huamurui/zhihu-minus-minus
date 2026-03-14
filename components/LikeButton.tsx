@@ -1,4 +1,3 @@
-import { voteContent } from '@/api/zhihu';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
@@ -9,10 +8,11 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { Text } from './Themed';
-import { useColorScheme } from './useColorScheme';
+import { voteContent } from '@/api/zhihu';
 import Colors from '@/constants/Colors';
 import { showToast } from '@/utils/toast';
+import { Text } from './Themed';
+import { useColorScheme } from './useColorScheme';
 
 export const LikeButton = ({
   id,

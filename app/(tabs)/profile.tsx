@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import CookieManager from '@react-native-cookies/cookies';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -13,14 +14,12 @@ import {
   StyleSheet,
   Switch,
 } from 'react-native';
-
 import { getMe, getMember } from '@/api/zhihu';
 import { Text, View } from '@/components/Themed';
-import { useAuthStore } from '@/store/useAuthStore';
-import { useThemeStore } from '@/store/useThemeStore';
-import CookieManager from '@react-native-cookies/cookies';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
+import { useAuthStore } from '@/store/useAuthStore';
+import { useThemeStore } from '@/store/useThemeStore';
 
 export default function ProfileScreen() {
   const colorScheme = useColorScheme();

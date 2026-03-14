@@ -1,8 +1,3 @@
-import { getSearchSuggest, searchContent } from '@/api/zhihu';
-import { FeedCard } from '@/components/FeedCard';
-import { Text, View } from '@/components/Themed';
-import { UserCard } from '@/components/UserCard';
-import { useSearchStore } from '@/store/useSearchStore';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
@@ -16,8 +11,13 @@ import {
   StyleSheet,
   TextInput,
 } from 'react-native';
+import { getSearchSuggest, searchContent } from '@/api/zhihu';
+import { FeedCard } from '@/components/FeedCard';
+import { Text, View } from '@/components/Themed';
+import { UserCard } from '@/components/UserCard';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
+import { useSearchStore } from '@/store/useSearchStore';
 
 export default function SearchScreen() {
   const colorScheme = useColorScheme();

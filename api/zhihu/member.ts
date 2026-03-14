@@ -34,7 +34,7 @@ export const getMemberRelations = async (
     sort_by?: string;
   },
 ) => {
-  let endpoint = `/members/${id}/${type}`;
+  const endpoint = `/members/${id}/${type}`;
   const res = await apiClient.get(endpoint, { params });
   return res.data;
 };

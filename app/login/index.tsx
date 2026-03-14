@@ -1,13 +1,13 @@
-import { Text, View } from '@/components/Themed';
-import { useAuthStore } from '@/store/useAuthStore';
 import CookieManager from '@react-native-cookies/cookies';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { Text, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
+import { useAuthStore } from '@/store/useAuthStore';
 
 export default function LoginScreen() {
   const colorScheme = useColorScheme();
