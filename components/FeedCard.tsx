@@ -117,13 +117,7 @@ export const FeedCard = ({ item }: { item: any }) => {
             id={item.id}
             count={item.voteCount}
             voted={item.voted}
-            type={
-              item.type === 'articles'
-                ? 'article'
-                : item.type === 'answers'
-                  ? 'answer'
-                  : item.type
-            }
+            type={item.type as any}
           />
 
           {/* 点击评论按钮 -> 评论页 */}

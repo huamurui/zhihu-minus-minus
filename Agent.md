@@ -73,6 +73,5 @@
 2. **FlashList Layout**: 如果列表底部留白异常，检查 `contentContainerStyle` 与 `paddingBottom`。
 3. **Cookie Sync**: `WebView` 与 `Axios` 的 Cookie 同步在部分 Android 版本上有延迟，建议手动触发一次 `SecureStore` 重刷。
 
----
-**Status**: 🏗️ 持续开发中 (v0.0.2) - 核心功能与基础架构迭代中  
-**Last Updated**: 2026-03-10
+**Status**: 🏗️ 持续开发中 (v0.0.5) - 核心功能与基础架构迭代中  
+**Last Updated**: 2026-03-14

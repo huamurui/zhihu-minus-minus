@@ -12,6 +12,7 @@ import Animated, {
 import { Text } from './Themed';
 import { useColorScheme } from './useColorScheme';
 import Colors from '@/constants/Colors';
+import { showToast } from '@/utils/toast';
 
 export const LikeButton = ({
   id,
@@ -74,8 +75,10 @@ export const LikeButton = ({
 
       setVoted(nextVoted);
       setCount((prev) => (isUpvoted ? prev - 1 : prev + 1));
+      showToast(isUpvoted ? '已取消赞同' : '已赞同');
     } catch (err) {
       console.error('投票失败:', err);
+      showToast('操作失败，请稍后重试');
     } finally {
       setLoading(false);
     }

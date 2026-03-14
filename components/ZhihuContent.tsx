@@ -19,6 +19,7 @@ import React, { useMemo, useState, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { reactAnswerSegment, unreactAnswerSegment } from '@/api/zhihu/answer';
 import { useColorScheme } from '@/components/useColorScheme';
+import { showToast } from '@/utils/toast';
 
 import Colors from '@/constants/Colors';
 interface SegmentInfo {
@@ -120,6 +121,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
             ? activeSegment.like_count - 1
             : activeSegment.like_count + 1,
         });
+        showToast(activeSegment.is_like ? '已取消赞同' : '已赞同');
       }
     },
   });

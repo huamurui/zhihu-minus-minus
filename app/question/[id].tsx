@@ -42,6 +42,7 @@ import {
 import { LikeButton } from '@/components/LikeButton';
 import { Text, View } from '@/components/Themed';
 import { ZhihuContent } from '@/components/ZhihuContent';
+import { showToast } from '@/utils/toast';
 
 const AnswerItem = forwardRef(
   (
@@ -77,8 +78,10 @@ const AnswerItem = forwardRef(
         if (item.author?.is_following) return unfollowMember(pid);
         return followMember(pid);
       },
-      onSuccess: () =>
-        queryClient.invalidateQueries({ queryKey: ['question-answers'] }),
+      onSuccess: () => {
+        showToast(item.author?.is_following ? '已取消关注' : '已关注');
+        queryClient.invalidateQueries({ queryKey: ['question-answers'] });
+      },
     });
 
     const deleteMutation = useMutation({
@@ -430,9 +433,15 @@ export default function QuestionDetail() {
       }));
       return { previous };
     },
-    onError: (err, variables, context) =>
-      context?.previous &&
-      queryClient.setQueryData(['question', id], context.previous),
+    onError: (err, variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['question', id], context.previous);
+      }
+      showToast('操作失败，请稍后重试');
+    },
+    onSuccess: () => {
+      showToast(question?.relationship?.is_following ? '已取消关注' : '已关注问题');
+    },
     onSettled: () =>
       queryClient.invalidateQueries({ queryKey: ['question', id] }),
   });

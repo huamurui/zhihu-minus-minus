@@ -11,6 +11,7 @@ import { LikeButton } from '@/components/LikeButton';
 import { Text, View } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { showToast } from '@/utils/toast';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useRef } from 'react';
 import {
@@ -102,8 +103,10 @@ export default function AnswerDetailScreen() {
         return unfollowMember(answer.author.url_token || answer.author.id);
       return followMember(answer.author.url_token || answer.author.id);
     },
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ['answer-detail', id] }),
+    onSuccess: () => {
+      showToast(answer?.author?.is_following ? '已取消关注' : '已关注');
+      queryClient.invalidateQueries({ queryKey: ['answer-detail', id] });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -154,16 +157,12 @@ export default function AnswerDetailScreen() {
     onSuccess: (res) => {
       refetchCollectionStatus();
       if (!isCollected)
-        Alert.alert(
-          '收藏成功',
-          `已收藏到「${res?.collection?.title || '我的收藏'}」喵！`,
-        );
+        showToast(`已收藏到「${res?.collection?.title || '我的收藏'}」`);
+      else
+        showToast('已取消收藏');
     },
     onError: (err: any) =>
-      Alert.alert(
-        '操作失败',
-        err.response?.data?.error?.message || '无法处理收藏请求',
-      ),
+      showToast(err.response?.data?.error?.message || '无法处理请求'),
   });
 
   const goToProfile = () => {

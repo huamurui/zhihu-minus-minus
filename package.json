@@ -1,7 +1,7 @@
 {
   "name": "zhihu--",
   "main": "expo-router/entry",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "scripts": {
     "start": "expo start",
     "prebuild": "expo prebuild",
