@@ -1,18 +1,18 @@
 {
-    "build": {
-        "production": {
-            "android": {
-                "buildType": "app-bundle",
-                "gradleCommand": ":app:bundleRelease"
-            },
-            "env": {
-                "NODE_ENV": "production"
-            }
-        },
-        "preview": {
-            "android": {
-                "buildType": "apk"
-            }
-        }
+  "build": {
+    "production": {
+      "android": {
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleRelease"
+      },
+      "env": {
+        "NODE_ENV": "production"
+      }
+    },
+    "preview": {
+      "android": {
+        "buildType": "apk"
+      }
     }
+  }
 }

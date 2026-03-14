@@ -1,5 +1,17 @@
-import { StyleSheet, useWindowDimensions, Pressable, Modal, FlatList, TouchableWithoutFeedback, Image, TouchableOpacity } from 'react-native';
-import RenderHtml, { CustomBlockRenderer, defaultSystemFonts } from 'react-native-render-html';
+import {
+  StyleSheet,
+  useWindowDimensions,
+  Pressable,
+  Modal,
+  FlatList,
+  TouchableWithoutFeedback,
+  Image,
+  TouchableOpacity,
+} from 'react-native';
+import RenderHtml, {
+  CustomBlockRenderer,
+  defaultSystemFonts,
+} from 'react-native-render-html';
 import { View, Text } from './Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -45,7 +57,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
   segmentInfos,
   objectId,
   type,
-  onRefresh
+  onRefresh,
 }) => {
   const colorScheme = useColorScheme();
   const { width } = useWindowDimensions();
@@ -71,7 +83,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
 
   const segmentMap = useMemo(() => {
     const map = new Map<string, SegmentInfo>();
-    segmentInfos?.forEach(info => {
+    segmentInfos?.forEach((info) => {
       map.set(info.pid, info);
     });
     return map;
@@ -80,22 +92,36 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
   const toggleSegmentLikeMutation = useMutation({
     mutationFn: async () => {
       if (!activeSegment) return;
-      const { is_like, seg_ids, text, pid, startIndex, endIndex } = activeSegment;
+      const { is_like, seg_ids, text, pid, startIndex, endIndex } =
+        activeSegment;
       const segId = Array.isArray(seg_ids) ? seg_ids[0] : (seg_ids as any);
 
       if (is_like) {
         return unreactAnswerSegment(objectId, segId);
       } else {
-        return reactAnswerSegment(objectId, segId, text, pid, startIndex || 0, endIndex || 0);
+        return reactAnswerSegment(
+          objectId,
+          segId,
+          text,
+          pid,
+          startIndex || 0,
+          endIndex || 0,
+        );
       }
     },
     onSuccess: () => {
       onRefresh?.();
       // 更新本地状态以立即响应
       if (activeSegment) {
-        setActiveSegment({ ...activeSegment, is_like: !activeSegment.is_like, like_count: activeSegment.is_like ? activeSegment.like_count - 1 : activeSegment.like_count + 1 });
+        setActiveSegment({
+          ...activeSegment,
+          is_like: !activeSegment.is_like,
+          like_count: activeSegment.is_like
+            ? activeSegment.like_count - 1
+            : activeSegment.like_count + 1,
+        });
       }
-    }
+    },
   });
 
   // 辅助函数：从复杂的 segmentInfos 中挑出最合适的交互数据
@@ -106,7 +132,8 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
     // 1. 优先寻找已经点赞过的，确保 UI 能显示“已赞”且“取消点赞”能操作到正确的 ID
     for (const mark of marks) {
       if (mark.seg_info?.is_like) return { ...mark.seg_info, mark };
-      if (mark.master_seg_info?.is_like) return { ...mark.master_seg_info, mark };
+      if (mark.master_seg_info?.is_like)
+        return { ...mark.master_seg_info, mark };
     }
 
     // 2. 其次选择包含主信息的数据段
@@ -119,38 +146,55 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
     return firstInfo ? { ...firstInfo, mark: marks[0] } : null;
   };
 
-  const domVisitors = useMemo(() => ({
-    onElement: (element: any) => {
-      // 修复图片逻辑
-      if (element.name === 'img') {
-        const { attribs } = element;
-        // 优先使用原图，其次是高清图，最后是当前 src
-        const actualSrc = attribs['data-actualsrc'] || attribs['data-original'] || attribs.src;
+  const domVisitors = useMemo(
+    () => ({
+      onElement: (element: any) => {
+        // 修复图片逻辑
+        if (element.name === 'img') {
+          const { attribs } = element;
+          // 优先使用原图，其次是高清图，最后是当前 src
+          const actualSrc =
+            attribs['data-actualsrc'] ||
+            attribs['data-original'] ||
+            attribs.src;
 
-        // 如果 src 是占位图，强制替换
-        if (actualSrc && (attribs.src?.startsWith('data:image') || !attribs.src)) {
-          attribs.src = actualSrc;
+          // 如果 src 是占位图，强制替换
+          if (
+            actualSrc &&
+            (attribs.src?.startsWith('data:image') || !attribs.src)
+          ) {
+            attribs.src = actualSrc;
+          }
+
+          // 映射属性以便渲染器使用
+          if (attribs['data-rawwidth'])
+            attribs.width = attribs['data-rawwidth'];
+          if (attribs['data-rawheight'])
+            attribs.height = attribs['data-rawheight'];
         }
 
-        // 映射属性以便渲染器使用
-        if (attribs['data-rawwidth']) attribs.width = attribs['data-rawwidth'];
-        if (attribs['data-rawheight']) attribs.height = attribs['data-rawheight'];
-      }
+        if (element.name === 'p') {
+          const pid = element.attribs['data-pid'];
+          const segment = pid ? segmentMap.get(pid) : null;
+          const interaction = findActiveInteraction(segment);
 
-      if (element.name === 'p') {
-        const pid = element.attribs['data-pid'];
-        const segment = pid ? segmentMap.get(pid) : null;
-        const interaction = findActiveInteraction(segment);
-
-        if (interaction && (interaction.like_count > 0 || interaction.comment_count > 0 || interaction.is_like)) {
-          element.attribs.class = (element.attribs.class || '') + ' segment-interactable';
-          if (interaction.is_like) {
-            element.attribs.class += ' segment-liked';
+          if (
+            interaction &&
+            (interaction.like_count > 0 ||
+              interaction.comment_count > 0 ||
+              interaction.is_like)
+          ) {
+            element.attribs.class =
+              (element.attribs.class || '') + ' segment-interactable';
+            if (interaction.is_like) {
+              element.attribs.class += ' segment-liked';
+            }
           }
         }
-      }
-    }
-  }), [segmentMap]);
+      },
+    }),
+    [segmentMap],
+  );
 
   const P_Renderer: CustomBlockRenderer = ({ TDefaultRenderer, ...props }) => {
     const pid = props.tnode.attributes['data-pid'];
@@ -158,7 +202,11 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
 
     // 找出该段落最合适的交互数据
     const interaction = findActiveInteraction(segment);
-    const hasInteraction = interaction && (interaction.like_count > 0 || interaction.comment_count > 0 || interaction.is_like);
+    const hasInteraction =
+      interaction &&
+      (interaction.like_count > 0 ||
+        interaction.comment_count > 0 ||
+        interaction.is_like);
     const isLiked = interaction?.is_like;
 
     const handlePress = () => {
@@ -170,9 +218,12 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
           is_like: !!interaction.is_like,
           like_count: interaction.like_count || 0,
           comment_count: interaction.comment_count || 0,
-          seg_ids: interaction.seg_ids || mark?.seg_info?.seg_ids || (mark as any)?.master_seg_info?.seg_ids,
+          seg_ids:
+            interaction.seg_ids ||
+            mark?.seg_info?.seg_ids ||
+            (mark as any)?.master_seg_info?.seg_ids,
           startIndex: mark?.start_index || 0,
-          endIndex: mark?.end_index || segment?.text.length || 0
+          endIndex: mark?.end_index || segment?.text.length || 0,
         });
         setModalVisible(true);
       }
@@ -185,8 +236,11 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
         onPress={handlePress}
         style={[
           styles.paragraphContainer,
-          isActive && { backgroundColor: Colors[colorScheme].primaryTransparent },
-          !isActive && isLiked && { backgroundColor: 'rgba(0, 132, 255, 0.05)' }
+          isActive && {
+            backgroundColor: Colors[colorScheme].primaryTransparent,
+          },
+          !isActive &&
+            isLiked && { backgroundColor: 'rgba(0, 132, 255, 0.05)' },
         ]}
       >
         <TDefaultRenderer {...props} />
@@ -238,7 +292,12 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
     );
   };
 
-  const LinkCard: React.FC<{ url: string; title?: string; image?: string; type?: string }> = ({ url, title, image, type }) => {
+  const LinkCard: React.FC<{
+    url: string;
+    title?: string;
+    image?: string;
+    type?: string;
+  }> = ({ url, title, image, type }) => {
     const isInternal = url.includes('zhihu.com');
 
     // 简易解析知乎链接类型
@@ -255,79 +314,143 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
     };
 
     return (
-      <Pressable onPress={handlePress} style={[styles.linkCard, { backgroundColor: surfaceColor }]}>
+      <Pressable
+        onPress={handlePress}
+        style={[styles.linkCard, { backgroundColor: surfaceColor }]}
+      >
         <View style={styles.linkCardContent}>
-          <Text style={styles.linkCardTitle} numberOfLines={2}>{title || url}</Text>
+          <Text style={styles.linkCardTitle} numberOfLines={2}>
+            {title || url}
+          </Text>
           <View style={styles.linkCardFooter}>
-            <Ionicons name={getLinkTypeIcon() as any} size={14} color={Colors[colorScheme].primary} />
-            <Text type="secondary" style={styles.linkCardSub}>{isInternal ? '知乎内部链接' : '外部链接'}</Text>
+            <Ionicons
+              name={getLinkTypeIcon() as any}
+              size={14}
+              color={Colors[colorScheme].primary}
+            />
+            <Text type="secondary" style={styles.linkCardSub}>
+              {isInternal ? '知乎内部链接' : '外部链接'}
+            </Text>
           </View>
         </View>
-        {image && <Image source={{ uri: image }} style={[styles.linkCardImage, { backgroundColor: Colors[colorScheme].backgroundSecondary }]} />}
+        {image && (
+          <Image
+            source={{ uri: image }}
+            style={[
+              styles.linkCardImage,
+              { backgroundColor: Colors[colorScheme].backgroundSecondary },
+            ]}
+          />
+        )}
       </Pressable>
     );
   };
 
-  const A_Renderer: CustomBlockRenderer = ({ tnode, TDefaultRenderer, ...props }) => {
-    const isLinkCard = tnode.attributes.class?.includes('LinkCard') || tnode.attributes['data-draft-type'] === 'link-card';
+  const A_Renderer: CustomBlockRenderer = ({
+    tnode,
+    TDefaultRenderer,
+    ...props
+  }) => {
+    const isLinkCard =
+      tnode.attributes.class?.includes('LinkCard') ||
+      tnode.attributes['data-draft-type'] === 'link-card';
     const url = tnode.attributes.href;
 
     if (isLinkCard && url) {
       // 这里的 title 可能在子节点中
-      return <LinkCard url={url} title={tnode.attributes['data-draft-title']} />;
+      return (
+        <LinkCard url={url} title={tnode.attributes['data-draft-title']} />
+      );
     }
 
     return <TDefaultRenderer tnode={tnode} {...props} />;
   };
 
-  const renderers = useMemo(() => ({
-    p: P_Renderer,
-    img: IMG_Renderer,
-    a: A_Renderer,
-  }), [P_Renderer, IMG_Renderer, A_Renderer]);
+  const renderers = useMemo(
+    () => ({
+      p: P_Renderer,
+      img: IMG_Renderer,
+      a: A_Renderer,
+    }),
+    [P_Renderer, IMG_Renderer, A_Renderer],
+  );
 
-  const classesStyles = useMemo(() => ({
-    'segment-interactable': {
-      textDecorationLine: 'underline',
-      textDecorationColor: Colors[colorScheme].primaryTransparent,
-    },
-    'segment-liked': {}
-  }), [colorScheme]);
+  const classesStyles = useMemo(
+    () => ({
+      'segment-interactable': {
+        textDecorationLine: 'underline',
+        textDecorationColor: Colors[colorScheme].primaryTransparent,
+      },
+      'segment-liked': {},
+    }),
+    [colorScheme],
+  );
 
-  const tagsStyles = useMemo(() => ({
-    p: { color: textColor, fontSize: 18, lineHeight: 28, marginBottom: 20 },
-    b: { color: Colors[colorScheme].primary, fontWeight: 'bold' },
-    img: { borderRadius: 12, marginVertical: 10 },
-    blockquote: {
-      borderLeftWidth: 4,
-      borderLeftColor: Colors[colorScheme].primary,
-      paddingLeft: 18,
-      backgroundColor: surfaceColor + '80', // 添加半透明底色
-      paddingVertical: 12,
-      marginVertical: 15,
-      fontStyle: 'italic',
-      color: textColor,
-    },
-    h1: { color: textColor, fontSize: 22, fontWeight: 'bold', marginVertical: 20, lineHeight: 30 },
-    h2: { color: textColor, fontSize: 20, fontWeight: 'bold', marginVertical: 18, lineHeight: 28 },
-    h3: { color: textColor, fontSize: 18, fontWeight: 'bold', marginVertical: 15, lineHeight: 26 },
-    ul: { paddingLeft: 20, color: textColor, marginVertical: 10 },
-    ol: { paddingLeft: 20, color: textColor, marginVertical: 10 },
-    li: { marginBottom: 8, color: textColor, fontSize: 17, lineHeight: 26 },
-    hr: { height: 1, backgroundColor: 'rgba(150,150,150,0.2)', marginVertical: 25 },
-    figure: { marginVertical: 15, alignItems: 'center' },
-    figcaption: { color: '#999', fontSize: 13, marginTop: 8, textAlign: 'center', fontStyle: 'italic' },
-    span: { color: textColor },
-    div: { color: textColor },
-    a: { color: Colors[colorScheme].primary, textDecorationLine: 'none' },
-    code: {
-      backgroundColor: Colors[colorScheme].border,
-      borderRadius: 4,
-      paddingHorizontal: 4,
-      fontFamily: 'monospace',
-      fontSize: 14,
-    },
-  }), [textColor, surfaceColor]);
+  const tagsStyles = useMemo(
+    () => ({
+      p: { color: textColor, fontSize: 18, lineHeight: 28, marginBottom: 20 },
+      b: { color: Colors[colorScheme].primary, fontWeight: 'bold' },
+      img: { borderRadius: 12, marginVertical: 10 },
+      blockquote: {
+        borderLeftWidth: 4,
+        borderLeftColor: Colors[colorScheme].primary,
+        paddingLeft: 18,
+        backgroundColor: surfaceColor + '80', // 添加半透明底色
+        paddingVertical: 12,
+        marginVertical: 15,
+        fontStyle: 'italic',
+        color: textColor,
+      },
+      h1: {
+        color: textColor,
+        fontSize: 22,
+        fontWeight: 'bold',
+        marginVertical: 20,
+        lineHeight: 30,
+      },
+      h2: {
+        color: textColor,
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginVertical: 18,
+        lineHeight: 28,
+      },
+      h3: {
+        color: textColor,
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginVertical: 15,
+        lineHeight: 26,
+      },
+      ul: { paddingLeft: 20, color: textColor, marginVertical: 10 },
+      ol: { paddingLeft: 20, color: textColor, marginVertical: 10 },
+      li: { marginBottom: 8, color: textColor, fontSize: 17, lineHeight: 26 },
+      hr: {
+        height: 1,
+        backgroundColor: 'rgba(150,150,150,0.2)',
+        marginVertical: 25,
+      },
+      figure: { marginVertical: 15, alignItems: 'center' },
+      figcaption: {
+        color: '#999',
+        fontSize: 13,
+        marginTop: 8,
+        textAlign: 'center',
+        fontStyle: 'italic',
+      },
+      span: { color: textColor },
+      div: { color: textColor },
+      a: { color: Colors[colorScheme].primary, textDecorationLine: 'none' },
+      code: {
+        backgroundColor: Colors[colorScheme].border,
+        borderRadius: 4,
+        paddingHorizontal: 4,
+        fontFamily: 'monospace',
+        fontSize: 14,
+      },
+    }),
+    [textColor, surfaceColor],
+  );
 
   const systemFonts = [...defaultSystemFonts, 'Inter', 'Roboto'];
 
@@ -352,7 +475,12 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
       if (item.type === 'image') {
         return (
           <View key={index} style={styles.imageWrapper}>
-            <Pressable onPress={() => { setViewerImage(item.url); setViewerVisible(true); }}>
+            <Pressable
+              onPress={() => {
+                setViewerImage(item.url);
+                setViewerVisible(true);
+              }}
+            >
               <Image
                 source={{ uri: item.url }}
                 style={{ width: width - 40, height: 250, borderRadius: 12 }}
@@ -363,7 +491,9 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
         );
       }
       if (item.type === 'link_card') {
-        return <LinkCard key={index} url={item.url} title={item.data_draft_title} />;
+        return (
+          <LinkCard key={index} url={item.url} title={item.data_draft_title} />
+        );
       }
       return null;
     });
@@ -371,7 +501,9 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
 
   return (
     <View style={styles.contentWrapper}>
-      {contentArray ? renderPinContent() : (
+      {contentArray ? (
+        renderPinContent()
+      ) : (
         <RenderHtml
           contentWidth={width - 40}
           source={{ html: content || '' }}
@@ -398,7 +530,12 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
         <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
-              <View style={[styles.bubbleContainer, { backgroundColor: surfaceColor }]}>
+              <View
+                style={[
+                  styles.bubbleContainer,
+                  { backgroundColor: surfaceColor },
+                ]}
+              >
                 <View style={styles.bubbleStats}>
                   <Pressable
                     style={styles.statItem}
@@ -406,11 +543,16 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
                     disabled={toggleSegmentLikeMutation.isPending}
                   >
                     <Ionicons
-                      name={activeSegment?.is_like ? "heart" : "heart-outline"}
+                      name={activeSegment?.is_like ? 'heart' : 'heart-outline'}
                       size={24}
-                      color={activeSegment?.is_like ? "#ff4d4f" : textColor}
+                      color={activeSegment?.is_like ? '#ff4d4f' : textColor}
                     />
-                    <Text style={[styles.statLabel, activeSegment?.is_like && { color: "#ff4d4f" }]}>
+                    <Text
+                      style={[
+                        styles.statLabel,
+                        activeSegment?.is_like && { color: '#ff4d4f' },
+                      ]}
+                    >
                       {activeSegment?.like_count || 0} 赞同
                     </Text>
                   </Pressable>
@@ -420,12 +562,22 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
                     onPress={() => {
                       setModalVisible(false);
                       const { seg_ids } = activeSegment || {};
-                      const segId = Array.isArray(seg_ids) ? seg_ids[0] : seg_ids;
-                      router.push(`/comments/${objectId}?type=${type}${segId ? `&segmentId=${segId}` : ''}`);
+                      const segId = Array.isArray(seg_ids)
+                        ? seg_ids[0]
+                        : seg_ids;
+                      router.push(
+                        `/comments/${objectId}?type=${type}${segId ? `&segmentId=${segId}` : ''}`,
+                      );
                     }}
                   >
-                    <Ionicons name="chatbubble-outline" size={22} color={Colors[colorScheme].primary} />
-                    <Text style={styles.statLabel}>{activeSegment?.comment_count || 0} 评论</Text>
+                    <Ionicons
+                      name="chatbubble-outline"
+                      size={22}
+                      color={Colors[colorScheme].primary}
+                    />
+                    <Text style={styles.statLabel}>
+                      {activeSegment?.comment_count || 0} 评论
+                    </Text>
                   </Pressable>
                 </View>
                 <Pressable
@@ -435,8 +587,14 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
                     router.push(`/comments/${objectId}?type=${type}`);
                   }}
                 >
-                  <Text type="primary" style={styles.bubbleActionText}>查看详细讨论</Text>
-                  <Ionicons name="chevron-forward" size={16} color={Colors[colorScheme].primary} />
+                  <Text type="primary" style={styles.bubbleActionText}>
+                    查看详细讨论
+                  </Text>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color={Colors[colorScheme].primary}
+                  />
                 </Pressable>
               </View>
             </TouchableWithoutFeedback>
@@ -612,5 +770,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
-  }
+  },
 });

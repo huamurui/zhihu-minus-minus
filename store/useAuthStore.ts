@@ -5,7 +5,8 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 // 适配器：让 Zustand 能用上 Expo 的安全存储
 const secureStorage = {
   getItem: (name: string) => SecureStore.getItemAsync(name),
-  setItem: (name: string, value: string) => SecureStore.setItemAsync(name, value),
+  setItem: (name: string, value: string) =>
+    SecureStore.setItemAsync(name, value),
   removeItem: (name: string) => SecureStore.deleteItemAsync(name),
 };
 
@@ -31,6 +32,6 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'auth-storage',
       storage: createJSONStorage(() => secureStorage),
-    }
-  )
+    },
+  ),
 );

@@ -4,7 +4,8 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 const secureStorage = {
   getItem: (name: string) => SecureStore.getItemAsync(name),
-  setItem: (name: string, value: string) => SecureStore.setItemAsync(name, value),
+  setItem: (name: string, value: string) =>
+    SecureStore.setItemAsync(name, value),
   removeItem: (name: string) => SecureStore.deleteItemAsync(name),
 };
 
@@ -24,7 +25,10 @@ export const useSearchStore = create<SearchState>()(
         if (!trimmedQuery) return;
         set((state) => {
           // 将新搜索词置顶，并去重
-          const newHistory = [trimmedQuery, ...state.history.filter((h) => h !== trimmedQuery)].slice(0, 20);
+          const newHistory = [
+            trimmedQuery,
+            ...state.history.filter((h) => h !== trimmedQuery),
+          ].slice(0, 20);
           return { history: newHistory };
         });
       },
@@ -38,6 +42,6 @@ export const useSearchStore = create<SearchState>()(
     {
       name: 'search-history-storage',
       storage: createJSONStorage(() => secureStorage),
-    }
-  )
+    },
+  ),
 );

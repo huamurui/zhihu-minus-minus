@@ -12,5 +12,3 @@ export * from './search';
 export * from './voters';
 export * from './question';
 export * from './pin';
-
-

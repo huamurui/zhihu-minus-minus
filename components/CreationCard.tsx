@@ -6,11 +6,16 @@ import { Pressable } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { LikeButton } from './LikeButton';
 
-export const CreationCard = ({ item, type, onPress, excerpt }: {
-  item: any,
-  type: 'answer' | 'article' | 'question' | 'pin' | 'video',
-  onPress?: () => void,
-  excerpt?: string
+export const CreationCard = ({
+  item,
+  type,
+  onPress,
+  excerpt,
+}: {
+  item: any;
+  type: 'answer' | 'article' | 'question' | 'pin' | 'video';
+  onPress?: () => void;
+  excerpt?: string;
 }) => {
   const router = useRouter();
   const [expanded, setExpanded] = React.useState(false);
@@ -25,15 +30,18 @@ export const CreationCard = ({ item, type, onPress, excerpt }: {
       return;
     }
     if (type === 'video') {
-      router.push({ pathname: '/video/[id]', params: { id: item.id, title: item.title } } as any);
+      router.push({
+        pathname: '/video/[id]',
+        params: { id: item.id, title: item.title },
+      } as any);
     } else {
-      router.push({ 
-        pathname: `/${type}/[id]`, 
-        params: { 
-          id: item.id, 
+      router.push({
+        pathname: `/${type}/[id]`,
+        params: {
+          id: item.id,
           title: item.title || item.question?.title,
-          questionId: item.question?.id 
-        } 
+          questionId: item.question?.id,
+        },
       } as any);
     }
   };
@@ -44,7 +52,8 @@ export const CreationCard = ({ item, type, onPress, excerpt }: {
       return item.content
         .map((c: any) => {
           if (c.type === 'text') return c.content;
-          if (c.type === 'link_card') return `[链接: ${c.data_draft_title || '查看详情'}]`;
+          if (c.type === 'link_card')
+            return `[链接: ${c.data_draft_title || '查看详情'}]`;
           return '';
         })
         .join('\n')
@@ -94,13 +103,22 @@ export const CreationCard = ({ item, type, onPress, excerpt }: {
   return (
     <View type="surface" className="p-4 mb-0.5 mt-px">
       <Pressable onPress={handlePress}>
-        <Animated.View sharedTransitionTag={`title-${item.question?.id || item.id}`}>
-          <Text className="text-base font-bold mb-2 leading-[22px] text-foreground dark:text-foreground-dark" numberOfLines={expanded ? undefined : 2}>
+        <Animated.View
+          sharedTransitionTag={`title-${item.question?.id || item.id}`}
+        >
+          <Text
+            className="text-base font-bold mb-2 leading-[22px] text-foreground dark:text-foreground-dark"
+            numberOfLines={expanded ? undefined : 2}
+          >
             {getTitle()}
           </Text>
         </Animated.View>
         <View className="bg-transparent">
-          <Text type="secondary" className="text-sm leading-5" numberOfLines={expanded ? undefined : 3}>
+          <Text
+            type="secondary"
+            className="text-sm leading-5"
+            numberOfLines={expanded ? undefined : 3}
+          >
             {content}
           </Text>
           {showExpandButton && (
@@ -123,28 +141,53 @@ export const CreationCard = ({ item, type, onPress, excerpt }: {
               id={item.id}
               count={item.voteup_count || item.reaction_count || 0}
               voted={item.relationship?.voting || 0}
-              type={type === 'article' ? 'articles' : type === 'pin' ? 'pins' : 'answers'}
+              type={
+                type === 'article'
+                  ? 'articles'
+                  : type === 'pin'
+                    ? 'pins'
+                    : 'answers'
+              }
             />
             <Pressable
-              onPress={() => router.push(`/comments/${item.id}?type=${type}&count=${item.comment_count || 0}`)}
+              onPress={() =>
+                router.push(
+                  `/comments/${item.id}?type=${type}&count=${item.comment_count || 0}`,
+                )
+              }
               className="flex-row items-center ml-2.5"
             >
               <Ionicons name="chatbubble-outline" size={16} color="#888" />
-              <Text className="text-[#888] ml-1 text-[13px]">{item.comment_count || 0} 评论</Text>
+              <Text className="text-[#888] ml-1 text-[13px]">
+                {item.comment_count || 0} 评论
+              </Text>
             </Pressable>
           </View>
         ) : (
-          <Text type="secondary" className="text-xs text-tertiary dark:text-tertiary-dark">
+          <Text
+            type="secondary"
+            className="text-xs text-tertiary dark:text-tertiary-dark"
+          >
             {type === 'question'
               ? `${item.answer_count || 0} 回答 · ${item.follower_count || 0} 关注`
-              : `${item.voteup_count || 0} 赞同 · ${item.comment_count || 0} 评论`
-            }
+              : `${item.voteup_count || 0} 赞同 · ${item.comment_count || 0} 评论`}
           </Text>
         )}
 
-        <Text type="secondary" className="text-xs text-tertiary dark:text-tertiary-dark ml-auto">
-          {item.updated_time || item.updated || item.created_time || item.created
-            ? new Date((item.updated_time || item.updated || item.created_time || item.created) * 1000).toLocaleDateString()
+        <Text
+          type="secondary"
+          className="text-xs text-tertiary dark:text-tertiary-dark ml-auto"
+        >
+          {item.updated_time ||
+          item.updated ||
+          item.created_time ||
+          item.created
+            ? new Date(
+                (item.updated_time ||
+                  item.updated ||
+                  item.created_time ||
+                  item.created) * 1000,
+              ).toLocaleDateString()
             : ''}
         </Text>
       </View>

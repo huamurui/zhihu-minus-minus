@@ -1,6 +1,13 @@
 import { useColorScheme } from '@/components/useColorScheme';
-import { useThemeStore, useSyncThemeWithNativeWind } from '@/store/useThemeStore';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import {
+  useThemeStore,
+  useSyncThemeWithNativeWind,
+} from '@/store/useThemeStore';
+import {
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
+} from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -41,7 +48,8 @@ export default function RootLayout() {
             },
             headerTintColor: '#0084ff',
             headerShadowVisible: false,
-          }}>
+          }}
+        >
           {/* 底部 Tab 主框架 */}
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
 
@@ -109,7 +117,10 @@ export default function RootLayout() {
           />
 
           {/* 其他 Modal 弹窗 */}
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: '提示' }} />
+          <Stack.Screen
+            name="modal"
+            options={{ presentation: 'modal', title: '提示' }}
+          />
         </Stack>
 
         {/* 全局状态栏控制 */}

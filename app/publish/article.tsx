@@ -2,11 +2,17 @@ import { Text, View } from '@/components/Themed';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, TextInput, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import {
+  Pressable,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/components/useColorScheme';
-
 import Colors from '@/constants/Colors';
+
 export default function PublishArticleScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -15,46 +21,61 @@ export default function PublishArticleScreen() {
   const textColor = Colors[colorScheme].text;
   const secondaryColor = Colors[colorScheme].textSecondary;
   const borderCol = Colors[colorScheme].border;
-  
+
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
 
   const isPublishEnabled = title.trim().length > 0 && content.trim().length > 0;
 
   return (
-    <View style={styles.container}>
-      {/* 顶部标题栏 */}
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-        <Pressable onPress={() => router.back()} style={styles.closeIcon}>
+    <View className="flex-1">
+      <View
+        className="flex-row items-center justify-between px-4 pb-3"
+        style={{ paddingTop: insets.top + 10 }}
+      >
+        <Pressable onPress={() => router.back()} className="p-1">
           <Ionicons name="close" size={28} color={textColor} />
         </Pressable>
-        <Text style={styles.headerTitle}>写文章</Text>
-        <Pressable 
-          disabled={!isPublishEnabled} 
+        <Text className="text-lg font-bold">写文章</Text>
+        <Pressable
+          disabled={!isPublishEnabled}
           onPress={() => {
             console.log('Publish Article:', title, content);
             router.back();
           }}
+          className="px-5 py-2 rounded-full"
           style={({ pressed }) => [
-            styles.publishBtn,
             { backgroundColor: isPublishEnabled ? tintColor : borderCol },
-            pressed && { opacity: 0.8 }
+            pressed && { opacity: 0.8 },
           ]}
         >
-          <Text style={[styles.publishText, { color: isPublishEnabled ? 'white' : secondaryColor }]}>发布</Text>
+          <Text
+            className="text-sm font-bold"
+            style={{ color: isPublishEnabled ? 'white' : secondaryColor }}
+          >
+            发布
+          </Text>
         </Pressable>
       </View>
 
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          className="flex-1 px-6 pt-3"
+          keyboardShouldPersistTaps="handled"
+        >
           <TextInput
             autoFocus
             placeholder="请输入文章标题"
             placeholderTextColor={secondaryColor}
-            style={[styles.titleInput, { color: textColor, borderBottomColor: borderCol }]}
+            className="text-[22px] font-extrabold py-4 mb-5"
+            style={{
+              color: textColor,
+              borderBottomWidth: 0.5,
+              borderBottomColor: borderCol,
+            }}
             value={title}
             onChangeText={setTitle}
             maxLength={100}
@@ -63,94 +84,39 @@ export default function PublishArticleScreen() {
             multiline
             placeholder="这一刻的想法..."
             placeholderTextColor={secondaryColor}
-            style={[styles.input, { color: textColor }]}
+            className="text-lg leading-7 min-h-[400px]"
+            style={{ color: textColor, textAlignVertical: 'top' }}
             value={content}
             onChangeText={setContent}
           />
         </ScrollView>
 
-        <View style={[styles.toolbar, { paddingBottom: insets.bottom + 20, borderTopColor: borderCol }]}>
-          <Pressable style={styles.toolItem}>
-            <Ionicons name="image-outline" size={24} color={tintColor} />
-            <Text style={[styles.toolLabel, { color: tintColor }]}>插图</Text>
-          </Pressable>
-          <Pressable style={styles.toolItem}>
-            <Ionicons name="text-outline" size={24} color={tintColor} />
-            <Text style={[styles.toolLabel, { color: tintColor }]}>排版</Text>
-          </Pressable>
-          <Pressable style={styles.toolItem}>
-            <Ionicons name="at-outline" size={24} color={tintColor} />
-            <Text style={[styles.toolLabel, { color: tintColor }]}>提到</Text>
-          </Pressable>
-          <Pressable style={styles.toolItem}>
-            <Ionicons name="settings-outline" size={24} color={tintColor} />
-            <Text style={[styles.toolLabel, { color: tintColor }]}>设置</Text>
-          </Pressable>
+        <View
+          className="flex-row px-5 py-3"
+          style={{
+            paddingBottom: insets.bottom + 20,
+            borderTopWidth: 0.5,
+            borderTopColor: borderCol,
+          }}
+        >
+          {[
+            { icon: 'image-outline', label: '插图' },
+            { icon: 'text-outline', label: '排版' },
+            { icon: 'at-outline', label: '提到' },
+            { icon: 'settings-outline', label: '设置' },
+          ].map((tool) => (
+            <Pressable key={tool.icon} className="flex-row items-center mr-6">
+              <Ionicons name={tool.icon as any} size={24} color={tintColor} />
+              <Text
+                className="text-sm ml-1 font-medium"
+                style={{ color: tintColor }}
+              >
+                {tool.label}
+              </Text>
+            </Pressable>
+          ))}
         </View>
       </KeyboardAvoidingView>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  closeIcon: {
-    padding: 4,
-  },
-  publishBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  publishText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 12,
-  },
-  titleInput: {
-    fontSize: 22,
-    fontWeight: '800',
-    paddingVertical: 16,
-    borderBottomWidth: 0.5,
-    marginBottom: 20,
-  },
-  input: {
-    fontSize: 18,
-    lineHeight: 28,
-    minHeight: 400,
-    textAlignVertical: 'top',
-  },
-  toolbar: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderTopWidth: 0.5,
-  },
-  toolItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 24,
-  },
-  toolLabel: {
-    fontSize: 14,
-    marginLeft: 4,
-    fontWeight: '500',
-  }
-});

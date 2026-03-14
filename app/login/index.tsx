@@ -7,8 +7,8 @@ import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useColorScheme } from '@/components/useColorScheme';
-
 import Colors from '@/constants/Colors';
+
 export default function LoginScreen() {
   const colorScheme = useColorScheme();
   const router = useRouter();
@@ -17,7 +17,7 @@ export default function LoginScreen() {
   const borderColor = Colors[colorScheme].border;
 
   const handleCookies = async (web_cookie: string) => {
-    console.log(web_cookie, '1111')
+    console.log(web_cookie, '1111');
     // 关键：只有当包含 z_c0 (登录 Token) 时才认为是有效的登录 Cookie
     // 获取 httpOnly cookie，webview 注入 js 是不行的，需要原生支持
     try {
@@ -50,7 +50,9 @@ export default function LoginScreen() {
       const hasZseCk = true;
       const hasDc0 = !!mergedCookies['d_c0'];
 
-      console.log(`📊 Cookie 状态: d_c0=${hasDc0}, z_c0=${hasZc0}, __zse_ck=${hasZseCk}`);
+      console.log(
+        `📊 Cookie 状态: d_c0=${hasDc0}, z_c0=${hasZc0}, __zse_ck=${hasZseCk}`,
+      );
 
       if (hasZc0 && hasZseCk) {
         console.log('🍪 捕获到完整且合规的 Cookie');
@@ -79,9 +81,13 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1">
       {/* 顶部标题栏 */}
-      <View type="surface" style={[styles.header, { borderBottomColor: borderColor }]}>
+      <View
+        type="surface"
+        className="h-[60px] flex-row items-center justify-between px-[15px] pt-[10px]"
+        style={{ borderBottomWidth: 1, borderBottomColor: borderColor }}
+      >
         <Pressable
           onPress={() => {
             if (router.canGoBack()) {
@@ -89,11 +95,12 @@ export default function LoginScreen() {
             } else {
               router.replace('/(tabs)');
             }
-          }}>
-          <Text style={styles.closeBtn}>取消</Text>
+          }}
+        >
+          <Text className="text-[#0084ff] text-base">取消</Text>
         </Pressable>
-        <Text style={styles.title}>登录知乎</Text>
-        <View style={{ width: 40, backgroundColor: 'transparent' }} />
+        <Text className="text-base font-bold">登录知乎</Text>
+        <View className="w-10 bg-transparent" />
       </View>
 
       <WebView
@@ -105,23 +112,21 @@ export default function LoginScreen() {
         onNavigationStateChange={(navState) => {
           const { url } = navState;
           console.log('🌐 导航至:', url);
-
-          // 核心逻辑：登录成功后跳转到首页 -> 强制跳转到特定问题页面进行反爬环境验证
-          if (url === 'https://www.zhihu.com/' || url === 'https://www.zhihu.com') {
+          if (
+            url === 'https://www.zhihu.com/' ||
+            url === 'https://www.zhihu.com'
+          ) {
             console.log('🔄 检测到登录成功，正在进行反爬环境模拟...');
-            // 修改 Webview 内部的 URL，触发环境检测脚本加载
-            webViewRef.current?.injectJavaScript(`window.location.href = 'https://www.zhihu.com/question/11474985081'`);
+            webViewRef.current?.injectJavaScript(
+              `window.location.href = 'https://www.zhihu.com/question/11474985081'`,
+            );
             return;
           }
-
-          // 如果到达了目标验证页面，等待 JS 执行完成后抓取 Cookie
           if (url.includes('question/11474985081')) {
             console.log('🎯 已到达验证页面，等待获取 __zse_ck...');
-            // todo，目前加密还有问题，zse-ck 的 cookie 并没有帮助解开更多 api 限制，故先不管这里。
-            // 延迟 3-5 秒，确保 知乎的 zse-ck 脚本运行完毕并设置了 Cookie
-            // setTimeout(() => {
-            webViewRef.current?.injectJavaScript(`window.ReactNativeWebView.postMessage(document.cookie)`);
-            // }, 4000);
+            webViewRef.current?.injectJavaScript(
+              `window.ReactNativeWebView.postMessage(document.cookie)`,
+            );
           }
         }}
         onLoadStart={() => setLoading(true)}
@@ -129,31 +134,16 @@ export default function LoginScreen() {
       />
 
       {loading && (
-        <View style={styles.loader}>
+        <View
+          className="justify-center items-center"
+          style={{
+            ...StyleSheet.absoluteFillObject,
+            backgroundColor: 'rgba(0,0,0,0.3)',
+          }}
+        >
           <ActivityIndicator size="large" color="#0084ff" />
         </View>
       )}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: {
-    height: 60,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 15,
-    borderBottomWidth: 1,
-    paddingTop: 10,
-  },
-  closeBtn: { color: '#0084ff', fontSize: 16 },
-  title: { fontSize: 16, fontWeight: 'bold' },
-  loader: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});

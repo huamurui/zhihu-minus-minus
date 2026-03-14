@@ -8,14 +8,25 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { useColorScheme } from '@/components/useColorScheme';
 import React, { useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import Colors from '@/constants/Colors';
+
 export default function ReplyDetailScreen() {
-  const { id } = useLocalSearchParams(); // 根评论 ID
+  const { id } = useLocalSearchParams();
   const [inputText, setInputText] = useState('');
-  const [replyTo, setReplyTo] = useState<{ id: string, name: string } | null>(null);
+  const [replyTo, setReplyTo] = useState<{ id: string; name: string } | null>(
+    null,
+  );
   const inputRef = useRef<TextInput>(null);
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -25,65 +36,104 @@ export default function ReplyDetailScreen() {
   const textColor = Colors[colorScheme].text;
   const tintColor = Colors[colorScheme].tint;
 
-  // 1. 获取回复列表
-  const { data: replies, isLoading, refetch, isFetching } = useQuery({
+  const {
+    data: replies,
+    isLoading,
+    refetch,
+    isFetching,
+  } = useQuery({
     queryKey: ['replies', id],
     queryFn: async () => {
       const data = await getChildComments(id as string);
       return data.data;
-    }
+    },
   });
 
-  // 2. 发布回复 Mutation
   const mutation = useMutation({
-    mutationFn: (content: string) => {
-      // 统一发送到根评论下
-      return createCommentReply(id as string, content, replyTo ? { reply_to_comment_id: replyTo.id } : {});
-    },
+    mutationFn: (content: string) =>
+      createCommentReply(
+        id as string,
+        content,
+        replyTo ? { reply_to_comment_id: replyTo.id } : {},
+      ),
     onSuccess: () => {
       Alert.alert('发布成功喵！');
       setInputText('');
       setReplyTo(null);
       refetch();
     },
-    onError: (err: any) => {
-      Alert.alert('发布失败', err.response?.data?.error?.message || '未知错误');
-    }
+    onError: (err: any) =>
+      Alert.alert('发布失败', err.response?.data?.error?.message || '未知错误'),
   });
 
   const goToProfile = (urlToken: string | number) => {
-    if (urlToken) {
-      router.push(`/user/${urlToken}`);
-    }
+    if (urlToken) router.push(`/user/${urlToken}`);
   };
 
   const renderReply = ({ item }: { item: any }) => {
     const cleanContent = item.content?.replace(/<[^>]+>/g, '').trim() || '';
-
     return (
-      <View type="secondary" style={[styles.replyRow, { borderBottomColor: borderColor, backgroundColor: 'transparent' }]}>
-        <Pressable onPress={() => goToProfile(item.author.member.url_token || item.author.member.id)}>
-          <Image source={{ uri: item.author.member.avatar_url }} style={styles.avatar} />
+      <View
+        type="secondary"
+        className="flex-row p-[15px] bg-transparent"
+        style={{
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: borderColor,
+        }}
+      >
+        <Pressable
+          onPress={() =>
+            goToProfile(item.author.member.url_token || item.author.member.id)
+          }
+        >
+          <Image
+            source={{ uri: item.author.member.avatar_url }}
+            className="w-8 h-8 rounded-full"
+          />
         </Pressable>
-        <View type="secondary" style={[styles.contentBox, { backgroundColor: 'transparent' }]}>
-          <Text style={styles.authorName}>
-            <Text onPress={() => goToProfile(item.author.member.url_token || item.author.member.id)}>
+        <View type="secondary" className="flex-1 ml-3 bg-transparent">
+          <Text className="font-bold text-[13px] mb-1">
+            <Text
+              onPress={() =>
+                goToProfile(
+                  item.author.member.url_token || item.author.member.id,
+                )
+              }
+            >
               {item.author.member.name}
             </Text>
             {item.reply_to_author && (
-              <Text type="secondary" style={styles.replyToText}> 回复 <Text type="primary" style={styles.replyTargetName} onPress={() => goToProfile(item.reply_to_author.member.url_token || item.reply_to_author.member.id)}>{item.reply_to_author.member.name}</Text></Text>
+              <Text type="secondary">
+                {' '}
+                回复{' '}
+                <Text
+                  type="primary"
+                  onPress={() =>
+                    goToProfile(
+                      item.reply_to_author.member.url_token ||
+                        item.reply_to_author.member.id,
+                    )
+                  }
+                >
+                  {item.reply_to_author.member.name}
+                </Text>
+              </Text>
             )}
           </Text>
-          <Text style={[styles.content, { color: textColor }]}>
+          <Text
+            className="text-[15px] leading-[22px]"
+            style={{ color: textColor }}
+          >
             {cleanContent}
           </Text>
 
-
-          <View style={styles.footerRow}>
-            <Text type="secondary" style={styles.time}>
-              {item.created_time ? new Date(item.created_time * 1000).toLocaleDateString() : ''}
+          <View className="flex-row justify-between items-center mt-2">
+            <Text type="secondary" className="text-xs">
+              {item.created_time
+                ? new Date(item.created_time * 1000).toLocaleDateString()
+                : ''}
             </Text>
-            <View style={styles.actionRow}>
+            <View className="flex-row items-center">
               <LikeButton
                 id={item.id}
                 count={item.vote_count || 0}
@@ -96,9 +146,11 @@ export default function ReplyDetailScreen() {
                   setReplyTo({ id: item.id, name: item.author.member.name });
                   inputRef.current?.focus();
                 }}
-                style={styles.replyBtn}
+                className="ml-[15px]"
               >
-                <Text type="secondary" style={styles.replyActionText}>回复</Text>
+                <Text type="secondary" className="text-xs py-1">
+                  回复
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -108,7 +160,7 @@ export default function ReplyDetailScreen() {
   };
 
   return (
-    <View type="secondary" style={styles.container}>
+    <View type="secondary" className="flex-1">
       <Stack.Screen options={{ title: '所有回复' }} />
       <View style={StyleSheet.absoluteFill}>
         <FlashList
@@ -122,9 +174,13 @@ export default function ReplyDetailScreen() {
           keyboardDismissMode="on-drag"
           ListEmptyComponent={
             isLoading ? (
-              <View style={[styles.center, { backgroundColor: 'transparent' }]}><ActivityIndicator color={tintColor} /></View>
+              <View className="flex-1 items-center justify-center mt-[50px] bg-transparent">
+                <ActivityIndicator color={tintColor} />
+              </View>
             ) : (
-              <View style={[styles.center, { backgroundColor: 'transparent' }]}><Text type="secondary">暂无回复喵~</Text></View>
+              <View className="flex-1 items-center justify-center mt-[50px] bg-transparent">
+                <Text type="secondary">暂无回复喵~</Text>
+              </View>
             )
           }
         />
@@ -132,35 +188,51 @@ export default function ReplyDetailScreen() {
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-        style={styles.floatingKAV}
+        style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         pointerEvents="box-none"
       >
-        <View style={styles.floatingInputWrapper} pointerEvents="box-none">
+        <View
+          className="flex-1 justify-end px-[15px] pb-5"
+          pointerEvents="box-none"
+        >
           <BlurView
             intensity={100}
             tint={colorScheme === 'dark' ? 'dark' : 'light'}
-            style={[
-              styles.capsuleWrapper,
-              {
-                borderColor,
-                backgroundColor: colorScheme === 'dark' ? 'rgba(26,26,26,0.85)' : 'rgba(255,255,255,0.9)'
-              }
-            ]}
+            style={{
+              borderRadius: 30,
+              overflow: 'hidden',
+              borderWidth: StyleSheet.hairlineWidth,
+              borderColor,
+              paddingHorizontal: 5,
+              backgroundColor:
+                colorScheme === 'dark'
+                  ? 'rgba(26,26,26,0.85)'
+                  : 'rgba(255,255,255,0.9)',
+            }}
           >
             {replyTo && (
-              <View style={styles.replyHeaderFloating}>
-                <Text type="secondary" style={styles.replyHintText}>正在回复 {replyTo.name}</Text>
+              <View className="flex-row justify-between items-center px-[15px] pt-2.5 pb-0.5">
+                <Text type="secondary" className="text-xs">
+                  正在回复 {replyTo.name}
+                </Text>
                 <Pressable onPress={() => setReplyTo(null)}>
-                  <Ionicons name="close-circle" size={16} color={Colors[colorScheme].textSecondary} />
+                  <Ionicons
+                    name="close-circle"
+                    size={16}
+                    color={Colors[colorScheme].textSecondary}
+                  />
                 </Pressable>
               </View>
             )}
-            <View style={styles.inputPill}>
+            <View className="flex-row items-end px-1 py-1">
               <TextInput
                 ref={inputRef}
-                style={[styles.input, { color: textColor }]}
-                placeholder={replyTo ? `回复 ${replyTo.name}...` : "说点什么吧..."}
+                className="flex-1 min-h-[40px] max-h-[100px] px-3 pt-2.5 pb-2.5"
+                style={{ color: textColor }}
+                placeholder={
+                  replyTo ? `回复 ${replyTo.name}...` : '说点什么吧...'
+                }
                 placeholderTextColor="#999"
                 value={inputText}
                 onChangeText={setInputText}
@@ -170,12 +242,20 @@ export default function ReplyDetailScreen() {
               <Pressable
                 disabled={!inputText.trim() || mutation.isPending}
                 onPress={() => mutation.mutate(inputText.trim())}
-                style={styles.sendBtn}
+                className="h-10 justify-center px-[15px]"
               >
                 {mutation.isPending ? (
                   <ActivityIndicator size="small" color={tintColor} />
                 ) : (
-                  <Text style={[styles.sendText, { color: tintColor, opacity: inputText.trim() ? 1 : 0.5 }]}>发布</Text>
+                  <Text
+                    className="font-bold text-base"
+                    style={{
+                      color: tintColor,
+                      opacity: inputText.trim() ? 1 : 0.5,
+                    }}
+                  >
+                    发布
+                  </Text>
                 )}
               </Pressable>
             </View>
@@ -185,66 +265,3 @@ export default function ReplyDetailScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  flex: { flex: 1 },
-  replyRow: { flexDirection: 'row', padding: 15, borderBottomWidth: StyleSheet.hairlineWidth },
-  avatar: { width: 32, height: 32, borderRadius: 16 },
-  contentBox: { flex: 1, marginLeft: 12 },
-  authorName: { fontWeight: 'bold', fontSize: 13, marginBottom: 4 },
-  replyToText: { fontWeight: 'normal' },
-  replyTargetName: {},
-  content: { fontSize: 15, lineHeight: 22 },
-  footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
-  time: { fontSize: 12 },
-  actionRow: { flexDirection: 'row', alignItems: 'center' },
-  replyBtn: { marginLeft: 15 },
-  replyActionText: { fontSize: 12, paddingVertical: 5 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 50 },
-  inputPill: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: 5,
-    paddingVertical: 4,
-  },
-  floatingKAV: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    right: 0,
-    bottom: 0,
-  },
-  floatingInputWrapper: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    paddingHorizontal: 15,
-    paddingBottom: 20
-  },
-  capsuleWrapper: {
-    borderRadius: 30,
-    overflow: 'hidden',
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 5,
-  },
-  replyHeaderFloating: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingTop: 10,
-    paddingBottom: 2,
-  },
-  input: {
-    flex: 1,
-    minHeight: 40,
-    maxHeight: 100,
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 10,
-  },
-  sendBtn: { height: 40, justifyContent: 'center', paddingHorizontal: 15 },
-  sendText: { fontWeight: 'bold', fontSize: 16 },
-  replyHeaderTip: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15, paddingTop: 10 },
-  replyHintText: { fontSize: 12 }
-});
