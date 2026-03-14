@@ -14,6 +14,7 @@ import {
   useThemeStore,
 } from '@/store/useThemeStore';
 import 'react-native-reanimated';
+import { RootSiblingParent } from 'react-native-root-siblings';
 import '../global.css';
 
 // 保持启动页显示，直到资源加载完成
@@ -36,96 +37,98 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider value={theme}>
-        <Stack
-          screenOptions={{
-            headerStyle: {
-              backgroundColor: isDark ? '#1a1a1a' : '#ffffff',
-            },
-            headerTitleStyle: {
-              color: isDark ? '#ffffff' : '#1a1a1a',
-              fontWeight: 'bold',
-            },
-            headerTintColor: '#0084ff',
-            headerShadowVisible: false,
-          }}
-        >
-          {/* 底部 Tab 主框架 */}
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-
-          {/* 文章详情页：从右侧推入 */}
-          <Stack.Screen
-            name="article/[id]"
-            options={{
-              headerTitle: '正文',
-              headerBackTitle: '返回',
+      <RootSiblingParent>
+        <ThemeProvider value={theme}>
+          <Stack
+            screenOptions={{
+              headerStyle: {
+                backgroundColor: isDark ? '#1a1a1a' : '#ffffff',
+              },
+              headerTitleStyle: {
+                color: isDark ? '#ffffff' : '#1a1a1a',
+                fontWeight: 'bold',
+              },
+              headerTintColor: '#0084ff',
+              headerShadowVisible: false,
             }}
-          />
+          >
+            {/* 底部 Tab 主框架 */}
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
 
-          {/* 登录页：建议做成从底部弹出的 Modal */}
-          <Stack.Screen
-            name="login/index"
-            options={{
-              presentation: 'modal',
-              headerTitle: '登录知乎',
-              headerLeft: () => null,
-            }}
-          />
+            {/* 文章详情页：从右侧推入 */}
+            <Stack.Screen
+              name="article/[id]"
+              options={{
+                headerTitle: '正文',
+                headerBackTitle: '返回',
+              }}
+            />
 
-          <Stack.Screen
-            name="feedback/index"
-            options={{
-              headerShown: false,
-              presentation: 'card',
-            }}
-          />
+            {/* 登录页：建议做成从底部弹出的 Modal */}
+            <Stack.Screen
+              name="login/index"
+              options={{
+                presentation: 'modal',
+                headerTitle: '登录知乎',
+                headerLeft: () => null,
+              }}
+            />
 
-          {/* 发布相关页面：使用全屏 Modal */}
-          <Stack.Screen
-            name="publish/answer"
-            options={{ presentation: 'fullScreenModal', headerShown: false }}
-          />
-          <Stack.Screen
-            name="publish/article"
-            options={{ presentation: 'fullScreenModal', headerShown: false }}
-          />
-          <Stack.Screen
-            name="publish/pin"
-            options={{ presentation: 'fullScreenModal', headerShown: false }}
-          />
-          <Stack.Screen
-            name="publish/question"
-            options={{ presentation: 'fullScreenModal', headerShown: false }}
-          />
+            <Stack.Screen
+              name="feedback/index"
+              options={{
+                headerShown: false,
+                presentation: 'card',
+              }}
+            />
 
-          {/* 问题详情页 */}
-          <Stack.Screen
-            name="question/[id]"
-            options={{
-              headerShown: false,
-              animation: 'fade',
-            }}
-          />
+            {/* 发布相关页面：使用全屏 Modal */}
+            <Stack.Screen
+              name="publish/answer"
+              options={{ presentation: 'fullScreenModal', headerShown: false }}
+            />
+            <Stack.Screen
+              name="publish/article"
+              options={{ presentation: 'fullScreenModal', headerShown: false }}
+            />
+            <Stack.Screen
+              name="publish/pin"
+              options={{ presentation: 'fullScreenModal', headerShown: false }}
+            />
+            <Stack.Screen
+              name="publish/question"
+              options={{ presentation: 'fullScreenModal', headerShown: false }}
+            />
 
-          {/* 回答详情页 */}
-          <Stack.Screen
-            name="answer/[id]"
-            options={{
-              headerShown: false,
-              animation: 'fade',
-            }}
-          />
+            {/* 问题详情页 */}
+            <Stack.Screen
+              name="question/[id]"
+              options={{
+                headerShown: false,
+                animation: 'fade',
+              }}
+            />
 
-          {/* 其他 Modal 弹窗 */}
-          <Stack.Screen
-            name="modal"
-            options={{ presentation: 'modal', title: '提示' }}
-          />
-        </Stack>
+            {/* 回答详情页 */}
+            <Stack.Screen
+              name="answer/[id]"
+              options={{
+                headerShown: false,
+                animation: 'fade',
+              }}
+            />
 
-        {/* 全局状态栏控制 */}
-        <StatusBar style={isDark ? 'light' : 'dark'} />
-      </ThemeProvider>
+            {/* 其他 Modal 弹窗 */}
+            <Stack.Screen
+              name="modal"
+              options={{ presentation: 'modal', title: '提示' }}
+            />
+          </Stack>
+
+          {/* 全局状态栏控制 */}
+          <StatusBar style={isDark ? 'light' : 'dark'} />
+        </ThemeProvider>
+      </RootSiblingParent>
     </QueryClientProvider>
   );
 }

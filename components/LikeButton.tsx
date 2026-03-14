@@ -99,7 +99,6 @@ export const LikeButton = ({
         variant === 'default' && {
           backgroundColor: isUpvoted ? tintColor : borderColor,
         },
-        isUpvoted && variant === 'default' && styles.likedBtn,
         loading && { opacity: 0.7 },
       ]}
     >
@@ -162,12 +161,3 @@ export const LikeButton = ({
     </Pressable>
   );
 };
-
-const styles = StyleSheet.create({
-  likedBtn: {
-    elevation: 2,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-  },
-});

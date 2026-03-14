@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -69,7 +69,6 @@ export function PublishView() {
             className="flex-row items-center p-5 rounded-[20px] mb-4 border bg-surface dark:bg-surface-dark active:opacity-80"
             style={[
               { borderColor: colorScheme === 'dark' ? '#333' : '#f0f0f0' },
-              styles.itemShadow,
             ]}
             onPress={() => handlePublish(item.id)}
           >
@@ -100,13 +99,3 @@ export function PublishView() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  itemShadow: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-});
