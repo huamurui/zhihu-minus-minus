@@ -21,6 +21,7 @@
     "axios": "^1.13.6",
     "expo": "~55.0.5",
     "expo-blur": "~55.0.9",
+    "expo-build-properties": "^55.0.9",
     "expo-constants": "~55.0.7",
     "expo-crypto": "^55.0.9",
     "expo-dev-client": "~55.0.16",
