@@ -2,9 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import type React from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
-  FlatList,
   Image,
   Modal,
   Pressable,
@@ -65,7 +64,6 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
   const { width } = useWindowDimensions();
   const textColor = Colors[colorScheme].text;
   const surfaceColor = Colors[colorScheme].surface;
-  const backgroundColor = Colors[colorScheme].background;
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -237,13 +235,13 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
     return (
       <Pressable
         onPress={handlePress}
+        className="flex-row items-start bg-transparent overflow-visible rounded-xl py-1.5 px-2 -mx-2 my-1"
         style={[
-          styles.paragraphContainer,
           isActive && {
             backgroundColor: Colors[colorScheme].primaryTransparent,
           },
           !isActive &&
-            isLiked && { backgroundColor: 'rgba(0, 132, 255, 0.05)' },
+          isLiked && { backgroundColor: 'rgba(0, 132, 255, 0.05)' },
         ]}
       >
         <TDefaultRenderer {...props} />
@@ -258,9 +256,6 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
     // 计算比例。知乎通常会提供 data-rawwidth/height，我们在 domVisitors 里已经映射到了 width/height
     const originalWidth = parseInt(attrWidth as string) || 0;
     const originalHeight = parseInt(attrHeight as string) || 0;
-
-    // 调试渲染器
-    // console.log('IMG_Renderer input:', { src, originalWidth, originalHeight });
 
     if (!src || src.startsWith('data:image/svg')) {
       return null;
@@ -278,15 +273,14 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
     };
 
     return (
-      <View style={styles.imageWrapper}>
+      <View className="my-2.5 items-center w-full bg-transparent">
         <Pressable onPress={handleImagePress}>
           <Image
             source={{ uri: src }}
+            className="rounded-xl bg-[rgba(150,150,150,0.1)]"
             style={{
               width: contentWidth,
               height: displayHeight,
-              borderRadius: 12,
-              backgroundColor: 'rgba(150,150,150,0.1)',
             }}
             resizeMode="cover"
           />
@@ -319,19 +313,31 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
     return (
       <Pressable
         onPress={handlePress}
-        style={[styles.linkCard, { backgroundColor: surfaceColor }]}
+        className="flex-row items-center p-3 rounded-xl my-2.5"
+        style={[
+          {
+            backgroundColor: surfaceColor,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: 'rgba(150,150,150,0.15)',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 4,
+            elevation: 2,
+          },
+        ]}
       >
-        <View style={styles.linkCardContent}>
-          <Text style={styles.linkCardTitle} numberOfLines={2}>
+        <View className="flex-1 mr-2.5 bg-transparent">
+          <Text className="text-[15px] font-bold leading-5 mb-1.5" numberOfLines={2}>
             {title || url}
           </Text>
-          <View style={styles.linkCardFooter}>
+          <View className="flex-row items-center bg-transparent">
             <Ionicons
               name={getLinkTypeIcon() as any}
               size={14}
               color={Colors[colorScheme].primary}
             />
-            <Text type="secondary" style={styles.linkCardSub}>
+            <Text type="secondary" className="text-xs ml-1">
               {isInternal ? '知乎内部链接' : '外部链接'}
             </Text>
           </View>
@@ -339,8 +345,8 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
         {image && (
           <Image
             source={{ uri: image }}
+            className="w-[60px] h-[60px] rounded-lg"
             style={[
-              styles.linkCardImage,
               { backgroundColor: Colors[colorScheme].backgroundSecondary },
             ]}
           />
@@ -378,6 +384,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
     [P_Renderer, IMG_Renderer, A_Renderer],
   );
 
+  // 注意：这部分的样式供 react-native-render-html 使用，只能接受 StyleSheet Object，不识别 className
   const classesStyles = useMemo(
     () => ({
       'segment-interactable': {
@@ -452,7 +459,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
         fontSize: 14,
       },
     }),
-    [textColor, surfaceColor],
+    [textColor, surfaceColor, colorScheme],
   );
 
   const systemFonts = [...defaultSystemFonts, 'Inter', 'Roboto'];
@@ -477,7 +484,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
       }
       if (item.type === 'image') {
         return (
-          <View key={index} style={styles.imageWrapper}>
+          <View key={index} className="my-2.5 items-center w-full bg-transparent">
             <Pressable
               onPress={() => {
                 setViewerImage(item.url);
@@ -486,7 +493,8 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
             >
               <Image
                 source={{ uri: item.url }}
-                style={{ width: width - 40, height: 250, borderRadius: 12 }}
+                className="rounded-xl"
+                style={{ width: width - 40, height: 250 }}
                 resizeMode="cover"
               />
             </Pressable>
@@ -503,7 +511,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
   };
 
   return (
-    <View style={styles.contentWrapper}>
+    <View className="bg-transparent">
       {contentArray ? (
         renderPinContent()
       ) : (
@@ -531,17 +539,24 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
         onRequestClose={() => setModalVisible(false)}
       >
         <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
-          <View style={styles.modalOverlay}>
+          <View className="flex-1 bg-black/10 justify-center items-center">
             <TouchableWithoutFeedback>
               <View
+                className="p-4 rounded-[20px] w-4/5"
                 style={[
-                  styles.bubbleContainer,
-                  { backgroundColor: surfaceColor },
+                  {
+                    backgroundColor: surfaceColor,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.15,
+                    shadowRadius: 12,
+                    elevation: 8,
+                  },
                 ]}
               >
-                <View style={styles.bubbleStats}>
+                <View className="flex-row items-center justify-around mb-4 bg-transparent">
                   <Pressable
-                    style={styles.statItem}
+                    className="flex-row items-center bg-transparent"
                     onPress={() => toggleSegmentLikeMutation.mutate()}
                     disabled={toggleSegmentLikeMutation.isPending}
                   >
@@ -551,17 +566,15 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
                       color={activeSegment?.is_like ? '#ff4d4f' : textColor}
                     />
                     <Text
-                      style={[
-                        styles.statLabel,
-                        activeSegment?.is_like && { color: '#ff4d4f' },
-                      ]}
+                      className="text-[15px] font-semibold ml-2"
+                      style={[activeSegment?.is_like && { color: '#ff4d4f' }]}
                     >
                       {activeSegment?.like_count || 0} 赞同
                     </Text>
                   </Pressable>
-                  <View style={styles.statDivider} />
+                  <View className="w-[1px] h-5 bg-[rgba(150,150,150,0.2)]" />
                   <Pressable
-                    style={styles.statItem}
+                    className="flex-row items-center bg-transparent"
                     onPress={() => {
                       setModalVisible(false);
                       const { seg_ids } = activeSegment || {};
@@ -578,19 +591,23 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
                       size={22}
                       color={Colors[colorScheme].primary}
                     />
-                    <Text style={styles.statLabel}>
+                    <Text className="text-[15px] font-semibold ml-2">
                       {activeSegment?.comment_count || 0} 评论
                     </Text>
                   </Pressable>
                 </View>
                 <Pressable
-                  style={styles.bubbleAction}
+                  className="flex-row items-center justify-center py-2.5 bg-transparent"
+                  style={{
+                    borderTopWidth: StyleSheet.hairlineWidth,
+                    borderTopColor: 'rgba(150,150,150,0.1)',
+                  }}
                   onPress={() => {
                     setModalVisible(false);
                     router.push(`/comments/${objectId}?type=${type}`);
                   }}
                 >
-                  <Text type="primary" style={styles.bubbleActionText}>
+                  <Text type="primary" className="text-sm font-bold mr-1">
                     查看详细讨论
                   </Text>
                   <Ionicons
@@ -612,21 +629,22 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
         animationType="fade"
         onRequestClose={() => setViewerVisible(false)}
       >
-        <View style={styles.viewerContainer}>
+        <View className="flex-1 bg-black justify-center items-center">
           <TouchableWithoutFeedback onPress={() => setViewerVisible(false)}>
-            <View style={styles.viewerOverlay} />
+            <View className="absolute inset-0" />
           </TouchableWithoutFeedback>
 
           {viewerImage && (
             <Image
               source={{ uri: viewerImage }}
-              style={styles.viewerImage}
+              className="w-full h-full"
               resizeMode="contain"
             />
           )}
 
           <TouchableOpacity
-            style={[styles.viewerCloseBtn, { top: 50 }]}
+            className="absolute right-5 w-[44px] h-[44px] rounded-[22px] bg-black/50 justify-center items-center z-10"
+            style={{ top: 50 }}
             onPress={() => setViewerVisible(false)}
           >
             <Ionicons name="close" size={28} color="#fff" />
@@ -636,142 +654,3 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = ({
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  contentWrapper: {
-    backgroundColor: 'transparent',
-  },
-  paragraphContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: 'transparent',
-    overflow: 'visible',
-    borderRadius: 12,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    marginHorizontal: -8,
-    marginVertical: 4,
-  },
-  imageWrapper: {
-    marginVertical: 10,
-    alignItems: 'center',
-    width: '100%',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  bubbleContainer: {
-    padding: 16,
-    borderRadius: 20,
-    width: '80%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  bubbleStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    marginBottom: 16,
-    backgroundColor: 'transparent',
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-  },
-  statLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  statDivider: {
-    width: 1,
-    height: 20,
-    backgroundColor: 'rgba(150,150,150,0.2)',
-  },
-  bubbleAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(150,150,150,0.1)',
-    backgroundColor: 'transparent',
-  },
-  bubbleActionText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginRight: 4,
-  },
-  // 图片查看器样式
-  viewerContainer: {
-    flex: 1,
-    backgroundColor: '#000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  viewerOverlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  viewerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  // LinkCard 样式
-  linkCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    marginVertical: 10,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(150,150,150,0.15)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  linkCardContent: {
-    flex: 1,
-    marginRight: 10,
-    backgroundColor: 'transparent',
-  },
-  linkCardTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    lineHeight: 20,
-    marginBottom: 6,
-  },
-  linkCardFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-  },
-  linkCardSub: {
-    fontSize: 12,
-    marginLeft: 4,
-  },
-  linkCardImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-  },
-  viewerCloseBtn: {
-    position: 'absolute',
-    right: 20,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-});
