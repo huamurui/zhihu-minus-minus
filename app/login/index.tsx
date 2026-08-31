@@ -21,7 +21,6 @@ export default function LoginScreen() {
   const borderColor = Colors[colorScheme].border;
 
   const handleCookies = async (web_cookie: string) => {
-    console.log(web_cookie, '1111');
     // 关键：只有当包含 z_c0 (登录 Token) 时才认为是有效的登录 Cookie
     // 获取 httpOnly cookie，webview 注入 js 是不行的，需要原生支持
     try {
