@@ -1,5 +1,6 @@
 import {
   runOnJS,
+  type SharedValue,
   useAnimatedScrollHandler,
   useSharedValue,
   withTiming,
@@ -9,6 +10,7 @@ export function useScrollHeaderAnim(
   threshold = 300,
   onScroll?: (currentY: number) => void,
   onScrollThrottleMs = 0,
+  sharedScrollY?: SharedValue<number>,
 ) {
   const headerVisible = useSharedValue(0);
   const isHeaderShown = useSharedValue(false);
@@ -19,6 +21,9 @@ export function useScrollHeaderAnim(
     {
       onScroll: (event) => {
         const currentY = event.contentOffset.y;
+        if (sharedScrollY) {
+          sharedScrollY.value = currentY;
+        }
         const diff = currentY - lastScrollY.value;
 
         if (currentY > threshold) {
@@ -47,7 +52,7 @@ export function useScrollHeaderAnim(
         }
       },
     },
-    [onScroll, onScrollThrottleMs, threshold],
+    [onScroll, onScrollThrottleMs, sharedScrollY, threshold],
   );
 
   return { headerVisible, handleScroll };

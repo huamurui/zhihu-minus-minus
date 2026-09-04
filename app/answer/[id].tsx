@@ -2,14 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Animated,
-  Pressable,
-  StyleSheet,
-} from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import PagerView from 'react-native-pager-view';
-import Reanimated, { SharedTransition } from 'react-native-reanimated';
+import Reanimated, {
+  Extrapolate,
+  interpolate,
+  SharedTransition,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import client from '@/api/client';
 import { getAnswer } from '@/api/zhihu';
@@ -124,23 +125,19 @@ export default function AnswerDetailScreen() {
     url: string;
   } | null>(null);
 
-  // Animated values and refs to manage scrolling headers
-  const scrollYAnim = useRef(new Animated.Value(0)).current;
+  // Keep the pager header animation on the UI thread while preserving the
+  // per-answer scroll position in JS for pager navigation.
+  const scrollY = useSharedValue(0);
   const scrollPositions = useRef<{ [key: string]: number }>({});
   const isCollapsedRef = useRef(false);
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
 
-  const headerBgOpacity = scrollYAnim.interpolate({
-    inputRange: [0, 80],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  });
-
-  const headerContentOpacity = scrollYAnim.interpolate({
-    inputRange: [0, 80],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  });
+  const headerBgStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [0, 80], [1, 0], Extrapolate.CLAMP),
+  }));
+  const headerContentStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [0, 80], [1, 0], Extrapolate.CLAMP),
+  }));
 
   // 4. 这里的关键是：PagerView 在 Android 下如果动态改变 children 且没有重置 key，可能会导致页面错乱。
   // 但重置 key 又会导致 WebView 重新加载。
@@ -236,7 +233,7 @@ export default function AnswerDetailScreen() {
         pointerEvents="box-none"
       >
         {/* Background (Animates to transparent on scroll) */}
-        <Animated.View
+        <Reanimated.View
           style={[
             StyleSheet.absoluteFillObject,
             {
@@ -244,8 +241,8 @@ export default function AnswerDetailScreen() {
                 colorScheme === 'dark'
                   ? 'rgba(0,0,0,0.6)'
                   : 'rgba(255,255,255,0.6)',
-              opacity: headerBgOpacity,
             },
+            headerBgStyle,
           ]}
           pointerEvents="none"
         />
@@ -259,9 +256,9 @@ export default function AnswerDetailScreen() {
         </Pressable>
 
         {/* 可折叠/淡出的内容区域 (标题和分享按钮) */}
-        <Animated.View
+        <Reanimated.View
           className="flex-1 flex-row items-start"
-          style={{ opacity: headerContentOpacity }}
+          style={headerContentStyle}
           pointerEvents={isHeaderCollapsed ? 'none' : 'auto'}
         >
           {/* 标题区域 */}
@@ -297,7 +294,7 @@ export default function AnswerDetailScreen() {
           >
             <Ionicons name="share-outline" size={24} color={textColor} />
           </Pressable>
-        </Animated.View>
+        </Reanimated.View>
       </View>
 
       <PagerView
@@ -314,7 +311,7 @@ export default function AnswerDetailScreen() {
 
             // Sync scroll position
             const lastY = scrollPositions.current[newId] || 0;
-            scrollYAnim.setValue(lastY);
+            scrollY.value = lastY;
 
             const shouldCollapse = lastY > 80;
             isCollapsedRef.current = shouldCollapse;
@@ -338,11 +335,10 @@ export default function AnswerDetailScreen() {
               initialTitle={aid === id ? (initialTitle as string) : undefined}
               questionId={questionId as string}
               isFocused={index === currentPage}
+              scrollY={scrollY}
               onScroll={(y) => {
                 scrollPositions.current[aid] = y;
                 if (index === currentPage) {
-                  scrollYAnim.setValue(y);
-
                   const shouldCollapse = y > 80;
                   if (shouldCollapse !== isCollapsedRef.current) {
                     isCollapsedRef.current = shouldCollapse;

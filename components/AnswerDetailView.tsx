@@ -14,6 +14,7 @@ import {
 import Reanimated, {
   interpolate,
   SharedTransition,
+  type SharedValue,
   useAnimatedStyle,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,6 +47,7 @@ interface AnswerDetailViewProps {
   initialTitle?: string;
   questionId?: string;
   onScroll?: (y: number) => void;
+  scrollY?: SharedValue<number>;
   isFocused?: boolean;
 }
 
@@ -53,6 +55,7 @@ export const AnswerDetailView = ({
   id,
   questionId,
   onScroll,
+  scrollY,
   isFocused = false,
 }: AnswerDetailViewProps) => {
   const router = useRouter();
@@ -63,7 +66,12 @@ export const AnswerDetailView = ({
   const _textColor = Colors[colorScheme].text;
 
   const scrollViewRef = useRef<NativeScrollView>(null);
-  const { headerVisible, handleScroll } = useScrollHeaderAnim(300, onScroll);
+  const { headerVisible, handleScroll } = useScrollHeaderAnim(
+    300,
+    onScroll,
+    100,
+    scrollY,
+  );
 
   const headerAnimatedStyle = useAnimatedStyle(() => ({
     opacity: headerVisible.value,

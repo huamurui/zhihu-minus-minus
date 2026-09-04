@@ -19,7 +19,6 @@ import {
 } from 'react';
 import {
   ActivityIndicator,
-  Animated,
   Image,
   LayoutAnimation,
   type NativeScrollEvent,
@@ -30,7 +29,11 @@ import {
   UIManager,
   useWindowDimensions,
 } from 'react-native';
-import Reanimated from 'react-native-reanimated';
+import Reanimated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   getMemberActivities,
@@ -532,7 +535,7 @@ export default function UserStreamScreen() {
   const [selectedAnswer, setSelectedAnswer] =
     useState<StreamContentItem | null>(null);
 
-  const footerAnim = useRef(new Animated.Value(0)).current;
+  const footerAnim = useSharedValue(0);
   const isFloatingShown = useRef(false);
   const lastCheckTime = useRef(0);
   const itemRefs = useRef(new Map<string, StreamItemHandle | null>());
@@ -592,27 +595,32 @@ export default function UserStreamScreen() {
 
           if (shouldShow !== isFloatingShown.current) {
             isFloatingShown.current = shouldShow;
-            Animated.spring(footerAnim, {
-              toValue: shouldShow ? 1 : 0,
-              useNativeDriver: true,
-              friction: 10,
-              tension: 50,
-            }).start();
+            footerAnim.value = withSpring(shouldShow ? 1 : 0, {
+              damping: 18,
+              stiffness: 180,
+            });
           }
         }
       } else {
         if (isFloatingShown.current) {
           isFloatingShown.current = false;
-          Animated.spring(footerAnim, {
-            toValue: 0,
-            useNativeDriver: true,
-            friction: 10,
-            tension: 50,
-          }).start();
+          footerAnim.value = withSpring(0, {
+            damping: 18,
+            stiffness: 180,
+          });
         }
       }
     }
   };
+
+  const footerAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: footerAnim.value,
+    transform: [
+      {
+        translateY: 100 * (1 - footerAnim.value),
+      },
+    ],
+  }));
 
   // 1. Fetch User Profile Details
   const {
@@ -956,21 +964,13 @@ export default function UserStreamScreen() {
             }
           />
 
-          <Animated.View
+          <Reanimated.View
             className="absolute left-5 right-5 h-[54px] rounded-[27px] overflow-hidden z-[1000] shadow-black/20 shadow-lg elevation-10"
             style={[
               {
                 bottom: insets.bottom,
-                transform: [
-                  {
-                    translateY: footerAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [100, 0],
-                    }),
-                  },
-                ],
-                opacity: footerAnim,
               },
+              footerAnimatedStyle,
             ]}
           >
             <BlurView
@@ -1072,7 +1072,7 @@ export default function UserStreamScreen() {
                 </Pressable>
               </View>
             </BlurView>
-          </Animated.View>
+          </Reanimated.View>
         </>
       )}
     </View>

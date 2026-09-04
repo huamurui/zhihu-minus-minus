@@ -62,13 +62,6 @@ export function BouncyButton({
 
   const handlePressIn = useCallback(
     (e: any) => {
-      console.log('[BouncyButton] PressIn:', {
-        isAndroid,
-        androidFeedbackType,
-        enableAnimation,
-        enableRipple,
-        rippleColor,
-      });
       if (enableAnimation) {
         scale.value = withSpring(pressScale, { damping: 35, stiffness: 800 });
         opacity.value = withTiming(pressOpacity, { duration: 50 });
@@ -85,17 +78,12 @@ export function BouncyButton({
       onPressIn,
       scale,
       opacity,
-      isAndroid,
-      androidFeedbackType,
-      enableRipple,
-      rippleColor,
       hapticFeedback,
     ],
   );
 
   const handlePressOut = useCallback(
     (e: any) => {
-      console.log('[BouncyButton] PressOut');
       if (enableAnimation) {
         scale.value = withSpring(1, { damping: 35, stiffness: 800 });
         opacity.value = withTiming(1, { duration: 100 });
