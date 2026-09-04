@@ -76,7 +76,7 @@ export function ActionSheet({
         {headerContent}
         <View style={[styles.optionGroup, { backgroundColor: itemBackground }]}>
           {options.map((option, index) => {
-            const optionColor = option.destructive
+            const iconColor = option.destructive
               ? Colors[colorScheme].danger
               : option.color || Colors[colorScheme].text;
             const iconBackground =
@@ -102,17 +102,13 @@ export function ActionSheet({
                       { backgroundColor: iconBackground },
                     ]}
                   >
-                    <Ionicons
-                      name={option.icon}
-                      size={21}
-                      color={optionColor}
-                    />
+                    <Ionicons name={option.icon} size={21} color={iconColor} />
                   </View>
                   <View style={styles.optionCopy}>
                     <Text
                       style={[
                         styles.optionLabel,
-                        { color: optionColor },
+                        { color: Colors[colorScheme].text },
                         option.destructive && styles.destructiveLabel,
                       ]}
                     >
