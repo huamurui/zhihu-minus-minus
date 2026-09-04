@@ -1,11 +1,20 @@
 import * as SecureStore from 'expo-secure-store';
-import { useColorScheme as useNativewindColorScheme } from 'nativewind';
+import { colorScheme as nativewindColorScheme } from 'nativewind';
 import { useEffect } from 'react';
-import { Appearance } from 'react-native';
+import {
+  Appearance,
+  Platform,
+  type TurboModule,
+  TurboModuleRegistry,
+} from 'react-native';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
+
+interface NativeAppearanceModule extends TurboModule {
+  setColorScheme: (style: 'light' | 'dark' | 'unspecified') => void;
+}
 
 interface ThemeState {
   isDark: boolean;
@@ -95,11 +104,19 @@ Appearance.addChangeListener(({ colorScheme }) => {
  */
 export function useSyncThemeWithNativeWind() {
   const themeMode = useThemeStore((state) => state.themeMode);
-  const { setColorScheme } = useNativewindColorScheme();
 
   useEffect(() => {
-    // NativeWind forwards `system` to Appearance to release manual overrides.
-    // The appearance listener above receives the resolved OS color afterward.
-    setColorScheme(themeMode);
-  }, [themeMode, setColorScheme]);
+    if (Platform.OS === 'web') {
+      nativewindColorScheme.set(themeMode);
+      return;
+    }
+
+    // NativeWind 4 passes null for system; RN 0.83 requires `unspecified`.
+    // Call the native module so RN's JS setter cannot cache `unspecified`
+    // as a resolved color. Native events update both Appearance and NativeWind;
+    // when the effective color is unchanged, their existing caches stay valid.
+    TurboModuleRegistry.get<NativeAppearanceModule>(
+      'Appearance',
+    )?.setColorScheme(themeMode === 'system' ? 'unspecified' : themeMode);
+  }, [themeMode]);
 }
