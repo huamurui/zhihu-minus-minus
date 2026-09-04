@@ -15,11 +15,14 @@ import {
   Pressable,
   TextInput,
 } from 'react-native';
-import PagerView from 'react-native-pager-view';
+import PagerView, {
+  type PagerViewOnPageScrollEvent,
+} from 'react-native-pager-view';
 import Reanimated, {
   interpolate,
   useAnimatedScrollHandler,
   useAnimatedStyle,
+  useEvent,
   useSharedValue,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -134,6 +137,7 @@ const PROFILE_TABS = [
   { key: 'questions', label: '提问', countKey: 'question_count' },
   { key: 'pins', label: '想法', countKey: 'pins_count' },
 ] as const;
+const AnimatedPagerView = Reanimated.createAnimatedComponent(PagerView);
 
 type ProfileTabKey = (typeof PROFILE_TABS)[number]['key'];
 
@@ -200,6 +204,18 @@ export default function UserDetailScreen() {
   const activeIndexRef = useRef(initialTabIndex);
   const pagerPosition = useSharedValue(initialTabIndex);
   const pagerOffset = useSharedValue(0);
+  const profileTabBarWidth = useSharedValue(0);
+
+  const pageScrollHandler = useEvent<PagerViewOnPageScrollEvent>(
+    (event) => {
+      'worklet';
+      if (event.eventName.endsWith('onPageScroll')) {
+        pagerPosition.value = event.position;
+        pagerOffset.value = event.offset;
+      }
+    },
+    ['onPageScroll'],
+  );
 
   // 获取对应 Tab 索引的 shared value
   const getSharedValue = (idx: number) => {
@@ -279,6 +295,14 @@ export default function UserDetailScreen() {
 
     return {
       transform: [{ translateY }],
+    };
+  });
+
+  const profileTabIndicatorStyle = useAnimatedStyle(() => {
+    const tabWidth = profileTabBarWidth.value / PROFILE_TABS.length;
+    return {
+      width: tabWidth,
+      transform: [{ translateX: pagerPosition.value * tabWidth }],
     };
   });
 
@@ -876,7 +900,12 @@ export default function UserDetailScreen() {
   );
 
   const renderTabsSelector = () => (
-    <View className="flex-row bg-transparent my-1 border-b border-gray-100 dark:border-gray-800">
+    <View
+      className="flex-row bg-transparent my-1 border-b border-gray-100 dark:border-gray-800"
+      onLayout={(event) => {
+        profileTabBarWidth.value = event.nativeEvent.layout.width;
+      }}
+    >
       {PROFILE_TABS.map((tab, idx) => {
         const count = tab.countKey ? user?.[tab.countKey] : undefined;
         const countStr = count !== undefined && count > 0 ? ` ${count}` : '';
@@ -886,12 +915,6 @@ export default function UserDetailScreen() {
             key={tab.key}
             onPress={() => handleTabPress(idx)}
             className="flex-1 py-2 items-center"
-            style={
-              isActive && {
-                borderBottomWidth: 2.5,
-                borderBottomColor: primaryColor,
-              }
-            }
           >
             <Text
               className="font-bold text-[14px]"
@@ -907,6 +930,20 @@ export default function UserDetailScreen() {
           </Pressable>
         );
       })}
+      <Reanimated.View
+        pointerEvents="none"
+        style={[
+          {
+            position: 'absolute',
+            left: 0,
+            bottom: 0,
+            height: 2.5,
+            borderRadius: 2,
+            backgroundColor: primaryColor,
+          },
+          profileTabIndicatorStyle,
+        ]}
+      />
     </View>
   );
 
@@ -1128,14 +1165,11 @@ export default function UserDetailScreen() {
           </Reanimated.View>
 
           {/* 底部 PagerView 进行左右切屏，Header 不会参与左右平移 */}
-          <PagerView
+          <AnimatedPagerView
             ref={pagerRef}
             style={{ flex: 1 }}
             initialPage={initialTabIndex}
-            onPageScroll={(e) => {
-              pagerPosition.value = e.nativeEvent.position;
-              pagerOffset.value = e.nativeEvent.offset;
-            }}
+            onPageScroll={pageScrollHandler}
             onPageScrollStateChanged={(e) => {
               const state = e.nativeEvent.pageScrollState;
               if (state === 'dragging') {
@@ -1247,7 +1281,7 @@ export default function UserDetailScreen() {
                 </NativeView>
               );
             })}
-          </PagerView>
+          </AnimatedPagerView>
         </View>
       )}
     </View>

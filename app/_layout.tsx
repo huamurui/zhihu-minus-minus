@@ -11,6 +11,7 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { RootSiblingParent } from 'react-native-root-siblings';
 import { ClipboardLinkModal } from '@/components/ClipboardLinkModal';
 import { CollectionSelectorModal } from '@/components/CollectionSelectorModal';
@@ -209,140 +210,142 @@ function RootLayout() {
   }, [hasThemeHydrated]);
   // throw new Error('test')
   return (
-    <QueryClientProvider client={queryClient}>
-      <SafeAreaProvider>
-        <RootSiblingParent>
-          <ThemeProvider value={theme}>
-            <UpdateChecker />
-            <ClipboardLinkModal
-              visible={clipboardModalVisible}
-              url={clipboardUrl}
-              onClose={() => setClipboardModalVisible(false)}
-              onOpen={() => {
-                setClipboardModalVisible(false);
-                const path = parseZhihuUrl(clipboardUrl);
-                if (path) {
-                  router.push(path as Href);
-                }
-              }}
-            />
-            <Stack
-              screenOptions={{
-                headerStyle: {
-                  backgroundColor: appThemeColors.backgroundSecondary,
-                },
-                headerTitleStyle: {
-                  color: appThemeColors.text,
-                  fontWeight: 'bold',
-                },
-                headerTintColor: currentTint,
-                headerShadowVisible: false,
-              }}
-            >
-              {/* 底部 Tab 主框架 */}
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-
-              {/* 文章详情页：从右侧推入 */}
-              <Stack.Screen
-                name="article/[id]"
-                options={{
-                  headerTitle: '正文',
-                  headerBackTitle: '返回',
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryClientProvider client={queryClient}>
+        <SafeAreaProvider>
+          <RootSiblingParent>
+            <ThemeProvider value={theme}>
+              <UpdateChecker />
+              <ClipboardLinkModal
+                visible={clipboardModalVisible}
+                url={clipboardUrl}
+                onClose={() => setClipboardModalVisible(false)}
+                onOpen={() => {
+                  setClipboardModalVisible(false);
+                  const path = parseZhihuUrl(clipboardUrl);
+                  if (path) {
+                    router.push(path as Href);
+                  }
                 }}
               />
-
-              {/* 登录页：建议做成从底部弹出的 Modal */}
-              <Stack.Screen
-                name="login/index"
-                options={{
-                  presentation: 'modal',
-                  headerTitle: '登录知乎',
-                  headerLeft: () => null,
+              <Stack
+                screenOptions={{
+                  headerStyle: {
+                    backgroundColor: appThemeColors.backgroundSecondary,
+                  },
+                  headerTitleStyle: {
+                    color: appThemeColors.text,
+                    fontWeight: 'bold',
+                  },
+                  headerTintColor: currentTint,
+                  headerShadowVisible: false,
                 }}
-              />
+              >
+                {/* 底部 Tab 主框架 */}
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
 
-              <Stack.Screen
-                name="feedback/index"
-                options={{
-                  headerShown: false,
-                  presentation: 'card',
-                }}
-              />
+                {/* 文章详情页：从右侧推入 */}
+                <Stack.Screen
+                  name="article/[id]"
+                  options={{
+                    headerTitle: '正文',
+                    headerBackTitle: '返回',
+                  }}
+                />
 
-              {/* 发布相关页面：使用全屏 Modal */}
-              <Stack.Screen
-                name="publish/answer"
-                options={{
-                  presentation: 'fullScreenModal',
-                  headerShown: false,
-                }}
-              />
-              <Stack.Screen
-                name="publish/article"
-                options={{
-                  presentation: 'fullScreenModal',
-                  headerShown: false,
-                }}
-              />
-              <Stack.Screen
-                name="publish/pin"
-                options={{
-                  presentation: 'fullScreenModal',
-                  headerShown: false,
-                }}
-              />
-              <Stack.Screen
-                name="publish/question"
-                options={{
-                  presentation: 'fullScreenModal',
-                  headerShown: false,
-                }}
-              />
+                {/* 登录页：建议做成从底部弹出的 Modal */}
+                <Stack.Screen
+                  name="login/index"
+                  options={{
+                    presentation: 'modal',
+                    headerTitle: '登录知乎',
+                    headerLeft: () => null,
+                  }}
+                />
 
-              {/* 问题详情页 */}
-              <Stack.Screen
-                name="question/[id]/index"
-                options={{
-                  headerShown: false,
-                  animation: 'fade',
-                }}
-              />
+                <Stack.Screen
+                  name="feedback/index"
+                  options={{
+                    headerShown: false,
+                    presentation: 'card',
+                  }}
+                />
 
-              {/* 回答详情页 */}
-              <Stack.Screen
-                name="answer/[id]"
-                options={{
-                  headerShown: false,
-                  animation: 'fade',
-                }}
-              />
+                {/* 发布相关页面：使用全屏 Modal */}
+                <Stack.Screen
+                  name="publish/answer"
+                  options={{
+                    presentation: 'fullScreenModal',
+                    headerShown: false,
+                  }}
+                />
+                <Stack.Screen
+                  name="publish/article"
+                  options={{
+                    presentation: 'fullScreenModal',
+                    headerShown: false,
+                  }}
+                />
+                <Stack.Screen
+                  name="publish/pin"
+                  options={{
+                    presentation: 'fullScreenModal',
+                    headerShown: false,
+                  }}
+                />
+                <Stack.Screen
+                  name="publish/question"
+                  options={{
+                    presentation: 'fullScreenModal',
+                    headerShown: false,
+                  }}
+                />
 
-              {/* 游客预览页 */}
-              <Stack.Screen
-                name="guest/detail"
-                options={{
-                  headerShown: false,
-                  animation: 'slide_from_right',
-                }}
-              />
-            </Stack>
+                {/* 问题详情页 */}
+                <Stack.Screen
+                  name="question/[id]/index"
+                  options={{
+                    headerShown: false,
+                    animation: 'fade',
+                  }}
+                />
 
-            {/* 全局状态栏和底部安全区渐变模糊遮罩 */}
-            <GradientMaskOverlay isDark={isDark} />
+                {/* 回答详情页 */}
+                <Stack.Screen
+                  name="answer/[id]"
+                  options={{
+                    headerShown: false,
+                    animation: 'fade',
+                  }}
+                />
 
-            {/* 全局状态栏控制 */}
-            <StatusBar style={isDark ? 'light' : 'dark'} />
+                {/* 游客预览页 */}
+                <Stack.Screen
+                  name="guest/detail"
+                  options={{
+                    headerShown: false,
+                    animation: 'slide_from_right',
+                  }}
+                />
+              </Stack>
 
-            {/* 人机验证弹窗 */}
-            <VerificationModal />
+              {/* 全局状态栏和底部安全区渐变模糊遮罩 */}
+              <GradientMaskOverlay isDark={isDark} />
 
-            {/* 全局收藏提醒和弹窗 */}
-            <CollectionToastOverlay />
-            <CollectionSelectorModal />
-          </ThemeProvider>
-        </RootSiblingParent>
-      </SafeAreaProvider>
-    </QueryClientProvider>
+              {/* 全局状态栏控制 */}
+              <StatusBar style={isDark ? 'light' : 'dark'} />
+
+              {/* 人机验证弹窗 */}
+              <VerificationModal />
+
+              {/* 全局收藏提醒和弹窗 */}
+              <CollectionToastOverlay />
+              <CollectionSelectorModal />
+            </ThemeProvider>
+          </RootSiblingParent>
+        </SafeAreaProvider>
+      </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }
 export default Sentry.wrap(RootLayout);

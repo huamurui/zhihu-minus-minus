@@ -6,13 +6,16 @@ import React, { useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Animated,
   Image,
+  type ScrollView as NativeScrollView,
   Pressable,
-  ScrollView,
   StyleSheet,
 } from 'react-native';
-import { SharedTransition } from 'react-native-reanimated';
+import Reanimated, {
+  interpolate,
+  SharedTransition,
+  useAnimatedStyle,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type AnswerDetail, deleteAnswer, getAnswer } from '@/api/zhihu';
 import {
@@ -59,10 +62,21 @@ export const AnswerDetailView = ({
   const backgroundColor = Colors[colorScheme].background;
   const _textColor = Colors[colorScheme].text;
 
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const scrollViewRef = useRef<ScrollView>(null);
-  const { headerVisible, handleScroll: baseHandleScroll } =
-    useScrollHeaderAnim(300);
+  const scrollViewRef = useRef<NativeScrollView>(null);
+  const { headerVisible, handleScroll } = useScrollHeaderAnim(300, onScroll);
+
+  const headerAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: headerVisible.value,
+    transform: [
+      {
+        translateY: interpolate(
+          headerVisible.value,
+          [0, 1],
+          [-insets.top - 50, 0],
+        ),
+      },
+    ],
+  }));
 
   const [isLiked, setIsLiked] = React.useState(false);
   const [menuVisible, setMenuVisible] = React.useState(false);
@@ -74,13 +88,6 @@ export const AnswerDetailView = ({
       setHasBeenFocused(true);
     }
   }, [isFocused, hasBeenFocused]);
-
-  const handleScrollInternal = (event: any) => {
-    baseHandleScroll(event, (currentY) => {
-      scrollY.setValue(currentY);
-      onScroll?.(currentY);
-    });
-  };
 
   const {
     data: answer,
@@ -230,22 +237,14 @@ export const AnswerDetailView = ({
   return (
     <View className="flex-1">
       {/* Header (On Scroll) */}
-      <Animated.View
+      <Reanimated.View
         className="absolute left-0 right-0 z-10"
         style={[
           {
             backgroundColor,
             paddingTop: insets.top,
-            opacity: headerVisible,
-            transform: [
-              {
-                translateY: headerVisible.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [-insets.top - 50, 0],
-                }),
-              },
-            ],
           },
+          headerAnimatedStyle,
         ]}
       >
         <View
@@ -289,9 +288,9 @@ export const AnswerDetailView = ({
           </View>
           <View className="w-10 bg-transparent" />
         </View>
-      </Animated.View>
+      </Reanimated.View>
 
-      <ScrollView
+      <Reanimated.ScrollView
         ref={scrollViewRef}
         className="flex-1"
         style={{
@@ -301,7 +300,7 @@ export const AnswerDetailView = ({
               : 'rgba(255,255,255,0.9)',
         }}
         scrollEventThrottle={16}
-        onScroll={handleScrollInternal}
+        onScroll={handleScroll}
         contentContainerStyle={{
           paddingTop: insets.top + 76,
           paddingBottom: 100 + insets.bottom,
@@ -426,7 +425,7 @@ export const AnswerDetailView = ({
             </View>
           </View>
         )}
-      </ScrollView>
+      </Reanimated.ScrollView>
 
       {/* Footer Actions */}
       <View
