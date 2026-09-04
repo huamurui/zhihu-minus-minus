@@ -22,11 +22,14 @@ import {
   StyleSheet,
   useWindowDimensions,
 } from 'react-native';
-import PagerView from 'react-native-pager-view';
+import PagerView, {
+  type PagerViewOnPageScrollEvent,
+} from 'react-native-pager-view';
 import Animated, {
   Extrapolate,
   interpolate,
   useAnimatedStyle,
+  useEvent,
   useSharedValue,
   withRepeat,
   withSequence,
@@ -101,6 +104,7 @@ const AUTO_HIDE_NAV_TABS: readonly TabType[] = [
   'hot',
   'daily',
 ];
+const AnimatedPagerView = Animated.createAnimatedComponent(PagerView);
 
 function isTabType(value: string): value is TabType {
   return (TABS as readonly string[]).includes(value);
@@ -176,6 +180,15 @@ export default function HomeScreen() {
   const scrollX = useSharedValue(initialPageIndex);
   const chromeVisibility = useSharedValue(1);
   const pagerRef = useRef<PagerView>(null);
+  const pageScrollHandler = useEvent<PagerViewOnPageScrollEvent>(
+    (event) => {
+      'worklet';
+      if (event.eventName.endsWith('onPageScroll')) {
+        scrollX.value = event.position + event.offset;
+      }
+    },
+    ['onPageScroll'],
+  );
   const { cookies } = useAuthStore();
 
   const tintColor = useThemeColor({}, 'primary');
@@ -542,14 +555,12 @@ export default function HomeScreen() {
         </BlurView>
       </Animated.View>
 
-      <PagerView
+      <AnimatedPagerView
         key={`pager-${currentTabs.join('-')}`} // 强制重新渲染
         ref={pagerRef}
         style={styles.pager}
         initialPage={initialPageIndex}
-        onPageScroll={(e) => {
-          scrollX.value = e.nativeEvent.position + e.nativeEvent.offset;
-        }}
+        onPageScroll={pageScrollHandler}
         onPageSelected={(e) => {
           setChromeHidden(false);
           setCurrentPage(e.nativeEvent.position);
@@ -604,7 +615,7 @@ export default function HomeScreen() {
             </View>
           );
         })}
-      </PagerView>
+      </AnimatedPagerView>
 
       {/* 3. 底部悬浮导航栏 (Custom TabBar) */}
       <Animated.View

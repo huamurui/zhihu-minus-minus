@@ -25,18 +25,16 @@ import React, {
 import {
   ActivityIndicator,
   Alert,
-  Animated,
   Image,
-  LayoutAnimation,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
   View as NativeView,
-  PanResponder,
-  Platform,
   Pressable,
-  UIManager,
   useWindowDimensions,
 } from 'react-native';
+import {
+  Gesture,
+  GestureDetector,
+  type GestureType,
+} from 'react-native-gesture-handler';
 import Reanimated, {
   interpolate,
   runOnJS,
@@ -82,6 +80,10 @@ import type { ZhihuAuthor } from '@/types/zhihu';
 import { formatDate } from '@/utils/date';
 import { refreshInfiniteQuery } from '@/utils/query';
 
+const AnimatedFlashList = Reanimated.createAnimatedComponent(
+  FlashList,
+) as typeof FlashList;
+
 type AnswerSort = 'default' | 'created';
 
 interface AnswerItemHandle {
@@ -99,8 +101,10 @@ interface AnswerItemProps {
   questionId: string;
   sortBy: AnswerSort;
   screenTranslateX: SharedValue<number>;
+  scrollGesture: GestureType;
   onSwipeStart?: (author: ZhihuAuthor) => void;
   onSwipeComplete?: (author: ZhihuAuthor) => void;
+  onSwipeCancel?: () => void;
 }
 
 const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
@@ -113,14 +117,14 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
       questionId,
       sortBy,
       screenTranslateX,
+      scrollGesture,
       onSwipeStart,
       onSwipeComplete,
+      onSwipeCancel,
     }: AnswerItemProps,
     ref,
   ) => {
     const { width: screenWidth } = useWindowDimensions();
-    const screenWidthRef = useRef(screenWidth);
-    screenWidthRef.current = screenWidth;
     const colorScheme = useColorScheme();
     const router = useRouter();
     const _textColor = Colors[colorScheme].text;
@@ -155,13 +159,6 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
     );
     const expandedProgress = useSharedValue(isExpanded ? 1 : 0);
     const borderProgress = useSharedValue(0);
-
-    const itemRef = useRef(item);
-    itemRef.current = item;
-    const onSwipeStartRef = useRef(onSwipeStart);
-    onSwipeStartRef.current = onSwipeStart;
-    const onSwipeCompleteRef = useRef(onSwipeComplete);
-    onSwipeCompleteRef.current = onSwipeComplete;
 
     React.useLayoutEffect(() => {
       const itemChanged = animationItemIdRef.current !== item.id;
@@ -224,48 +221,58 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
       };
     });
 
-    const panResponder = useRef(
-      PanResponder.create({
-        onStartShouldSetPanResponderCapture: () => false,
-        onMoveShouldSetPanResponderCapture: (_evt, gestureState) => {
-          // 仅在向左滑动且存在 author.url_token 时拦截手势
-          const currentItem = itemRef.current;
-          const isHorizontal =
-            gestureState.dx < -15 &&
-            Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5;
-          return isHorizontal && !!currentItem?.author?.url_token;
-        },
-        onPanResponderGrant: () => {
-          const currentItem = itemRef.current;
-          if (onSwipeStartRef.current && currentItem?.author) {
-            runOnJS(onSwipeStartRef.current)(currentItem.author);
-          }
-        },
-        onPanResponderMove: (_evt, gestureState) => {
-          // 只允许向左侧滑动（偏移量 <= 0）
-          screenTranslateX.value = Math.min(0, gestureState.dx);
-        },
-        onPanResponderRelease: (_evt, gestureState) => {
-          const currentItem = itemRef.current;
-          if (gestureState.dx < -120) {
-            screenTranslateX.value = withTiming(
-              -screenWidthRef.current,
-              { duration: 250 },
-              () => {
-                if (onSwipeCompleteRef.current && currentItem?.author) {
-                  runOnJS(onSwipeCompleteRef.current)(currentItem.author);
-                }
-              },
-            );
-          } else {
-            screenTranslateX.value = withTiming(0, { duration: 250 });
-          }
-        },
-        onPanResponderTerminate: () => {
-          screenTranslateX.value = withTiming(0, { duration: 250 });
-        },
-      }),
-    ).current;
+    const panGesture = useMemo(
+      () =>
+        Gesture.Pan()
+          .enabled(Boolean(item.author?.url_token))
+          .activeOffsetX(-15)
+          .failOffsetY([-8, 8])
+          .simultaneousWithExternalGesture(scrollGesture)
+          .onStart(() => {
+            if (item.author && onSwipeStart) {
+              runOnJS(onSwipeStart)(item.author);
+            }
+          })
+          .onUpdate((event) => {
+            // 只允许向左侧滑动（偏移量 <= 0）
+            screenTranslateX.value = Math.min(0, event.translationX);
+          })
+          .onEnd((event) => {
+            if (event.translationX < -120 && item.author && onSwipeComplete) {
+              screenTranslateX.value = withTiming(
+                -screenWidth,
+                { duration: 250 },
+                (finished) => {
+                  if (finished) {
+                    runOnJS(onSwipeComplete)(item.author);
+                  }
+                },
+              );
+            } else {
+              screenTranslateX.value = withTiming(0, { duration: 250 });
+              if (onSwipeCancel) {
+                runOnJS(onSwipeCancel)();
+              }
+            }
+          })
+          .onFinalize((_event, success) => {
+            if (!success) {
+              screenTranslateX.value = withTiming(0, { duration: 250 });
+              if (onSwipeCancel) {
+                runOnJS(onSwipeCancel)();
+              }
+            }
+          }),
+      [
+        item.author,
+        onSwipeComplete,
+        onSwipeCancel,
+        onSwipeStart,
+        scrollGesture,
+        screenTranslateX,
+        screenWidth,
+      ],
+    );
 
     useImperativeHandle(ref, () => ({
       measureFooter: (callback) => footerRef.current?.measureInWindow(callback),
@@ -360,344 +367,349 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
     };
 
     return (
-      <View
-        {...panResponder.panHandlers}
-        style={{
-          backgroundColor: Colors[colorScheme].backgroundSecondary,
-          borderRadius: 12,
-          position: 'relative',
-        }}
-        className="p-4 mb-2.5 mx-1.5"
-      >
-        {/* Glowing border hint overlay */}
-        <Reanimated.View
-          style={[
-            animatedBorderStyle,
-            {
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              borderRadius: 12,
-              borderWidth: 2,
-              pointerEvents: 'none',
-              zIndex: 999,
-            },
-          ]}
-        />
-        <View className="flex-row items-center mb-3 bg-transparent">
-          <Pressable
-            onPress={() =>
-              item.author?.url_token &&
-              router.push(`/user/${item.author.url_token}`)
-            }
-            className="flex-row flex-1 items-center bg-transparent"
-          >
-            <Image
-              source={{ uri: item.author?.avatar_url }}
-              className="w-[34px] h-[34px] rounded-[17px]"
-            />
-            <View className="flex-1 ml-2.5 bg-transparent">
-              <Text className="text-[15px] font-bold">{item.author?.name}</Text>
-              <Text
-                type="secondary"
-                className="text-xs mt-0.5"
-                numberOfLines={1}
-              >
-                {item.author?.headline}
-              </Text>
-            </View>
-          </Pressable>
-          {!item.relationship?.is_author && (
+      <GestureDetector gesture={panGesture}>
+        <View
+          style={{
+            backgroundColor: Colors[colorScheme].backgroundSecondary,
+            borderRadius: 12,
+            position: 'relative',
+          }}
+          className="p-4 mb-2.5 mx-1.5"
+        >
+          {/* Glowing border hint overlay */}
+          <Reanimated.View
+            style={[
+              animatedBorderStyle,
+              {
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                borderRadius: 12,
+                borderWidth: 2,
+                pointerEvents: 'none',
+                zIndex: 999,
+              },
+            ]}
+          />
+          <View className="flex-row items-center mb-3 bg-transparent">
             <Pressable
-              className="px-3 py-1.5 rounded-[15px]"
-              style={[
-                !item.author?.is_following && {
-                  backgroundColor: primaryTransparent,
-                },
-                item.author?.is_following && {
-                  backgroundColor: 'transparent',
-                  borderColor: Colors[colorScheme].border,
-                  borderWidth: 1,
-                },
-              ]}
-              onPress={() => followMutation.mutate()}
-              disabled={followMutation.isPending}
-              accessibilityState={{ disabled: followMutation.isPending }}
+              onPress={() =>
+                item.author?.url_token &&
+                router.push(`/user/${item.author.url_token}`)
+              }
+              className="flex-row flex-1 items-center bg-transparent"
             >
-              <Text
-                className="text-[13px] font-bold"
-                style={[
-                  item.author?.is_following
-                    ? { color: Colors[colorScheme].textSecondary }
-                    : { color: primaryColor },
-                ]}
-              >
-                {item.author?.is_following ? '已关注' : '关注'}
-              </Text>
-            </Pressable>
-          )}
-        </View>
-
-        <View className="mt-1 bg-transparent">
-          {!isLongContent ? (
-            // Short content: render directly
-            <View className="flex-1 bg-transparent">
-              <ZhihuContent
-                objectId={item.id.toString()}
-                type="answer"
-                content={item.content}
-                segmentInfos={item.segment_infos}
-                useNative={true}
+              <Image
+                source={{ uri: item.author?.avatar_url }}
+                className="w-[34px] h-[34px] rounded-[17px]"
               />
-              {MetaInfo}
-            </View>
-          ) : !isMounted ? (
-            // Long content, never expanded: plain-text excerpt styled like ZhihuContent <p>
-            <View className="flex-1 bg-transparent">
-              {/* Text + gradient overlay in a relative container */}
-              <View style={{ position: 'relative', height: 180 }}>
-                <View style={{ height: 180, overflow: 'hidden' }}>
-                  <Text
-                    style={{
-                      fontSize: 17 * fontSizeScale,
-                      lineHeight: 17 * lineHeightScale,
-                      color: Colors[colorScheme].text,
-                      marginBottom: 14,
-                    }}
-                  >
-                    {excerpt}
-                  </Text>
-                </View>
-                {/* Gradient fades out the bottom of the text, tap to expand */}
-                <Pressable
-                  onPress={() => onToggle(item.id.toString(), true)}
-                  style={{
-                    position: 'absolute',
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    height: 150,
-                  }}
+              <View className="flex-1 ml-2.5 bg-transparent">
+                <Text className="text-[15px] font-bold">
+                  {item.author?.name}
+                </Text>
+                <Text
+                  type="secondary"
+                  className="text-xs mt-0.5"
+                  numberOfLines={1}
                 >
-                  <LinearGradient
-                    colors={[
-                      colorScheme === 'dark'
-                        ? 'rgba(30, 30, 34, 0)'
-                        : 'rgba(255, 255, 255, 0)',
-                      colorScheme === 'dark'
-                        ? 'rgba(30, 30, 34, 1)'
-                        : 'rgba(255, 255, 255, 1)',
-                    ]}
-                    style={{
-                      flex: 1,
-                      justifyContent: 'flex-end',
-                      alignItems: 'center',
-                      paddingBottom: 6,
-                    }}
-                  >
-                    <Text
-                      className="text-[13px] font-bold"
-                      style={{ color: primaryColor }}
-                    >
-                      展开全文
-                    </Text>
-                  </LinearGradient>
-                </Pressable>
+                  {item.author?.headline}
+                </Text>
               </View>
-              {MetaInfo}
-            </View>
-          ) : (
-            // Long content, mounted (expanded at least once): full ZhihuContent with animation
-            <View
-              className="flex-1 bg-transparent"
-              style={{ position: 'relative' }}
-            >
-              <Reanimated.View
+            </Pressable>
+            {!item.relationship?.is_author && (
+              <Pressable
+                className="px-3 py-1.5 rounded-[15px]"
                 style={[
-                  animatedContentStyle,
-                  { overflow: 'hidden', alignSelf: 'stretch' },
-                ]}
-                className="bg-transparent"
-              >
-                <View
-                  onLayout={(e) => {
-                    const h = e.nativeEvent.layout.height;
-                    if (h > 0) {
-                      setMeasuredHeight(h);
-                    }
-                  }}
-                  style={{ width: '100%' }}
-                  className="bg-transparent"
-                >
-                  <ZhihuContent
-                    objectId={item.id.toString()}
-                    type="answer"
-                    content={item.content}
-                    segmentInfos={item.segment_infos}
-                  />
-                  {MetaInfo}
-                  <Pressable
-                    onPress={() =>
-                      item?.id && onToggle(item.id.toString(), false)
-                    }
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      paddingVertical: 10,
-                      marginTop: 4,
-                    }}
-                  >
-                    <Text
-                      className="text-[13px] font-bold mr-1"
-                      style={{ color: primaryColor }}
-                    >
-                      收起回答
-                    </Text>
-                    <Ionicons
-                      name="chevron-up"
-                      size={14}
-                      color={primaryColor}
-                    />
-                  </Pressable>
-                </View>
-              </Reanimated.View>
-
-              <Reanimated.View
-                style={[
-                  animatedReadMoreStyle,
-                  {
-                    position: 'absolute',
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    height: 100,
+                  !item.author?.is_following && {
+                    backgroundColor: primaryTransparent,
+                  },
+                  item.author?.is_following && {
+                    backgroundColor: 'transparent',
+                    borderColor: Colors[colorScheme].border,
+                    borderWidth: 1,
                   },
                 ]}
-                pointerEvents={isExpanded ? 'none' : 'auto'}
+                onPress={() => followMutation.mutate()}
+                disabled={followMutation.isPending}
+                accessibilityState={{ disabled: followMutation.isPending }}
               >
-                <Pressable
-                  onPress={() => onToggle(item.id.toString(), true)}
-                  className="absolute inset-0"
+                <Text
+                  className="text-[13px] font-bold"
+                  style={[
+                    item.author?.is_following
+                      ? { color: Colors[colorScheme].textSecondary }
+                      : { color: primaryColor },
+                  ]}
                 >
-                  <LinearGradient
-                    colors={[
-                      colorScheme === 'dark'
-                        ? 'rgba(30, 30, 34, 0)'
-                        : 'rgba(255, 255, 255, 0)',
-                      colorScheme === 'dark'
-                        ? 'rgba(30, 30, 34, 1)'
-                        : 'rgba(255, 255, 255, 1)',
-                    ]}
+                  {item.author?.is_following ? '已关注' : '关注'}
+                </Text>
+              </Pressable>
+            )}
+          </View>
+
+          <View className="mt-1 bg-transparent">
+            {!isLongContent ? (
+              // Short content: render directly
+              <View className="flex-1 bg-transparent">
+                <ZhihuContent
+                  objectId={item.id.toString()}
+                  type="answer"
+                  content={item.content}
+                  segmentInfos={item.segment_infos}
+                  useNative={true}
+                />
+                {MetaInfo}
+              </View>
+            ) : !isMounted ? (
+              // Long content, never expanded: plain-text excerpt styled like ZhihuContent <p>
+              <View className="flex-1 bg-transparent">
+                {/* Text + gradient overlay in a relative container */}
+                <View style={{ position: 'relative', height: 180 }}>
+                  <View style={{ height: 180, overflow: 'hidden' }}>
+                    <Text
+                      style={{
+                        fontSize: 17 * fontSizeScale,
+                        lineHeight: 17 * lineHeightScale,
+                        color: Colors[colorScheme].text,
+                        marginBottom: 14,
+                      }}
+                    >
+                      {excerpt}
+                    </Text>
+                  </View>
+                  {/* Gradient fades out the bottom of the text, tap to expand */}
+                  <Pressable
+                    onPress={() => onToggle(item.id.toString(), true)}
                     style={{
                       position: 'absolute',
                       left: 0,
                       right: 0,
-                      top: 0,
                       bottom: 0,
-                      justifyContent: 'flex-end',
-                      alignItems: 'center',
-                      paddingBottom: 6,
+                      height: 150,
                     }}
                   >
-                    <Text
-                      className="text-[13px] font-bold"
-                      style={{ color: primaryColor }}
+                    <LinearGradient
+                      colors={[
+                        colorScheme === 'dark'
+                          ? 'rgba(30, 30, 34, 0)'
+                          : 'rgba(255, 255, 255, 0)',
+                        colorScheme === 'dark'
+                          ? 'rgba(30, 30, 34, 1)'
+                          : 'rgba(255, 255, 255, 1)',
+                      ]}
+                      style={{
+                        flex: 1,
+                        justifyContent: 'flex-end',
+                        alignItems: 'center',
+                        paddingBottom: 6,
+                      }}
                     >
-                      展开全文
-                    </Text>
-                  </LinearGradient>
-                </Pressable>
-              </Reanimated.View>
-            </View>
-          )}
-        </View>
-
-        <NativeView
-          ref={footerRef}
-          className="flex-row items-center pt-1 px-1 bg-transparent"
-        >
-          <View className="flex-row items-center bg-transparent">
-            <LikeButton
-              id={item.id}
-              count={item.voteup_count}
-              voted={item.relationship?.voting}
-              type="answers"
-              variant="ghost"
-            />
-          </View>
-          <BouncyButton
-            className="flex-row items-center  bg-transparent py-1.5 px-3 rounded-full"
-            onPress={() =>
-              router.push({
-                pathname: '/comments/[id]',
-                params: {
-                  id: item.id,
-                  type: 'answer',
-                  count: item.comment_count,
-                },
-              })
-            }
-          >
-            <Ionicons
-              name="chatbubble-outline"
-              size={16}
-              color={Colors[colorScheme].iconMuted}
-            />
-            <Text type="secondary" className="ml-1 text-xs font-semibold">
-              {item.comment_count > 0 ? item.comment_count : '0'}
-            </Text>
-          </BouncyButton>
-          <BouncyButton
-            className="flex-row items-center  bg-transparent py-1.5 px-3 rounded-full"
-            onPress={() => toggleCollect(item.id, 'answer', isCollected)}
-          >
-            <Ionicons
-              name={isCollected ? 'star' : 'star-outline'}
-              size={16}
-              color={isCollected ? warningColor : Colors[colorScheme].iconMuted}
-            />
-            {displayCount > 0 && (
-              <Text
-                className="ml-1 text-xs font-semibold"
-                style={{
-                  color: isCollected
-                    ? warningColor
-                    : Colors[colorScheme].iconMuted,
-                }}
+                      <Text
+                        className="text-[13px] font-bold"
+                        style={{ color: primaryColor }}
+                      >
+                        展开全文
+                      </Text>
+                    </LinearGradient>
+                  </Pressable>
+                </View>
+                {MetaInfo}
+              </View>
+            ) : (
+              // Long content, mounted (expanded at least once): full ZhihuContent with animation
+              <View
+                className="flex-1 bg-transparent"
+                style={{ position: 'relative' }}
               >
-                {displayCount}
-              </Text>
+                <Reanimated.View
+                  style={[
+                    animatedContentStyle,
+                    { overflow: 'hidden', alignSelf: 'stretch' },
+                  ]}
+                  className="bg-transparent"
+                >
+                  <View
+                    onLayout={(e) => {
+                      const h = e.nativeEvent.layout.height;
+                      if (h > 0) {
+                        setMeasuredHeight(h);
+                      }
+                    }}
+                    style={{ width: '100%' }}
+                    className="bg-transparent"
+                  >
+                    <ZhihuContent
+                      objectId={item.id.toString()}
+                      type="answer"
+                      content={item.content}
+                      segmentInfos={item.segment_infos}
+                    />
+                    {MetaInfo}
+                    <Pressable
+                      onPress={() =>
+                        item?.id && onToggle(item.id.toString(), false)
+                      }
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        paddingVertical: 10,
+                        marginTop: 4,
+                      }}
+                    >
+                      <Text
+                        className="text-[13px] font-bold mr-1"
+                        style={{ color: primaryColor }}
+                      >
+                        收起回答
+                      </Text>
+                      <Ionicons
+                        name="chevron-up"
+                        size={14}
+                        color={primaryColor}
+                      />
+                    </Pressable>
+                  </View>
+                </Reanimated.View>
+
+                <Reanimated.View
+                  style={[
+                    animatedReadMoreStyle,
+                    {
+                      position: 'absolute',
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: 100,
+                    },
+                  ]}
+                  pointerEvents={isExpanded ? 'none' : 'auto'}
+                >
+                  <Pressable
+                    onPress={() => onToggle(item.id.toString(), true)}
+                    className="absolute inset-0"
+                  >
+                    <LinearGradient
+                      colors={[
+                        colorScheme === 'dark'
+                          ? 'rgba(30, 30, 34, 0)'
+                          : 'rgba(255, 255, 255, 0)',
+                        colorScheme === 'dark'
+                          ? 'rgba(30, 30, 34, 1)'
+                          : 'rgba(255, 255, 255, 1)',
+                      ]}
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+                        justifyContent: 'flex-end',
+                        alignItems: 'center',
+                        paddingBottom: 6,
+                      }}
+                    >
+                      <Text
+                        className="text-[13px] font-bold"
+                        style={{ color: primaryColor }}
+                      >
+                        展开全文
+                      </Text>
+                    </LinearGradient>
+                  </Pressable>
+                </Reanimated.View>
+              </View>
             )}
-          </BouncyButton>
-          {item.relationship?.is_author && (
+          </View>
+
+          <NativeView
+            ref={footerRef}
+            className="flex-row items-center pt-1 px-1 bg-transparent"
+          >
+            <View className="flex-row items-center bg-transparent">
+              <LikeButton
+                id={item.id}
+                count={item.voteup_count}
+                voted={item.relationship?.voting}
+                type="answers"
+                variant="ghost"
+              />
+            </View>
             <BouncyButton
-              className="p-2 bg-transparent"
-              style={{ borderRadius: 99 }}
-              onPress={handleDelete}
+              className="flex-row items-center  bg-transparent py-1.5 px-3 rounded-full"
+              onPress={() =>
+                router.push({
+                  pathname: '/comments/[id]',
+                  params: {
+                    id: item.id,
+                    type: 'answer',
+                    count: item.comment_count,
+                  },
+                })
+              }
             >
               <Ionicons
-                name="trash-outline"
+                name="chatbubble-outline"
+                size={16}
+                color={Colors[colorScheme].iconMuted}
+              />
+              <Text type="secondary" className="ml-1 text-xs font-semibold">
+                {item.comment_count > 0 ? item.comment_count : '0'}
+              </Text>
+            </BouncyButton>
+            <BouncyButton
+              className="flex-row items-center  bg-transparent py-1.5 px-3 rounded-full"
+              onPress={() => toggleCollect(item.id, 'answer', isCollected)}
+            >
+              <Ionicons
+                name={isCollected ? 'star' : 'star-outline'}
+                size={16}
+                color={
+                  isCollected ? warningColor : Colors[colorScheme].iconMuted
+                }
+              />
+              {displayCount > 0 && (
+                <Text
+                  className="ml-1 text-xs font-semibold"
+                  style={{
+                    color: isCollected
+                      ? warningColor
+                      : Colors[colorScheme].iconMuted,
+                  }}
+                >
+                  {displayCount}
+                </Text>
+              )}
+            </BouncyButton>
+            {item.relationship?.is_author && (
+              <BouncyButton
+                className="p-2 bg-transparent"
+                style={{ borderRadius: 99 }}
+                onPress={handleDelete}
+              >
+                <Ionicons
+                  name="trash-outline"
+                  size={18}
+                  color={Colors[colorScheme].danger}
+                />
+              </BouncyButton>
+            )}
+            <BouncyButton
+              className="ml-auto p-2 bg-transparent"
+              style={{ borderRadius: 99 }}
+              onPress={() => onShare?.(item)}
+            >
+              <Ionicons
+                name="share-social-outline"
                 size={18}
-                color={Colors[colorScheme].danger}
+                color={Colors[colorScheme].textSecondary}
               />
             </BouncyButton>
-          )}
-          <BouncyButton
-            className="ml-auto p-2 bg-transparent"
-            style={{ borderRadius: 99 }}
-            onPress={() => onShare?.(item)}
-          >
-            <Ionicons
-              name="share-social-outline"
-              size={18}
-              color={Colors[colorScheme].textSecondary}
-            />
-          </BouncyButton>
-        </NativeView>
-      </View>
+          </NativeView>
+        </View>
+      </GestureDetector>
     );
   },
 );
@@ -717,6 +729,7 @@ export default function QuestionDetail() {
   const queryClient = useQueryClient();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const screenTranslateX = useSharedValue(0);
+  const scrollGesture = useMemo(() => Gesture.Native(), []);
   const [swipedAuthor, setSwipedAuthor] = useState<ZhihuAuthor | null>(null);
 
   const animatedScreenStyle = useAnimatedStyle(() => {
@@ -776,13 +789,10 @@ export default function QuestionDetail() {
     (activeItem?.favlists_count || 0) + storeFloatingOffset;
   const { toggleCollect: toggleFloatingCollect } = useCollectionAction();
 
-  const footerAnim = useRef(new Animated.Value(0)).current;
+  const footerAnim = useSharedValue(0);
 
   const isFloatingShown = useRef(false);
   const flashListRef = useRef<FlashListRef<AnswerDetail>>(null);
-  const { headerVisible, handleScroll: baseHandleScroll } =
-    useScrollHeaderAnim(400);
-
   const {
     data: answersData,
     fetchNextPage,
@@ -830,14 +840,6 @@ export default function QuestionDetail() {
 
   const handleToggleExpand = useCallback(
     (id: string, expanded: boolean) => {
-      if (
-        Platform.OS === 'android' &&
-        UIManager.setLayoutAnimationEnabledExperimental
-      ) {
-        UIManager.setLayoutAnimationEnabledExperimental(true);
-      }
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-
       setExpandedIds((prev) => {
         const next = new Set(prev);
         if (expanded) next.add(id);
@@ -881,59 +883,92 @@ export default function QuestionDetail() {
 
   const lastCheckTime = useRef(0);
 
-  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const { currentY } = baseHandleScroll(event);
+  const handleScrollEffects = useCallback(
+    (currentY: number) => {
+      // if (!qLoading && isRestored && currentY > 0) {
+      //   saveProgress(id as string, currentY);
+      // }
 
-    // if (!qLoading && isRestored && currentY > 0) {
-    //   saveProgress(id as string, currentY);
-    // }
+      const now = Date.now();
 
-    const now = Date.now();
+      if (now - lastCheckTime.current > 100) {
+        lastCheckTime.current = now;
+        const currentViewableIds = viewableIdsRef.current;
+        let anyFooterVisible = false;
+        const promises: Promise<boolean>[] = [];
 
-    if (now - lastCheckTime.current > 100) {
-      lastCheckTime.current = now;
-      const currentViewableIds = viewableIdsRef.current;
-      let anyFooterVisible = false;
-      const promises: Promise<boolean>[] = [];
+        currentViewableIds.forEach((id) => {
+          const ref = itemRefs.current.get(id);
+          if (ref) {
+            promises.push(
+              new Promise((resolve) => {
+                ref.measureFooter(
+                  (_x: number, y: number, _w: number, _h: number) => {
+                    const isVisible =
+                      y > insets.top + 40 && y < screenHeight - 40;
+                    resolve(isVisible);
+                  },
+                );
+              }),
+            );
+          }
+        });
 
-      currentViewableIds.forEach((id) => {
-        const ref = itemRefs.current.get(id);
-        if (ref) {
-          promises.push(
-            new Promise((resolve) => {
-              ref.measureFooter(
-                (_x: number, y: number, _w: number, _h: number) => {
-                  const isVisible =
-                    y > insets.top + 40 && y < screenHeight - 40;
-                  resolve(isVisible);
-                },
-              );
-            }),
+        Promise.all(promises).then((results) => {
+          anyFooterVisible = results.some((r) => r === true);
+          const shouldShow = Boolean(
+            !anyFooterVisible &&
+              activeItem &&
+              expandedIds.has(activeItem.id.toString()) &&
+              currentY > 300,
           );
-        }
-      });
 
-      Promise.all(promises).then((results) => {
-        anyFooterVisible = results.some((r) => r === true);
-        const shouldShow = Boolean(
-          !anyFooterVisible &&
-            activeItem &&
-            expandedIds.has(activeItem.id.toString()) &&
-            currentY > 300,
-        );
+          if (shouldShow !== isFloatingShown.current) {
+            isFloatingShown.current = shouldShow;
+            footerAnim.value = withTiming(shouldShow ? 1 : 0, {
+              duration: 220,
+            });
+          }
+        });
+      }
+    },
+    [
+      activeItem,
+      expandedIds,
+      footerAnim,
+      insets.top,
+      screenHeight,
+      viewableIdsRef,
+    ],
+  );
 
-        if (shouldShow !== isFloatingShown.current) {
-          isFloatingShown.current = shouldShow;
-          Animated.spring(footerAnim, {
-            toValue: shouldShow ? 1 : 0,
-            useNativeDriver: true,
-            friction: 10,
-            tension: 50,
-          }).start();
-        }
-      });
-    }
-  };
+  const { headerVisible, handleScroll } = useScrollHeaderAnim(
+    400,
+    handleScrollEffects,
+    100,
+  );
+
+  const headerAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: headerVisible.value,
+    transform: [
+      {
+        translateY: interpolate(
+          headerVisible.value,
+          [0, 1],
+          [-insets.top - 120, 0],
+        ),
+      },
+    ],
+  }));
+
+  const footerAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: footerAnim.value,
+    transform: [
+      {
+        translateY: interpolate(footerAnim.value, [0, 1], [100, 0]),
+      },
+    ],
+  }));
 
   const primaryColor = useThemeColor({}, 'primary');
   const primaryTransparent = useThemeColor({}, 'primaryTransparent');
@@ -1246,22 +1281,14 @@ export default function QuestionDetail() {
 
       <Reanimated.View style={[{ flex: 1 }, animatedScreenStyle]}>
         {/* 顶部标题栏 */}
-        <Animated.View
+        <Reanimated.View
           className="absolute left-0 right-0 z-10"
           style={[
             {
               backgroundColor,
               paddingTop: insets.top,
-              opacity: headerVisible,
-              transform: [
-                {
-                  translateY: headerVisible.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [-insets.top - 120, 0],
-                  }),
-                },
-              ],
             },
+            headerAnimatedStyle,
           ]}
         >
           <View
@@ -1281,7 +1308,7 @@ export default function QuestionDetail() {
               {question?.title || initialTitle}
             </Text>
           </View>
-        </Animated.View>
+        </Reanimated.View>
 
         {/* 返回按钮 */}
         <Pressable
@@ -1292,89 +1319,85 @@ export default function QuestionDetail() {
           <Ionicons name="chevron-back" size={28} color={textColor} />
         </Pressable>
 
-        <FlashList<AnswerDetail>
-          ref={flashListRef}
-          onScroll={handleScroll}
-          data={qLoading ? [] : answers}
-          ListHeaderComponent={renderHeader}
-          renderItem={({ item }) => (
-            <AnswerItem
-              ref={(r) => {
-                const answerId = item.id.toString();
-                if (r) itemRefs.current.set(answerId, r);
-                else itemRefs.current.delete(answerId);
-              }}
-              item={item}
-              isExpanded={
-                item?.id ? expandedIds.has(item.id.toString()) : false
-              }
-              onToggle={handleToggleExpand}
-              onShare={(ans) => {
-                setSelectedAnswer(ans);
-                setIsSharing(true);
-              }}
-              questionId={id}
-              sortBy={sortBy}
-              screenTranslateX={screenTranslateX}
-              onSwipeStart={setSwipedAuthor}
-              onSwipeComplete={handleSwipeComplete}
-            />
-          )}
-          keyExtractor={(item) => `ans-${item.id.toString()}`}
-          onViewableItemsChanged={onViewableItemsChanged}
-          viewabilityConfig={viewabilityConfig}
-          onEndReached={() =>
-            hasNextPage && !isFetchingNextPage && fetchNextPage()
-          }
-          onEndReachedThreshold={0.5}
-          ListEmptyComponent={
-            qLoading ? null : answersPending ? (
-              <ActivityIndicator
-                style={{ marginTop: 60 }}
-                color={primaryColor}
+        <GestureDetector gesture={scrollGesture}>
+          <AnimatedFlashList<AnswerDetail>
+            ref={flashListRef}
+            onScroll={handleScroll}
+            data={qLoading ? [] : answers}
+            ListHeaderComponent={renderHeader}
+            renderItem={({ item }) => (
+              <AnswerItem
+                ref={(r) => {
+                  const answerId = item.id.toString();
+                  if (r) itemRefs.current.set(answerId, r);
+                  else itemRefs.current.delete(answerId);
+                }}
+                item={item}
+                isExpanded={
+                  item?.id ? expandedIds.has(item.id.toString()) : false
+                }
+                onToggle={handleToggleExpand}
+                onShare={(ans) => {
+                  setSelectedAnswer(ans);
+                  setIsSharing(true);
+                }}
+                questionId={id}
+                sortBy={sortBy}
+                screenTranslateX={screenTranslateX}
+                scrollGesture={scrollGesture}
+                onSwipeStart={setSwipedAuthor}
+                onSwipeComplete={handleSwipeComplete}
+                onSwipeCancel={() => setSwipedAuthor(null)}
               />
-            ) : answersError ? (
-              <QueryErrorView
-                message="回答列表加载失败"
-                onRetry={() => void refetch()}
-              />
-            ) : (
-              <Text type="secondary" className="text-center mt-16 text-sm">
-                暂无回答
-              </Text>
-            )
-          }
-          ListFooterComponent={() =>
-            isFetchingNextPage ? (
-              <ActivityIndicator
-                style={{ marginVertical: 20 }}
-                color={primaryColor}
-              />
-            ) : answers?.length > 0 && !hasNextPage ? (
-              <Text type="secondary" className="text-center my-5">
-                — 没有更多回答了 —
-              </Text>
-            ) : null
-          }
-          onRefresh={handleRefresh}
-          refreshing={isRefetching}
-        />
+            )}
+            keyExtractor={(item) => `ans-${item.id.toString()}`}
+            onViewableItemsChanged={onViewableItemsChanged}
+            viewabilityConfig={viewabilityConfig}
+            onEndReached={() =>
+              hasNextPage && !isFetchingNextPage && fetchNextPage()
+            }
+            onEndReachedThreshold={0.5}
+            ListEmptyComponent={
+              qLoading ? null : answersPending ? (
+                <ActivityIndicator
+                  style={{ marginTop: 60 }}
+                  color={primaryColor}
+                />
+              ) : answersError ? (
+                <QueryErrorView
+                  message="回答列表加载失败"
+                  onRetry={() => void refetch()}
+                />
+              ) : (
+                <Text type="secondary" className="text-center mt-16 text-sm">
+                  暂无回答
+                </Text>
+              )
+            }
+            ListFooterComponent={() =>
+              isFetchingNextPage ? (
+                <ActivityIndicator
+                  style={{ marginVertical: 20 }}
+                  color={primaryColor}
+                />
+              ) : answers?.length > 0 && !hasNextPage ? (
+                <Text type="secondary" className="text-center my-5">
+                  — 没有更多回答了 —
+                </Text>
+              ) : null
+            }
+            onRefresh={handleRefresh}
+            refreshing={isRefetching}
+          />
+        </GestureDetector>
 
-        <Animated.View
+        <Reanimated.View
           className="absolute left-5 right-5 h-[54px] rounded-[27px] overflow-hidden z-[1000] shadow-black/20 shadow-lg elevation-10"
           style={[
             {
               bottom: insets.bottom,
-              transform: [
-                {
-                  translateY: footerAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [100, 0],
-                  }),
-                },
-              ],
-              opacity: footerAnim,
             },
+            footerAnimatedStyle,
           ]}
         >
           <BlurView
@@ -1495,7 +1518,7 @@ export default function QuestionDetail() {
               </Pressable>
             </View>
           </BlurView>
-        </Animated.View>
+        </Reanimated.View>
       </Reanimated.View>
 
       {/* Immersive profile preview panel pulled from the right */}

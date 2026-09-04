@@ -8,11 +8,10 @@ import {
 } from '@tanstack/react-query';
 import { BlurView } from 'expo-blur';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Animated,
   Image,
   Keyboard,
   Platform,
@@ -20,6 +19,11 @@ import {
   TextInput,
   useWindowDimensions,
 } from 'react-native';
+import Reanimated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   type CommentItem,
@@ -63,26 +67,22 @@ export default function ReplyDetailScreen() {
   const insets = _insets;
 
   // 键盘高度动画：解决键盘收起后输入框无法回到底部的 bug
-  const keyboardHeight = React.useRef(new Animated.Value(0)).current;
+  const keyboardHeight = useSharedValue(0);
   useEffect(() => {
     const show = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
       (e) => {
-        Animated.timing(keyboardHeight, {
-          toValue: e.endCoordinates.height,
+        keyboardHeight.value = withTiming(e.endCoordinates.height, {
           duration: Platform.OS === 'ios' ? e.duration || 250 : 200,
-          useNativeDriver: false,
-        }).start();
+        });
       },
     );
     const hide = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
       (e) => {
-        Animated.timing(keyboardHeight, {
-          toValue: 0,
+        keyboardHeight.value = withTiming(0, {
           duration: Platform.OS === 'ios' ? e.duration || 250 : 200,
-          useNativeDriver: false,
-        }).start();
+        });
       },
     );
     return () => {
@@ -90,6 +90,10 @@ export default function ReplyDetailScreen() {
       hide.remove();
     };
   }, [keyboardHeight]);
+
+  const inputBarAnimatedStyle = useAnimatedStyle(() => ({
+    bottom: keyboardHeight.value,
+  }));
 
   const INPUT_BAR_HEIGHT = 60;
 
@@ -427,17 +431,17 @@ export default function ReplyDetailScreen() {
       </View>
 
       {/* 输入框：绝对定位 + 随键盘动画移动 */}
-      <Animated.View
+      <Reanimated.View
         style={[
           {
             position: 'absolute',
             left: 0,
             right: 0,
-            bottom: keyboardHeight,
             paddingHorizontal: 15,
             paddingBottom: insets.bottom > 0 ? insets.bottom : 12,
             paddingTop: 8,
           },
+          inputBarAnimatedStyle,
         ]}
         pointerEvents="box-none"
       >
@@ -513,7 +517,7 @@ export default function ReplyDetailScreen() {
             </BouncyButton>
           </View>
         </BlurView>
-      </Animated.View>
+      </Reanimated.View>
 
       <CommentActionSheet
         visible={commentAction !== null}

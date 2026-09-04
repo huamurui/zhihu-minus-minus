@@ -10,10 +10,8 @@ import {
   useState,
 } from 'react';
 import {
-  Animated,
   KeyboardAvoidingView,
   Modal,
-  PanResponder,
   Platform,
   Pressable,
   type StyleProp,
@@ -21,6 +19,14 @@ import {
   useWindowDimensions,
   type ViewStyle,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Reanimated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -74,8 +80,8 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
     const [mounted, setMounted] = useState(visible);
     const mountedRef = useRef(visible);
     const onCloseRef = useRef(onClose);
-    const translateY = useRef(new Animated.Value(windowHeight)).current;
-    const backdropOpacity = useRef(new Animated.Value(0)).current;
+    const translateY = useSharedValue(windowHeight);
+    const backdropOpacity = useSharedValue(0);
     const closing = useRef(false);
 
     useEffect(() => {
@@ -86,24 +92,22 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       (notify: boolean) => {
         if (closing.current) return;
         closing.current = true;
-        Animated.parallel([
-          Animated.timing(backdropOpacity, {
-            toValue: 0,
-            duration: EXIT_DURATION,
-            useNativeDriver: true,
-          }),
-          Animated.timing(translateY, {
-            toValue: windowHeight,
-            duration: EXIT_DURATION,
-            useNativeDriver: true,
-          }),
-        ]).start(({ finished }) => {
+        const finishClose = (finished: boolean) => {
           closing.current = false;
           if (!finished) return;
           mountedRef.current = false;
           setMounted(false);
           if (notify) onCloseRef.current();
-        });
+        };
+
+        backdropOpacity.value = withTiming(0, { duration: EXIT_DURATION });
+        translateY.value = withTiming(
+          windowHeight,
+          { duration: EXIT_DURATION },
+          (finished) => {
+            runOnJS(finishClose)(Boolean(finished));
+          },
+        );
       },
       [backdropOpacity, translateY, windowHeight],
     );
@@ -119,78 +123,62 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
         closing.current = false;
         mountedRef.current = true;
         setMounted(true);
-        translateY.stopAnimation();
-        backdropOpacity.stopAnimation();
-        translateY.setValue(windowHeight);
-        backdropOpacity.setValue(0);
-        Animated.parallel([
-          Animated.spring(translateY, {
-            toValue: 0,
-            damping: 26,
-            stiffness: 260,
-            mass: 0.8,
-            useNativeDriver: true,
-          }),
-          Animated.timing(backdropOpacity, {
-            toValue: 1,
-            duration: ENTER_DURATION,
-            useNativeDriver: true,
-          }),
-        ]).start();
+        translateY.value = windowHeight;
+        backdropOpacity.value = 0;
+        translateY.value = withSpring(0, {
+          damping: 26,
+          stiffness: 260,
+          mass: 0.8,
+        });
+        backdropOpacity.value = withTiming(1, { duration: ENTER_DURATION });
       } else if (mountedRef.current) {
         animateClosed(false);
       }
     }, [animateClosed, backdropOpacity, translateY, visible, windowHeight]);
 
-    const panResponder = useMemo(
+    const panGesture = useMemo(
       () =>
-        PanResponder.create({
-          onMoveShouldSetPanResponder: (_, gesture) =>
-            dismissible &&
-            gesture.dy > 5 &&
-            Math.abs(gesture.dy) > Math.abs(gesture.dx),
-          onPanResponderMove: (_, gesture) => {
-            const distance = Math.max(0, gesture.dy);
-            translateY.setValue(distance);
-            backdropOpacity.setValue(
-              Math.max(0.25, 1 - distance / Math.max(windowHeight * 0.55, 1)),
+        Gesture.Pan()
+          .enabled(dismissible)
+          .activeOffsetY(5)
+          .failOffsetX([-12, 12])
+          .onUpdate((event) => {
+            const distance = Math.max(0, event.translationY);
+            translateY.value = distance;
+            backdropOpacity.value = Math.max(
+              0.25,
+              1 - distance / Math.max(windowHeight * 0.55, 1),
             );
-          },
-          onPanResponderRelease: (_, gesture) => {
-            if (gesture.dy > 84 || gesture.vy > 0.9) {
-              requestClose();
+          })
+          .onEnd((event) => {
+            if (event.translationY > 84 || event.velocityY > 900) {
+              runOnJS(requestClose)();
               return;
             }
-            Animated.parallel([
-              Animated.spring(translateY, {
-                toValue: 0,
-                damping: 24,
-                stiffness: 300,
-                useNativeDriver: true,
-              }),
-              Animated.timing(backdropOpacity, {
-                toValue: 1,
-                duration: 140,
-                useNativeDriver: true,
-              }),
-            ]).start();
-          },
-          onPanResponderTerminate: () => {
-            Animated.spring(translateY, {
-              toValue: 0,
+            translateY.value = withSpring(0, {
               damping: 24,
               stiffness: 300,
-              useNativeDriver: true,
-            }).start();
-            Animated.timing(backdropOpacity, {
-              toValue: 1,
-              duration: 140,
-              useNativeDriver: true,
-            }).start();
-          },
-        }),
+            });
+            backdropOpacity.value = withTiming(1, { duration: 140 });
+          })
+          .onFinalize((_event, success) => {
+            if (!success) {
+              translateY.value = withSpring(0, {
+                damping: 24,
+                stiffness: 300,
+              });
+              backdropOpacity.value = withTiming(1, { duration: 140 });
+            }
+          }),
       [backdropOpacity, dismissible, requestClose, translateY, windowHeight],
     );
+
+    const backdropAnimatedStyle = useAnimatedStyle(() => ({
+      opacity: backdropOpacity.value,
+    }));
+    const sheetAnimatedStyle = useAnimatedStyle(() => ({
+      transform: [{ translateY: translateY.value }],
+    }));
 
     if (!mounted) return null;
 
@@ -212,14 +200,14 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.overlay}
         >
-          <Animated.View
+          <Reanimated.View
             pointerEvents="none"
             style={[
               StyleSheet.absoluteFillObject,
               {
                 backgroundColor: Colors[colorScheme].blackTransparent,
-                opacity: backdropOpacity,
               },
+              backdropAnimatedStyle,
             ]}
           />
           {dismissible && (
@@ -230,7 +218,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
               onPress={requestClose}
             />
           )}
-          <Animated.View
+          <Reanimated.View
             accessibilityViewIsModal
             style={[
               styles.sheet,
@@ -239,17 +227,19 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
                 height,
                 maxHeight,
                 paddingBottom: Math.max(insets.bottom, 12) + 8,
-                transform: [{ translateY }],
               },
+              sheetAnimatedStyle,
               contentStyle,
             ]}
           >
             {showHandle && (
-              <View style={styles.handleHitArea} {...panResponder.panHandlers}>
-                <View
-                  style={[styles.handle, { backgroundColor: handleColor }]}
-                />
-              </View>
+              <GestureDetector gesture={panGesture}>
+                <View style={styles.handleHitArea}>
+                  <View
+                    style={[styles.handle, { backgroundColor: handleColor }]}
+                  />
+                </View>
+              </GestureDetector>
             )}
 
             {hasHeader && (
@@ -304,7 +294,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
             )}
 
             {children}
-          </Animated.View>
+          </Reanimated.View>
         </KeyboardAvoidingView>
       </Modal>
     );

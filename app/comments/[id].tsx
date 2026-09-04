@@ -11,7 +11,6 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Animated,
   Image,
   Keyboard,
   Platform,
@@ -19,6 +18,11 @@ import {
   TextInput,
   useWindowDimensions,
 } from 'react-native';
+import Reanimated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   type CommentItem,
@@ -72,26 +76,22 @@ export default function CommentScreen() {
   const insets = _insets;
 
   // 键盘高度动画：解决键盘收起后输入框无法回到底部的 bug
-  const keyboardHeight = React.useRef(new Animated.Value(0)).current;
+  const keyboardHeight = useSharedValue(0);
   useEffect(() => {
     const show = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
       (e) => {
-        Animated.timing(keyboardHeight, {
-          toValue: e.endCoordinates.height,
+        keyboardHeight.value = withTiming(e.endCoordinates.height, {
           duration: Platform.OS === 'ios' ? e.duration || 250 : 200,
-          useNativeDriver: false,
-        }).start();
+        });
       },
     );
     const hide = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
       (e) => {
-        Animated.timing(keyboardHeight, {
-          toValue: 0,
+        keyboardHeight.value = withTiming(0, {
           duration: Platform.OS === 'ios' ? e.duration || 250 : 200,
-          useNativeDriver: false,
-        }).start();
+        });
       },
     );
     return () => {
@@ -99,6 +99,10 @@ export default function CommentScreen() {
       hide.remove();
     };
   }, [keyboardHeight]);
+
+  const inputBarAnimatedStyle = useAnimatedStyle(() => ({
+    bottom: keyboardHeight.value,
+  }));
 
   // 输入框高度（居中估算，动态取实际高度应用 onLayout）
   const INPUT_BAR_HEIGHT = 60;
@@ -423,17 +427,17 @@ export default function CommentScreen() {
       </View>
 
       {/* 输入框：绝对定位 + 随键盘动画移动，避免 KAV 全屏占位导致收起后不归位的 bug */}
-      <Animated.View
+      <Reanimated.View
         style={[
           {
             position: 'absolute',
             left: 0,
             right: 0,
-            bottom: keyboardHeight,
             paddingHorizontal: 15,
             paddingBottom: insets.bottom > 0 ? insets.bottom : 12,
             paddingTop: 8,
           },
+          inputBarAnimatedStyle,
         ]}
         pointerEvents="box-none"
       >
@@ -511,7 +515,7 @@ export default function CommentScreen() {
             </BouncyButton>
           </View>
         </BlurView>
-      </Animated.View>
+      </Reanimated.View>
 
       <CommentActionSheet
         visible={commentAction !== null}

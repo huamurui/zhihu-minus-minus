@@ -1,60 +1,58 @@
-import { useCallback, useRef } from 'react';
 import {
-  Animated,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-} from 'react-native';
+  runOnJS,
+  type SharedValue,
+  useAnimatedScrollHandler,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
-export function useScrollHeaderAnim(threshold = 300) {
-  const headerVisible = useRef(new Animated.Value(0)).current;
-  const isHeaderShowRef = useRef(false);
-  const lastScrollY = useRef(0);
+export function useScrollHeaderAnim(
+  threshold = 300,
+  onScroll?: (currentY: number) => void,
+  onScrollThrottleMs = 0,
+  sharedScrollY?: SharedValue<number>,
+) {
+  const headerVisible = useSharedValue(0);
+  const isHeaderShown = useSharedValue(false);
+  const lastScrollY = useSharedValue(0);
+  const lastCallbackTime = useSharedValue(0);
 
-  const handleScroll = useCallback(
-    (
-      event: NativeSyntheticEvent<NativeScrollEvent>,
-      callback?: (currentY: number) => void,
-    ) => {
-      const currentY = event.nativeEvent.contentOffset.y;
-      const diff = currentY - (lastScrollY.current || 0);
-
-      if (currentY > threshold) {
-        if (diff < -15 && !isHeaderShowRef.current) {
-          isHeaderShowRef.current = true;
-          Animated.timing(headerVisible, {
-            toValue: 1,
-            duration: 250,
-            useNativeDriver: true,
-          }).start();
-        } else if (diff > 5 && isHeaderShowRef.current) {
-          isHeaderShowRef.current = false;
-          Animated.timing(headerVisible, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-          }).start();
+  const handleScroll = useAnimatedScrollHandler(
+    {
+      onScroll: (event) => {
+        const currentY = event.contentOffset.y;
+        if (sharedScrollY) {
+          sharedScrollY.value = currentY;
         }
-      } else if (currentY <= 100 && isHeaderShowRef.current) {
-        isHeaderShowRef.current = false;
-        Animated.timing(headerVisible, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }).start();
-      }
+        const diff = currentY - lastScrollY.value;
 
-      // Attach lastY back to event purely for components that rely on reading event.lastY,
-      // but locally we track it using lastScrollY
-      (event as any).lastY = currentY;
-      lastScrollY.current = currentY;
+        if (currentY > threshold) {
+          if (diff < -15 && !isHeaderShown.value) {
+            isHeaderShown.value = true;
+            headerVisible.value = withTiming(1, { duration: 250 });
+          } else if (diff > 5 && isHeaderShown.value) {
+            isHeaderShown.value = false;
+            headerVisible.value = withTiming(0, { duration: 200 });
+          }
+        } else if (currentY <= 100 && isHeaderShown.value) {
+          isHeaderShown.value = false;
+          headerVisible.value = withTiming(0, { duration: 200 });
+        }
 
-      if (callback) {
-        callback(currentY);
-      }
+        lastScrollY.value = currentY;
 
-      return { currentY, diff };
+        const now = Date.now();
+        if (
+          onScroll &&
+          (onScrollThrottleMs <= 0 ||
+            now - lastCallbackTime.value >= onScrollThrottleMs)
+        ) {
+          lastCallbackTime.value = now;
+          runOnJS(onScroll)(currentY);
+        }
+      },
     },
-    [headerVisible, threshold],
+    [onScroll, onScrollThrottleMs, sharedScrollY, threshold],
   );
 
   return { headerVisible, handleScroll };

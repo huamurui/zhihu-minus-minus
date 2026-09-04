@@ -1,9 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   LayoutAnimation,
-  PanResponder,
   Platform,
   Pressable,
   View as RNView,
@@ -13,6 +12,12 @@ import {
   TextInput,
   UIManager,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Reanimated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BouncyButton } from '@/components/BouncyButton';
 import { Section, SettingItem } from '@/components/SettingItem';
@@ -823,98 +828,111 @@ function HslSlider({
   onComplete,
 }: any) {
   const [trackWidth, setTrackWidth] = useState(0);
-  const viewRef = useRef<any>(null);
-  const trackWidthRef = useRef(0);
-  const trackPageXRef = useRef(0);
   const onChangeRef = useRef(onChange);
   const onCompleteRef = useRef(onComplete);
-  const minRef = useRef(min);
-  const maxRef = useRef(max);
+  const trackWidthValue = useSharedValue(0);
+  const sliderRatio = useSharedValue(0);
 
   onChangeRef.current = onChange;
   onCompleteRef.current = onComplete;
-  minRef.current = min;
-  maxRef.current = max;
-
-  const measureTrack = () => {
-    viewRef.current?.measure(
-      (_x: number, _y: number, width: number, _h: number, pageX: number) => {
-        trackWidthRef.current = width;
-        trackPageXRef.current = pageX;
-        setTrackWidth(width);
-      },
-    );
-  };
-
-  const computeValue = (pageX: number) => {
-    const x = pageX - trackPageXRef.current;
-    const r = Math.max(0, Math.min(1, x / trackWidthRef.current));
-    return Math.round(minRef.current + r * (maxRef.current - minRef.current));
-  };
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) =>
-        onChangeRef.current(computeValue(evt.nativeEvent.pageX)),
-      onPanResponderMove: (evt) =>
-        onChangeRef.current(computeValue(evt.nativeEvent.pageX)),
-      onPanResponderRelease: (evt) => {
-        const finalVal = computeValue(evt.nativeEvent.pageX);
-        onChangeRef.current(finalVal);
-        onCompleteRef.current?.(finalVal);
-      },
-    }),
-  ).current;
 
   const ratio =
     trackWidth > 0 ? Math.max(0, Math.min(1, (value - min) / (max - min))) : 0;
 
+  useEffect(() => {
+    sliderRatio.value = ratio;
+  }, [ratio, sliderRatio]);
+
+  const notifyChange = useCallback((nextValue: number) => {
+    onChangeRef.current(nextValue);
+  }, []);
+  const notifyComplete = useCallback((nextValue: number) => {
+    onCompleteRef.current?.(nextValue);
+  }, []);
+  const panGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetX([-8, 8])
+        .failOffsetY([-12, 12])
+        .onBegin((event) => {
+          const nextRatio = Math.max(
+            0,
+            Math.min(1, event.x / Math.max(trackWidthValue.value, 1)),
+          );
+          sliderRatio.value = nextRatio;
+          runOnJS(notifyChange)(Math.round(min + nextRatio * (max - min)));
+        })
+        .onUpdate((event) => {
+          const nextRatio = Math.max(
+            0,
+            Math.min(1, event.x / Math.max(trackWidthValue.value, 1)),
+          );
+          sliderRatio.value = nextRatio;
+          runOnJS(notifyChange)(Math.round(min + nextRatio * (max - min)));
+        })
+        .onEnd((event) => {
+          const nextRatio = Math.max(
+            0,
+            Math.min(1, event.x / Math.max(trackWidthValue.value, 1)),
+          );
+          runOnJS(notifyComplete)(Math.round(min + nextRatio * (max - min)));
+        }),
+    [max, min, notifyChange, notifyComplete, sliderRatio, trackWidthValue],
+  );
+  const thumbAnimatedStyle = useAnimatedStyle(() => ({
+    left: sliderRatio.value * trackWidthValue.value - 10,
+  }));
+
   return (
-    <RNView
-      ref={viewRef}
-      style={{ height: 32, justifyContent: 'center' }}
-      onLayout={measureTrack}
-      {...panResponder.panHandlers}
-    >
+    <GestureDetector gesture={panGesture}>
       <RNView
-        style={{
-          height: 8,
-          borderRadius: 4,
-          overflow: 'hidden',
-          flexDirection: 'row',
+        style={{ height: 32, justifyContent: 'center' }}
+        onLayout={(event) => {
+          const width = event.nativeEvent.layout.width;
+          setTrackWidth(width);
+          trackWidthValue.value = width;
         }}
       >
-        {gradientColors.map((color: string, i: number) => (
-          <RNView
-            // biome-ignore lint/suspicious/noArrayIndexKey: gradientColors 是固定长度的预设色序,渲染的是无状态色块;色值本身会重复,不能当 key。
-            key={i}
-            style={{ flex: 1, backgroundColor: color }}
-          />
-        ))}
-      </RNView>
-      {trackWidth > 0 && (
         <RNView
-          pointerEvents="none"
           style={{
-            position: 'absolute',
-            left: ratio * trackWidth - 10,
-            width: 20,
-            height: 20,
-            borderRadius: 10,
-            backgroundColor: thumbColor,
-            borderWidth: 2,
-            borderColor: Colors.light.textInverse,
-            shadowColor: Colors.light.shadow,
-            shadowOpacity: 0.2,
-            shadowRadius: 3,
-            shadowOffset: { width: 0, height: 1 },
-            elevation: 3,
+            height: 8,
+            borderRadius: 4,
+            overflow: 'hidden',
+            flexDirection: 'row',
           }}
-        />
-      )}
-    </RNView>
+        >
+          {gradientColors.map((color: string, i: number) => (
+            <RNView
+              // biome-ignore lint/suspicious/noArrayIndexKey: gradientColors 是固定长度的预设色序,渲染的是无状态色块;色值本身会重复,不能当 key。
+              key={i}
+              style={{ flex: 1, backgroundColor: color }}
+            />
+          ))}
+        </RNView>
+        {trackWidth > 0 && (
+          <Reanimated.View
+            pointerEvents="none"
+            style={[
+              {
+                position: 'absolute',
+                width: 20,
+                height: 20,
+                borderRadius: 10,
+                backgroundColor: thumbColor,
+                borderWidth: 2,
+                borderColor: Colors.light.textInverse,
+                shadowColor: Colors.light.shadow,
+                shadowOpacity: 0.2,
+                shadowRadius: 3,
+                shadowOffset: { width: 0, height: 1 },
+                elevation: 3,
+              },
+              thumbAnimatedStyle,
+            ]}
+          />
+        )}
+      </RNView>
+    </GestureDetector>
   );
 }
 
