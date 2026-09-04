@@ -28,7 +28,7 @@ import '../global.css';
 import * as Clipboard from 'expo-clipboard';
 import { AppState, type AppStateStatus, Linking } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import Colors from '@/constants/Colors';
+import { resolveThemeColors } from '@/constants/theme';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { consumeAppClipboardText } from '@/utils/clipboard';
 
@@ -84,20 +84,27 @@ function RootLayout() {
   const _colorScheme = useColorScheme();
   const isDark = useThemeStore((state) => state.isDark);
   const hasThemeHydrated = useThemeStore((state) => state.hasHydrated);
-  const { primaryColor } = useSettingsStore();
-  const currentTint = primaryColor || Colors[isDark ? 'dark' : 'light'].primary;
+  const { primaryColor, readingBackground, textContrast, surfaceStyle } =
+    useSettingsStore();
   const appColorScheme = isDark ? 'dark' : 'light';
+  const appThemeColors = resolveThemeColors(appColorScheme, {
+    primaryColor,
+    readingBackground,
+    textContrast,
+    surfaceStyle,
+  });
+  const currentTint = appThemeColors.primary;
   const baseNavigationTheme = isDark ? DarkTheme : DefaultTheme;
   const theme = {
     ...baseNavigationTheme,
     colors: {
       ...baseNavigationTheme.colors,
       primary: currentTint,
-      background: Colors[appColorScheme].background,
-      card: Colors[appColorScheme].backgroundSecondary,
-      text: Colors[appColorScheme].text,
-      border: Colors[appColorScheme].border,
-      notification: Colors[appColorScheme].danger,
+      background: appThemeColors.background,
+      card: appThemeColors.backgroundSecondary,
+      text: appThemeColors.text,
+      border: appThemeColors.border,
+      notification: appThemeColors.danger,
     },
   };
 
@@ -222,11 +229,10 @@ function RootLayout() {
             <Stack
               screenOptions={{
                 headerStyle: {
-                  backgroundColor:
-                    Colors[isDark ? 'dark' : 'light'].backgroundSecondary,
+                  backgroundColor: appThemeColors.backgroundSecondary,
                 },
                 headerTitleStyle: {
-                  color: Colors[isDark ? 'dark' : 'light'].text,
+                  color: appThemeColors.text,
                   fontWeight: 'bold',
                 },
                 headerTintColor: currentTint,

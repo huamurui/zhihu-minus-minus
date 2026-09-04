@@ -102,6 +102,92 @@
       "chatBubble": "#222222"
     }
   },
+  "themeAdjustments": {
+    "readingBackground": {
+      "default": {
+        "light": {
+          "background": "#f6f6f6",
+          "backgroundSecondary": "#ffffff",
+          "backgroundTertiary": "#f3f3f3",
+          "surface": "#ffffff"
+        },
+        "dark": {
+          "background": "#121212",
+          "backgroundSecondary": "#1e1e22",
+          "backgroundTertiary": "#2c2c30",
+          "surface": "#1e1e22"
+        }
+      },
+      "soft": {
+        "light": {
+          "background": "#f2f4f7",
+          "backgroundSecondary": "#ffffff",
+          "backgroundTertiary": "#e9edf2",
+          "surface": "#ffffff"
+        },
+        "dark": {
+          "background": "#10141a",
+          "backgroundSecondary": "#171d24",
+          "backgroundTertiary": "#202933",
+          "surface": "#171d24"
+        }
+      },
+      "warm": {
+        "light": {
+          "background": "#fbf8f0",
+          "backgroundSecondary": "#fffdf7",
+          "backgroundTertiary": "#f3efe5",
+          "surface": "#fffdf7"
+        },
+        "dark": {
+          "background": "#171411",
+          "backgroundSecondary": "#211c17",
+          "backgroundTertiary": "#2c251e",
+          "surface": "#211c17"
+        }
+      },
+      "dim": {
+        "light": {
+          "background": "#eceff1",
+          "backgroundSecondary": "#f7f8f9",
+          "backgroundTertiary": "#e2e6e9",
+          "surface": "#f7f8f9"
+        },
+        "dark": {
+          "background": "#0b0d10",
+          "backgroundSecondary": "#14171c",
+          "backgroundTertiary": "#20242b",
+          "surface": "#14171c"
+        }
+      }
+    },
+    "textContrast": {
+      "standard": {
+        "light": {
+          "text": "#1a1a1a",
+          "textSecondary": "#666666",
+          "textTertiary": "#999999"
+        },
+        "dark": {
+          "text": "#ffffff",
+          "textSecondary": "#bbbbbb",
+          "textTertiary": "#cccccc"
+        }
+      },
+      "high": {
+        "light": {
+          "text": "#111111",
+          "textSecondary": "#4b4b4b",
+          "textTertiary": "#707070"
+        },
+        "dark": {
+          "text": "#ffffff",
+          "textSecondary": "#d2d2d2",
+          "textTertiary": "#adadad"
+        }
+      }
+    }
+  },
   "primaryPresets": [
     { "name": "知乎蓝", "value": "#0084ff" },
     { "name": "极客靛", "value": "#6366f1" },

@@ -588,8 +588,10 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
     const colorScheme = useColorScheme();
     const { width } = useWindowDimensions();
     const { useWebView, fontSizeScale, lineHeightScale } = useSettingsStore();
-    const textColor = Colors[colorScheme].text;
-    const surfaceColor = Colors[colorScheme].surface;
+    const textColor = useThemeColor({}, 'text');
+    const textSecondaryColor = useThemeColor({}, 'textSecondary');
+    const borderColor = useThemeColor({}, 'border');
+    const surfaceColor = useThemeColor({}, 'surface');
     const router = useRouter();
 
     const [activeSegment, setActiveSegment] = useState<{
@@ -911,7 +913,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         },
         figure: { marginVertical: 12, alignItems: 'center' },
         figcaption: {
-          color: Colors[colorScheme].textSecondary,
+          color: textSecondaryColor,
           fontSize: 13 * fontSizeScale,
           marginTop: 6,
           textAlign: 'center',
@@ -921,7 +923,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         div: { color: textColor },
         a: { color: primaryColor, textDecorationLine: 'none' },
         code: {
-          backgroundColor: Colors[colorScheme].border,
+          backgroundColor: borderColor,
           borderRadius: 4,
           paddingHorizontal: 5,
           paddingVertical: 2,
@@ -931,8 +933,9 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
       }),
       [
         textColor,
+        textSecondaryColor,
+        borderColor,
         surfaceColor,
-        colorScheme,
         fontSizeScale,
         lineHeightScale,
         primaryColor,
