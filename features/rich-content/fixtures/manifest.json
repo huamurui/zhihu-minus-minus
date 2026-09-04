@@ -1,49 +1,13 @@
 {
-  "version": 1,
+  "version": 2,
   "cases": [
     {
-      "id": "formula-heavy-001",
-      "file": "./cases/lala.md",
-      "block": 0,
-      "sourceType": "answer",
-      "collectedAt": "2026-08-30",
-      "traits": ["formula", "image", "heading", "list"],
-      "expected": {
-        "paragraphs": 50,
-        "headings": 7,
-        "figures": 3,
-        "totalImages": 77,
-        "activeImages": 74,
-        "formulaImages": 71,
-        "noscripts": 3,
-        "videoBoxes": 0
-      }
-    },
-    {
-      "id": "image-video-001",
-      "file": "./cases/lala.md",
-      "block": 1,
-      "sourceType": "answer",
-      "collectedAt": "2026-08-30",
-      "traits": ["image", "figcaption", "video"],
-      "expected": {
-        "paragraphs": 6,
-        "headings": 0,
-        "figures": 5,
-        "totalImages": 11,
-        "activeImages": 6,
-        "formulaImages": 0,
-        "noscripts": 5,
-        "videoBoxes": 1
-      }
-    },
-    {
       "id": "long-image-heavy-001",
-      "file": "./cases/pig.md",
-      "block": 0,
+      "file": "./cases/pig.json",
+      "contentPath": "content",
       "sourceType": "answer",
       "collectedAt": "2026-08-30",
-      "traits": ["long-form", "image", "figcaption", "escaped-html"],
+      "traits": ["long-form", "image", "figcaption", "json-envelope", "metadata"],
       "expected": {
         "paragraphs": 269,
         "headings": 0,
@@ -55,6 +19,183 @@
         "noscripts": 16,
         "videoBoxes": 0,
         "linkCards": 0
+      },
+      "expectedMetadata": {
+        "type": "answer",
+        "content_need_truncated": true,
+        "is_labeled": true,
+        "question.title": "为什么猪没在进化中灭绝？",
+        "endorsements.length": 2,
+        "reward_info.is_rewardable": true,
+        "relationship.voting": 1,
+        "reaction.relation.liked": false,
+        "can_comment.status": true
+      }
+    },
+    {
+      "id": "article-formula-heavy-001",
+      "file": "./cases/article-formula-heavy.json",
+      "contentPath": "content",
+      "sourceType": "article",
+      "collectedAt": "2026-09-04",
+      "traits": ["article", "formula", "image", "list", "json-envelope", "metadata"],
+      "expected": {
+        "paragraphs": 70,
+        "headings": 0,
+        "figures": 1,
+        "figcaptions": 0,
+        "lists": 9,
+        "totalImages": 346,
+        "activeImages": 346,
+        "formulaImages": 345,
+        "noscripts": 0,
+        "videoBoxes": 0,
+        "linkCards": 0
+      },
+      "expectedMetadata": {
+        "type": "article",
+        "article_type": "normal",
+        "content_need_truncated": true,
+        "settings.table_of_contents.enabled": false,
+        "has_column": true,
+        "can_comment.status": true
+      }
+    },
+    {
+      "id": "question-feed-card-heavy-001",
+      "file": "./cases/question-feed-card-heavy.json",
+      "contentPath": "target.content",
+      "sourceType": "question_feed_card",
+      "collectedAt": "2026-09-04",
+      "traits": ["feed-card", "answer-target", "long-form", "heading", "image", "link-card", "segment-interaction", "json-envelope", "metadata"],
+      "expected": {
+        "paragraphs": 400,
+        "headings": 30,
+        "figures": 130,
+        "figcaptions": 19,
+        "lists": 0,
+        "totalImages": 260,
+        "activeImages": 130,
+        "formulaImages": 0,
+        "noscripts": 130,
+        "videoBoxes": 0,
+        "linkCards": 1
+      },
+      "expectedMetadata": {
+        "type": "question_feed_card",
+        "target_type": "answer",
+        "target.type": "answer",
+        "target.content_need_truncated": false,
+        "target.segment_infos.length": 18,
+        "target.hot_comment.length": 1,
+        "target.thumbnail_info.count": 3,
+        "target.relationship.voting": 0,
+        "target.can_comment.status": true
+      }
+    },
+    {
+      "id": "pin-link-card-001",
+      "file": "./cases/pin-link-card-001.json",
+      "contentPath": "content_html",
+      "sourceType": "pin",
+      "collectedAt": "2026-09-04",
+      "traits": ["pin", "link-card", "question-card", "json-envelope", "metadata"],
+      "expected": {
+        "paragraphs": 2,
+        "headings": 0,
+        "figures": 0,
+        "lists": 0,
+        "totalImages": 0,
+        "activeImages": 0,
+        "formulaImages": 0,
+        "noscripts": 0,
+        "videoBoxes": 0,
+        "linkCards": 0
+      },
+      "expectedMetadata": {
+        "type": "pin",
+        "state": "normal",
+        "content.length": 2,
+        "content.0.type": "text",
+        "content.0.fold_type": "raw",
+        "content.1.type": "link_card",
+        "content.1.data_content_type": "question",
+        "content.1.data_content_id": "618885757",
+        "content.1.data_draft_title": "禁止早恋的副作用是什么？",
+        "content.1.url": "https://www.zhihu.com/question/618885757",
+        "virtuals.is_liked": false,
+        "virtuals.is_favorited": false,
+        "comment_permission": "all"
+      }
+    },
+    {
+      "id": "pin-member-mention-muted-001",
+      "file": "./cases/pin-member-mention-muted.json",
+      "contentPath": "content_html",
+      "sourceType": "pin",
+      "collectedAt": "2026-09-04",
+      "traits": ["pin", "member-mention", "image", "muted", "json-envelope", "metadata"],
+      "expected": {
+        "paragraphs": 6,
+        "headings": 0,
+        "figures": 0,
+        "figcaptions": 0,
+        "lists": 0,
+        "totalImages": 2,
+        "activeImages": 2,
+        "formulaImages": 0,
+        "noscripts": 0,
+        "videoBoxes": 0,
+        "linkCards": 0,
+        "memberMentions": 1,
+        "topicTags": 0
+      },
+      "expectedMetadata": {
+        "type": "pin",
+        "state": "muted",
+        "is_deleted": false,
+        "content.length": 3,
+        "content.0.type": "text",
+        "content.0.text_link_type": "internal",
+        "content.1.type": "image",
+        "content.2.type": "image",
+        "virtuals.is_liked": false,
+        "virtuals.is_favorited": false
+      }
+    },
+    {
+      "id": "pin-topic-tag-001",
+      "file": "./cases/pin-topic-tag-001.json",
+      "contentPath": "content_html",
+      "sourceType": "pin",
+      "collectedAt": "2026-09-04",
+      "traits": ["pin", "topic-tag", "image", "json-envelope", "metadata"],
+      "expected": {
+        "paragraphs": 3,
+        "headings": 0,
+        "figures": 0,
+        "figcaptions": 0,
+        "lists": 0,
+        "totalImages": 1,
+        "activeImages": 1,
+        "formulaImages": 0,
+        "noscripts": 0,
+        "videoBoxes": 0,
+        "linkCards": 0,
+        "memberMentions": 0,
+        "topicTags": 1
+      },
+      "expectedMetadata": {
+        "type": "pin",
+        "state": "normal",
+        "is_deleted": false,
+        "content.length": 2,
+        "content.0.type": "text",
+        "content.0.text_link_type": "internal",
+        "content.1.type": "image",
+        "topics.length": 1,
+        "virtuals.is_liked": false,
+        "virtuals.is_favorited": false
       }
     }
   ]

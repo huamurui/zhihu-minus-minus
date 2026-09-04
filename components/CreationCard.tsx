@@ -45,6 +45,7 @@ interface CreationItem {
   created_time?: number;
   updated?: number;
   updated_time?: number;
+  link_card_info?: Record<string, string>;
   question?: {
     id?: string | number;
     title?: string;
@@ -285,6 +286,7 @@ export const CreationCard = React.forwardRef<
                     ? item.content
                     : undefined
                 }
+                linkCardInfo={item.link_card_info}
                 useNative={true}
               />
               <Pressable
@@ -374,6 +376,7 @@ export const CreationCard = React.forwardRef<
                       ? item.content
                       : undefined
                   }
+                  linkCardInfo={item.link_card_info}
                   useNative={true}
                 />
               </View>

@@ -2,6 +2,8 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const OPEN_TAG_PATTERN = /<([a-z][a-z0-9-]*)(?:\s|\/?>)/gi;
+const JSON_FIXTURE_EXTENSION = '.json';
+const MISSING_VALUE = Symbol('missing-fixture-value');
 
 function countMatches(value, pattern) {
   return Array.from(value.matchAll(pattern)).length;
@@ -16,13 +18,6 @@ function getOpeningTags(html) {
   return tags;
 }
 
-export function splitFixtureBlocks(raw) {
-  return raw
-    .split(/(?:\r?\n){2,}/)
-    .map((block) => block.trim())
-    .filter(Boolean);
-}
-
 export function normalizeFixtureHtml(rawBlock) {
   const trimmed = rawBlock.trim();
   if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
@@ -35,6 +30,85 @@ export function normalizeFixtureHtml(rawBlock) {
     }
   }
   return trimmed.replaceAll('\\"', '"').replaceAll('\\/', '/');
+}
+
+function getFixtureValue(value, selector) {
+  if (!selector) return value;
+
+  return selector.split('.').reduce((current, segment) => {
+    if (
+      current === null ||
+      current === undefined ||
+      !(segment in Object(current))
+    ) {
+      return MISSING_VALUE;
+    }
+    return current[segment];
+  }, value);
+}
+
+function formatFixtureValue(value) {
+  if (value === MISSING_VALUE) return '<missing>';
+  if (value === undefined) return '<undefined>';
+  return JSON.stringify(value);
+}
+
+function fixtureValuesEqual(left, right) {
+  if (Object.is(left, right)) return true;
+  if (
+    left === null ||
+    right === null ||
+    typeof left !== 'object' ||
+    typeof right !== 'object'
+  ) {
+    return false;
+  }
+
+  if (Array.isArray(left) !== Array.isArray(right)) return false;
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+
+  return leftKeys.every(
+    (key) =>
+      Object.hasOwn(right, key) && fixtureValuesEqual(left[key], right[key]),
+  );
+}
+
+export function compareExpectedMetadata(document, expected = {}) {
+  return Object.entries(expected).flatMap(([selector, expectedValue]) => {
+    const actualValue = getFixtureValue(document, selector);
+    return fixtureValuesEqual(actualValue, expectedValue)
+      ? []
+      : [
+          `metadata.${selector}: expected ${formatFixtureValue(expectedValue)}, received ${formatFixtureValue(actualValue)}`,
+        ];
+  });
+}
+
+async function loadFixtureSource(filePath, contentPath) {
+  const raw = await readFile(filePath, 'utf8');
+  if (path.extname(filePath).toLowerCase() !== JSON_FIXTURE_EXTENSION) {
+    throw new Error(`Fixture must be a JSON API envelope: ${filePath}`);
+  }
+
+  let document;
+  try {
+    document = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(
+      `Invalid JSON fixture ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  const selectedContent = getFixtureValue(document, contentPath ?? 'content');
+  if (typeof selectedContent !== 'string') {
+    throw new Error(
+      `JSON fixture ${filePath} must contain string content at ${contentPath ?? 'content'}`,
+    );
+  }
+
+  return { content: normalizeFixtureHtml(selectedContent), document };
 }
 
 export function analyzeHtml(html) {
@@ -75,6 +149,14 @@ export function analyzeHtml(html) {
       activeHtml,
       /<a\b[^>]*(?:data-draft-type=(?:"|')link-card(?:"|')|class=(?:"|')[^"']*\bLinkCard\b[^"']*(?:"|'))[^>]*>/gi,
     ),
+    memberMentions: countMatches(
+      activeHtml,
+      /<a\b[^>]*class=(?:"|')[^"']*\bmember_mention\b[^"']*(?:"|')[^>]*>/gi,
+    ),
+    topicTags: countMatches(
+      activeHtml,
+      /<a\b[^>]*class=(?:"|')[^"']*\bhash_tag\b[^"']*(?:"|')[^>]*>/gi,
+    ),
   };
 }
 
@@ -90,7 +172,7 @@ export function compareExpected(actual, expected = {}) {
 export async function loadManifest(manifestPath) {
   const raw = await readFile(manifestPath, 'utf8');
   const manifest = JSON.parse(raw);
-  if (manifest.version !== 1 || !Array.isArray(manifest.cases)) {
+  if (manifest.version !== 2 || !Array.isArray(manifest.cases)) {
     throw new Error(`Unsupported fixture manifest: ${manifestPath}`);
   }
   return manifest;
@@ -98,22 +180,21 @@ export async function loadManifest(manifestPath) {
 
 export async function analyzeFixtureCase(fixtureCase, manifestPath) {
   const filePath = path.resolve(path.dirname(manifestPath), fixtureCase.file);
-  const raw = await readFile(filePath, 'utf8');
-  const blocks = splitFixtureBlocks(raw);
-  const block = blocks[fixtureCase.block ?? 0];
-  if (block === undefined) {
-    throw new Error(
-      `${fixtureCase.id}: block ${fixtureCase.block ?? 0} not found in ${filePath}`,
-    );
-  }
-
-  const html = normalizeFixtureHtml(block);
-  const stats = analyzeHtml(html);
+  const { content, document } = await loadFixtureSource(
+    filePath,
+    fixtureCase.contentPath,
+  );
+  const stats = analyzeHtml(content);
   return {
     ...fixtureCase,
     filePath,
     stats,
-    errors: compareExpected(stats, fixtureCase.expected),
+    errors: [
+      ...compareExpected(stats, fixtureCase.expected),
+      ...(document
+        ? compareExpectedMetadata(document, fixtureCase.expectedMetadata)
+        : []),
+    ],
   };
 }
 
@@ -124,7 +205,9 @@ async function listFixtureFiles(directoryPath) {
       const entryPath = path.join(directoryPath, entry.name);
       if (entry.isDirectory()) return listFixtureFiles(entryPath);
       if (entry.name.toLowerCase() === 'readme.md') return [];
-      return /\.(?:html?|md)$/i.test(entry.name) ? [entryPath] : [];
+      return entry.name.toLowerCase().endsWith(JSON_FIXTURE_EXTENSION)
+        ? [entryPath]
+        : [];
     }),
   );
   return nestedFiles.flat().sort();
@@ -135,20 +218,16 @@ export async function analyzeFixtureDirectory(directoryPath) {
   const results = [];
 
   for (const filePath of filePaths) {
-    const raw = await readFile(filePath, 'utf8');
-    const blocks = splitFixtureBlocks(raw);
-    for (const [blockIndex, rawBlock] of blocks.entries()) {
-      const relativePath = path.relative(directoryPath, filePath);
-      results.push({
-        id: `inbox:${relativePath}#${blockIndex}`,
-        filePath,
-        block: blockIndex,
-        sourceType: 'unregistered',
-        traits: [],
-        stats: analyzeHtml(normalizeFixtureHtml(rawBlock)),
-        errors: [],
-      });
-    }
+    const { content } = await loadFixtureSource(filePath);
+    const relativePath = path.relative(directoryPath, filePath);
+    results.push({
+      id: `inbox:${relativePath}`,
+      filePath,
+      sourceType: 'unregistered',
+      traits: [],
+      stats: analyzeHtml(content),
+      errors: [],
+    });
   }
 
   return results;

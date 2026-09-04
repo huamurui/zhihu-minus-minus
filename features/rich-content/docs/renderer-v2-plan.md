@@ -37,7 +37,7 @@ Renderer V2 必须在规范化阶段就把两者拆成 `inlineFormula` 与 `bloc
 
 详情正文当前位于 `ScrollView` 中。React Native 文档说明 `ScrollView` 会一次渲染全部子节点，而 `FlatList`/虚拟化列表只渲染可见区域附近的元素。参见 [React Native ScrollView](https://reactnative.dev/docs/scrollview)。
 
-所以即使 HTML 解析更快，只要仍生成并挂载完整 RN View 树，超级长正文的布局时间、View 数量与峰值内存仍会增长。目前的 `long-image-heavy-001`（来自 `pig.md`）主要覆盖长图和混合媒体，不能代表真正的超长文本；测试集必须补一份数量级更高的纯文本/混合 block 样本。
+所以即使 HTML 解析更快，只要仍生成并挂载完整 RN View 树，超级长正文的布局时间、View 数量与峰值内存仍会增长。目前的 `long-image-heavy-001`（来自 `pig.json` 的 `content`）主要覆盖长图和混合媒体，不能代表真正的超长文本；测试集必须补一份数量级更高的纯文本/混合 block 样本。
 
 ## 目标内容模型
 
@@ -87,7 +87,7 @@ Skia Paragraph 目前只是候选；其 [官方文档](https://shopify.github.io
 ### Phase A：基线与正确性 oracle
 
 - [x] 集中 runtime、fixtures、工具和文档。
-- [x] 建立 `lala.md`、`pig.md` 等稳定案例及结构断言。
+- [x] 建立 `pig.json`、`article-formula-heavy.json` 等稳定案例及结构/元数据断言。
 - [x] 完成 Android Debug 真机网络与挂载基线。
 - [ ] 新增真正超长文本、混合 inline、恶意 HTML、深层列表/引用案例。
 - [ ] 为当前 RNRH 截取正确/错误表现，形成跨 Android/iOS 的视觉矩阵。
@@ -125,7 +125,7 @@ Skia Paragraph 目前只是候选；其 [官方文档](https://shopify.github.io
 
 - `eeimg=1` 公式与相邻文字保持同一行，baseline 与行高可接受；`eeimg=2` 仍按块级公式展示。
 - Android 能表现知识点片段约定的线型和独立颜色，或经过产品确认采用明确的跨端替代样式。
-- 链接、图片点击/长按、视频、卡片、文本选择、暗色模式和字号缩放通过 fixture 回归。
+- 链接、图片点击/长按、视频、卡片、@ 提及、# 话题、文本选择、暗色模式和字号缩放通过 fixture 回归。
 - 未支持节点有可观测 fallback，不能静默丢正文。
 
 性能：

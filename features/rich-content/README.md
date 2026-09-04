@@ -8,9 +8,9 @@
 
 - `components/`：当前 RNRH 渲染器和已有 WebView/DOM 实验实现；迁移期间作为旧链路与参考。
 - `docs/`：Renderer V2 架构、真机基准计划和阶段性结论。
-- `fixtures/inbox/`：可以持续投递的新 `.md`/HTML 样本。
+- `fixtures/inbox/`：可以持续投递的脱敏知乎 API `.json` 样本。
 - `fixtures/cases/`：已经登记精确期望值的稳定回归案例。
-- `fixtures/manifest.json`：稳定案例的来源、特征和结构断言。
+- `fixtures/manifest.json`：稳定案例的来源、特征、正文路径和结构/元数据断言。
 - `tests/`：不依赖 React Native 运行时的 fixture 回归测试。
 - `tools/`：内容复杂度分析和后续基准辅助工具。
 - `queryPolicy.ts`：列表正文复用、统一查询 key 和 Pager 相邻预取策略。
@@ -30,7 +30,7 @@ npm run analyze:rich-content:inbox
 npm run test:rich-content
 ```
 
-第一个分析命令校验 manifest 中的稳定案例；带 `inbox` 的命令递归扫描新投递文件，只输出结构统计，不要求先维护 manifest。
+第一个分析命令校验 manifest 中的稳定案例；带 `inbox` 的命令递归扫描新投递文件，只输出结构统计，不要求先维护 manifest。对于完整知乎 API JSON，案例通过 `contentPath` 选择正文，同时可以用 `expectedMetadata` 覆盖作者、问题、徽章、反应、权限、截断状态、@ 提及和 # 话题等正文之外或 HTML 属性之外的行为输入。
 
 ## 当前范围
 
