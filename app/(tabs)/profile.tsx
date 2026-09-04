@@ -10,7 +10,6 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
-  Switch,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getMe, getMemberWithFallback } from '@/api/zhihu';
@@ -18,11 +17,11 @@ import { BouncyButton } from '@/components/BouncyButton';
 import { BottomSheet } from '@/components/overlays/BottomSheet';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { Text, useThemeColor, View } from '@/components/Themed';
+import { ThemeModeSelector } from '@/components/ThemeModeSelector';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
-import { useThemeStore } from '@/store/useThemeStore';
 import { useVerificationStore } from '@/store/useVerificationStore';
 import { syncNativeSessionCookies } from '@/utils/authSession';
 import { ImpactFeedbackStyle, impactAsync } from '@/utils/haptics';
@@ -36,7 +35,6 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { isDark, toggleTheme } = useThemeStore();
   const accentColor = useThemeColor({}, 'primary');
   const accentBgColor = useThemeColor({}, 'primaryTransparent');
   const _surfaceColor = Colors[colorScheme].surface;
@@ -229,11 +227,6 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
     }
   };
 
-  const onToggleTheme = () => {
-    void impactAsync(ImpactFeedbackStyle.Light);
-    toggleTheme();
-  };
-
   return (
     <ScrollView
       className="flex-1"
@@ -376,31 +369,7 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
 
       {/* 通用设置 */}
       <View type="surface" className="rounded-2xl mx-3 mt-3 overflow-hidden">
-        <View className="flex-row items-center justify-between py-[15px] px-4 bg-transparent">
-          <View className="flex-row items-center bg-transparent">
-            <View
-              className="w-9 h-9 rounded-lg justify-center items-center"
-              style={{
-                backgroundColor: isDark
-                  ? 'rgba(255,255,255,0.1)'
-                  : 'rgba(0,0,0,0.05)',
-              }}
-            >
-              <Ionicons
-                name={isDark ? 'moon' : 'sunny'}
-                size={20}
-                color={Colors[colorScheme].warning}
-              />
-            </View>
-            <Text className="text-base ml-3 font-medium">夜间模式</Text>
-          </View>
-          <Switch
-            value={isDark}
-            onValueChange={onToggleTheme}
-            trackColor={{ false: '#ddd', true: accentColor }}
-            thumbColor={Colors[colorScheme].textInverse}
-          />
-        </View>
+        <ThemeModeSelector />
 
         <MenuItem
           icon="color-palette-outline"

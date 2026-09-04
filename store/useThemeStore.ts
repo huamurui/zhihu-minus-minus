@@ -45,8 +45,8 @@ export const useThemeStore = create<ThemeState>()(
       hasHydrated: false,
       setThemeMode: (mode) =>
         set({ themeMode: mode, isDark: resolveIsDark(mode) }),
-      // The existing switch is a manual light/dark override. If the current
-      // mode is system, the first toggle intentionally leaves system mode.
+      // Keep the binary toggle for callers that still need a quick manual
+      // override; the settings UI uses setThemeMode for all three modes.
       toggleTheme: () =>
         set((state) => {
           const mode: ThemeMode = state.isDark ? 'light' : 'dark';
@@ -94,10 +94,12 @@ Appearance.addChangeListener(({ colorScheme }) => {
  * Call this once in your root layout.
  */
 export function useSyncThemeWithNativeWind() {
-  const isDark = useThemeStore((state) => state.isDark);
+  const themeMode = useThemeStore((state) => state.themeMode);
   const { setColorScheme } = useNativewindColorScheme();
 
   useEffect(() => {
-    setColorScheme(isDark ? 'dark' : 'light');
-  }, [isDark, setColorScheme]);
+    // NativeWind forwards `system` to Appearance to release manual overrides.
+    // The appearance listener above receives the resolved OS color afterward.
+    setColorScheme(themeMode);
+  }, [themeMode, setColorScheme]);
 }
