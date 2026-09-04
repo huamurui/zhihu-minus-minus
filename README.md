@@ -206,4 +206,4 @@ npm run test:rich-content
 </a>
 
 ---
-**Version**: v0.4.2 | **Last Updated**: 2026-08-31
+**Version**: v0.5.0 | **Last Updated**: 2026-09-05
