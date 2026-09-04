@@ -52,7 +52,8 @@ export default function GuestDetailScreen() {
           加载预览失败喵
         </Text>
         <Pressable
-          className="mt-6 px-6 py-2.5 rounded-full bg-primary"
+          className="mt-6 px-6 py-2.5 rounded-full"
+          style={{ backgroundColor: tintColor }}
           onPress={() => router.back()}
         >
           <Text className="text-white font-bold">返回上一页</Text>
@@ -119,7 +120,7 @@ export default function GuestDetailScreen() {
         </Pressable>
         <Text className="text-[17px] font-bold">游客预览</Text>
         <View
-          className="px-2 py-0.5 rounded-full bg-primary/10"
+          className="px-2 py-0.5 rounded-full"
           style={{ backgroundColor: `${tintColor}15` }}
         >
           <Text

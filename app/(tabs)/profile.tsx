@@ -369,7 +369,7 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
         <MenuItem
           icon="time-outline"
           title="最近浏览"
-          color={Colors[colorScheme].primary}
+          color={accentColor}
           onPress={() => router.push('/history')}
         />
       </View>

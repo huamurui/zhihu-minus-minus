@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
-import { Text, View } from '@/components/Themed';
+import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { ImpactFeedbackStyle, impactAsync } from '@/utils/haptics';
@@ -38,6 +38,7 @@ export function ActionSheet({
   cancelLabel = '取消',
 }: ActionSheetProps) {
   const colorScheme = useColorScheme();
+  const primaryTransparent = useThemeColor({}, 'primaryTransparent');
   const sheetRef = useRef<BottomSheetHandle>(null);
   const pendingAction = useRef<ActionSheetOption['onPress'] | null>(null);
 
@@ -82,7 +83,7 @@ export function ActionSheet({
               option.iconBackgroundColor ||
               (option.destructive
                 ? `${Colors[colorScheme].danger}1A`
-                : Colors[colorScheme].primaryTransparent);
+                : primaryTransparent);
 
             return (
               <React.Fragment key={option.key}>

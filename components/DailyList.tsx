@@ -12,7 +12,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { getDailyBefore, getDailyLatest } from '@/api/zhihu';
-import { Text, View } from '@/components/Themed';
+import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { refreshInfiniteQuery } from '@/utils/query';
@@ -50,7 +50,7 @@ const SkeletonCard = () => {
       ),
       -1,
     );
-  }, []);
+  }, [opacity]);
   const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
 
   return (
@@ -100,6 +100,7 @@ export const DailyList = React.forwardRef<
   const queryClient = useQueryClient();
   const router = useRouter();
   const colorScheme = useColorScheme();
+  const primaryColor = useThemeColor({}, 'primary');
   const [isRefreshing, setIsRefreshing] = React.useState(false);
 
   const {
@@ -179,7 +180,8 @@ export const DailyList = React.forwardRef<
           暂时没发现日报内容喵，可能是网络问题或者知乎日报今天还没更新。
         </Text>
         <Pressable
-          className="mt-6 px-6 py-2.5 rounded-full bg-primary"
+          className="mt-6 px-6 py-2.5 rounded-full"
+          style={{ backgroundColor: primaryColor }}
           onPress={() => refetch()}
         >
           <Text className="text-white font-bold">重试一下</Text>

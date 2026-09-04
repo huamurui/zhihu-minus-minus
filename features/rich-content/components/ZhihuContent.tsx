@@ -1089,10 +1089,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
           <View style={{ minHeight: 400 }}>
             {!domReady && !useNativeFallback && (
               <View className="absolute inset-0 z-10 justify-center items-center bg-transparent">
-                <ActivityIndicator
-                  size="small"
-                  color={Colors[colorScheme].primary}
-                />
+                <ActivityIndicator size="small" color={primaryColor} />
                 <Text type="secondary" className="mt-4 text-xs opacity-50">
                   正在建立连接...
                 </Text>

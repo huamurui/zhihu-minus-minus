@@ -20,7 +20,7 @@ import {
 } from '@/api/zhihu/collection';
 import { CollectionEditorForm } from '@/components/CollectionEditorForm';
 import { BottomSheet } from '@/components/overlays/BottomSheet';
-import { Text, View } from '@/components/Themed';
+import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { useCollectionStore } from '@/store/useCollectionStore';
@@ -44,6 +44,8 @@ function getErrorMessage(error: unknown, fallback: string): string {
 export function CollectionSelectorModal() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const primaryColor = useThemeColor({}, 'primary');
+  const primaryTransparent = useThemeColor({}, 'primaryTransparent');
   const queryClient = useQueryClient();
   const {
     selectorVisible,
@@ -169,13 +171,10 @@ export function CollectionSelectorModal() {
       accessibilityRole="button"
       accessibilityLabel="新建收藏夹"
       onPress={() => setEditorVisible(true)}
-      style={[
-        styles.headerButton,
-        { backgroundColor: colors.primaryTransparent },
-      ]}
+      style={[styles.headerButton, { backgroundColor: primaryTransparent }]}
     >
-      <Ionicons name="add" size={17} color={colors.primary} />
-      <Text style={[styles.headerButtonLabel, { color: colors.primary }]}>
+      <Ionicons name="add" size={17} color={primaryColor} />
+      <Text style={[styles.headerButtonLabel, { color: primaryColor }]}>
         新建
       </Text>
     </Pressable>
@@ -218,7 +217,7 @@ export function CollectionSelectorModal() {
         <View style={styles.selectorBody}>
           {isLoading ? (
             <View style={styles.centered}>
-              <ActivityIndicator color={colors.primary} size="small" />
+              <ActivityIndicator color={primaryColor} size="small" />
             </View>
           ) : (
             <FlatList
@@ -253,7 +252,7 @@ export function CollectionSelectorModal() {
                     <View
                       style={[
                         styles.folderIcon,
-                        { backgroundColor: colors.primaryTransparent },
+                        { backgroundColor: primaryTransparent },
                       ]}
                     >
                       <Ionicons
@@ -261,7 +260,7 @@ export function CollectionSelectorModal() {
                         size={22}
                         color={
                           item.is_favorited
-                            ? colors.primary
+                            ? primaryColor
                             : colors.textSecondary
                         }
                       />
@@ -282,10 +281,7 @@ export function CollectionSelectorModal() {
                     </View>
                     <View style={styles.statusIcon}>
                       {isPending ? (
-                        <ActivityIndicator
-                          size="small"
-                          color={colors.primary}
-                        />
+                        <ActivityIndicator size="small" color={primaryColor} />
                       ) : (
                         <Ionicons
                           name={
@@ -296,7 +292,7 @@ export function CollectionSelectorModal() {
                           size={23}
                           color={
                             item.is_favorited
-                              ? colors.primary
+                              ? primaryColor
                               : colors.textTertiary
                           }
                         />
@@ -317,7 +313,7 @@ export function CollectionSelectorModal() {
             accessibilityRole="button"
             accessibilityLabel="完成选择收藏夹"
             onPress={handleClose}
-            style={[styles.doneButton, { backgroundColor: colors.primary }]}
+            style={[styles.doneButton, { backgroundColor: primaryColor }]}
           >
             <Text style={styles.doneLabel}>完成</Text>
           </Pressable>

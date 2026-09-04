@@ -291,7 +291,10 @@ export const CreationCard = React.forwardRef<
                 onPress={() => setExpanded(false)}
                 className="mt-3 py-2.5 flex-row items-center justify-center border-t border-gray-100 dark:border-gray-800"
               >
-                <Text className="text-sm text-primary font-bold mr-1">
+                <Text
+                  className="text-sm font-bold mr-1"
+                  style={{ color: primaryColor }}
+                >
                   收起
                   {type === 'answer'
                     ? '回答'

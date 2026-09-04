@@ -35,6 +35,10 @@ export function useThemeColor(
   const theme = useColorScheme();
   const { primaryColor } = useSettingsStore();
   const colorFromProps = props[theme];
+  const resolvedPrimaryColor = primaryColor || Colors[theme].primary;
+  const hasCustomPrimaryColor =
+    !!primaryColor &&
+    primaryColor.toLowerCase() !== Colors.light.primary.toLowerCase();
 
   if (colorFromProps) {
     return colorFromProps;
@@ -47,10 +51,12 @@ export function useThemeColor(
       colorName === 'tint' ||
       colorName === 'tabIconSelected'
     ) {
-      return primaryColor;
+      return resolvedPrimaryColor;
     }
     if (colorName === 'primaryTransparent') {
-      return `${primaryColor}26`; // 15% opacity
+      return hasCustomPrimaryColor
+        ? `${resolvedPrimaryColor}26`
+        : Colors[theme].primaryTransparent;
     }
     if (colorName === 'warning') {
       return Colors[theme].warningAccent;
@@ -58,7 +64,7 @@ export function useThemeColor(
     if (typeof colorName === 'string' && colorName.startsWith('primary_')) {
       const opacityHex = colorName.split('_')[1];
       if (opacityHex && opacityHex.length === 2) {
-        return `${primaryColor}${opacityHex}`;
+        return `${resolvedPrimaryColor}${opacityHex}`;
       }
     }
   } else {

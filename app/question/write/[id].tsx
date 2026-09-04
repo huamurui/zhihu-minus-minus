@@ -12,12 +12,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createAnswer, getQuestion } from '@/api/zhihu';
-import { Text, View } from '@/components/Themed';
+import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 
 export default function WriteAnswerScreen() {
   const colorScheme = useColorScheme();
+  const primaryColor = useThemeColor({}, 'primary');
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const _insets = useSafeAreaInsets();
@@ -55,7 +56,7 @@ export default function WriteAnswerScreen() {
   if (qLoading) {
     return (
       <View className="flex-1 justify-center items-center">
-        <ActivityIndicator size="large" color={Colors[colorScheme].primary} />
+        <ActivityIndicator size="large" color={primaryColor} />
       </View>
     );
   }
@@ -72,12 +73,12 @@ export default function WriteAnswerScreen() {
               style={{ opacity: !content.trim() ? 0.5 : 1 }}
             >
               {mutation.isPending ? (
-                <ActivityIndicator
-                  size="small"
-                  color={Colors[colorScheme].primary}
-                />
+                <ActivityIndicator size="small" color={primaryColor} />
               ) : (
-                <Text className="text-primary text-base font-bold mr-[15px]">
+                <Text
+                  className="text-base font-bold mr-[15px]"
+                  style={{ color: primaryColor }}
+                >
                   发布
                 </Text>
               )}

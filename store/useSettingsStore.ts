@@ -19,7 +19,7 @@ function isValidHex(color: string | null | undefined): boolean {
 
 /** Sanitize a color value: returns the color if valid, null otherwise */
 function sanitizeColor(color: string | null | undefined): string | null {
-  return isValidHex(color) ? (color as string) : null;
+  return isValidHex(color) ? (color as string).toLowerCase() : null;
 }
 
 const VALID_FILTER_MODES: ReadonlyArray<FilterMode> = ['collapse', 'hide'];

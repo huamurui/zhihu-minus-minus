@@ -37,7 +37,7 @@ import {
 import { addReadHistory } from '@/api/zhihu/history';
 import { FeedCard } from '@/components/FeedCard';
 import { QueryErrorView } from '@/components/QueryErrorView';
-import { Text, View } from '@/components/Themed';
+import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -334,8 +334,7 @@ export default function UserDetailScreen() {
   }, [navigation]);
 
   const borderColor = Colors[colorScheme].border;
-  const { primaryColor: customPrimaryColor } = useSettingsStore();
-  const primaryColor = customPrimaryColor || Colors[colorScheme].primary;
+  const primaryColor = useThemeColor({}, 'primary');
 
   const { cookies, me: storedMe } = useAuthStore();
   const { data: fetchedMe } = useQuery({

@@ -8,7 +8,7 @@ import {
   StyleSheet,
   useWindowDimensions,
 } from 'react-native';
-import { Text, View } from '@/components/Themed';
+import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 
@@ -41,6 +41,8 @@ export function AppDialog({
   dismissible = true,
 }: AppDialogProps) {
   const colorScheme = useColorScheme();
+  const primaryColor = useThemeColor({}, 'primary');
+  const primaryTransparent = useThemeColor({}, 'primaryTransparent');
   const { width } = useWindowDimensions();
   const [mounted, setMounted] = useState(visible);
   const mountedRef = useRef(visible);
@@ -109,7 +111,7 @@ export function AppDialog({
 
   const surface = Colors[colorScheme].backgroundSecondary;
   const tertiary = Colors[colorScheme].backgroundTertiary;
-  const primary = Colors[colorScheme].primary;
+  const primary = primaryColor;
 
   return (
     <Modal
@@ -149,10 +151,7 @@ export function AppDialog({
         >
           {icon ? (
             <View
-              style={[
-                styles.icon,
-                { backgroundColor: Colors[colorScheme].primaryTransparent },
-              ]}
+              style={[styles.icon, { backgroundColor: primaryTransparent }]}
             >
               <Ionicons name={icon} size={27} color={primary} />
             </View>

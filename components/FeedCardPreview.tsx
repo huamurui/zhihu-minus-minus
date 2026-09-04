@@ -15,7 +15,7 @@ import {
   RICH_CONTENT_STALE_TIME,
   ZhihuContent,
 } from '@/features/rich-content';
-import { Text, View } from './Themed';
+import { Text, useThemeColor, View } from './Themed';
 
 interface FeedCardPreviewProps {
   item: FeedItem;
@@ -34,6 +34,7 @@ function getResponseStatus(error: unknown) {
 
 export function FeedCardPreview({ item }: FeedCardPreviewProps) {
   const colorScheme = useColorScheme();
+  const primaryColor = useThemeColor({}, 'primary');
   const isVideo = item.type === 'videos';
   const typeKey =
     item.type === 'answers'
@@ -133,10 +134,7 @@ export function FeedCardPreview({ item }: FeedCardPreviewProps) {
           </Text>
         ) : isLoading ? (
           <View className="py-10 justify-center items-center bg-transparent">
-            <ActivityIndicator
-              size="small"
-              color={Colors[colorScheme].primary}
-            />
+            <ActivityIndicator size="small" color={primaryColor} />
             <Text className="mt-2 text-xs opacity-60">正在获取完整内容...</Text>
           </View>
         ) : (

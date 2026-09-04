@@ -23,3 +23,5 @@ const titleStyle = { fontSize: typography.fontSize.title };
 NativeWind 使用同一份 token 生成的语义 class，例如 `bg-surface`、`text-foreground`、`text-tertiary`、`border-border` 和 `bg-primary`。`constants/Colors.ts` 仅作为旧代码的兼容入口，新代码不要再从那里新增依赖。
 
 用户自定义主题色仍然属于运行时设置，由 `useThemeColor` 在 `primary`、`tint` 和相关透明色上覆盖静态 token。知乎接口返回的标签色等内容数据可以保留在 feature 边界内，不应反向写入全局设计 token。
+
+主题模式由 `store/useThemeStore.ts` 管理，支持 `system`、`light` 和 `dark`。`system` 模式会监听操作系统外观变化，手动切换后的模式会持久化。涉及主色的原生组件样式应使用 `useThemeColor`，不要直接读取 `Colors[colorScheme].primary` 或使用静态 `bg-primary`，否则无法响应用户自定义主题色。

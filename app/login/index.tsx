@@ -5,7 +5,7 @@ import { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { getMe } from '@/api/zhihu';
-import { Text, View } from '@/components/Themed';
+import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -14,6 +14,7 @@ import { syncNativeSessionCookies } from '@/utils/authSession';
 
 export default function LoginScreen() {
   const colorScheme = useColorScheme();
+  const primaryColor = useThemeColor({}, 'primary');
   const router = useRouter();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(true);
@@ -123,7 +124,9 @@ export default function LoginScreen() {
             }
           }}
         >
-          <Text type="primary" className="text-base">取消</Text>
+          <Text type="primary" className="text-base">
+            取消
+          </Text>
         </Pressable>
         <Text className="text-base font-bold">登录知乎</Text>
         <View className="w-10 bg-transparent" />
@@ -169,7 +172,7 @@ export default function LoginScreen() {
             backgroundColor: 'rgba(0,0,0,0.3)',
           }}
         >
-          <ActivityIndicator size="large" color={Colors[colorScheme].primary} />
+          <ActivityIndicator size="large" color={primaryColor} />
         </View>
       )}
     </View>

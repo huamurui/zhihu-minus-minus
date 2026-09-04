@@ -15,7 +15,7 @@ import {
   type ReadHistoryDataItem,
   type ReadHistoryResponse,
 } from '@/api/zhihu';
-import { Text, View } from '@/components/Themed';
+import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { formatDate } from '@/utils/date';
@@ -23,6 +23,7 @@ import { formatDate } from '@/utils/date';
 export default function HistoryScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
+  const primaryColor = useThemeColor({}, 'primary');
   const queryClient = useQueryClient();
   const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -178,9 +179,7 @@ export default function HistoryScreen() {
                 name={isSelected ? 'checkbox' : 'square-outline'}
                 size={22}
                 color={
-                  isSelected
-                    ? Colors[colorScheme].primary
-                    : Colors[colorScheme].textTertiary
+                  isSelected ? primaryColor : Colors[colorScheme].textTertiary
                 }
               />
             </View>
@@ -225,11 +224,7 @@ export default function HistoryScreen() {
           headerRight: () =>
             selecting ? (
               <Pressable onPress={exitSelection}>
-                <Text
-                  style={{ color: Colors[colorScheme].primary, fontSize: 16 }}
-                >
-                  完成
-                </Text>
+                <Text style={{ color: primaryColor, fontSize: 16 }}>完成</Text>
               </Pressable>
             ) : historyItems.length > 0 ? (
               <Pressable onPress={handleClearAll}>
@@ -255,10 +250,7 @@ export default function HistoryScreen() {
         onEndReachedThreshold={0.5}
         ListFooterComponent={() =>
           isFetchingNextPage ? (
-            <ActivityIndicator
-              style={{ margin: 20 }}
-              color={Colors[colorScheme].primary}
-            />
+            <ActivityIndicator style={{ margin: 20 }} color={primaryColor} />
           ) : historyItems.length > 0 && !hasNextPage ? (
             <Text type="secondary" className="text-center p-5 text-xs">
               — 已经到底了喵 —
@@ -268,10 +260,7 @@ export default function HistoryScreen() {
         ListEmptyComponent={() => (
           <View className="p-[50px] items-center">
             {isLoading ? (
-              <ActivityIndicator
-                size="small"
-                color={Colors[colorScheme].primary}
-              />
+              <ActivityIndicator size="small" color={primaryColor} />
             ) : (
               <Text type="secondary">这里空空如也喵</Text>
             )}
@@ -283,7 +272,8 @@ export default function HistoryScreen() {
       {selecting && selectedIds.size > 0 && (
         <Pressable
           onPress={handleDeleteSelected}
-          className="absolute bottom-8 left-8 right-8 bg-primary py-3 rounded-xl items-center"
+          className="absolute bottom-8 left-8 right-8 py-3 rounded-xl items-center"
+          style={{ backgroundColor: primaryColor }}
         >
           <Text className="text-white text-base font-bold">
             删除选中 ({selectedIds.size})

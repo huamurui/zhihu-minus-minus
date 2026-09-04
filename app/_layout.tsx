@@ -83,9 +83,23 @@ function RootLayout() {
   const router = useRouter();
   const _colorScheme = useColorScheme();
   const isDark = useThemeStore((state) => state.isDark);
-  const theme = isDark ? DarkTheme : DefaultTheme;
+  const hasThemeHydrated = useThemeStore((state) => state.hasHydrated);
   const { primaryColor } = useSettingsStore();
   const currentTint = primaryColor || Colors[isDark ? 'dark' : 'light'].primary;
+  const appColorScheme = isDark ? 'dark' : 'light';
+  const baseNavigationTheme = isDark ? DarkTheme : DefaultTheme;
+  const theme = {
+    ...baseNavigationTheme,
+    colors: {
+      ...baseNavigationTheme.colors,
+      primary: currentTint,
+      background: Colors[appColorScheme].background,
+      card: Colors[appColorScheme].backgroundSecondary,
+      text: Colors[appColorScheme].text,
+      border: Colors[appColorScheme].border,
+      notification: Colors[appColorScheme].danger,
+    },
+  };
 
   // Sync NativeWind dark mode with zustand store
   useSyncThemeWithNativeWind();
@@ -182,8 +196,10 @@ function RootLayout() {
 
   // 这里简单处理：如果以后需要加载字体，可以写在这里
   useEffect(() => {
-    SplashScreen.hideAsync();
-  }, []);
+    if (hasThemeHydrated) {
+      void SplashScreen.hideAsync();
+    }
+  }, [hasThemeHydrated]);
   // throw new Error('test')
   return (
     <QueryClientProvider client={queryClient}>

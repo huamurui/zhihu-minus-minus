@@ -14,7 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createArticle } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
-import { Text, View } from '@/components/Themed';
+import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 
@@ -23,7 +23,7 @@ export default function PublishArticleScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const queryClient = useQueryClient();
-  const tintColor = Colors[colorScheme].tint;
+  const tintColor = useThemeColor({}, 'primary');
   const textColor = Colors[colorScheme].text;
   const secondaryColor = Colors[colorScheme].textSecondary;
   const borderCol = Colors[colorScheme].border;

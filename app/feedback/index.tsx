@@ -1,14 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Linking, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { Text, View } from '@/components/Themed';
+import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 
 export default function FeedbackScreen() {
   const colorScheme = useColorScheme();
   const router = useRouter();
-  const accentColor = Colors[colorScheme].tint;
+  const accentColor = useThemeColor({}, 'primary');
   const borderColor = Colors[colorScheme].border;
   const surfaceColor = Colors[colorScheme].backgroundSecondary;
 
@@ -68,7 +68,11 @@ export default function FeedbackScreen() {
                   huamurui/zhihu-minus-minus
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={Colors[colorScheme].tabIconDefault} />
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={Colors[colorScheme].tabIconDefault}
+              />
             </Pressable>
 
             <View
@@ -95,7 +99,11 @@ export default function FeedbackScreen() {
                   huamurui@outlook.com
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={Colors[colorScheme].tabIconDefault} />
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={Colors[colorScheme].tabIconDefault}
+              />
             </Pressable>
           </View>
         </View>
