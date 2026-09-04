@@ -33,7 +33,7 @@ import {
 import {
   Gesture,
   GestureDetector,
-  type GestureType,
+  RefreshControl,
 } from 'react-native-gesture-handler';
 import Reanimated, {
   interpolate,
@@ -70,6 +70,10 @@ import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { ZhihuContent } from '@/features/rich-content';
 import { useCollectionAction } from '@/hooks/useCollectionAction';
+import {
+  type GestureScrollViewRef,
+  useGestureScrollView,
+} from '@/hooks/useGestureScrollView';
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
 import { useScrollHeaderAnim } from '@/hooks/useScrollAnimation';
 import { useViewableItems } from '@/hooks/useViewableItems';
@@ -101,7 +105,7 @@ interface AnswerItemProps {
   questionId: string;
   sortBy: AnswerSort;
   screenTranslateX: SharedValue<number>;
-  scrollGesture: GestureType;
+  scrollGestureRef: GestureScrollViewRef;
   onSwipeStart?: (author: ZhihuAuthor) => void;
   onSwipeComplete?: (author: ZhihuAuthor) => void;
   onSwipeCancel?: () => void;
@@ -117,7 +121,7 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
       questionId,
       sortBy,
       screenTranslateX,
-      scrollGesture,
+      scrollGestureRef,
       onSwipeStart,
       onSwipeComplete,
       onSwipeCancel,
@@ -227,7 +231,7 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
           .enabled(Boolean(item.author?.url_token))
           .activeOffsetX(-15)
           .failOffsetY([-8, 8])
-          .simultaneousWithExternalGesture(scrollGesture)
+          .simultaneousWithExternalGesture(scrollGestureRef)
           .onStart(() => {
             if (item.author && onSwipeStart) {
               runOnJS(onSwipeStart)(item.author);
@@ -268,7 +272,7 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
         onSwipeComplete,
         onSwipeCancel,
         onSwipeStart,
-        scrollGesture,
+        scrollGestureRef,
         screenTranslateX,
         screenWidth,
       ],
@@ -731,7 +735,7 @@ export default function QuestionDetail() {
   const queryClient = useQueryClient();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const screenTranslateX = useSharedValue(0);
-  const scrollGesture = useMemo(() => Gesture.Native(), []);
+  const { scrollGestureRef, renderScrollComponent } = useGestureScrollView();
   const [swipedAuthor, setSwipedAuthor] = useState<ZhihuAuthor | null>(null);
 
   const animatedScreenStyle = useAnimatedStyle(() => {
@@ -1321,77 +1325,81 @@ export default function QuestionDetail() {
           <Ionicons name="chevron-back" size={28} color={textColor} />
         </Pressable>
 
-        <GestureDetector gesture={scrollGesture}>
-          <AnimatedFlashList<AnswerDetail>
-            ref={flashListRef}
-            onScroll={handleScroll}
-            data={qLoading ? [] : answers}
-            ListHeaderComponent={renderHeader}
-            renderItem={({ item }) => (
-              <AnswerItem
-                ref={(r) => {
-                  const answerId = item.id.toString();
-                  if (r) itemRefs.current.set(answerId, r);
-                  else itemRefs.current.delete(answerId);
-                }}
-                item={item}
-                isExpanded={
-                  item?.id ? expandedIds.has(item.id.toString()) : false
-                }
-                onToggle={handleToggleExpand}
-                onShare={(ans) => {
-                  setSelectedAnswer(ans);
-                  setIsSharing(true);
-                }}
-                questionId={id}
-                sortBy={sortBy}
-                screenTranslateX={screenTranslateX}
-                scrollGesture={scrollGesture}
-                onSwipeStart={setSwipedAuthor}
-                onSwipeComplete={handleSwipeComplete}
-                onSwipeCancel={() => setSwipedAuthor(null)}
+        <AnimatedFlashList<AnswerDetail>
+          ref={flashListRef}
+          // Bind the gesture to the actual scroller, not FlashList's outer View.
+          renderScrollComponent={renderScrollComponent}
+          onScroll={handleScroll}
+          data={qLoading ? [] : answers}
+          ListHeaderComponent={renderHeader}
+          renderItem={({ item }) => (
+            <AnswerItem
+              ref={(r) => {
+                const answerId = item.id.toString();
+                if (r) itemRefs.current.set(answerId, r);
+                else itemRefs.current.delete(answerId);
+              }}
+              item={item}
+              isExpanded={
+                item?.id ? expandedIds.has(item.id.toString()) : false
+              }
+              onToggle={handleToggleExpand}
+              onShare={(ans) => {
+                setSelectedAnswer(ans);
+                setIsSharing(true);
+              }}
+              questionId={id}
+              sortBy={sortBy}
+              screenTranslateX={screenTranslateX}
+              scrollGestureRef={scrollGestureRef}
+              onSwipeStart={setSwipedAuthor}
+              onSwipeComplete={handleSwipeComplete}
+              onSwipeCancel={() => setSwipedAuthor(null)}
+            />
+          )}
+          keyExtractor={(item) => `ans-${item.id.toString()}`}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          onEndReached={() =>
+            hasNextPage && !isFetchingNextPage && fetchNextPage()
+          }
+          onEndReachedThreshold={0.5}
+          ListEmptyComponent={
+            qLoading ? null : answersPending ? (
+              <ActivityIndicator
+                style={{ marginTop: 60 }}
+                color={primaryColor}
               />
-            )}
-            keyExtractor={(item) => `ans-${item.id.toString()}`}
-            onViewableItemsChanged={onViewableItemsChanged}
-            viewabilityConfig={viewabilityConfig}
-            onEndReached={() =>
-              hasNextPage && !isFetchingNextPage && fetchNextPage()
-            }
-            onEndReachedThreshold={0.5}
-            ListEmptyComponent={
-              qLoading ? null : answersPending ? (
-                <ActivityIndicator
-                  style={{ marginTop: 60 }}
-                  color={primaryColor}
-                />
-              ) : answersError ? (
-                <QueryErrorView
-                  message="回答列表加载失败"
-                  onRetry={() => void refetch()}
-                />
-              ) : (
-                <Text type="secondary" className="text-center mt-16 text-sm">
-                  暂无回答
-                </Text>
-              )
-            }
-            ListFooterComponent={() =>
-              isFetchingNextPage ? (
-                <ActivityIndicator
-                  style={{ marginVertical: 20 }}
-                  color={primaryColor}
-                />
-              ) : answers?.length > 0 && !hasNextPage ? (
-                <Text type="secondary" className="text-center my-5">
-                  — 没有更多回答了 —
-                </Text>
-              ) : null
-            }
-            onRefresh={handleRefresh}
-            refreshing={isRefetching}
-          />
-        </GestureDetector>
+            ) : answersError ? (
+              <QueryErrorView
+                message="回答列表加载失败"
+                onRetry={() => void refetch()}
+              />
+            ) : (
+              <Text type="secondary" className="text-center mt-16 text-sm">
+                暂无回答
+              </Text>
+            )
+          }
+          ListFooterComponent={() =>
+            isFetchingNextPage ? (
+              <ActivityIndicator
+                style={{ marginVertical: 20 }}
+                color={primaryColor}
+              />
+            ) : answers?.length > 0 && !hasNextPage ? (
+              <Text type="secondary" className="text-center my-5">
+                — 没有更多回答了 —
+              </Text>
+            ) : null
+          }
+          refreshControl={
+            <RefreshControl
+              onRefresh={handleRefresh}
+              refreshing={isRefetching}
+            />
+          }
+        />
 
         <Reanimated.View
           className="absolute left-5 right-5 h-[54px] rounded-[27px] overflow-hidden z-[1000] shadow-black/20 shadow-lg elevation-10"
