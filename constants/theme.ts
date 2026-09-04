@@ -1,4 +1,9 @@
-import { colors, designTokens } from './designTokens';
+import {
+  type ColorScheme,
+  type ColorToken,
+  colors,
+  designTokens,
+} from './designTokens';
 
 export type ReadingBackground = 'default' | 'soft' | 'warm' | 'dim';
 export type TextContrast = 'standard' | 'high';
@@ -37,39 +42,44 @@ export const SURFACE_STYLE_OPTIONS: ReadonlyArray<{
   { value: 'flat', label: '扁平' },
 ];
 
-type ThemeColorMap = Record<string, string>;
+type ThemeColorMap = Record<ColorToken, string>;
 
 type ThemeAdjustmentTokens = {
   readingBackground: Record<
     ReadingBackground,
-    Record<'light' | 'dark', Partial<ThemeColorMap>>
+    Record<ColorScheme, ThemeColorMap>
   >;
   textContrast: Record<
     TextContrast,
-    Record<'light' | 'dark', Partial<ThemeColorMap>>
+    Record<
+      ColorScheme,
+      Partial<Pick<ThemeColorMap, 'text' | 'textSecondary' | 'textTertiary'>>
+    >
   >;
 };
 
-const themeAdjustmentTokens = designTokens.themeAdjustments as
-  | ThemeAdjustmentTokens
-  | undefined;
+// Default uses the base palette directly; every other preset must be complete.
+const themeAdjustmentTokens: ThemeAdjustmentTokens = {
+  readingBackground: {
+    default: colors,
+    ...designTokens.themeAdjustments.readingBackground,
+  },
+  textContrast: designTokens.themeAdjustments.textContrast,
+};
 
 export function resolveThemeColors(
-  colorScheme: 'light' | 'dark',
+  colorScheme: ColorScheme,
   preferences: ThemePreferences,
 ): ThemeColorMap {
-  const resolved = { ...colors[colorScheme] } as ThemeColorMap;
-  const adjustmentTokens = themeAdjustmentTokens;
-
-  if (adjustmentTokens) {
-    Object.assign(
-      resolved,
-      adjustmentTokens.readingBackground[preferences.readingBackground][
-        colorScheme
-      ],
-      adjustmentTokens.textContrast[preferences.textContrast][colorScheme],
-    );
-  }
+  const resolved: ThemeColorMap = {
+    ...themeAdjustmentTokens.readingBackground[preferences.readingBackground][
+      colorScheme
+    ],
+    // Standard keeps the preset's text palette; high contrast overrides it.
+    ...themeAdjustmentTokens.textContrast[preferences.textContrast][
+      colorScheme
+    ],
+  };
 
   if (preferences.surfaceStyle === 'flat') {
     resolved.backgroundSecondary = resolved.background;
