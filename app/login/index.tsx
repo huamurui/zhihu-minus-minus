@@ -123,7 +123,7 @@ export default function LoginScreen() {
             }
           }}
         >
-          <Text className="text-[#0084ff] text-base">取消</Text>
+          <Text type="primary" className="text-base">取消</Text>
         </Pressable>
         <Text className="text-base font-bold">登录知乎</Text>
         <View className="w-10 bg-transparent" />
@@ -169,7 +169,7 @@ export default function LoginScreen() {
             backgroundColor: 'rgba(0,0,0,0.3)',
           }}
         >
-          <ActivityIndicator size="large" color="#0084ff" />
+          <ActivityIndicator size="large" color={Colors[colorScheme].primary} />
         </View>
       )}
     </View>

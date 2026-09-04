@@ -2,6 +2,7 @@ import type React from 'react';
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { colors } from '@/constants/designTokens';
 import { useSettingsStore } from '@/store/useSettingsStore';
 
 interface LaTeXRendererProps {
@@ -20,7 +21,7 @@ export const LaTeXRenderer: React.FC<LaTeXRendererProps> = ({
   const [height, setHeight] = useState(inline ? 30 : 60);
   const [loading, setLoading] = useState(true);
   const { primaryColor: customPrimaryColor } = useSettingsStore();
-  const primaryColor = customPrimaryColor || '#0084ff';
+  const primaryColor = customPrimaryColor || colors.light.primary;
 
   const html = `
     <!DOCTYPE html>
@@ -37,7 +38,7 @@ export const LaTeXRenderer: React.FC<LaTeXRendererProps> = ({
           justify-content: ${inline ? 'flex-start' : 'center'};
           align-items: center;
           background-color: transparent;
-          color: ${colorScheme === 'dark' ? '#ffffff' : '#1a1a1a'};
+          color: ${colors[colorScheme].text};
           overflow: hidden;
         }
         #math {

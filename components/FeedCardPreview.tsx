@@ -133,7 +133,10 @@ export function FeedCardPreview({ item }: FeedCardPreviewProps) {
           </Text>
         ) : isLoading ? (
           <View className="py-10 justify-center items-center bg-transparent">
-            <ActivityIndicator size="small" color="#0084ff" />
+            <ActivityIndicator
+              size="small"
+              color={Colors[colorScheme].primary}
+            />
             <Text className="mt-2 text-xs opacity-60">正在获取完整内容...</Text>
           </View>
         ) : (

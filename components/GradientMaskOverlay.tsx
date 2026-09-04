@@ -3,6 +3,7 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { effects } from '@/constants/designTokens';
 
 export function GradientMaskOverlay({ isDark }: { isDark: boolean }) {
   const insets = useSafeAreaInsets();
@@ -24,7 +25,7 @@ export function GradientMaskOverlay({ isDark }: { isDark: boolean }) {
           }}
           maskElement={
             <LinearGradient
-              colors={['rgba(0,0,0,1)', 'rgba(0,0,0,0)']}
+              colors={effects.gradientMask.light}
               style={{ flex: 1 }}
             />
           }
@@ -35,8 +36,8 @@ export function GradientMaskOverlay({ isDark }: { isDark: boolean }) {
             style={{
               flex: 1,
               backgroundColor: isDark
-                ? 'rgba(26,26,26,0.2)'
-                : 'rgba(255,255,255,0.2)',
+                ? effects.blurSurface.dark
+                : effects.blurSurface.light,
             }}
           />
         </MaskedView>
@@ -53,7 +54,7 @@ export function GradientMaskOverlay({ isDark }: { isDark: boolean }) {
           }}
           maskElement={
             <LinearGradient
-              colors={['rgba(0,0,0,0)', 'rgba(0,0,0,1)']}
+              colors={effects.gradientMask.dark}
               style={{ flex: 1 }}
             />
           }
@@ -64,8 +65,8 @@ export function GradientMaskOverlay({ isDark }: { isDark: boolean }) {
             style={{
               flex: 1,
               backgroundColor: isDark
-                ? 'rgba(26,26,26,0.2)'
-                : 'rgba(255,255,255,0.2)',
+                ? effects.blurSurface.dark
+                : effects.blurSurface.light,
             }}
           />
         </MaskedView>

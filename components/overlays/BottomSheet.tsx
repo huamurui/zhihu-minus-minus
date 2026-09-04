@@ -195,7 +195,8 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
     if (!mounted) return null;
 
     const surfaceColor = Colors[colorScheme].backgroundSecondary;
-    const handleColor = colorScheme === 'dark' ? Colors.dark.border : '#D1D1D6';
+    const handleColor =
+      colorScheme === 'dark' ? Colors.dark.border : Colors.light.controlBorder;
     const hasHeader = title || subtitle || headerLeft || headerRight;
 
     return (
@@ -322,7 +323,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     overflow: 'hidden',
-    shadowColor: '#000',
+    shadowColor: Colors.light.shadow,
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.12,
     shadowRadius: 14,

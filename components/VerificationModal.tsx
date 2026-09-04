@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Modal, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+import Colors from '@/constants/Colors';
 import { useVerificationStore } from '@/store/useVerificationStore';
 import { BouncyButton } from './BouncyButton';
 import { Text, View } from './Themed';
@@ -40,9 +41,16 @@ export const VerificationModal = () => {
       onRequestClose={hide}
     >
       <SafeAreaView style={styles.container}>
-        <StatusBar style="dark" backgroundColor="#fff" />
+        <StatusBar
+          style="dark"
+          backgroundColor={Colors.light.backgroundSecondary}
+        />
         <View style={styles.header}>
-          <Text lightColor="#1a1a1a" darkColor="#1a1a1a" style={styles.title}>
+          <Text
+            lightColor={Colors.light.text}
+            darkColor={Colors.dark.textInverse}
+            style={styles.title}
+          >
             安全验证
           </Text>
           <BouncyButton onPress={hide} style={styles.closeButton}>
@@ -66,7 +74,7 @@ export const VerificationModal = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.light.backgroundSecondary,
   },
   header: {
     height: 54,
@@ -74,7 +82,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#eee',
+    borderBottomColor: Colors.light.border,
     position: 'relative',
   },
   title: {
@@ -87,6 +95,6 @@ const styles = StyleSheet.create({
     padding: 5,
   },
   webView: {
-    backgroundColor: '#fff',
+    backgroundColor: Colors.light.backgroundSecondary,
   },
 });

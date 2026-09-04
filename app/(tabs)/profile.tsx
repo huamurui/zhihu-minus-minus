@@ -258,7 +258,7 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
           >
             <Image
               source={{ uri: me.avatar_url }}
-              className="w-16 h-16 rounded-full bg-[#eee]"
+              className="w-16 h-16 rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark"
             />
             <View className="flex-1 ml-[15px] bg-transparent">
               <Text className="text-[22px] font-bold">{me.name}</Text>
@@ -270,7 +270,11 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
                 {me.headline || '点击查看个人主页'}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#ccc" />
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={Colors[colorScheme].tabIconDefault}
+            />
           </Pressable>
         ) : cookies && isMeLoading ? (
           <View className="h-24 items-center justify-center bg-transparent">
@@ -287,8 +291,12 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
             className="flex-row items-center mb-[25px]"
             onPress={() => router.push('/login')}
           >
-            <View className="w-16 h-16 rounded-full border border-[#eee] justify-center items-center">
-              <Ionicons name="person" size={40} color="#ccc" />
+            <View className="w-16 h-16 rounded-full border border-border dark:border-border-dark justify-center items-center">
+              <Ionicons
+                name="person"
+                size={40}
+                color={Colors[colorScheme].tabIconDefault}
+              />
             </View>
             <View className="flex-1 ml-[15px] bg-transparent">
               <Text className="text-[22px] font-bold">点击登录</Text>
@@ -355,13 +363,13 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
         <MenuItem
           icon="bookmark-outline"
           title="我的收藏"
-          color="#ff9800"
+          color={Colors[colorScheme].warning}
           onPress={() => router.push('/collections')}
         />
         <MenuItem
           icon="time-outline"
           title="最近浏览"
-          color="#2196f3"
+          color={Colors[colorScheme].primary}
           onPress={() => router.push('/history')}
         />
       </View>
@@ -381,7 +389,7 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
               <Ionicons
                 name={isDark ? 'moon' : 'sunny'}
                 size={20}
-                color={isDark ? '#ffcf40' : '#ff9800'}
+                color={Colors[colorScheme].warning}
               />
             </View>
             <Text className="text-base ml-3 font-medium">夜间模式</Text>
@@ -390,7 +398,7 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
             value={isDark}
             onValueChange={onToggleTheme}
             trackColor={{ false: '#ddd', true: accentColor }}
-            thumbColor="#fff"
+            thumbColor={Colors[colorScheme].textInverse}
           />
         </View>
 
@@ -417,7 +425,11 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
                 <Text className="bg-[#ff4d4f] text-white text-xs font-bold px-1.5 py-0.5 rounded-[10px] overflow-hidden mr-1">
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </Text>
-                <Ionicons name="chevron-forward" size={16} color="#ccc" />
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={Colors[colorScheme].tabIconDefault}
+                />
               </View>
             ) : undefined
           }
@@ -439,7 +451,11 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
               <Text type="secondary" className="mr-1 text-[13px]">
                 {accounts.length} 个账号
               </Text>
-              <Ionicons name="chevron-forward" size={16} color="#ccc" />
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={Colors[colorScheme].tabIconDefault}
+              />
             </View>
           }
         />
@@ -485,7 +501,7 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
                 >
                   <Image
                     source={{ uri: account.me?.avatar_url }}
-                    className="w-12 h-12 rounded-full bg-[#eee]"
+                    className="w-12 h-12 rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark"
                   />
                   <View className="flex-1 ml-4 bg-transparent">
                     <View className="flex-row items-center bg-transparent">
@@ -663,7 +679,11 @@ function MenuItem({
       {right ? (
         right
       ) : (
-        <Ionicons name="chevron-forward" size={16} color="#ccc" />
+        <Ionicons
+          name="chevron-forward"
+          size={16}
+          color={Colors.light.tabIconDefault}
+        />
       )}
     </BouncyButton>
   );

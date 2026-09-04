@@ -40,6 +40,7 @@ import { ActionSheet } from '@/components/overlays/ActionSheet';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
+import { typography } from '@/constants/designTokens';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ZhihuSegmentInfo } from '@/types/zhihu';
 import { showToast } from '@/utils/toast';
@@ -142,7 +143,7 @@ export const LinkCard: React.FC<{
             backgroundColor: surfaceColor,
             borderWidth: StyleSheet.hairlineWidth,
             borderColor: 'rgba(150,150,150,0.15)',
-            shadowColor: '#000',
+            shadowColor: Colors[colorScheme].shadow,
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.05,
             shadowRadius: 4,
@@ -285,8 +286,8 @@ const P_Renderer: CustomBlockRenderer = ({ TDefaultRenderer, ...props }) => {
     return <TDefaultRenderer {...props} />;
   }
 
-  const textFontSize = 17 * fontSizeScale;
-  const textLineHeight = 17 * lineHeightScale;
+  const textFontSize = typography.fontSize.subtitle * fontSizeScale;
+  const textLineHeight = typography.fontSize.subtitle * lineHeightScale;
 
   return (
     <Text
@@ -344,7 +345,8 @@ const LazyImage: React.FC<{
   style: any;
   resizeMode: 'contain' | 'cover' | 'stretch' | 'center';
   resizeMethod?: 'auto' | 'resize' | 'scale';
-}> = ({ src, style, resizeMode, resizeMethod }) => {
+  colorScheme: 'light' | 'dark';
+}> = ({ src, style, resizeMode, resizeMethod, colorScheme }) => {
   const [visible, setVisible] = useState(false);
   const containerRef = useRef<RNView>(null);
   const timerRef = useRef<any>(null);
@@ -392,7 +394,10 @@ const LazyImage: React.FC<{
           className="rounded-xl"
         />
       ) : (
-        <ActivityIndicator size="small" color="#999" />
+        <ActivityIndicator
+          size="small"
+          color={Colors[colorScheme].textTertiary}
+        />
       )}
     </RNView>
   );
@@ -410,6 +415,7 @@ const IMG_Renderer: CustomBlockRenderer = ({ tnode }) => {
     width: contentWidth,
     colorScheme,
   } = rendererProps as any;
+  const themeColors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
 
   const originalWidth = parseInt(attrWidth as string, 10) || 0;
   const originalHeight = parseInt(attrHeight as string, 10) || 0;
@@ -453,7 +459,7 @@ const IMG_Renderer: CustomBlockRenderer = ({ tnode }) => {
 
   // 如果是公式，且是暗色模式，使用 tintColor 将黑色公式变为白色
   if (isFormula && colorScheme === 'dark') {
-    imageStyle.tintColor = '#ffffff';
+    imageStyle.tintColor = themeColors.textInverse;
   }
 
   // 确保 src 有协议
@@ -465,7 +471,7 @@ const IMG_Renderer: CustomBlockRenderer = ({ tnode }) => {
         {svgError ? (
           <Text
             style={{
-              color: colorScheme === 'dark' ? '#ffffff' : '#1a1a1a',
+              color: themeColors.text,
               fontSize: 16,
             }}
           >
@@ -476,7 +482,7 @@ const IMG_Renderer: CustomBlockRenderer = ({ tnode }) => {
             uri={finalSrc}
             width={displayWidth}
             height={displayHeight}
-            color={colorScheme === 'dark' ? '#ffffff' : '#1a1a1a'}
+            color={themeColors.text}
             onError={() => setSvgError(true)}
           />
         )}
@@ -501,7 +507,7 @@ const IMG_Renderer: CustomBlockRenderer = ({ tnode }) => {
           svgError ? (
             <Text
               style={{
-                color: colorScheme === 'dark' ? '#ffffff' : '#1a1a1a',
+                color: themeColors.text,
                 fontSize: 16,
               }}
             >
@@ -512,7 +518,7 @@ const IMG_Renderer: CustomBlockRenderer = ({ tnode }) => {
               uri={finalSrc}
               width={displayWidth}
               height={displayHeight}
-              color={colorScheme === 'dark' ? '#ffffff' : '#1a1a1a'}
+              color={themeColors.text}
               onError={() => setSvgError(true)}
             />
           )
@@ -522,6 +528,7 @@ const IMG_Renderer: CustomBlockRenderer = ({ tnode }) => {
             style={imageStyle}
             resizeMode="contain"
             resizeMethod="resize"
+            colorScheme={colorScheme}
           />
         )}
       </Pressable>
@@ -1082,7 +1089,10 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
           <View style={{ minHeight: 400 }}>
             {!domReady && !useNativeFallback && (
               <View className="absolute inset-0 z-10 justify-center items-center bg-transparent">
-                <ActivityIndicator size="small" color="#0084ff" />
+                <ActivityIndicator
+                  size="small"
+                  color={Colors[colorScheme].primary}
+                />
                 <Text type="secondary" className="mt-4 text-xs opacity-50">
                   正在建立连接...
                 </Text>
@@ -1202,7 +1212,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
                 backgroundColor: surfaceColor,
                 borderWidth: StyleSheet.hairlineWidth,
                 borderColor: 'rgba(150,150,150,0.15)',
-                shadowColor: '#000',
+                shadowColor: Colors[colorScheme].shadow,
                 shadowOffset: { width: 0, height: 2 },
                 shadowOpacity: 0.08,
                 shadowRadius: 8,
@@ -1251,13 +1261,20 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
                 disabled={createReactionMutation.isPending}
               >
                 {createReactionMutation.isPending ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator
+                    size="small"
+                    color={Colors[colorScheme].textInverse}
+                  />
                 ) : (
                   <>
-                    <Ionicons name="heart" size={16} color="#fff" />
+                    <Ionicons
+                      name="heart"
+                      size={16}
+                      color={Colors[colorScheme].textInverse}
+                    />
                     <Text
                       className="text-sm font-bold ml-1"
-                      style={{ color: '#fff' }}
+                      style={{ color: Colors[colorScheme].textInverse }}
                     >
                       赞同
                     </Text>

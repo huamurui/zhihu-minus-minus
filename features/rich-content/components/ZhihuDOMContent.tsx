@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { colors, typography } from '@/constants/designTokens';
 import { useSettingsStore } from '@/store/useSettingsStore';
 
 export interface TextSelectionInfo {
@@ -40,9 +41,9 @@ export default React.memo(function ZhihuDOMContent({
   const [_loading, _setLoading] = useState(true);
 
   const isDark = colorScheme === 'dark';
-  const textColor = isDark ? '#ffffff' : '#1a1a1a';
+  const textColor = colors[colorScheme].text;
   const { primaryColor: customPrimaryColor } = useSettingsStore();
-  const primaryColor = customPrimaryColor || '#0084ff';
+  const primaryColor = customPrimaryColor || colors.light.primary;
 
   const html = `
     <!DOCTYPE html>
@@ -64,8 +65,8 @@ export default React.memo(function ZhihuDOMContent({
         }
         .zhihu-content {
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-          font-size: 17px;
-          line-height: 1.6;
+          font-size: ${typography.fontSize.subtitle}px;
+          line-height: ${typography.lineHeight.reading};
           color: ${textColor};
           max-width: 100%;
         }
@@ -83,11 +84,11 @@ export default React.memo(function ZhihuDOMContent({
           font-size: 14px;
         }
         .highlight {
-          background-color: ${isDark ? '#1a1a1a' : '#f6f6f6'};
+          background-color: ${colors[colorScheme].backgroundSecondary};
           padding: 12px;
           border-radius: 8px;
           margin: 15px 0;
-          border: 1px solid ${isDark ? '#333' : '#eee'};
+          border: 1px solid ${colors[colorScheme].border};
         }
         .zhihu-content p {
           margin-bottom: 20px;
@@ -104,7 +105,7 @@ export default React.memo(function ZhihuDOMContent({
           text-align: center;
         }
         .zhihu-content figcaption {
-          color: ${isDark ? '#888' : '#999'};
+          color: ${colors[colorScheme].iconMuted};
           font-size: 13px;
           margin-top: 8px;
           font-style: italic;
@@ -116,7 +117,7 @@ export default React.memo(function ZhihuDOMContent({
         .zhihu-content blockquote {
           border-left: 4px solid ${primaryColor};
           padding-left: 18px;
-          background-color: ${isDark ? '#1a1a1a' : '#f6f6f6'};
+          background-color: ${colors[colorScheme].backgroundSecondary};
           padding: 12px 18px;
           margin: 15px 0;
           font-style: italic;

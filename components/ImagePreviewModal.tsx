@@ -4,7 +4,8 @@ import { Modal, Pressable, SafeAreaView, StyleSheet, View } from 'react-native';
 import ImageViewer from 'react-native-image-zoom-viewer';
 import { ImageActionBottomSheet } from '@/components/ImageActionBottomSheet';
 import { Text } from '@/components/Themed';
-import { saveImageToGallery, shareImage } from '@/utils/saveImage';
+import Colors from '@/constants/Colors';
+import { saveImageToGallery } from '@/utils/saveImage';
 
 export interface ImagePreviewModalProps {
   visible: boolean;
@@ -98,7 +99,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: Colors.light.shadow,
   },
   headerSafeArea: {
     position: 'absolute',

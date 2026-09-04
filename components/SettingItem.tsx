@@ -3,6 +3,7 @@ import React from 'react';
 import { View as RNView, StyleSheet } from 'react-native';
 import { Text } from '@/components/Themed';
 import Colors from '@/constants/Colors';
+import { colors } from '@/constants/designTokens';
 
 /**
  * 共享的设置页 UI 原语。两个设置页（外观与定制 / 过滤与推荐）共用，
@@ -17,9 +18,8 @@ export function Section({
   children: React.ReactNode;
   colorScheme: 'light' | 'dark';
 }) {
-  const isDark = colorScheme === 'dark';
-  const cardBg = isDark ? '#1C1C1E' : '#FFFFFF';
-  const dividerColor = isDark ? '#38383A' : '#E5E5EA';
+  const cardBg = colors[colorScheme].backgroundSecondary;
+  const dividerColor = colors[colorScheme].controlBorder;
 
   // Section 内子元素由调用处逐个写死，数量与顺序在编译期就已固定。
   const childArray = React.Children.toArray(children).filter(Boolean);
@@ -70,7 +70,7 @@ export function SettingItem({
             style={[
               styles.iconWrapper,
               {
-                backgroundColor: colorScheme === 'dark' ? '#2C2C2E' : '#F2F2F7',
+                backgroundColor: colors[colorScheme].controlBackground,
               },
             ]}
           >

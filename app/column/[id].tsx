@@ -127,7 +127,7 @@ export default function ColumnDetail() {
               style={{
                 color: column.is_following
                   ? Colors[colorScheme].textSecondary
-                  : '#fff',
+                  : Colors[colorScheme].textInverse,
               }}
               className="font-bold text-sm"
             >

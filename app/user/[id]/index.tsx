@@ -335,7 +335,7 @@ export default function UserDetailScreen() {
 
   const borderColor = Colors[colorScheme].border;
   const { primaryColor: customPrimaryColor } = useSettingsStore();
-  const primaryColor = customPrimaryColor || '#0084ff';
+  const primaryColor = customPrimaryColor || Colors[colorScheme].primary;
 
   const { cookies, me: storedMe } = useAuthStore();
   const { data: fetchedMe } = useQuery({
@@ -749,14 +749,14 @@ export default function UserDetailScreen() {
                   color={
                     user?.is_following
                       ? Colors[colorScheme].textSecondary
-                      : '#fff'
+                      : Colors[colorScheme].textInverse
                   }
                 />
               ) : (
                 <Text
                   className="font-bold text-sm"
                   style={[
-                    { color: '#fff' },
+                    { color: Colors[colorScheme].textInverse },
                     user?.is_following && {
                       color: Colors[colorScheme].textSecondary,
                     },

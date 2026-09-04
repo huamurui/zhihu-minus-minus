@@ -261,7 +261,7 @@ export default function ArticleDetail() {
           style={[
             StyleSheet.absoluteFillObject,
             {
-              backgroundColor: isDark ? '#1a1a1a' : '#ffffff',
+              backgroundColor: Colors[colorScheme].backgroundSecondary,
               opacity: headerBgOpacity,
               borderBottomWidth: StyleSheet.hairlineWidth,
               borderBottomColor: isDark
@@ -358,7 +358,7 @@ export default function ArticleDetail() {
                   </Text>
                   <Text
                     type="secondary"
-                    className="text-[13px] text-[#999] mt-0.5"
+                    className="text-[13px] text-tertiary dark:text-tertiary-dark mt-0.5"
                     numberOfLines={1}
                   >
                     {data.author?.headline}
@@ -453,7 +453,7 @@ export default function ArticleDetail() {
                   style={{
                     color: columnCard.is_following
                       ? Colors[colorScheme].textSecondary
-                      : '#fff',
+                      : Colors[colorScheme].textInverse,
                   }}
                   className="font-bold text-sm"
                 >

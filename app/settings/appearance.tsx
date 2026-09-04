@@ -19,6 +19,7 @@ import { Section, SettingItem } from '@/components/SettingItem';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
+import { designTokens } from '@/constants/designTokens';
 import { type TabKey, useSettingsStore } from '@/store/useSettingsStore';
 
 // 开启 Android 下的 LayoutAnimation
@@ -34,18 +35,7 @@ export interface ColorPreset {
   value: string;
 }
 
-const PRESET_COLORS: ColorPreset[] = [
-  { name: '知乎蓝', value: '#0084ff' },
-  { name: '极客靛', value: '#6366f1' },
-  { name: '薄荷青', value: '#00a896' },
-  { name: '翡翠绿', value: '#10b981' },
-  { name: '落日橙', value: '#f97316' },
-  { name: '樱花粉', value: '#ec4899' },
-  { name: '蜜桃粉', value: '#ff758f' },
-  { name: '玫瑰红', value: '#f43f5e' },
-  { name: '紫罗兰', value: '#8b5cf6' },
-  { name: '静谧灰', value: '#64748b' },
-];
+const PRESET_COLORS: ColorPreset[] = designTokens.primaryPresets;
 
 export default function AppearanceSettings() {
   const insets = useSafeAreaInsets();
@@ -104,7 +94,11 @@ export default function AppearanceSettings() {
     <RNView
       style={[
         styles.container,
-        { backgroundColor: isDark ? '#000000' : '#F2F2F6' },
+        {
+          backgroundColor: isDark
+            ? Colors.dark.background
+            : Colors.light.controlBackground,
+        },
       ]}
     >
       <Stack.Screen
@@ -243,14 +237,16 @@ export default function AppearanceSettings() {
               );
             })}
             <Pressable
-              onPress={() => updateSettings({ primaryColor: '#0084ff' })}
+              onPress={() =>
+                updateSettings({ primaryColor: Colors.light.primary })
+              }
               style={[
                 styles.colorChip,
                 {
                   backgroundColor: Colors[colorScheme].backgroundTertiary,
                   borderColor:
-                    primaryColor === '#0084ff' || !primaryColor
-                      ? '#0084ff'
+                    primaryColor === Colors.light.primary || !primaryColor
+                      ? Colors.light.primary
                       : 'transparent',
                 },
               ]}
@@ -335,7 +331,7 @@ export default function AppearanceSettings() {
                     style={[
                       styles.tabChipText,
                       androidFeedbackType === 'ripple' && {
-                        color: '#fff',
+                        color: Colors[colorScheme].textInverse,
                         fontWeight: 'bold',
                       },
                     ]}
@@ -359,7 +355,7 @@ export default function AppearanceSettings() {
                     style={[
                       styles.tabChipText,
                       androidFeedbackType === 'scale-opacity' && {
-                        color: '#fff',
+                        color: Colors[colorScheme].textInverse,
                         fontWeight: 'bold',
                       },
                     ]}
@@ -531,7 +527,10 @@ export default function AppearanceSettings() {
                 <Text
                   style={[
                     styles.tabChipText,
-                    defaultTab === tab && { color: '#fff', fontWeight: 'bold' },
+                    defaultTab === tab && {
+                      color: Colors[colorScheme].textInverse,
+                      fontWeight: 'bold',
+                    },
                   ]}
                 >
                   {TAB_LABELS[tab]}
@@ -781,8 +780,8 @@ function HslSlider({
             borderRadius: 10,
             backgroundColor: thumbColor,
             borderWidth: 2,
-            borderColor: '#fff',
-            shadowColor: '#000',
+            borderColor: Colors.light.textInverse,
+            shadowColor: Colors.light.shadow,
             shadowOpacity: 0.2,
             shadowRadius: 3,
             shadowOffset: { width: 0, height: 1 },
@@ -799,11 +798,13 @@ function ColorPickerSection({ primaryColor, onColorChange }: any) {
   const textColor = Colors[colorScheme].text;
   const borderColor = Colors[colorScheme].border;
 
-  const [hsl, setHsl] = useState(() => hexToHsl(primaryColor || '#0084ff'));
-  const [hexText, setHexText] = useState(primaryColor || '#0084ff');
+  const [hsl, setHsl] = useState(() =>
+    hexToHsl(primaryColor || Colors.light.primary),
+  );
+  const [hexText, setHexText] = useState(primaryColor || Colors.light.primary);
 
   useEffect(() => {
-    const target = primaryColor || '#0084ff';
+    const target = primaryColor || Colors.light.primary;
     setHexText(target);
     const newHsl = hexToHsl(target);
     setHsl((currentHsl) => {
@@ -870,7 +871,7 @@ function ColorPickerSection({ primaryColor, onColorChange }: any) {
             },
           ]}
           placeholder="#0084ff"
-          placeholderTextColor="#999"
+          placeholderTextColor={Colors[colorScheme].textTertiary}
           value={hexText}
           onChangeText={(val) => {
             const v = val.startsWith('#') ? val : val ? `#${val}` : '#';
@@ -881,7 +882,8 @@ function ColorPickerSection({ primaryColor, onColorChange }: any) {
             }
           }}
           onBlur={() => {
-            if (hexText.length !== 7) setHexText(primaryColor || '#0084ff');
+            if (hexText.length !== 7)
+              setHexText(primaryColor || Colors.light.primary);
           }}
           maxLength={7}
           autoCapitalize="none"

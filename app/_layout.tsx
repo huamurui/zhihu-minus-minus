@@ -206,10 +206,11 @@ function RootLayout() {
             <Stack
               screenOptions={{
                 headerStyle: {
-                  backgroundColor: isDark ? '#1a1a1a' : '#ffffff',
+                  backgroundColor:
+                    Colors[isDark ? 'dark' : 'light'].backgroundSecondary,
                 },
                 headerTitleStyle: {
-                  color: isDark ? '#ffffff' : '#1a1a1a',
+                  color: Colors[isDark ? 'dark' : 'light'].text,
                   fontWeight: 'bold',
                 },
                 headerTintColor: currentTint,

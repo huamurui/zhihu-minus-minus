@@ -14,6 +14,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import { colors } from '@/constants/designTokens';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { ImpactFeedbackStyle, impactAsync } from '@/utils/haptics';
 
@@ -49,7 +50,7 @@ export function BouncyButton({
   // Android 水波纹颜色：跟随主题色，带透明度
   const rippleColor = primaryColor
     ? `${primaryColor}1A` // 10% opacity
-    : 'rgba(0,0,0,0.06)';
+    : colors.light.pressedOverlay;
 
   const scale = useSharedValue(1);
   const opacity = useSharedValue(1);

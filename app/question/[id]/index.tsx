@@ -641,7 +641,11 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
               })
             }
           >
-            <Ionicons name="chatbubble-outline" size={16} color="#888" />
+            <Ionicons
+              name="chatbubble-outline"
+              size={16}
+              color={Colors[colorScheme].iconMuted}
+            />
             <Text type="secondary" className="ml-1 text-xs font-semibold">
               {item.comment_count > 0 ? item.comment_count : '0'}
             </Text>
@@ -653,13 +657,15 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
             <Ionicons
               name={isCollected ? 'star' : 'star-outline'}
               size={16}
-              color={isCollected ? warningColor : '#888'}
+              color={isCollected ? warningColor : Colors[colorScheme].iconMuted}
             />
             {displayCount > 0 && (
               <Text
                 className="ml-1 text-xs font-semibold"
                 style={{
-                  color: isCollected ? warningColor : '#888',
+                  color: isCollected
+                    ? warningColor
+                    : Colors[colorScheme].iconMuted,
                 }}
               >
                 {displayCount}
@@ -1434,7 +1440,7 @@ export default function QuestionDetail() {
                     size={20}
                     color={
                       isFloatingCollected
-                        ? '#ffb400'
+                        ? Colors[colorScheme].warningAccent
                         : Colors[colorScheme].textSecondary
                     }
                   />
@@ -1443,7 +1449,7 @@ export default function QuestionDetail() {
                       className=" text-sm font-bold"
                       style={{
                         color: isFloatingCollected
-                          ? '#ffb400'
+                          ? Colors[colorScheme].warningAccent
                           : Colors[colorScheme].textSecondary,
                       }}
                     >

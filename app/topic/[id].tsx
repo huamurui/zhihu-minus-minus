@@ -147,7 +147,7 @@ export default function TopicDetail() {
               style={{
                 color: topic.is_following
                   ? Colors[colorScheme].textSecondary
-                  : '#fff',
+                  : Colors[colorScheme].textInverse,
               }}
               className="font-bold text-sm"
             >

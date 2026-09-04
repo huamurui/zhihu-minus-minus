@@ -1,4 +1,5 @@
 import { Share } from 'react-native';
+import Colors from '@/constants/Colors';
 import { useCollectionAction } from '@/hooks/useCollectionAction';
 import { useCollectionStore } from '@/store/useCollectionStore';
 import { copyToClipboard } from '@/utils/clipboard';
@@ -129,7 +130,7 @@ export function ShareMenu({ visible, onClose, type, data }: ShareMenuProps) {
                   ? ('star' as const)
                   : ('star-outline' as const),
                 label: isCollected ? '取消收藏' : '移至收藏',
-                color: isCollected ? '#ffb400' : undefined,
+                color: isCollected ? Colors.light.warningAccent : undefined,
                 onPress: () => toggleCollect(data.id, type, isCollected),
               },
             ]

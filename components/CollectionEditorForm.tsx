@@ -110,7 +110,7 @@ export function CollectionEditorForm({
         ]}
       >
         {pending ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={Colors[colorScheme].textInverse} />
         ) : (
           <Text style={styles.submitLabel}>{submitLabel}</Text>
         )}
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   submitLabel: {
-    color: '#fff',
+    color: Colors.light.textInverse,
     fontSize: 16,
     lineHeight: 22,
     fontWeight: '700',

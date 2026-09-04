@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { colors } from '@/constants/designTokens';
 import type { FilterMode, FilterQualityLevel } from '@/utils/feedFilter';
 
 const settingsStorage = {
@@ -114,7 +115,7 @@ interface SettingsState extends AppSettings {
 const DEFAULT_SETTINGS: AppSettings = {
   fontSizeScale: 1.0,
   lineHeightScale: 1.5,
-  primaryColor: '#0084ff', // Zhihu Blue — the canonical default
+  primaryColor: colors.light.primary,
   visibleTabs: ['following', 'recommend', 'hot', 'daily', 'publish', 'profile'],
   defaultTab: 'recommend',
   localCityName: null,
@@ -186,7 +187,7 @@ export const useSettingsStore = create<SettingsState>()(
       migrate: (persistedState: any, version: number) => {
         // 清理历史脏数据：null 或非法 hex 都退回默认蓝
         const sanitized = sanitizeColor(persistedState?.primaryColor);
-        persistedState.primaryColor = sanitized ?? '#0084ff';
+        persistedState.primaryColor = sanitized ?? colors.light.primary;
 
         // 升级到 v3 时兜底新增的按压反馈参数
         if (version < 3) {

@@ -10,6 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { voteContent } from '@/api/zhihu';
 import Colors from '@/constants/Colors';
+import { colors } from '@/constants/designTokens';
 import { showToast } from '@/utils/toast';
 import { BouncyButton } from './BouncyButton';
 import { Text, useThemeColor } from './Themed';
@@ -133,20 +134,22 @@ export const LikeButton = ({
               variant === 'minimal'
                 ? isUpvoted
                   ? tintColor
-                  : '#888'
+                  : colors[colorScheme].iconMuted
                 : isUpvoted
                   ? variant === 'default'
-                    ? '#fff'
+                    ? colors[colorScheme].textInverse
                     : tintColor
                   : variant === 'default'
                     ? tintColor
-                    : '#888'
+                    : colors[colorScheme].iconMuted
             }
           />
           {variant === 'minimal' && (
             <Text
               className="text-sm ml-0.5 font-bold"
-              style={{ color: isUpvoted ? tintColor : '#888' }}
+              style={{
+                color: isUpvoted ? tintColor : colors[colorScheme].iconMuted,
+              }}
             >
               {count}
             </Text>
@@ -159,11 +162,11 @@ export const LikeButton = ({
           style={{
             color: isUpvoted
               ? variant === 'default'
-                ? '#fff'
+                ? colors[colorScheme].textInverse
                 : tintColor
               : variant === 'default'
                 ? tintColor
-                : '#888',
+                : colors[colorScheme].iconMuted,
           }}
         >
           {typeof count === 'number' && count > 0

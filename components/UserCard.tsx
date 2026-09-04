@@ -108,8 +108,17 @@ export const UserCard = ({ user, invalidateQueryKeys = [] }: UserCardProps) => {
             {user.name}
           </Text>
           {user.badge?.find((b: ZhihuBadge) => b.type === 'best_answerer') && (
-            <View className="ml-1.5 px-1 py-px rounded bg-[#fffbe6] border-[0.5px] border-[#ffe58f]">
-              <Text className="text-[10px] font-bold text-[#d48806]">
+            <View
+              className="ml-1.5 px-1 py-px rounded border-[0.5px]"
+              style={{
+                backgroundColor: Colors[colorScheme].badgeBackground,
+                borderColor: Colors[colorScheme].badgeBorder,
+              }}
+            >
+              <Text
+                className="text-[10px] font-bold"
+                style={{ color: Colors[colorScheme].badgeText }}
+              >
                 优秀回答者
               </Text>
             </View>
@@ -150,7 +159,11 @@ export const UserCard = ({ user, invalidateQueryKeys = [] }: UserCardProps) => {
         ) : (
           <Text
             className="text-[13px] font-bold"
-            style={{ color: isFollowing ? textSecondaryColor : '#ffffff' }}
+            style={{
+              color: isFollowing
+                ? textSecondaryColor
+                : Colors[colorScheme].textInverse,
+            }}
           >
             {isFollowing ? '已关注' : '关注'}
           </Text>

@@ -1,0 +1,163 @@
+{
+  "colors": {
+    "light": {
+      "primary": "#0084ff",
+      "danger": "#ff4d4f",
+      "success": "#2ecc71",
+      "warning": "#ff9800",
+      "warningAccent": "#ffb400",
+      "text": "#1a1a1a",
+      "textSecondary": "#666666",
+      "textTertiary": "#999999",
+      "textInverse": "#ffffff",
+      "background": "#f6f6f6",
+      "backgroundSecondary": "#ffffff",
+      "backgroundTertiary": "#f3f3f3",
+      "surface": "#ffffff",
+      "border": "#eeeeee",
+      "divider": "rgba(0,0,0,0.05)",
+      "tint": "#0084ff",
+      "tabIconDefault": "#cccccc",
+      "tabIconSelected": "#0084ff",
+      "primaryTransparent": "rgba(0, 132, 255, 0.1)",
+      "blackTransparent": "rgba(0,0,0,0.5)",
+      "whiteTransparent": "rgba(255,255,255,0.85)",
+      "iconMuted": "#888888",
+      "shadow": "#000000",
+      "cardShadow": "rgba(0,0,0,0.1)",
+      "scrim": "rgba(0,0,0,0.5)",
+      "scrimLight": "rgba(0,0,0,0.3)",
+      "highlight": "rgba(0,132,255,0.08)",
+      "highlightSubtle": "rgba(0,132,255,0.05)",
+      "contentBorder": "rgba(150,150,150,0.1)",
+      "contentBorderStrong": "rgba(150,150,150,0.15)",
+      "contentPlaceholder": "rgba(150,150,150,0.06)",
+      "contentOverlay": "rgba(255,255,255,0.9)",
+      "contentOverlayStrong": "rgba(255,255,255,0.85)",
+      "controlBackground": "#f2f2f7",
+      "controlBorder": "#e5e5ea",
+      "hotRankFirst": "#e73828",
+      "hotRankSecond": "#f65324",
+      "hotRankThird": "#ff8b1f",
+      "hotLabel": "#ff9607",
+      "badgeBackground": "#fffbe6",
+      "badgeBorder": "#ffe58f",
+      "badgeText": "#d48806",
+      "pressedOverlay": "rgba(0,0,0,0.06)",
+      "imageActionSave": "#34c759",
+      "imageActionSaveBackground": "#34c7591a",
+      "imageActionCopy": "#ff9500",
+      "imageActionCopyBackground": "#ff95001a",
+      "chatBubble": "#f0f0f0"
+    },
+    "dark": {
+      "primary": "#0084ff",
+      "danger": "#ff4d4f",
+      "success": "#2ecc71",
+      "warning": "#ffcf40",
+      "warningAccent": "#ffb400",
+      "text": "#ffffff",
+      "textSecondary": "#bbbbbb",
+      "textTertiary": "#cccccc",
+      "textInverse": "#1a1a1a",
+      "background": "#121212",
+      "backgroundSecondary": "#1e1e22",
+      "backgroundTertiary": "#2c2c30",
+      "surface": "#1e1e22",
+      "border": "#333333",
+      "divider": "rgba(255,255,255,0.1)",
+      "tint": "#0084ff",
+      "tabIconDefault": "#cccccc",
+      "tabIconSelected": "#ffffff",
+      "primaryTransparent": "rgba(0, 132, 255, 0.15)",
+      "blackTransparent": "rgba(0,0,0,0.6)",
+      "whiteTransparent": "rgba(26,26,26,0.8)",
+      "iconMuted": "#888888",
+      "shadow": "#000000",
+      "cardShadow": "#000000",
+      "scrim": "rgba(0,0,0,0.7)",
+      "scrimLight": "rgba(0,0,0,0.45)",
+      "highlight": "rgba(0,132,255,0.08)",
+      "highlightSubtle": "rgba(0,132,255,0.05)",
+      "contentBorder": "rgba(150,150,150,0.1)",
+      "contentBorderStrong": "rgba(150,150,150,0.15)",
+      "contentPlaceholder": "rgba(150,150,150,0.06)",
+      "contentOverlay": "rgba(34,34,34,0.85)",
+      "contentOverlayStrong": "rgba(26,26,26,0.85)",
+      "controlBackground": "#2c2c2e",
+      "controlBorder": "#38383a",
+      "hotRankFirst": "#e73828",
+      "hotRankSecond": "#f65324",
+      "hotRankThird": "#ff8b1f",
+      "hotLabel": "#ff9607",
+      "toastSurface": "#1e1e24",
+      "badgeBackground": "#fffbe6",
+      "badgeBorder": "#ffe58f",
+      "badgeText": "#d48806",
+      "pressedOverlay": "rgba(255,255,255,0.06)",
+      "imageActionSave": "#34c759",
+      "imageActionSaveBackground": "#34c7591a",
+      "imageActionCopy": "#ff9500",
+      "imageActionCopyBackground": "#ff95001a",
+      "chatBubble": "#222222"
+    }
+  },
+  "primaryPresets": [
+    { "name": "知乎蓝", "value": "#0084ff" },
+    { "name": "极客靛", "value": "#6366f1" },
+    { "name": "薄荷青", "value": "#00a896" },
+    { "name": "翡翠绿", "value": "#10b981" },
+    { "name": "落日橙", "value": "#f97316" },
+    { "name": "樱花粉", "value": "#ec4899" },
+    { "name": "蜜桃粉", "value": "#ff758f" },
+    { "name": "玫瑰红", "value": "#f43f5e" },
+    { "name": "紫罗兰", "value": "#8b5cf6" },
+    { "name": "静谧灰", "value": "#64748b" }
+  ],
+  "typography": {
+    "fontFamily": {
+      "sans": "System",
+      "mono": "monospace"
+    },
+    "fontSize": {
+      "caption": 12,
+      "body": 15,
+      "bodyLarge": 16,
+      "subtitle": 17,
+      "title": 20,
+      "display": 28
+    },
+    "lineHeight": {
+      "body": 1.5,
+      "compact": 1.4,
+      "reading": 1.6
+    },
+    "fontWeight": {
+      "regular": "400",
+      "medium": "500",
+      "semibold": "600",
+      "bold": "700"
+    }
+  },
+  "radii": {
+    "sm": 6,
+    "md": 12,
+    "lg": 16,
+    "pill": 999
+  },
+  "opacity": {
+    "disabled": 0.5,
+    "pressed": 0.82,
+    "subtle": 0.7
+  },
+  "effects": {
+    "gradientMask": {
+      "light": ["rgba(0,0,0,1)", "rgba(0,0,0,0)"],
+      "dark": ["rgba(0,0,0,0)", "rgba(0,0,0,1)"]
+    },
+    "blurSurface": {
+      "light": "rgba(255,255,255,0.2)",
+      "dark": "rgba(26,26,26,0.2)"
+    }
+  }
+}

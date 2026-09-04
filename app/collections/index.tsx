@@ -174,10 +174,14 @@ export default function MyCollectionsScreen() {
             style={{
               backgroundColor: '#ff4d4f',
               borderWidth: 1,
-              borderColor: '#fff',
+              borderColor: Colors[colorScheme].textInverse,
             }}
           >
-            <Ionicons name="lock-closed" size={10} color="#fff" />
+            <Ionicons
+              name="lock-closed"
+              size={10}
+              color={Colors[colorScheme].textInverse}
+            />
           </View>
         )}
       </View>
@@ -197,7 +201,11 @@ export default function MyCollectionsScreen() {
         </Text>
       </View>
       <Pressable onPress={() => setActionItem(item)} className="p-2.5">
-        <Ionicons name="ellipsis-horizontal" size={18} color="#ccc" />
+        <Ionicons
+          name="ellipsis-horizontal"
+          size={18}
+          color={Colors[colorScheme].tabIconDefault}
+        />
       </Pressable>
     </BouncyButton>
   );

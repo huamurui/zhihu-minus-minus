@@ -99,6 +99,7 @@ export const DailyList = React.forwardRef<
 >(({ insets, onScroll, onRefreshStateChange }, ref) => {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const colorScheme = useColorScheme();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
 
   const {
@@ -169,7 +170,11 @@ export const DailyList = React.forwardRef<
   if (!isLoading && flattenedData.length === 0) {
     return (
       <View className="flex-1 justify-center items-center p-10">
-        <Ionicons name="alert-circle-outline" size={48} color="#ccc" />
+        <Ionicons
+          name="alert-circle-outline"
+          size={48}
+          color={Colors[colorScheme].tabIconDefault}
+        />
         <Text type="secondary" className="mt-4 text-center">
           暂时没发现日报内容喵，可能是网络问题或者知乎日报今天还没更新。
         </Text>

@@ -10,7 +10,7 @@ export default function FeedbackScreen() {
   const router = useRouter();
   const accentColor = Colors[colorScheme].tint;
   const borderColor = Colors[colorScheme].border;
-  const surfaceColor = colorScheme === 'dark' ? '#1c1c1e' : '#fff';
+  const surfaceColor = Colors[colorScheme].backgroundSecondary;
 
   return (
     <View className="flex-1">
@@ -68,7 +68,7 @@ export default function FeedbackScreen() {
                   huamurui/zhihu-minus-minus
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color="#ccc" />
+              <Ionicons name="chevron-forward" size={16} color={Colors[colorScheme].tabIconDefault} />
             </Pressable>
 
             <View
@@ -95,7 +95,7 @@ export default function FeedbackScreen() {
                   huamurui@outlook.com
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color="#ccc" />
+              <Ionicons name="chevron-forward" size={16} color={Colors[colorScheme].tabIconDefault} />
             </Pressable>
           </View>
         </View>

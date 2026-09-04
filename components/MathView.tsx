@@ -1,6 +1,7 @@
 'use dom';
 
 import katex from 'katex';
+import { colors, typography } from '@/constants/designTokens';
 
 interface MathViewProps {
   formula: string;
@@ -19,7 +20,7 @@ export default function MathView({
     strict: false,
   });
 
-  const textColor = colorScheme === 'dark' ? '#ffffff' : '#1a1a1a';
+  const textColor = colors[colorScheme].text;
 
   return (
     <span
@@ -44,7 +45,7 @@ export default function MathView({
         // biome-ignore lint/security/noDangerouslySetInnerHtml: KaTeX 的渲染结果只能这样注入。formula 虽来自知乎正文,但 renderToString 的 trust 选项默认为 false,\href/\url/\includegraphics 等可注入 URL 或 HTML 的命令会被拒绝渲染,输出不含可执行内容。
         dangerouslySetInnerHTML={{ __html: html }}
         style={{
-          fontSize: '17px',
+          fontSize: `${typography.fontSize.subtitle}px`,
           color: textColor,
         }}
       />

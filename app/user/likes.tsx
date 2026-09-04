@@ -67,7 +67,12 @@ export default function MyLikesScreen() {
         >
           <Text
             className="font-bold"
-            style={{ color: activeTab === 'answers' ? primaryColor : '#888' }}
+            style={{
+              color:
+                activeTab === 'answers'
+                  ? primaryColor
+                  : Colors[colorScheme].iconMuted,
+            }}
           >
             回答
           </Text>
@@ -83,7 +88,12 @@ export default function MyLikesScreen() {
         >
           <Text
             className="font-bold"
-            style={{ color: activeTab === 'articles' ? primaryColor : '#888' }}
+            style={{
+              color:
+                activeTab === 'articles'
+                  ? primaryColor
+                  : Colors[colorScheme].iconMuted,
+            }}
           >
             文章
           </Text>

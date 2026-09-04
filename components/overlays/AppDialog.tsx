@@ -175,7 +175,9 @@ export function AppDialog({
                       ? Colors[colorScheme].danger
                       : tertiary;
                 const color =
-                  variant === 'secondary' ? Colors[colorScheme].text : '#fff';
+                  variant === 'secondary'
+                    ? Colors[colorScheme].text
+                    : Colors[colorScheme].textInverse;
                 return (
                   <Pressable
                     key={action.label}
@@ -215,7 +217,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 24,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: Colors.light.shadow,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.18,
     shadowRadius: 20,

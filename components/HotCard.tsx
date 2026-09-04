@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import Animated, { SharedTransition } from 'react-native-reanimated';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
+import { colors } from '@/constants/designTokens';
 import { useAuthStore } from '@/store/useAuthStore';
 import { BouncyButton } from './BouncyButton';
 import { Text, View } from './Themed';
@@ -38,20 +39,22 @@ export const HotCard = ({ item }: { item: HotItem }) => {
   // Custom Rank Colors
   const rankBgColor =
     item.rank === 1
-      ? '#e73828'
+      ? colors.light.hotRankFirst
       : item.rank === 2
-        ? '#f65324'
+        ? colors.light.hotRankSecond
         : item.rank === 3
-          ? '#ff8b1f'
-          : Colors[colorScheme].backgroundTertiary || '#e0e0e0';
+          ? colors.light.hotRankThird
+          : Colors[colorScheme].backgroundTertiary;
   const rankTextColor =
-    item.rank <= 3 ? '#ffffff' : Colors[colorScheme].textSecondary;
+    item.rank <= 3
+      ? colors[colorScheme].textInverse
+      : Colors[colorScheme].textSecondary;
 
   // Dynamic Label Style
   const labelColor =
     colorScheme === 'dark'
-      ? item.labelArea?.night_color || '#ff9607'
-      : item.labelArea?.normal_color || '#ff9607';
+      ? item.labelArea?.night_color || colors.light.hotLabel
+      : item.labelArea?.normal_color || colors.light.hotLabel;
 
   return (
     <BouncyButton
@@ -78,7 +81,7 @@ export const HotCard = ({ item }: { item: HotItem }) => {
       style={{
         backgroundColor: Colors[colorScheme].backgroundSecondary,
         borderRadius: 14,
-        shadowColor: colorScheme === 'dark' ? '#000' : 'rgba(0,0,0,0.1)',
+        shadowColor: colors[colorScheme].cardShadow,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 1,
         shadowRadius: 10,
@@ -164,7 +167,10 @@ export const HotCard = ({ item }: { item: HotItem }) => {
           )}
 
           {item.hotValue ? (
-            <Text className="text-[12px] text-[#ff9607] font-medium mr-2">
+            <Text
+              className="text-[12px] font-medium mr-2"
+              style={{ color: colors.light.hotLabel }}
+            >
               {item.hotValue}
             </Text>
           ) : null}

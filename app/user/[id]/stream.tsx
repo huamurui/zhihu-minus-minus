@@ -440,8 +440,12 @@ const StreamItem = forwardRef<StreamItemHandle, StreamItemProps>(
                 }}
                 className="flex-row items-center ml-5 bg-transparent py-1"
               >
-                <Ionicons name="chatbubble-outline" size={16} color="#888" />
-                <Text className="text-[#888] ml-1 text-xs font-semibold">
+                <Ionicons
+                  name="chatbubble-outline"
+                  size={16}
+                  color={Colors[colorScheme].iconMuted}
+                />
+                <Text className="text-muted ml-1 text-xs font-semibold">
                   {(item.comment_count ?? 0) > 0 ? item.comment_count : '评论'}
                 </Text>
               </Pressable>
@@ -453,12 +457,18 @@ const StreamItem = forwardRef<StreamItemHandle, StreamItemProps>(
                   <Ionicons
                     name={isCollected ? 'star' : 'star-outline'}
                     size={16}
-                    color={isCollected ? warningColor : '#888'}
+                    color={
+                      isCollected ? warningColor : Colors[colorScheme].iconMuted
+                    }
                   />
                   {displayCount > 0 && (
                     <Text
                       className="ml-1 text-xs font-semibold"
-                      style={{ color: isCollected ? warningColor : '#888' }}
+                      style={{
+                        color: isCollected
+                          ? warningColor
+                          : Colors[colorScheme].iconMuted,
+                      }}
                     >
                       {displayCount}
                     </Text>
@@ -488,7 +498,11 @@ const StreamItem = forwardRef<StreamItemHandle, StreamItemProps>(
               onPress={() => onShare(item)}
               className="p-1 -mr-1 bg-transparent"
             >
-              <Ionicons name="ellipsis-horizontal" size={18} color="#888" />
+              <Ionicons
+                name="ellipsis-horizontal"
+                size={18}
+                color={Colors[colorScheme].iconMuted}
+              />
             </BouncyButton>
           </View>
         </NativeView>
