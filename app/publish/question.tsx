@@ -60,9 +60,12 @@ export default function PublishQuestionScreen() {
         className="flex-row items-center justify-between px-4 pb-3"
         style={{ paddingTop: insets.top + 10 }}
       >
-        <Pressable onPress={() => router.back()} className="p-1">
+        <BouncyButton
+          onPress={() => router.back()}
+          className="p-2 rounded-full"
+        >
           <Ionicons name="close" size={28} color={textColor} />
-        </Pressable>
+        </BouncyButton>
         <Text className="text-lg font-bold">提问题(WIP)</Text>
         <BouncyButton
           disabled={!isPublishEnabled}

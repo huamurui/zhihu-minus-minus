@@ -2,8 +2,9 @@ import { FlashList } from '@shopify/flash-list';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigation } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
+import { ActivityIndicator, StyleSheet } from 'react-native';
 import { getMyLikes } from '@/api/zhihu';
+import { BouncyButton } from '@/components/BouncyButton';
 import { CreationCard } from '@/components/CreationCard';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { Text, useThemeColor, View } from '@/components/Themed';
@@ -56,7 +57,7 @@ export default function MyLikesScreen() {
           borderBottomColor: borderColor,
         }}
       >
-        <Pressable
+        <BouncyButton
           className="flex-1 py-[15px] items-center"
           style={
             activeTab === 'answers'
@@ -76,8 +77,8 @@ export default function MyLikesScreen() {
           >
             回答
           </Text>
-        </Pressable>
-        <Pressable
+        </BouncyButton>
+        <BouncyButton
           className="flex-1 py-[15px] items-center"
           style={
             activeTab === 'articles'
@@ -97,7 +98,7 @@ export default function MyLikesScreen() {
           >
             文章
           </Text>
-        </Pressable>
+        </BouncyButton>
       </View>
 
       <FlashList<ZhihuMemberRelation>

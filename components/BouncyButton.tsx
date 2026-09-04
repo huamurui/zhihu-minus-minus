@@ -1,11 +1,14 @@
+import { cssInterop } from 'nativewind';
 import type React from 'react';
 import { useCallback } from 'react';
 import {
+  type GestureResponderEvent,
   Platform,
   Pressable,
   type PressableProps,
   type StyleProp,
   StyleSheet,
+  View,
   type ViewStyle,
 } from 'react-native';
 import Animated, {
@@ -17,6 +20,7 @@ import Animated, {
 import { useThemeColor } from '@/components/Themed';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { ImpactFeedbackStyle, impactAsync } from '@/utils/haptics';
+import { getRippleButtonStyles } from './bouncyButtonStyles';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -27,12 +31,41 @@ export interface BouncyButtonProps extends PressableProps {
   style?: StyleProp<ViewStyle>;
 }
 
+function RippleButton({
+  children,
+  style,
+  hitSlop,
+  onLayout,
+  ...props
+}: BouncyButtonProps) {
+  const styles = getRippleButtonStyles(StyleSheet.flatten(style) ?? {});
+
+  return (
+    <View
+      collapsable={false}
+      accessible={false}
+      pointerEvents="box-none"
+      hitSlop={hitSlop}
+      onLayout={onLayout}
+      style={styles.container}
+    >
+      <Pressable {...props} hitSlop={hitSlop} style={styles.content}>
+        {children}
+      </Pressable>
+    </View>
+  );
+}
+
+// 先解析 className，使 rounded-full 等样式参与外层水波纹裁剪。
+cssInterop(RippleButton, { className: 'style' });
+
 export function BouncyButton({
   children,
   hapticFeedback = false,
   style,
   onPressIn,
   onPressOut,
+  android_ripple,
   ...props
 }: BouncyButtonProps) {
   const isAndroid = Platform.OS === 'android';
@@ -44,8 +77,6 @@ export function BouncyButton({
 
   // 是否启用物理动画（缩放与不透明度）
   const enableAnimation = !isAndroid || androidFeedbackType === 'scale-opacity';
-  // 是否启用 Android 水波纹效果
-  const enableRipple = isAndroid && androidFeedbackType === 'ripple';
 
   // Android 水波纹颜色：跟随主题色，带透明度
   const rippleColor = `${primaryColor}1A`; // 10% opacity
@@ -61,7 +92,7 @@ export function BouncyButton({
   });
 
   const handlePressIn = useCallback(
-    (e: any) => {
+    (e: GestureResponderEvent) => {
       if (enableAnimation) {
         scale.value = withSpring(pressScale, { damping: 35, stiffness: 800 });
         opacity.value = withTiming(pressOpacity, { duration: 50 });
@@ -83,7 +114,7 @@ export function BouncyButton({
   );
 
   const handlePressOut = useCallback(
-    (e: any) => {
+    (e: GestureResponderEvent) => {
       if (enableAnimation) {
         scale.value = withSpring(1, { damping: 35, stiffness: 800 });
         opacity.value = withTiming(1, { duration: 100 });
@@ -106,31 +137,20 @@ export function BouncyButton({
     );
   }
 
-  const flatStyle = StyleSheet.flatten(style) || {};
-  const borderRadius = flatStyle.borderRadius ?? 8; // 保底默认圆角以避免水波纹变成大方块
-
   return (
-    <Pressable
+    <RippleButton
+      {...props}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
-      style={[
-        enableRipple
-          ? {
-              overflow: 'hidden',
-              backgroundColor: 'transparent',
-              borderRadius,
-            }
-          : undefined,
-        style,
-      ]}
+      style={style}
       android_ripple={{
         color: rippleColor,
         borderless: false,
-        foreground: true, // 强制在前层绘制，避免被子组件背景色覆盖
+        foreground: true,
+        ...android_ripple,
       }}
-      {...props}
     >
       {children}
-    </Pressable>
+    </RippleButton>
   );
 }

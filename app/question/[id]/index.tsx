@@ -398,7 +398,7 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
             ]}
           />
           <View className="flex-row items-center mb-3 bg-transparent">
-            <Pressable
+            <BouncyButton
               onPress={() =>
                 item.author?.url_token &&
                 router.push(`/user/${item.author.url_token}`)
@@ -421,9 +421,9 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
                   {item.author?.headline}
                 </Text>
               </View>
-            </Pressable>
+            </BouncyButton>
             {!item.relationship?.is_author && (
-              <Pressable
+              <BouncyButton
                 className="px-3 py-1.5 rounded-[15px]"
                 style={[
                   !item.author?.is_following && {
@@ -449,7 +449,7 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
                 >
                   {item.author?.is_following ? '已关注' : '关注'}
                 </Text>
-              </Pressable>
+              </BouncyButton>
             )}
           </View>
 
@@ -553,7 +553,7 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
                       linkCardInfo={item.link_card_info}
                     />
                     {MetaInfo}
-                    <Pressable
+                    <BouncyButton
                       onPress={() =>
                         item?.id && onToggle(item.id.toString(), false)
                       }
@@ -576,7 +576,7 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
                         size={14}
                         color={primaryColor}
                       />
-                    </Pressable>
+                    </BouncyButton>
                   </View>
                 </Reanimated.View>
 
@@ -1071,7 +1071,7 @@ export default function QuestionDetail() {
             {question?.topics && (
               <View className="flex-row flex-wrap mb-2.5 mt-2 bg-transparent">
                 {question.topics.map((topic) => (
-                  <Pressable
+                  <BouncyButton
                     key={topic.id}
                     onPress={() => router.push(`/topic/${topic.id}`)}
                     className="px-2.5 py-1 rounded-[15px] mr-2 mb-1"
@@ -1080,7 +1080,7 @@ export default function QuestionDetail() {
                     <Text className="text-xs" style={{ color: primaryColor }}>
                       {topic.name}
                     </Text>
-                  </Pressable>
+                  </BouncyButton>
                 ))}
               </View>
             )}
@@ -1093,7 +1093,7 @@ export default function QuestionDetail() {
                       objectId={id as string}
                       type="question"
                     />
-                    <Pressable
+                    <BouncyButton
                       onPress={() => setDetailExpanded(false)}
                       className="flex-row items-center justify-center py-1 mt-1"
                     >
@@ -1108,10 +1108,10 @@ export default function QuestionDetail() {
                         size={14}
                         color={primaryColor}
                       />
-                    </Pressable>
+                    </BouncyButton>
                   </View>
                 ) : (
-                  <Pressable onPress={() => setDetailExpanded(true)}>
+                  <BouncyButton onPress={() => setDetailExpanded(true)}>
                     <Text type="secondary" className="text-sm leading-5">
                       {question.excerpt?.replace(/<[^>]+>/g, '') || ''}
                     </Text>
@@ -1121,7 +1121,7 @@ export default function QuestionDetail() {
                     >
                       展开全文
                     </Text>
-                  </Pressable>
+                  </BouncyButton>
                 )}
               </View>
             ) : question?.excerpt ? (
@@ -1136,7 +1136,7 @@ export default function QuestionDetail() {
               </Text>
             </View>
             <View className="flex-row mt-[15px] gap-2.5 bg-transparent">
-              <Pressable
+              <BouncyButton
                 className="flex-1 flex-row items-center justify-center py-2 rounded-md"
                 style={[
                   { backgroundColor: primaryTransparent },
@@ -1160,8 +1160,8 @@ export default function QuestionDetail() {
                 >
                   {question?.relationship?.is_following ? '已关注' : '关注问题'}
                 </Text>
-              </Pressable>
-              <Pressable
+              </BouncyButton>
+              <BouncyButton
                 className="flex-1 flex-row items-center justify-center py-2 rounded-md"
                 style={{ backgroundColor: primaryTransparent }}
                 onPress={() =>
@@ -1181,8 +1181,8 @@ export default function QuestionDetail() {
                 >
                   {question?.comment_count || 0} 条评论
                 </Text>
-              </Pressable>
-              <Pressable
+              </BouncyButton>
+              <BouncyButton
                 className="flex-1 flex-row items-center justify-center py-2 rounded-md"
                 style={{ backgroundColor: primaryTransparent }}
                 onPress={() => router.push(`/question/write/${id}`)}
@@ -1193,14 +1193,14 @@ export default function QuestionDetail() {
                 >
                   写回答
                 </Text>
-              </Pressable>
+              </BouncyButton>
             </View>
             <View className="mt-[15px] pt-3 flex-row justify-between items-center bg-transparent">
               <Text className="font-medium text-[15px]">
                 {question?.answer_count || 0} 个回答
               </Text>
               <View className="flex-row items-center bg-transparent">
-                <Pressable
+                <BouncyButton
                   onPress={() => setSortBy('default')}
                   className="ml-[15px] px-1 py-0.5"
                   style={[
@@ -1217,8 +1217,8 @@ export default function QuestionDetail() {
                   >
                     默认
                   </Text>
-                </Pressable>
-                <Pressable
+                </BouncyButton>
+                <BouncyButton
                   onPress={() => setSortBy('created')}
                   className="ml-[15px] px-1 py-0.5"
                   style={[
@@ -1235,7 +1235,7 @@ export default function QuestionDetail() {
                   >
                     时间
                   </Text>
-                </Pressable>
+                </BouncyButton>
               </View>
             </View>
           </>
@@ -1317,13 +1317,13 @@ export default function QuestionDetail() {
         </Reanimated.View>
 
         {/* 返回按钮 */}
-        <Pressable
+        <BouncyButton
           onPress={() => router.back()}
-          className="absolute left-2.5 z-[100] w-10 h-10 justify-center items-center"
+          className="absolute left-2.5 z-[100] w-10 h-10 justify-center items-center rounded-full"
           style={{ top: insets.top + 8 }}
         >
           <Ionicons name="chevron-back" size={28} color={textColor} />
-        </Pressable>
+        </BouncyButton>
 
         <AnimatedFlashList<AnswerDetail>
           ref={flashListRef}
@@ -1430,8 +1430,9 @@ export default function QuestionDetail() {
                   type="answers"
                   variant="ghost"
                 />
-                <Pressable
-                  className="flex-row items-center ml-5 bg-transparent"
+                <BouncyButton
+                  className="flex-row items-center justify-center ml-3 p-2 bg-transparent"
+                  style={{ borderRadius: 99 }}
                   onPress={() => {
                     if (!activeItem) return;
                     router.push({
@@ -1455,10 +1456,11 @@ export default function QuestionDetail() {
                   >
                     {activeItem?.comment_count || 0}
                   </Text>
-                </Pressable>
+                </BouncyButton>
 
-                <Pressable
-                  className="flex-row items-center ml-5 bg-transparent"
+                <BouncyButton
+                  className="flex-row items-center justify-center ml-3 p-2 bg-transparent"
+                  style={{ borderRadius: 99 }}
                   onPress={() =>
                     activeItem?.id &&
                     toggleFloatingCollect(
@@ -1489,12 +1491,13 @@ export default function QuestionDetail() {
                       {displayFloatingCount}
                     </Text>
                   )}
-                </Pressable>
+                </BouncyButton>
 
                 {activeItem?.id &&
                   expandedIds.has(activeItem.id.toString()) && (
-                    <Pressable
-                      className="flex-row items-center ml-5 bg-transparent"
+                    <BouncyButton
+                      className="flex-row items-center justify-center ml-3 p-2 bg-transparent"
+                      style={{ borderRadius: 99 }}
                       onPress={() =>
                         handleToggleExpand(activeItem.id.toString(), false)
                       }
@@ -1510,11 +1513,12 @@ export default function QuestionDetail() {
                       >
                         收起
                       </Text>
-                    </Pressable>
+                    </BouncyButton>
                   )}
               </View>
-              <Pressable
-                className="flex-row items-center bg-transparent"
+              <BouncyButton
+                className="flex-row items-center justify-center p-2 bg-transparent"
+                style={{ borderRadius: 99 }}
                 onPress={() => {
                   setSelectedAnswer(activeItem);
                   setIsSharing(true);
@@ -1525,7 +1529,7 @@ export default function QuestionDetail() {
                   size={22}
                   color={Colors[colorScheme].textSecondary}
                 />
-              </Pressable>
+              </BouncyButton>
             </View>
           </BlurView>
         </Reanimated.View>

@@ -28,6 +28,7 @@ import Reanimated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BouncyButton } from '@/components/BouncyButton';
 import { Text, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -267,7 +268,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
                   </View>
                 ) : dismissible ? (
                   <View style={[styles.headerSide, styles.headerRight]}>
-                    <Pressable
+                    <BouncyButton
                       accessibilityRole="button"
                       accessibilityLabel="关闭"
                       hitSlop={8}
@@ -285,7 +286,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
                         size={18}
                         color={Colors[colorScheme].textSecondary}
                       />
-                    </Pressable>
+                    </BouncyButton>
                   </View>
                 ) : (
                   <View style={styles.headerSide} />

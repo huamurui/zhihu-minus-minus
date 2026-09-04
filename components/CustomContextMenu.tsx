@@ -15,6 +15,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import { BouncyButton } from '@/components/BouncyButton';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { ImpactFeedbackStyle, impactAsync } from '@/utils/haptics';
@@ -238,13 +239,13 @@ export function CustomContextMenu({
           <Pressable onPress={(e) => e.stopPropagation()}>
             {options.map((option, index) => (
               <React.Fragment key={option.key}>
-                <Pressable
+                <BouncyButton
                   onPress={() => {
                     void impactAsync(ImpactFeedbackStyle.Light);
                     option.onPress();
                     handleClose();
                   }}
-                  className="flex-row items-center py-3.5 px-4 active:bg-black/5 dark:active:bg-white/5"
+                  className="flex-row items-center py-3.5 px-4 rounded-xl"
                 >
                   <Text
                     className={`flex-1 text-[16px] ${
@@ -264,7 +265,7 @@ export function CustomContextMenu({
                         : Colors[colorScheme].textSecondary
                     }
                   />
-                </Pressable>
+                </BouncyButton>
                 {index < options.length - 1 && (
                   <View className="h-[0.5px] bg-[#e0e0e0] dark:bg-[#333] ml-4" />
                 )}

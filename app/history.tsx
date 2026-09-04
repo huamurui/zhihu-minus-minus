@@ -7,7 +7,7 @@ import {
 } from '@tanstack/react-query';
 import { type Href, Stack, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable } from 'react-native';
+import { ActivityIndicator, Alert } from 'react-native';
 import {
   batchDelReadHistory,
   getReadHistory,
@@ -15,6 +15,7 @@ import {
   type ReadHistoryDataItem,
   type ReadHistoryResponse,
 } from '@/api/zhihu';
+import { BouncyButton } from '@/components/BouncyButton';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -165,7 +166,7 @@ export default function HistoryScreen() {
     };
 
     return (
-      <Pressable
+      <BouncyButton
         onPress={() => onPressItem(item)}
         onLongPress={handleLongPress}
       >
@@ -212,7 +213,7 @@ export default function HistoryScreen() {
             </View>
           </View>
         </View>
-      </Pressable>
+      </BouncyButton>
     );
   };
 
@@ -223,17 +224,23 @@ export default function HistoryScreen() {
           title: '最近浏览',
           headerRight: () =>
             selecting ? (
-              <Pressable onPress={exitSelection}>
+              <BouncyButton
+                className="p-2 rounded-full"
+                onPress={exitSelection}
+              >
                 <Text style={{ color: primaryColor, fontSize: 16 }}>完成</Text>
-              </Pressable>
+              </BouncyButton>
             ) : historyItems.length > 0 ? (
-              <Pressable onPress={handleClearAll}>
+              <BouncyButton
+                className="p-2 rounded-full"
+                onPress={handleClearAll}
+              >
                 <Ionicons
                   name="trash-outline"
                   size={20}
                   color={Colors[colorScheme].textTertiary}
                 />
-              </Pressable>
+              </BouncyButton>
             ) : null,
         }}
       />
@@ -270,7 +277,7 @@ export default function HistoryScreen() {
         refreshing={isRefetching}
       />
       {selecting && selectedIds.size > 0 && (
-        <Pressable
+        <BouncyButton
           onPress={handleDeleteSelected}
           className="absolute bottom-8 left-8 right-8 py-3 rounded-xl items-center"
           style={{ backgroundColor: primaryColor }}
@@ -278,7 +285,7 @@ export default function HistoryScreen() {
           <Text className="text-white text-base font-bold">
             删除选中 ({selectedIds.size})
           </Text>
-        </Pressable>
+        </BouncyButton>
       )}
     </View>
   );

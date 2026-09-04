@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { Modal, Pressable, SafeAreaView, StyleSheet, View } from 'react-native';
+import { Modal, SafeAreaView, StyleSheet, View } from 'react-native';
 import ImageViewer from 'react-native-image-zoom-viewer';
+import { BouncyButton } from '@/components/BouncyButton';
 import { ImageActionBottomSheet } from '@/components/ImageActionBottomSheet';
 import { Text } from '@/components/Themed';
 import Colors from '@/constants/Colors';
@@ -63,9 +64,9 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
         {/* 顶栏控制条 */}
         <SafeAreaView style={styles.headerSafeArea} pointerEvents="box-none">
           <View style={styles.headerBar}>
-            <Pressable onPress={onClose} style={styles.iconBtn} hitSlop={12}>
+            <BouncyButton onPress={onClose} style={styles.iconBtn} hitSlop={12}>
               <Ionicons name="close" size={24} color="#FFFFFF" />
-            </Pressable>
+            </BouncyButton>
 
             {imageUrls.length > 1 && (
               <Text style={styles.pageIndicator}>
@@ -74,13 +75,13 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
             )}
 
             <View style={styles.rightActions}>
-              <Pressable
+              <BouncyButton
                 onPress={() => saveImageToGallery(currentUrl)}
                 style={styles.iconBtn}
                 hitSlop={12}
               >
                 <Ionicons name="download-outline" size={22} color="#FFFFFF" />
-              </Pressable>
+              </BouncyButton>
             </View>
           </View>
         </SafeAreaView>

@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable } from 'react-native';
+import { BouncyButton } from '@/components/BouncyButton';
+
 import { Text, useThemeColor, View } from '@/components/Themed';
 
 interface QueryErrorViewProps {
@@ -28,14 +29,14 @@ export function QueryErrorView({
       <Text type="secondary" className="text-center mt-2 text-sm">
         {message}
       </Text>
-      <Pressable
+      <BouncyButton
         accessibilityRole="button"
         className="mt-3 px-5 py-2 rounded-full"
         style={{ backgroundColor: primaryColor }}
         onPress={onRetry}
       >
         <Text className="text-white font-bold text-sm">重新加载</Text>
-      </Pressable>
+      </BouncyButton>
     </View>
   );
 }

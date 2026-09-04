@@ -6,12 +6,12 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createAnswer, getQuestion } from '@/api/zhihu';
+import { BouncyButton } from '@/components/BouncyButton';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -67,7 +67,8 @@ export default function WriteAnswerScreen() {
         options={{
           headerTitle: '写回答',
           headerRight: () => (
-            <Pressable
+            <BouncyButton
+              className="px-3 py-2 rounded-full"
               onPress={handlePublish}
               disabled={mutation.isPending || !content.trim()}
               style={{ opacity: !content.trim() ? 0.5 : 1 }}
@@ -82,7 +83,7 @@ export default function WriteAnswerScreen() {
                   发布
                 </Text>
               )}
-            </Pressable>
+            </BouncyButton>
           ),
         }}
       />

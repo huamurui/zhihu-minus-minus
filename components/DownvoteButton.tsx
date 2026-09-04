@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable } from 'react-native';
+import { ActivityIndicator } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -10,6 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { voteContent } from '@/api/zhihu/voters';
 import { colors } from '@/constants/designTokens';
+import { BouncyButton } from './BouncyButton';
 import { useThemeColor } from './Themed';
 import { useColorScheme } from './useColorScheme';
 
@@ -63,18 +64,19 @@ export const DownvoteButton = ({
   };
 
   return (
-    <Pressable
+    <BouncyButton
       onPress={handlePress}
       disabled={loading}
       className={
         variant === 'default'
           ? 'w-9 h-9 rounded-lg justify-center items-center '
-          : 'flex-row items-center justify-center bg-transparent px-1'
+          : 'flex-row items-center justify-center bg-transparent p-2'
       }
       style={[
         variant === 'default' && {
           backgroundColor: isDownvoted ? tintColor : `${tintColor}1a`,
         },
+        variant === 'minimal' && { borderRadius: 99 },
         loading && { opacity: 0.7 },
       ]}
     >
@@ -106,6 +108,6 @@ export const DownvoteButton = ({
           />
         </Animated.View>
       )}
-    </Pressable>
+    </BouncyButton>
   );
 };

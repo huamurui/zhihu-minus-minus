@@ -17,7 +17,6 @@ import React, {
 } from 'react';
 import {
   ActivityIndicator,
-  Pressable,
   RefreshControl,
   StyleSheet,
   useWindowDimensions,
@@ -544,12 +543,12 @@ export default function HomeScreen() {
                   );
                 })}
             </View>
-            <Pressable
+            <BouncyButton
               onPress={() => router.push('/search')}
               style={styles.searchBtn}
             >
               <Ionicons name="search" size={22} color={textColor} />
-            </Pressable>
+            </BouncyButton>
           </View>
           {isCurrentRefreshing && <TopLoadingBar color={tintColor} />}
         </BlurView>
@@ -590,12 +589,12 @@ export default function HomeScreen() {
                   <Text style={styles.loginText} type="secondary">
                     登录后才能看此栏目哦
                   </Text>
-                  <Pressable
+                  <BouncyButton
                     style={[styles.loginBtn, { backgroundColor: tintColor }]}
                     onPress={() => router.push('/login')}
                   >
                     <Text style={styles.loginBtnText}>去登录</Text>
-                  </Pressable>
+                  </BouncyButton>
                 </View>
               ) : (
                 <FeedList
@@ -1294,7 +1293,7 @@ const FeedList = React.forwardRef<
             const expanded = expandedCollapsedKeys.has(item.groupKey);
             const showReason = filterMode === 'collapse' && filterShowReason;
             return (
-              <Pressable
+              <BouncyButton
                 onPress={() => toggleCollapsed(item.groupKey)}
                 className="mx-2 my-1 flex-row items-center justify-between rounded-xl px-4 py-3"
                 style={{ backgroundColor: `${tintColor}14` }}
@@ -1312,7 +1311,7 @@ const FeedList = React.forwardRef<
                   size={16}
                   color={tintColor}
                 />
-              </Pressable>
+              </BouncyButton>
             );
           }
           return tab === 'hot' ? (

@@ -3,13 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { BlurView } from 'expo-blur';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Animated,
-  Image,
-  Pressable,
-  StyleSheet,
-} from 'react-native';
+import { ActivityIndicator, Animated, Image, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getArticle, getDailyDetail } from '@/api/zhihu';
 import {
@@ -24,6 +18,7 @@ import {
 } from '@/api/zhihu/column';
 import { addReadHistory } from '@/api/zhihu/history';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
+import { BouncyButton } from '@/components/BouncyButton';
 import { DownvoteButton } from '@/components/DownvoteButton';
 import { LikeButton } from '@/components/LikeButton';
 import { ActionSheet } from '@/components/overlays/ActionSheet';
@@ -228,7 +223,7 @@ export default function ArticleDetail() {
         <Text type="secondary" className="text-xs text-center mb-6">
           该文章可能已被删除、失效或暂不可见 喵~
         </Text>
-        <Pressable
+        <BouncyButton
           onPress={() => router.back()}
           className="px-4 py-2 rounded-full"
           style={{ backgroundColor: primaryTransparent }}
@@ -236,7 +231,7 @@ export default function ArticleDetail() {
           <Text className="text-xs font-bold" style={{ color: primaryColor }}>
             返回上一页
           </Text>
-        </Pressable>
+        </BouncyButton>
       </View>
     );
   }
@@ -272,12 +267,12 @@ export default function ArticleDetail() {
           pointerEvents="none"
         />
 
-        <Pressable
+        <BouncyButton
           onPress={() => router.back()}
-          className="w-10 h-10 justify-center items-center z-50"
+          className="w-10 h-10 justify-center items-center z-50 rounded-full"
         >
           <Ionicons name="chevron-back" size={28} color={textColor} />
-        </Pressable>
+        </BouncyButton>
 
         <Animated.View
           className="flex-1 mx-4"
@@ -293,12 +288,12 @@ export default function ArticleDetail() {
           </Text>
         </Animated.View>
 
-        <Pressable
+        <BouncyButton
           onPress={() => setIsSharing(true)}
-          className="w-10 h-10 justify-center items-center z-50"
+          className="w-10 h-10 justify-center items-center z-50 rounded-full"
         >
           <Ionicons name="share-outline" size={24} color={textColor} />
-        </Pressable>
+        </BouncyButton>
       </View>
 
       <Animated.ScrollView
@@ -344,7 +339,7 @@ export default function ArticleDetail() {
               {data.title}
             </Text>
             <View className="flex-row items-center justify-between bg-transparent mt-2">
-              <Pressable
+              <BouncyButton
                 onPress={goToProfile}
                 className="flex-row items-center flex-1 bg-transparent"
               >
@@ -364,8 +359,8 @@ export default function ArticleDetail() {
                     {data.author?.headline}
                   </Text>
                 </View>
-              </Pressable>
-              <Pressable
+              </BouncyButton>
+              <BouncyButton
                 className="px-[15px] py-1.5 rounded-[20px]"
                 style={[
                   !data.author?.is_following
@@ -389,7 +384,7 @@ export default function ArticleDetail() {
                 >
                   {data.author?.is_following ? '已关注' : '关注'}
                 </Text>
-              </Pressable>
+              </BouncyButton>
             </View>
           </View>
         )}
@@ -407,7 +402,7 @@ export default function ArticleDetail() {
         {!isDaily && columnCard && (
           <View className="px-5 mt-8 mb-4 bg-transparent">
             <Text className="text-sm font-bold mb-3">收录于专栏</Text>
-            <Pressable
+            <BouncyButton
               onPress={() => router.push(`/column/${columnCard.id}`)}
               className="flex-row items-center p-4 rounded-xl border"
               style={{
@@ -431,7 +426,7 @@ export default function ArticleDetail() {
                   {columnCard.extra || `${columnCard.intro || '知乎专栏'}`}
                 </Text>
               </View>
-              <Pressable
+              <BouncyButton
                 onPress={(e) => {
                   e.stopPropagation();
                   columnFollowMutation.mutate();
@@ -459,8 +454,8 @@ export default function ArticleDetail() {
                 >
                   {columnCard.is_following ? '已关注' : '关注'}
                 </Text>
-              </Pressable>
-            </Pressable>
+              </BouncyButton>
+            </BouncyButton>
           </View>
         )}
 
@@ -513,8 +508,8 @@ export default function ArticleDetail() {
                 />
               </View>
               <View className="flex-1 flex-row justify-end items-center bg-transparent">
-                <Pressable
-                  className="items-center ml-5 flex-row bg-transparent"
+                <BouncyButton
+                  className="items-center justify-center ml-3 p-2 flex-row rounded-full bg-transparent"
                   onPress={() => router.push(`/comments/${id}?type=article`)}
                 >
                   <ThemedIcon
@@ -530,9 +525,9 @@ export default function ArticleDetail() {
                       {data.comment_count}
                     </Text>
                   )}
-                </Pressable>
-                <Pressable
-                  className="items-center ml-5 flex-row bg-transparent"
+                </BouncyButton>
+                <BouncyButton
+                  className="items-center justify-center ml-3 p-2 flex-row rounded-full bg-transparent"
                   onPress={() => setMenuVisible(true)}
                 >
                   <ThemedIcon
@@ -540,7 +535,7 @@ export default function ArticleDetail() {
                     size={24}
                     colorType="secondary"
                   />
-                </Pressable>
+                </BouncyButton>
               </View>
             </View>
           </BlurView>

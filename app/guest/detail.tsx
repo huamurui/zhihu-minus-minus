@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Image, ScrollView, StyleSheet } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { FeedItem } from '@/api/zhihu';
@@ -51,13 +51,13 @@ export default function GuestDetailScreen() {
         <Text type="secondary" className="mt-3 text-center">
           加载预览失败喵
         </Text>
-        <Pressable
+        <BouncyButton
           className="mt-6 px-6 py-2.5 rounded-full"
           style={{ backgroundColor: tintColor }}
           onPress={() => router.back()}
         >
           <Text className="text-white font-bold">返回上一页</Text>
-        </Pressable>
+        </BouncyButton>
       </View>
     );
   }
@@ -112,12 +112,12 @@ export default function GuestDetailScreen() {
         ]}
         className="flex-row items-center justify-between px-[15px]"
       >
-        <Pressable
+        <BouncyButton
           onPress={() => router.back()}
-          className="w-10 h-10 justify-center items-center"
+          className="w-10 h-10 justify-center items-center rounded-full"
         >
           <Ionicons name="chevron-back" size={28} color={textColor} />
-        </Pressable>
+        </BouncyButton>
         <Text className="text-[17px] font-bold">游客预览</Text>
         <View
           className="px-2 py-0.5 rounded-full"

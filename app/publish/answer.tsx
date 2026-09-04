@@ -2,14 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  TextInput,
-} from 'react-native';
+import { ActivityIndicator, FlatList, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getInvitedQuestions, searchCreatorQuestions } from '@/api/zhihu';
+import { BouncyButton } from '@/components/BouncyButton';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -57,7 +53,7 @@ export default function PublishAnswerScreen() {
       const questionId = target_link?.split('/').pop();
 
       return (
-        <Pressable
+        <BouncyButton
           onPress={() => router.push(`/question/write/${questionId}`)}
           className="px-5 py-4 border-b"
           style={{ borderBottomColor: borderCol }}
@@ -76,7 +72,7 @@ export default function PublishAnswerScreen() {
           >
             {qTitle}
           </Text>
-        </Pressable>
+        </BouncyButton>
       );
     }
 
@@ -89,7 +85,7 @@ export default function PublishAnswerScreen() {
       : item.target_source?.sub_text || `${question.follow_num || 0} 关注`;
 
     return (
-      <Pressable
+      <BouncyButton
         onPress={() => router.push(`/question/write/${question.id}`)}
         className="px-5 py-4 border-b"
         style={{ borderBottomColor: borderCol }}
@@ -103,7 +99,7 @@ export default function PublishAnswerScreen() {
         <Text className="text-xs" style={{ color: secondaryColor }}>
           {subText}
         </Text>
-      </Pressable>
+      </BouncyButton>
     );
   };
 
@@ -114,9 +110,12 @@ export default function PublishAnswerScreen() {
         className="flex-row items-center justify-between px-4 pb-3"
         style={{ paddingTop: insets.top + 10 }}
       >
-        <Pressable onPress={() => router.back()} className="p-1">
+        <BouncyButton
+          onPress={() => router.back()}
+          className="p-2 rounded-full"
+        >
           <Ionicons name="close" size={28} color={textColor} />
-        </Pressable>
+        </BouncyButton>
         <Text className="text-lg font-bold">写回答</Text>
         <View className="w-10" />
       </View>
@@ -126,7 +125,7 @@ export default function PublishAnswerScreen() {
         className="flex-row px-5 border-b"
         style={{ borderBottomColor: borderCol }}
       >
-        <Pressable
+        <BouncyButton
           onPress={() => setActiveTab('search')}
           className="py-3 mr-6"
           style={{
@@ -143,8 +142,8 @@ export default function PublishAnswerScreen() {
           >
             搜索问题
           </Text>
-        </Pressable>
-        <Pressable
+        </BouncyButton>
+        <BouncyButton
           onPress={() => setActiveTab('invite')}
           className="py-3"
           style={{
@@ -161,7 +160,7 @@ export default function PublishAnswerScreen() {
           >
             邀请回答
           </Text>
-        </Pressable>
+        </BouncyButton>
       </View>
 
       {activeTab === 'search' ? (

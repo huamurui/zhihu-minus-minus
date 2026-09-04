@@ -1,6 +1,7 @@
 import type React from 'react';
 import { useState } from 'react';
-import { Image, Pressable } from 'react-native';
+import { Image } from 'react-native';
+import { BouncyButton } from '@/components/BouncyButton';
 import { ImagePreviewModal } from '@/components/ImagePreviewModal';
 import { Text, useThemeColor, View } from './Themed';
 
@@ -63,7 +64,7 @@ export const CommentContent: React.FC<CommentContentProps> = ({
       {imageUrls.length > 0 && (
         <View className="flex-row flex-wrap gap-2 my-1.5 bg-transparent">
           {imageUrls.map((url, idx) => (
-            <Pressable
+            <BouncyButton
               // biome-ignore lint/suspicious/noArrayIndexKey: 同一条评论可以重复引用同一张图,url 不唯一,复合 key 才能保证不撞。
               key={`${url}-${idx}`}
               onPress={() => handleOpenImage(url)}
@@ -78,7 +79,7 @@ export const CommentContent: React.FC<CommentContentProps> = ({
                 }
                 resizeMode="cover"
               />
-            </Pressable>
+            </BouncyButton>
           ))}
         </View>
       )}

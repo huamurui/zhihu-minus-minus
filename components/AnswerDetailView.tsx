@@ -8,7 +8,6 @@ import {
   Alert,
   Image,
   type ScrollView as NativeScrollView,
-  Pressable,
   StyleSheet,
 } from 'react-native';
 import Reanimated, {
@@ -262,7 +261,7 @@ export const AnswerDetailView = ({
           <View className="w-10 bg-transparent" />
           <View className="flex-1 flex-col items-center bg-transparent">
             {/* 问题标题 */}
-            <Pressable
+            <BouncyButton
               onPress={() =>
                 router.push(`/question/${answer?.question?.id || questionId}`)
               }
@@ -275,10 +274,10 @@ export const AnswerDetailView = ({
               >
                 {answer?.question?.title || '加载中...'}
               </Text>
-            </Pressable>
+            </BouncyButton>
 
             {/* 用户头像 + 名字 */}
-            <Pressable
+            <BouncyButton
               onPress={goToProfile}
               className="flex-row items-center justify-center mt-1 bg-transparent"
             >
@@ -292,7 +291,7 @@ export const AnswerDetailView = ({
               >
                 {answer?.author?.name || '知乎用户'}
               </Text>
-            </Pressable>
+            </BouncyButton>
           </View>
           <View className="w-10 bg-transparent" />
         </View>
@@ -315,7 +314,7 @@ export const AnswerDetailView = ({
         }}
       >
         <View className="flex-row items-center px-5 pt-5 pb-4 justify-between bg-transparent">
-          <Pressable
+          <BouncyButton
             onPress={goToProfile}
             className="flex-row items-center flex-1 bg-transparent"
           >
@@ -335,8 +334,8 @@ export const AnswerDetailView = ({
                 {answer?.author?.headline}
               </Text>
             </View>
-          </Pressable>
-          <Pressable
+          </BouncyButton>
+          <BouncyButton
             className="px-[15px] py-1.5 rounded-[20px]"
             style={[
               !answer?.author?.is_following
@@ -360,7 +359,7 @@ export const AnswerDetailView = ({
             >
               {answer?.author?.is_following ? '已关注' : '关注'}
             </Text>
-          </Pressable>
+          </BouncyButton>
         </View>
 
         {queryLoading ? (
@@ -470,8 +469,9 @@ export const AnswerDetailView = ({
               />
             </View>
             <View className="flex-1 flex-row justify-end items-center bg-transparent">
-              <Pressable
-                className="items-center ml-5 flex-row bg-transparent"
+              <BouncyButton
+                className="items-center justify-center ml-3 p-2 flex-row bg-transparent"
+                style={{ borderRadius: 99 }}
                 onPress={() => router.push(`/comments/${id}?type=answer`)}
               >
                 <ThemedIcon
@@ -487,9 +487,10 @@ export const AnswerDetailView = ({
                     {answer?.comment_count}
                   </Text>
                 )}
-              </Pressable>
-              <Pressable
-                className="items-center ml-5 flex-row bg-transparent"
+              </BouncyButton>
+              <BouncyButton
+                className="items-center justify-center ml-3 p-2 flex-row bg-transparent"
+                style={{ borderRadius: 99 }}
                 onPress={() => setMenuVisible(true)}
               >
                 <ThemedIcon
@@ -497,7 +498,7 @@ export const AnswerDetailView = ({
                   size={24}
                   colorType="secondary"
                 />
-              </Pressable>
+              </BouncyButton>
             </View>
           </View>
         </BlurView>

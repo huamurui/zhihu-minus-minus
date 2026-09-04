@@ -12,7 +12,6 @@ import {
   Alert,
   Image,
   View as NativeView,
-  Pressable,
   TextInput,
 } from 'react-native';
 import PagerView, {
@@ -38,6 +37,7 @@ import {
   type ZhihuMember,
 } from '@/api/zhihu';
 import { addReadHistory } from '@/api/zhihu/history';
+import { BouncyButton } from '@/components/BouncyButton';
 import { FeedCard } from '@/components/FeedCard';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { Text, useThemeColor, View } from '@/components/Themed';
@@ -752,7 +752,7 @@ export default function UserDetailScreen() {
             sharedTransitionTag={`avatar-${user?.url_token || id}`}
           />
           {!isMe && (
-            <Pressable
+            <BouncyButton
               className="px-5 h-9 rounded-full justify-center items-center mb-1.5"
               style={[
                 user?.is_following
@@ -788,7 +788,7 @@ export default function UserDetailScreen() {
                   {user?.is_following ? '已关注' : '关注'}
                 </Text>
               )}
-            </Pressable>
+            </BouncyButton>
           )}
         </View>
         <Text className="text-[22px] font-bold mt-2.5">{user?.name}</Text>
@@ -807,7 +807,7 @@ export default function UserDetailScreen() {
         ) : null}
 
         {!isMe && (user?.mutual_followees_count || 0) > 0 && (
-          <Pressable
+          <BouncyButton
             className="flex-row items-center mt-[15px] p-2.5 rounded-lg bg-black/5 dark:bg-white/5"
             onPress={() => router.push(`/user/${user?.url_token || id}/mutual`)}
           >
@@ -821,11 +821,11 @@ export default function UserDetailScreen() {
               }}
               className="w-5 h-5 rounded-full ml-2"
             />
-          </Pressable>
+          </BouncyButton>
         )}
 
         <View className="flex-row mt-5 pt-[15px] bg-transparent">
-          <Pressable
+          <BouncyButton
             className="mr-[30px] items-center"
             onPress={() =>
               router.push(`/user/${user?.url_token || id}/followers`)
@@ -837,8 +837,8 @@ export default function UserDetailScreen() {
             <Text type="secondary" className="text-xs mt-0.5">
               关注者
             </Text>
-          </Pressable>
-          <Pressable
+          </BouncyButton>
+          <BouncyButton
             className="mr-[30px] items-center"
             onPress={() =>
               router.push(`/user/${user?.url_token || id}/following`)
@@ -850,7 +850,7 @@ export default function UserDetailScreen() {
             <Text type="secondary" className="text-xs mt-0.5">
               关注
             </Text>
-          </Pressable>
+          </BouncyButton>
           <View className="items-center">
             <Text className="font-bold text-lg">{user?.voteup_count || 0}</Text>
             <Text type="secondary" className="text-xs mt-0.5">
@@ -887,13 +887,16 @@ export default function UserDetailScreen() {
           returnKeyType="search"
         />
         {searchQuery.length > 0 && (
-          <Pressable onPress={() => setSearchQuery('')} className="p-[5px]">
+          <BouncyButton
+            onPress={() => setSearchQuery('')}
+            className="p-[5px] rounded-full"
+          >
             <Ionicons
               name="close-circle"
               size={16}
               color={Colors[colorScheme].textTertiary}
             />
-          </Pressable>
+          </BouncyButton>
         )}
       </View>
     </View>
@@ -911,7 +914,7 @@ export default function UserDetailScreen() {
         const countStr = count !== undefined && count > 0 ? ` ${count}` : '';
         const isActive = activeTab === tab.key;
         return (
-          <Pressable
+          <BouncyButton
             key={tab.key}
             onPress={() => handleTabPress(idx)}
             className="flex-1 py-2 items-center"
@@ -927,7 +930,7 @@ export default function UserDetailScreen() {
               {tab.label}
               {countStr}
             </Text>
-          </Pressable>
+          </BouncyButton>
         );
       })}
       <Reanimated.View
@@ -959,7 +962,7 @@ export default function UserDetailScreen() {
             { key: 'voteups', label: '赞同' },
           ] as const
         ).map((item) => (
-          <Pressable
+          <BouncyButton
             key={item.key}
             onPress={() => setSortBy(item.key)}
             className="px-3 py-1 mr-2.5 rounded"
@@ -976,7 +979,7 @@ export default function UserDetailScreen() {
             >
               {item.label}
             </Text>
-          </Pressable>
+          </BouncyButton>
         ))}
       </View>
     );

@@ -7,7 +7,7 @@ import {
 } from '@tanstack/react-query';
 import { useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import {
   createCollection,
   deleteCollection,
@@ -108,9 +108,13 @@ export default function MyCollectionsScreen() {
     navigation.setOptions({
       title: '我的收藏夹',
       headerRight: () => (
-        <Pressable onPress={() => openModal()} style={{ marginRight: 15 }}>
+        <BouncyButton
+          className="p-2 rounded-full"
+          onPress={() => openModal()}
+          style={{ marginRight: 15 }}
+        >
           <Ionicons name="add" size={28} color={primaryColor} />
-        </Pressable>
+        </BouncyButton>
       ),
     });
   }, [navigation, openModal, primaryColor]);
@@ -200,13 +204,16 @@ export default function MyCollectionsScreen() {
           {item.answer_count || 0} 内容 · {item.follower_count || 0} 关注
         </Text>
       </View>
-      <Pressable onPress={() => setActionItem(item)} className="p-2.5">
+      <BouncyButton
+        onPress={() => setActionItem(item)}
+        className="p-2.5 rounded-full"
+      >
         <Ionicons
           name="ellipsis-horizontal"
           size={18}
           color={Colors[colorScheme].tabIconDefault}
         />
-      </Pressable>
+      </BouncyButton>
     </BouncyButton>
   );
 

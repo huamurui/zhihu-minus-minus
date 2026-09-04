@@ -172,8 +172,14 @@ export default function ReplyDetailScreen() {
 
   const renderReply = ({ item }: { item: CommentItem }) => {
     return (
-      <View
+      <BouncyButton
+        accessible={false}
+        onLongPress={() =>
+          handleLongPressComment(item.content, item.author.member.name)
+        }
+        delayLongPress={400}
         style={{
+          borderRadius: 0,
           borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: borderColor,
         }}
@@ -220,15 +226,9 @@ export default function ReplyDetailScreen() {
                 </Text>
               )}
             </Text>
-            <BouncyButton
-              onLongPress={() =>
-                handleLongPressComment(item.content, item.author.member.name)
-              }
-              delayLongPress={400}
-              style={{ marginTop: 4, borderRadius: 4 }}
-            >
+            <View className="mt-1 bg-transparent">
               <CommentContent htmlContent={item.content} width={contentWidth} />
-            </BouncyButton>
+            </View>
 
             <View className="flex-row justify-between items-center bg-transparent">
               <Text
@@ -271,7 +271,7 @@ export default function ReplyDetailScreen() {
             </View>
           </View>
         </View>
-      </View>
+      </BouncyButton>
     );
   };
 
@@ -284,7 +284,18 @@ export default function ReplyDetailScreen() {
           borderBottomColor: colorScheme === 'dark' ? '#1A1A1A' : '#F5F5F5',
         }}
       >
-        <View className="flex-row p-[15px] bg-transparent">
+        <BouncyButton
+          accessible={false}
+          className="flex-row p-[15px] bg-transparent"
+          style={{ borderRadius: 0 }}
+          onLongPress={() =>
+            handleLongPressComment(
+              parentComment.content,
+              parentComment.author.member.name,
+            )
+          }
+          delayLongPress={400}
+        >
           <BouncyButton
             onPress={() =>
               goToProfile(
@@ -313,21 +324,12 @@ export default function ReplyDetailScreen() {
                 {parentComment.author.member.name}
               </Text>
             </View>
-            <BouncyButton
-              onLongPress={() =>
-                handleLongPressComment(
-                  parentComment.content,
-                  parentComment.author.member.name,
-                )
-              }
-              delayLongPress={400}
-              style={{ marginTop: 4, borderRadius: 4 }}
-            >
+            <View className="mt-1 bg-transparent">
               <CommentContent
                 htmlContent={parentComment.content}
                 width={contentWidth}
               />
-            </BouncyButton>
+            </View>
 
             <View className="flex-row justify-between items-center bg-transparent">
               <Text
@@ -373,7 +375,7 @@ export default function ReplyDetailScreen() {
               </View>
             </View>
           </View>
-        </View>
+        </BouncyButton>
         <View
           className="px-[15px] py-2.5 bg-transparent"
           style={{

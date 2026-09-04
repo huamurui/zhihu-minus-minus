@@ -13,13 +13,13 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   View as RNView,
   StyleSheet,
   TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getMessages, sendMessage } from '@/api/zhihu';
+import { BouncyButton } from '@/components/BouncyButton';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -259,7 +259,7 @@ export default function ChatScreen() {
           />
         </RNView>
 
-        <Pressable
+        <BouncyButton
           onPress={handleSend}
           disabled={!inputText.trim() || sendMutation.isPending}
           className="ml-3 w-10 h-10 rounded-full justify-center items-center"
@@ -287,7 +287,7 @@ export default function ChatScreen() {
               }
             />
           )}
-        </Pressable>
+        </BouncyButton>
       </View>
     </KeyboardAvoidingView>
   );

@@ -3,12 +3,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Image,
-  View as NativeView,
-  Pressable,
-} from 'react-native';
+import { ActivityIndicator, Image, View as NativeView } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import {
   getMemberFollowing,
@@ -22,6 +17,7 @@ import {
   type ZhihuFollowingTopicContributionItem,
   type ZhihuMemberListItem,
 } from '@/api/zhihu';
+import { BouncyButton } from '@/components/BouncyButton';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { UserCard } from '@/components/UserCard';
@@ -247,7 +243,7 @@ export default function FollowingScreen() {
     if (tabKey === 'columns') {
       const column = item as ZhihuFollowingColumnItem;
       return (
-        <Pressable
+        <BouncyButton
           className="flex-row items-center p-4"
           style={{ borderBottomWidth: 0.5, borderBottomColor: borderColor }}
           onPress={() => router.push(`/column/${column.id}`)}
@@ -276,14 +272,14 @@ export default function FollowingScreen() {
               </Text>
             </View>
           </View>
-        </Pressable>
+        </BouncyButton>
       );
     }
     if (tabKey === 'topics') {
       const topic = (item as ZhihuFollowingTopicContributionItem).topic;
       if (!topic) return null;
       return (
-        <Pressable
+        <BouncyButton
           className="flex-row items-center p-4"
           style={{ borderBottomWidth: 0.5, borderBottomColor: borderColor }}
           onPress={() => router.push(`/topic/${topic.id}`)}
@@ -312,13 +308,13 @@ export default function FollowingScreen() {
               </Text>
             </View>
           </View>
-        </Pressable>
+        </BouncyButton>
       );
     }
     if (tabKey === 'questions') {
       const question = item as ZhihuFollowingQuestionItem;
       return (
-        <Pressable
+        <BouncyButton
           className="p-4"
           style={{ borderBottomWidth: 0.5, borderBottomColor: borderColor }}
           onPress={() => router.push(`/question/${question.id}`)}
@@ -339,13 +335,13 @@ export default function FollowingScreen() {
               </Text>
             )}
           </View>
-        </Pressable>
+        </BouncyButton>
       );
     }
     if (tabKey === 'favlists') {
       const favlist = item as ZhihuFollowingFavlistItem;
       return (
-        <Pressable
+        <BouncyButton
           className="flex-row items-center p-4"
           style={{ borderBottomWidth: 0.5, borderBottomColor: borderColor }}
           onPress={() => router.push(`/collections/${favlist.id}`)}
@@ -381,7 +377,7 @@ export default function FollowingScreen() {
               </Text>
             </View>
           </View>
-        </Pressable>
+        </BouncyButton>
       );
     }
     return null;
@@ -399,7 +395,7 @@ export default function FollowingScreen() {
         {TABS.map((tab, idx) => {
           const isActive = activeTab === tab.key;
           return (
-            <Pressable
+            <BouncyButton
               key={tab.key}
               onPress={() => handleTabPress(idx)}
               className="flex-1 justify-center items-center h-full"
@@ -416,7 +412,7 @@ export default function FollowingScreen() {
                   style={{ backgroundColor: tint }}
                 />
               )}
-            </Pressable>
+            </BouncyButton>
           );
         })}
       </View>

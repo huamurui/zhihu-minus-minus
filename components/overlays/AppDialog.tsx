@@ -8,6 +8,7 @@ import {
   StyleSheet,
   useWindowDimensions,
 } from 'react-native';
+import { BouncyButton } from '@/components/BouncyButton';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -178,7 +179,7 @@ export function AppDialog({
                     ? Colors[colorScheme].text
                     : Colors[colorScheme].textInverse;
                 return (
-                  <Pressable
+                  <BouncyButton
                     key={action.label}
                     accessibilityRole="button"
                     accessibilityLabel={action.label}
@@ -194,7 +195,7 @@ export function AppDialog({
                     <Text style={[styles.actionLabel, { color }]}>
                       {action.label}
                     </Text>
-                  </Pressable>
+                  </BouncyButton>
                 );
               })}
             </View>

@@ -3,7 +3,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Pressable } from 'react-native';
+import { ActivityIndicator, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   followTopic,
@@ -130,7 +130,7 @@ export default function TopicDetail() {
               {topic.followers_count} 关注 · {topic.best_answers_count} 精华
             </Text>
           </View>
-          <Pressable
+          <BouncyButton
             onPress={() => followMutation.mutate()}
             className="px-4 py-1.5 rounded-full"
             style={[
@@ -153,7 +153,7 @@ export default function TopicDetail() {
             >
               {topic.is_following ? '已关注' : '关注'}
             </Text>
-          </Pressable>
+          </BouncyButton>
         </View>
 
         {topic.introduction ? (
@@ -178,7 +178,7 @@ export default function TopicDetail() {
             { id: 'unanswered', name: '等待回答' },
             { id: 'structure', name: '话题结构' },
           ].map((tab) => (
-            <Pressable
+            <BouncyButton
               key={tab.id}
               onPress={() => setActiveTab(tab.id as any)}
               className="flex-1 py-3 items-center"
@@ -199,7 +199,7 @@ export default function TopicDetail() {
                   style={{ backgroundColor: tintColor }}
                 />
               )}
-            </Pressable>
+            </BouncyButton>
           ))}
         </View>
       </View>
@@ -222,9 +222,12 @@ export default function TopicDetail() {
           headerStyle: { backgroundColor },
           headerTintColor: textColor,
           headerLeft: () => (
-            <Pressable onPress={() => router.back()} className="mr-4">
+            <BouncyButton
+              onPress={() => router.back()}
+              className="mr-2 p-2 rounded-full"
+            >
               <Ionicons name="chevron-back" size={28} color={textColor} />
-            </Pressable>
+            </BouncyButton>
           ),
         }}
       />
@@ -397,7 +400,7 @@ function TopicItem({ topic }: { topic: any }) {
   const colorScheme = useColorScheme();
 
   return (
-    <Pressable
+    <BouncyButton
       onPress={() => router.push(`/topic/${topic.id}` as any)}
       className="flex-row items-center p-3 mb-3 mr-3 rounded-xl border w-[46%]"
       style={{
@@ -414,7 +417,7 @@ function TopicItem({ topic }: { topic: any }) {
           {topic.name}
         </Text>
       </View>
-    </Pressable>
+    </BouncyButton>
   );
 }
 

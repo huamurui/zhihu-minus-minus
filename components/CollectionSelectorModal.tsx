@@ -2,13 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Pressable,
-  StyleSheet,
-} from 'react-native';
+import { ActivityIndicator, Alert, FlatList, StyleSheet } from 'react-native';
 import {
   addArticleToCollection,
   addToCollection,
@@ -18,6 +12,7 @@ import {
   removeArticleFromCollection,
   removeFromCollection,
 } from '@/api/zhihu/collection';
+import { BouncyButton } from '@/components/BouncyButton';
 import { CollectionEditorForm } from '@/components/CollectionEditorForm';
 import { BottomSheet } from '@/components/overlays/BottomSheet';
 import { Text, useThemeColor, View } from '@/components/Themed';
@@ -167,7 +162,7 @@ export function CollectionSelectorModal() {
   };
 
   const newButton = (
-    <Pressable
+    <BouncyButton
       accessibilityRole="button"
       accessibilityLabel="新建收藏夹"
       onPress={() => setEditorVisible(true)}
@@ -177,11 +172,12 @@ export function CollectionSelectorModal() {
       <Text style={[styles.headerButtonLabel, { color: primaryColor }]}>
         新建
       </Text>
-    </Pressable>
+    </BouncyButton>
   );
 
   const backButton = (
-    <Pressable
+    <BouncyButton
+      className="rounded-full"
       accessibilityRole="button"
       accessibilityLabel="返回收藏夹列表"
       hitSlop={8}
@@ -189,7 +185,7 @@ export function CollectionSelectorModal() {
       style={styles.backButton}
     >
       <Ionicons name="chevron-back" size={24} color={colors.text} />
-    </Pressable>
+    </BouncyButton>
   );
 
   return (
@@ -230,7 +226,8 @@ export function CollectionSelectorModal() {
                   toggleMutation.isPending &&
                   toggleMutation.variables?.folderId === item.id;
                 return (
-                  <Pressable
+                  <BouncyButton
+                    className="rounded-xl"
                     accessibilityRole="checkbox"
                     accessibilityLabel={item.title}
                     accessibilityState={{
@@ -298,7 +295,7 @@ export function CollectionSelectorModal() {
                         />
                       )}
                     </View>
-                  </Pressable>
+                  </BouncyButton>
                 );
               }}
               ListEmptyComponent={
@@ -309,14 +306,14 @@ export function CollectionSelectorModal() {
             />
           )}
 
-          <Pressable
+          <BouncyButton
             accessibilityRole="button"
             accessibilityLabel="完成选择收藏夹"
             onPress={handleClose}
             style={[styles.doneButton, { backgroundColor: primaryColor }]}
           >
             <Text style={styles.doneLabel}>完成</Text>
-          </Pressable>
+          </BouncyButton>
         </View>
       )}
     </BottomSheet>

@@ -1133,7 +1133,8 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
               key={index}
               className="my-2.5 items-center w-full bg-transparent"
             >
-              <Pressable
+              <BouncyButton
+                className="rounded-xl"
                 onPress={() => {
                   setViewerImage(item.url);
                   setViewerVisible(true);
@@ -1145,7 +1146,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
                   style={{ width: width - 40, height: 250 }}
                   resizeMode="cover"
                 />
-              </Pressable>
+              </BouncyButton>
             </View>
           );
         }
@@ -1401,8 +1402,8 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
                 borderTopColor: contentBorderColor,
               }}
             >
-              <Pressable
-                className="flex-row items-center bg-transparent"
+              <BouncyButton
+                className="flex-row items-center p-2 rounded-full bg-transparent"
                 onPress={() => setTextSelection(null)}
               >
                 <Ionicons
@@ -1413,8 +1414,8 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
                 <Text type="secondary" className="text-sm ml-1">
                   取消
                 </Text>
-              </Pressable>
-              <Pressable
+              </BouncyButton>
+              <BouncyButton
                 className="flex-row items-center rounded-full px-4 py-1.5"
                 style={{
                   backgroundColor: primaryColor,
@@ -1435,7 +1436,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
                     </Text>
                   </>
                 )}
-              </Pressable>
+              </BouncyButton>
             </View>
           </View>
         )}

@@ -7,13 +7,7 @@ import {
 } from '@tanstack/react-query';
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-} from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet } from 'react-native';
 import { getNotifications, markAllNotificationsRead } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
 import { Text, useThemeColor, View } from '@/components/Themed';
@@ -244,7 +238,7 @@ export default function NotificationScreen() {
           }}
         >
           {NOTIFICATION_TYPES.map((type) => (
-            <Pressable
+            <BouncyButton
               key={type.value}
               onPress={() => setSelectedType(type.value)}
               className="px-4 py-1.5 mx-1 rounded-full"
@@ -264,7 +258,7 @@ export default function NotificationScreen() {
               >
                 {type.label}
               </Text>
-            </Pressable>
+            </BouncyButton>
           ))}
         </ScrollView>
       </View>

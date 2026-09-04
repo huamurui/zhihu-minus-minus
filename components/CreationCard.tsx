@@ -289,7 +289,7 @@ export const CreationCard = React.forwardRef<
                 linkCardInfo={item.link_card_info}
                 useNative={true}
               />
-              <Pressable
+              <BouncyButton
                 onPress={() => setExpanded(false)}
                 className="mt-3 py-2.5 flex-row items-center justify-center border-t border-gray-100 dark:border-gray-800"
               >
@@ -305,7 +305,7 @@ export const CreationCard = React.forwardRef<
                       : '想法'}
                 </Text>
                 <Ionicons name="chevron-up" size={14} color={primaryColor} />
-              </Pressable>
+              </BouncyButton>
             </View>
           ) : type === 'answer' || type === 'article' || type === 'pin' ? (
             isLongContent ? (
@@ -425,7 +425,7 @@ export const CreationCard = React.forwardRef<
                 }
                 variant="ghost"
               />
-              <Pressable
+              <BouncyButton
                 onPress={() => {
                   const commentType =
                     type === 'article'
@@ -437,7 +437,7 @@ export const CreationCard = React.forwardRef<
                     `/comments/${item.id}?type=${commentType}&count=${item.comment_count || 0}`,
                   );
                 }}
-                className="flex-row items-center ml-5 bg-transparent py-1"
+                className="flex-row items-center justify-center ml-3 p-2 rounded-full bg-transparent"
               >
                 <Ionicons
                   name="chatbubble-outline"
@@ -447,11 +447,11 @@ export const CreationCard = React.forwardRef<
                 <Text className="ml-1 text-xs font-semibold">
                   {(item.comment_count ?? 0) > 0 ? item.comment_count : '0'}
                 </Text>
-              </Pressable>
+              </BouncyButton>
               {isCollectable && (
-                <Pressable
+                <BouncyButton
                   onPress={() => toggleCollect(item.id, type, isCollected)}
-                  className="flex-row items-center ml-5 bg-transparent py-1"
+                  className="flex-row items-center justify-center ml-3 p-2 rounded-full bg-transparent"
                 >
                   <Ionicons
                     name={isCollected ? 'star' : 'star-outline'}
@@ -472,7 +472,7 @@ export const CreationCard = React.forwardRef<
                       {displayCount}
                     </Text>
                   )}
-                </Pressable>
+                </BouncyButton>
               )}
             </View>
           ) : (

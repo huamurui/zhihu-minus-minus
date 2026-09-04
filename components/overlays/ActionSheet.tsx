@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { BouncyButton } from '@/components/BouncyButton';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -87,13 +88,12 @@ export function ActionSheet({
 
             return (
               <React.Fragment key={option.key}>
-                <Pressable
+                <BouncyButton
                   accessibilityRole="button"
                   accessibilityLabel={option.label}
                   accessibilityState={{ disabled: option.disabled }}
                   disabled={option.disabled}
                   onPress={() => selectOption(option)}
-                  android_ripple={{ color: dividerColor }}
                   style={[styles.option, option.disabled && styles.disabled]}
                 >
                   <View
@@ -115,7 +115,7 @@ export function ActionSheet({
                       {option.label}
                     </Text>
                   </View>
-                </Pressable>
+                </BouncyButton>
                 {index < options.length - 1 ? (
                   <View
                     style={[styles.divider, { backgroundColor: dividerColor }]}
@@ -126,17 +126,16 @@ export function ActionSheet({
           })}
         </View>
 
-        <Pressable
+        <BouncyButton
           accessibilityRole="button"
           accessibilityLabel={cancelLabel}
           onPress={close}
-          android_ripple={{ color: dividerColor }}
           style={[styles.cancel, { backgroundColor: itemBackground }]}
         >
           <Text type="secondary" style={styles.cancelLabel}>
             {cancelLabel}
           </Text>
-        </Pressable>
+        </BouncyButton>
       </View>
     </BottomSheet>
   );
@@ -155,6 +154,7 @@ const styles = StyleSheet.create({
   option: {
     width: '100%',
     minHeight: 56,
+    borderRadius: 12,
     paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',

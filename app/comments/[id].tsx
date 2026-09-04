@@ -174,10 +174,16 @@ export default function CommentScreen() {
 
   const renderComment = ({ item }: { item: CommentItem }) => {
     return (
-      <View
+      <BouncyButton
+        accessible={false}
+        onLongPress={() =>
+          handleLongPressComment(item.content, item.author.member.name)
+        }
+        delayLongPress={400}
         style={{
           paddingHorizontal: 15,
           paddingVertical: 13,
+          borderRadius: 0,
           borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: borderColor,
         }}
@@ -207,15 +213,9 @@ export default function CommentScreen() {
                 {item.author.member.name}
               </Text>
             </BouncyButton>
-            <BouncyButton
-              onLongPress={() =>
-                handleLongPressComment(item.content, item.author.member.name)
-              }
-              delayLongPress={400}
-              style={{ marginTop: 8, borderRadius: 4 }}
-            >
+            <View className="mt-2 bg-transparent">
               <CommentContent htmlContent={item.content} width={contentWidth} />
-            </BouncyButton>
+            </View>
 
             <View className="flex-row justify-between items-center bg-transparent">
               <Text
@@ -306,7 +306,7 @@ export default function CommentScreen() {
             )}
           </View>
         </View>
-      </View>
+      </BouncyButton>
     );
   };
 

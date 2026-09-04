@@ -2,9 +2,10 @@ import CookieManager from '@preeternal/react-native-cookie-manager';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
+import { ActivityIndicator, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { getMe } from '@/api/zhihu';
+import { BouncyButton } from '@/components/BouncyButton';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -115,7 +116,8 @@ export default function LoginScreen() {
         className="h-[60px] flex-row items-center justify-between px-[15px] pt-[10px]"
         style={{ borderBottomWidth: 1, borderBottomColor: borderColor }}
       >
-        <Pressable
+        <BouncyButton
+          className="p-2 rounded-full"
           onPress={() => {
             if (router.canGoBack()) {
               router.back();
@@ -127,7 +129,7 @@ export default function LoginScreen() {
           <Text type="primary" className="text-base">
             取消
           </Text>
-        </Pressable>
+        </BouncyButton>
         <Text className="text-base font-bold">登录知乎</Text>
         <View className="w-10 bg-transparent" />
       </View>

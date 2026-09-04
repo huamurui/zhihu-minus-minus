@@ -337,7 +337,7 @@ const StreamItem = forwardRef<StreamItemHandle, StreamItemProps>(
                 linkCardInfo={item.link_card_info}
                 useNative={true}
               />
-              <Pressable
+              <BouncyButton
                 onPress={() => item?.id && onToggle(item.id.toString(), false)}
                 className="flex-row items-center justify-center py-2.5 mt-1 bg-transparent"
               >
@@ -354,7 +354,7 @@ const StreamItem = forwardRef<StreamItemHandle, StreamItemProps>(
                       : '想法'}
                 </Text>
                 <Ionicons name="chevron-up" size={14} color={primaryColor} />
-              </Pressable>
+              </BouncyButton>
             </View>
           ) : (
             <Pressable
@@ -432,7 +432,7 @@ const StreamItem = forwardRef<StreamItemHandle, StreamItemProps>(
                 }
                 variant="ghost"
               />
-              <Pressable
+              <BouncyButton
                 onPress={() => {
                   const commentType =
                     type === 'article'
@@ -444,7 +444,7 @@ const StreamItem = forwardRef<StreamItemHandle, StreamItemProps>(
                     `/comments/${item.id}?type=${commentType}&count=${item.comment_count || 0}`,
                   );
                 }}
-                className="flex-row items-center ml-5 bg-transparent py-1"
+                className="flex-row items-center justify-center ml-3 p-2 rounded-full bg-transparent"
               >
                 <Ionicons
                   name="chatbubble-outline"
@@ -454,11 +454,11 @@ const StreamItem = forwardRef<StreamItemHandle, StreamItemProps>(
                 <Text className="text-muted ml-1 text-xs font-semibold">
                   {(item.comment_count ?? 0) > 0 ? item.comment_count : '评论'}
                 </Text>
-              </Pressable>
+              </BouncyButton>
               {isCollectable && (
-                <Pressable
+                <BouncyButton
                   onPress={() => toggleCollect(item.id, type, isCollected)}
-                  className="flex-row items-center ml-5 bg-transparent py-1"
+                  className="flex-row items-center justify-center ml-3 p-2 rounded-full bg-transparent"
                 >
                   <Ionicons
                     name={isCollected ? 'star' : 'star-outline'}
@@ -479,7 +479,7 @@ const StreamItem = forwardRef<StreamItemHandle, StreamItemProps>(
                       {displayCount}
                     </Text>
                   )}
-                </Pressable>
+                </BouncyButton>
               )}
             </View>
           ) : (
@@ -843,7 +843,7 @@ export default function UserStreamScreen() {
             </BouncyButton>
 
             {/* User Mini Profile */}
-            <Pressable
+            <BouncyButton
               onPress={() => router.push(`/user/${user?.url_token || id}`)}
               className="flex-row items-center ml-2 flex-1 bg-transparent"
             >
@@ -867,7 +867,7 @@ export default function UserStreamScreen() {
                   {user?.headline || '查看全部个人主页'}
                 </Text>
               </View>
-            </Pressable>
+            </BouncyButton>
 
             {/* Content Type Badge */}
             <View
@@ -1009,8 +1009,8 @@ export default function UserStreamScreen() {
                       variant="ghost"
                     />
                   )}
-                  <Pressable
-                    className="flex-row items-center ml-5 bg-transparent"
+                  <BouncyButton
+                    className="flex-row items-center justify-center ml-3 p-2 rounded-full bg-transparent"
                     onPress={() => {
                       const commentType =
                         activeItem?.type === 'article'
@@ -1035,12 +1035,12 @@ export default function UserStreamScreen() {
                     >
                       {activeItem?.comment_count || 0}
                     </Text>
-                  </Pressable>
+                  </BouncyButton>
 
                   {activeItem?.id &&
                     expandedIds.has(activeItem.id.toString()) && (
-                      <Pressable
-                        className="flex-row items-center ml-5 bg-transparent"
+                      <BouncyButton
+                        className="flex-row items-center justify-center ml-3 p-2 rounded-full bg-transparent"
                         onPress={() =>
                           handleToggleExpand(activeItem.id.toString(), false)
                         }
@@ -1057,11 +1057,11 @@ export default function UserStreamScreen() {
                         >
                           收起
                         </Text>
-                      </Pressable>
+                      </BouncyButton>
                     )}
                 </View>
-                <Pressable
-                  className="flex-row items-center bg-transparent"
+                <BouncyButton
+                  className="flex-row items-center justify-center p-2 rounded-full bg-transparent"
                   onPress={() => {
                     setSelectedAnswer(activeItem);
                     setIsSharing(true);
@@ -1072,7 +1072,7 @@ export default function UserStreamScreen() {
                     size={22}
                     color={primaryColor}
                   />
-                </Pressable>
+                </BouncyButton>
               </View>
             </BlurView>
           </Reanimated.View>

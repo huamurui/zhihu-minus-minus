@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  Pressable,
   RefreshControl,
   ScrollView,
 } from 'react-native';
@@ -245,7 +244,7 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
         style={{ paddingTop: insets.top + 20 }}
       >
         {me ? (
-          <Pressable
+          <BouncyButton
             className="flex-row items-center mb-[25px]"
             onPress={() => router.push(`/user/${me.url_token || me.id}`)}
           >
@@ -268,7 +267,7 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
               size={20}
               color={Colors[colorScheme].tabIconDefault}
             />
-          </Pressable>
+          </BouncyButton>
         ) : cookies && isMeLoading ? (
           <View className="h-24 items-center justify-center bg-transparent">
             <ActivityIndicator color={accentColor} />
@@ -280,7 +279,7 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
             onRetry={() => void refreshProfile()}
           />
         ) : (
-          <Pressable
+          <BouncyButton
             className="flex-row items-center mb-[25px]"
             onPress={() => router.push('/login')}
           >
@@ -297,7 +296,7 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
                 登录后开启更多精彩内容
               </Text>
             </View>
-          </Pressable>
+          </BouncyButton>
         )}
 
         {/* 数据战绩统计 */}
@@ -340,14 +339,14 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
           />
         </View>
         {me && isMemberError ? (
-          <Pressable
+          <BouncyButton
             className="items-center mt-3 bg-transparent"
             onPress={() => void refreshProfile()}
           >
             <Text type="secondary" className="text-xs">
               详细统计加载失败，点此重试
             </Text>
-          </Pressable>
+          </BouncyButton>
         ) : null}
       </View>
 
@@ -437,7 +436,7 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
 
       {/* 退出登录按钮 */}
       {me && (
-        <Pressable
+        <BouncyButton
           className="mt-[30px] py-[15px] items-center"
           onPress={handleLogout}
           disabled={sessionChanging}
@@ -445,7 +444,7 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
           <Text className="text-[#ff4d4f] text-base font-semibold">
             退出账号
           </Text>
-        </Pressable>
+        </BouncyButton>
       )}
 
       <View className="h-[100px] bg-transparent" />
@@ -463,7 +462,7 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
                 key={account.me.id}
                 className="flex-row items-center bg-transparent"
               >
-                <Pressable
+                <BouncyButton
                   onPress={() => handleSwitchAccount(index)}
                   disabled={sessionChanging}
                   className="flex-row items-center py-4 flex-1 border-b border-gray-100 dark:border-gray-800 bg-transparent"
@@ -508,20 +507,20 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
                       color={accentColor}
                     />
                   )}
-                </Pressable>
-                <Pressable
+                </BouncyButton>
+                <BouncyButton
                   onPress={() => handleRemoveAccount(index)}
                   disabled={sessionChanging}
                   className="pl-4 py-4"
                 >
                   <Ionicons name="trash-outline" size={20} color="#ff4d4f" />
-                </Pressable>
+                </BouncyButton>
               </View>
             ))}
 
             {/* 游客模式 */}
             <View className="flex-row items-center bg-transparent">
-              <Pressable
+              <BouncyButton
                 onPress={() => handleSwitchAccount(-1)}
                 disabled={sessionChanging}
                 className="flex-row items-center py-4 flex-1 border-b border-gray-100 dark:border-gray-800 bg-transparent"
@@ -565,13 +564,13 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
                     color={accentColor}
                   />
                 )}
-              </Pressable>
+              </BouncyButton>
               <View className="pl-4 py-4">
                 <Ionicons name="trash-outline" size={20} color="transparent" />
               </View>
             </View>
 
-            <Pressable
+            <BouncyButton
               onPress={handleAddAccount}
               disabled={sessionChanging}
               className="flex-row items-center py-5 bg-transparent"
@@ -580,15 +579,15 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
                 <Ionicons name="add" size={28} color="#666" />
               </View>
               <Text className="text-base ml-4 font-medium">添加账号</Text>
-            </Pressable>
+            </BouncyButton>
           </ScrollView>
 
-          <Pressable
+          <BouncyButton
             onPress={() => setAccountModalVisible(false)}
             className="mt-4 py-4 items-center bg-gray-100 dark:bg-gray-800 rounded-2xl"
           >
             <Text className="text-base font-bold">取消</Text>
-          </Pressable>
+          </BouncyButton>
         </View>
       </BottomSheet>
     </ScrollView>
@@ -603,7 +602,7 @@ interface StatItemProps {
 
 function StatItem({ count, label, onPress }: StatItemProps) {
   return (
-    <Pressable
+    <BouncyButton
       onPress={onPress}
       disabled={!onPress}
       className="align-center flex-1 bg-transparent"
@@ -612,7 +611,7 @@ function StatItem({ count, label, onPress }: StatItemProps) {
       <Text type="secondary" className="text-xs mt-1 text-center">
         {label}
       </Text>
-    </Pressable>
+    </BouncyButton>
   );
 }
 

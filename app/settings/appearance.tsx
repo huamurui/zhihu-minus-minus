@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   LayoutAnimation,
   Platform,
-  Pressable,
   View as RNView,
   ScrollView,
   StyleSheet,
@@ -131,7 +130,7 @@ export default function AppearanceSettings() {
             colorScheme={colorScheme}
           >
             <View style={styles.row}>
-              <Pressable
+              <BouncyButton
                 onPress={() =>
                   updateSettings({
                     fontSizeScale: Math.max(0.8, fontSizeScale - 0.1),
@@ -147,9 +146,9 @@ export default function AppearanceSettings() {
                   size={18}
                   color={Colors[colorScheme].text}
                 />
-              </Pressable>
+              </BouncyButton>
               <Text style={styles.valueText}>{fontSizeScale.toFixed(1)}x</Text>
-              <Pressable
+              <BouncyButton
                 onPress={() =>
                   updateSettings({
                     fontSizeScale: Math.min(1.5, fontSizeScale + 0.1),
@@ -165,7 +164,7 @@ export default function AppearanceSettings() {
                   size={18}
                   color={Colors[colorScheme].text}
                 />
-              </Pressable>
+              </BouncyButton>
             </View>
           </SettingItem>
 
@@ -175,7 +174,7 @@ export default function AppearanceSettings() {
             colorScheme={colorScheme}
           >
             <View style={styles.row}>
-              <Pressable
+              <BouncyButton
                 onPress={() =>
                   updateSettings({
                     lineHeightScale: Math.max(1.0, lineHeightScale - 0.1),
@@ -191,11 +190,11 @@ export default function AppearanceSettings() {
                   size={18}
                   color={Colors[colorScheme].text}
                 />
-              </Pressable>
+              </BouncyButton>
               <Text style={styles.valueText}>
                 {lineHeightScale.toFixed(1)}x
               </Text>
-              <Pressable
+              <BouncyButton
                 onPress={() =>
                   updateSettings({
                     lineHeightScale: Math.min(2.5, lineHeightScale + 0.1),
@@ -211,7 +210,7 @@ export default function AppearanceSettings() {
                   size={18}
                   color={Colors[colorScheme].text}
                 />
-              </Pressable>
+              </BouncyButton>
             </View>
           </SettingItem>
         </Section>
@@ -222,7 +221,7 @@ export default function AppearanceSettings() {
             {PRESET_COLORS.map((preset) => {
               const isSelected = primaryColor === preset.value;
               return (
-                <Pressable
+                <BouncyButton
                   key={preset.value}
                   onPress={() => updateSettings({ primaryColor: preset.value })}
                   style={[
@@ -245,10 +244,10 @@ export default function AppearanceSettings() {
                       style={{ marginLeft: 2 }}
                     />
                   )}
-                </Pressable>
+                </BouncyButton>
               );
             })}
-            <Pressable
+            <BouncyButton
               onPress={() =>
                 updateSettings({ primaryColor: Colors.light.primary })
               }
@@ -276,7 +275,7 @@ export default function AppearanceSettings() {
               >
                 重置
               </Text>
-            </Pressable>
+            </BouncyButton>
           </RNView>
 
           <SettingItem
@@ -312,7 +311,7 @@ export default function AppearanceSettings() {
               {READING_BACKGROUND_OPTIONS.map((option) => {
                 const isSelected = readingBackground === option.value;
                 return (
-                  <Pressable
+                  <BouncyButton
                     key={option.value}
                     onPress={() =>
                       updateSettings({ readingBackground: option.value })
@@ -336,7 +335,7 @@ export default function AppearanceSettings() {
                     >
                       {option.label}
                     </Text>
-                  </Pressable>
+                  </BouncyButton>
                 );
               })}
             </RNView>
@@ -350,7 +349,7 @@ export default function AppearanceSettings() {
               {TEXT_CONTRAST_OPTIONS.map((option) => {
                 const isSelected = textContrast === option.value;
                 return (
-                  <Pressable
+                  <BouncyButton
                     key={option.value}
                     onPress={() =>
                       updateSettings({ textContrast: option.value })
@@ -374,7 +373,7 @@ export default function AppearanceSettings() {
                     >
                       {option.label}
                     </Text>
-                  </Pressable>
+                  </BouncyButton>
                 );
               })}
             </RNView>
@@ -388,7 +387,7 @@ export default function AppearanceSettings() {
               {SURFACE_STYLE_OPTIONS.map((option) => {
                 const isSelected = surfaceStyle === option.value;
                 return (
-                  <Pressable
+                  <BouncyButton
                     key={option.value}
                     onPress={() =>
                       updateSettings({ surfaceStyle: option.value })
@@ -412,7 +411,7 @@ export default function AppearanceSettings() {
                     >
                       {option.label}
                     </Text>
-                  </Pressable>
+                  </BouncyButton>
                 );
               })}
             </RNView>
@@ -442,7 +441,7 @@ export default function AppearanceSettings() {
               colorScheme={colorScheme}
             >
               <View style={styles.row}>
-                <Pressable
+                <BouncyButton
                   onPress={() =>
                     updateSettings({ androidFeedbackType: 'ripple' })
                   }
@@ -468,8 +467,8 @@ export default function AppearanceSettings() {
                   >
                     水波纹
                   </Text>
-                </Pressable>
-                <Pressable
+                </BouncyButton>
+                <BouncyButton
                   onPress={() =>
                     updateSettings({ androidFeedbackType: 'scale-opacity' })
                   }
@@ -492,7 +491,7 @@ export default function AppearanceSettings() {
                   >
                     缩放
                   </Text>
-                </Pressable>
+                </BouncyButton>
               </View>
             </SettingItem>
           )}
@@ -506,7 +505,7 @@ export default function AppearanceSettings() {
                 colorScheme={colorScheme}
               >
                 <View style={styles.row}>
-                  <Pressable
+                  <BouncyButton
                     onPress={() =>
                       updateSettings({
                         pressOpacity: Math.max(
@@ -527,11 +526,11 @@ export default function AppearanceSettings() {
                       size={18}
                       color={Colors[colorScheme].text}
                     />
-                  </Pressable>
+                  </BouncyButton>
                   <Text style={styles.valueText}>
                     {pressOpacity.toFixed(2)}
                   </Text>
-                  <Pressable
+                  <BouncyButton
                     onPress={() =>
                       updateSettings({
                         pressOpacity: Math.min(
@@ -552,7 +551,7 @@ export default function AppearanceSettings() {
                       size={18}
                       color={Colors[colorScheme].text}
                     />
-                  </Pressable>
+                  </BouncyButton>
                 </View>
               </SettingItem>
               <SettingItem
@@ -561,7 +560,7 @@ export default function AppearanceSettings() {
                 colorScheme={colorScheme}
               >
                 <View style={styles.row}>
-                  <Pressable
+                  <BouncyButton
                     onPress={() =>
                       updateSettings({
                         pressScale: Math.max(
@@ -582,9 +581,9 @@ export default function AppearanceSettings() {
                       size={18}
                       color={Colors[colorScheme].text}
                     />
-                  </Pressable>
+                  </BouncyButton>
                   <Text style={styles.valueText}>{pressScale.toFixed(2)}</Text>
-                  <Pressable
+                  <BouncyButton
                     onPress={() =>
                       updateSettings({
                         pressScale: Math.min(
@@ -605,7 +604,7 @@ export default function AppearanceSettings() {
                       size={18}
                       color={Colors[colorScheme].text}
                     />
-                  </Pressable>
+                  </BouncyButton>
                 </View>
               </SettingItem>
             </>
@@ -645,7 +644,7 @@ export default function AppearanceSettings() {
         <Section title="默认启动页" colorScheme={colorScheme}>
           <RNView style={styles.tabGrid}>
             {visibleTabs.map((tab) => (
-              <Pressable
+              <BouncyButton
                 key={tab}
                 onPress={() => updateSettings({ defaultTab: tab })}
                 style={[
@@ -665,7 +664,7 @@ export default function AppearanceSettings() {
                 >
                   {TAB_LABELS[tab]}
                 </Text>
-              </Pressable>
+              </BouncyButton>
             ))}
           </RNView>
         </Section>
@@ -711,7 +710,7 @@ export default function AppearanceSettings() {
           </SettingItem>
         </Section>
 
-        <Pressable
+        <BouncyButton
           onPress={resetSettings}
           style={[
             styles.resetBtn,
@@ -731,7 +730,7 @@ export default function AppearanceSettings() {
           >
             恢复默认设置
           </Text>
-        </Pressable>
+        </BouncyButton>
       </ScrollView>
     </RNView>
   );

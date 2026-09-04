@@ -3,7 +3,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect } from 'react';
-import { ActivityIndicator, Image, Pressable } from 'react-native';
+import { ActivityIndicator, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   followColumn,
@@ -12,6 +12,7 @@ import {
   unfollowColumn,
 } from '@/api/zhihu/column';
 import { addReadHistory } from '@/api/zhihu/history';
+import { BouncyButton } from '@/components/BouncyButton';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -108,7 +109,7 @@ export default function ColumnDetail() {
               {column.items_count || column.articles_count || 0} 文章
             </Text>
           </View>
-          <Pressable
+          <BouncyButton
             onPress={() => followMutation.mutate()}
             className="px-4 py-1.5 rounded-full"
             style={[
@@ -133,7 +134,7 @@ export default function ColumnDetail() {
             >
               {column.is_following ? '已关注' : '关注'}
             </Text>
-          </Pressable>
+          </BouncyButton>
         </View>
 
         {column.intro || column.excerpt ? (
@@ -145,7 +146,7 @@ export default function ColumnDetail() {
         ) : null}
 
         {column.author ? (
-          <Pressable
+          <BouncyButton
             className="flex-row items-center px-5 py-2 mt-2 bg-transparent"
             onPress={() =>
               router.push(
@@ -163,7 +164,7 @@ export default function ColumnDetail() {
                 {column.author.name}
               </Text>
             </Text>
-          </Pressable>
+          </BouncyButton>
         ) : null}
       </View>
     );
@@ -171,7 +172,7 @@ export default function ColumnDetail() {
 
   const renderItem = ({ item }: { item: any }) => {
     return (
-      <Pressable
+      <BouncyButton
         className="p-4"
         style={{ borderBottomWidth: 0.5, borderBottomColor: borderColor }}
         onPress={() => router.push(`/article/${item.id}`)}
@@ -227,7 +228,7 @@ export default function ColumnDetail() {
             </Text>
           )}
         </View>
-      </Pressable>
+      </BouncyButton>
     );
   };
 
@@ -240,9 +241,12 @@ export default function ColumnDetail() {
           headerStyle: { backgroundColor },
           headerTintColor: textColor,
           headerLeft: () => (
-            <Pressable onPress={() => router.back()} className="mr-4">
+            <BouncyButton
+              onPress={() => router.back()}
+              className="mr-2 p-2 rounded-full"
+            >
               <Ionicons name="chevron-back" size={28} color={textColor} />
-            </Pressable>
+            </BouncyButton>
           ),
         }}
       />

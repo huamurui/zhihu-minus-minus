@@ -1,13 +1,14 @@
 import { type QueryKey, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable } from 'react-native';
+import { ActivityIndicator, Image } from 'react-native';
 import {
   followMember,
   unfollowMember,
   type ZhihuMember,
   type ZhihuMemberListItem,
 } from '@/api/zhihu';
+import { BouncyButton } from '@/components/BouncyButton';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -93,7 +94,7 @@ export const UserCard = ({ user, invalidateQueryKeys = [] }: UserCardProps) => {
   };
 
   return (
-    <Pressable
+    <BouncyButton
       className="flex-row items-center p-4"
       style={{ borderBottomWidth: 0.5, borderBottomColor: borderColor }}
       onPress={() => router.push(`/user/${user.url_token || user.id}`)}
@@ -136,7 +137,7 @@ export const UserCard = ({ user, invalidateQueryKeys = [] }: UserCardProps) => {
           </Text>
         </View>
       </View>
-      <Pressable
+      <BouncyButton
         accessibilityRole="button"
         accessibilityState={{ busy: loading, selected: isFollowing }}
         disabled={loading}
@@ -168,7 +169,7 @@ export const UserCard = ({ user, invalidateQueryKeys = [] }: UserCardProps) => {
             {isFollowing ? '已关注' : '关注'}
           </Text>
         )}
-      </Pressable>
-    </Pressable>
+      </BouncyButton>
+    </BouncyButton>
   );
 };

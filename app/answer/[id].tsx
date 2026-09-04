@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
+import { ActivityIndicator, StyleSheet } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import Reanimated, {
   Extrapolate,
@@ -16,6 +16,7 @@ import client from '@/api/client';
 import { getAnswer } from '@/api/zhihu';
 import { addReadHistory } from '@/api/zhihu/history';
 import { AnswerDetailView } from '@/components/AnswerDetailView';
+import { BouncyButton } from '@/components/BouncyButton';
 import { ShareMenu } from '@/components/ShareMenu';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -248,12 +249,12 @@ export default function AnswerDetailScreen() {
         />
 
         {/* 返回按钮 (Always Visible) */}
-        <Pressable
+        <BouncyButton
           onPress={() => router.back()}
-          className="w-10 h-10 justify-center items-center z-50"
+          className="w-10 h-10 justify-center items-center z-50 rounded-full"
         >
           <Ionicons name="chevron-back" size={28} color={textColor} />
-        </Pressable>
+        </BouncyButton>
 
         {/* 可折叠/淡出的内容区域 (标题和分享按钮) */}
         <Reanimated.View
@@ -262,7 +263,7 @@ export default function AnswerDetailScreen() {
           pointerEvents={isHeaderCollapsed ? 'none' : 'auto'}
         >
           {/* 标题区域 */}
-          <Pressable
+          <BouncyButton
             className="flex-1 mx-2"
             onPress={() =>
               router.push(
@@ -285,15 +286,15 @@ export default function AnswerDetailScreen() {
                   '加载中...'}
               </Text>
             </Reanimated.View>
-          </Pressable>
+          </BouncyButton>
 
           {/* 分享按钮 */}
-          <Pressable
+          <BouncyButton
             onPress={handleShareClick}
-            className="w-10 h-10 justify-center items-center"
+            className="w-10 h-10 justify-center items-center rounded-full"
           >
             <Ionicons name="share-outline" size={24} color={textColor} />
-          </Pressable>
+          </BouncyButton>
         </Reanimated.View>
       </View>
 

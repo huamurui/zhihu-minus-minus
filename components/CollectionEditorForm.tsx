@@ -1,11 +1,11 @@
 import {
   ActivityIndicator,
-  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
   TextInput,
 } from 'react-native';
+import { BouncyButton } from '@/components/BouncyButton';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -98,7 +98,7 @@ export function CollectionEditorForm({
         </View>
       </ScrollView>
 
-      <Pressable
+      <BouncyButton
         accessibilityRole="button"
         accessibilityLabel={submitLabel}
         accessibilityState={{ disabled: pending }}
@@ -115,7 +115,7 @@ export function CollectionEditorForm({
         ) : (
           <Text style={styles.submitLabel}>{submitLabel}</Text>
         )}
-      </Pressable>
+      </BouncyButton>
     </View>
   );
 }
