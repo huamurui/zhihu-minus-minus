@@ -11,6 +11,7 @@ import React, {
 import {
   ActivityIndicator,
   Dimensions,
+  type GestureResponderEvent,
   Image,
   Linking,
   Pressable,
@@ -21,6 +22,7 @@ import {
 import RenderHtml, {
   type CustomBlockRenderer,
   defaultSystemFonts,
+  useNormalizedUrl,
   useRendererProps,
 } from 'react-native-render-html';
 import { SvgUri } from 'react-native-svg';
@@ -51,148 +53,273 @@ export interface ZhihuContentProps {
   content?: string;
   contentArray?: any[];
   segmentInfos?: ZhihuSegmentInfo[];
+  linkCardInfo?: Record<string, unknown>;
   objectId: string;
   type: 'answer' | 'article' | 'pin' | 'question';
   onRefresh?: () => void;
   useNative?: boolean;
 }
 
+interface LinkCardDisplay {
+  title?: unknown;
+  card_open_url?: unknown;
+  desc?: unknown;
+  content?: unknown;
+  [key: string]: unknown;
+}
+
+interface LinkCardMetadata {
+  display?: LinkCardDisplay;
+  [key: string]: unknown;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function parseLinkCardMetadata(value: unknown): LinkCardMetadata | null {
+  if (typeof value === 'string') {
+    try {
+      return asRecord(JSON.parse(value)) as LinkCardMetadata | null;
+    } catch {
+      return null;
+    }
+  }
+  return asRecord(value) as LinkCardMetadata | null;
+}
+
+function getLinkCardMetadata(
+  linkCardInfo: Record<string, unknown> | undefined,
+  ...urls: Array<string | undefined>
+): LinkCardMetadata | null {
+  if (!linkCardInfo) return null;
+  for (const url of urls) {
+    if (!url) continue;
+    const metadata = parseLinkCardMetadata(linkCardInfo[url]);
+    if (metadata) return metadata;
+  }
+  return null;
+}
+
+function getString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function isLikelyUrl(value: string | undefined): boolean {
+  return !!value && /^(?:https?:)?\/\//i.test(value.trim());
+}
+
+function getImageUrl(value: unknown): string | undefined {
+  const candidate = getString(value);
+  if (!candidate || !isLikelyUrl(candidate)) return undefined;
+  return candidate.startsWith('//') ? `https:${candidate}` : candidate;
+}
+
+function stripHtml(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  return (
+    value
+      .replace(/<[^>]*>/g, '')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .trim() || undefined
+  );
+}
+
+function getLinkCardImage(display: LinkCardDisplay | null): string | undefined {
+  if (!display) return undefined;
+  const content = asRecord(display.content);
+  return (
+    getImageUrl(display.image_url) ||
+    getImageUrl(display.cover_url) ||
+    getImageUrl(display.thumbnail) ||
+    getImageUrl(content?.image_url) ||
+    getImageUrl(content?.cover_url) ||
+    getImageUrl(content?.thumbnail) ||
+    getImageUrl(content?.url) ||
+    getImageUrl(content?.src)
+  );
+}
+
+interface LinkCardElementLike {
+  name?: string;
+  tagName?: string;
+  attributes?: Record<string, string | undefined>;
+  attribs?: Record<string, string | undefined>;
+}
+
+function isLinkCardElement(element: LinkCardElementLike): boolean {
+  const tagName = element?.name || element?.tagName;
+  const attributes = element?.attributes || element?.attribs || {};
+  return (
+    tagName === 'a' &&
+    (attributes.class?.includes('LinkCard') ||
+      attributes['data-draft-type'] === 'link-card')
+  );
+}
+
 export const LinkCard: React.FC<{
   url: string;
   title?: string;
   image?: string;
+  cardInfo?: unknown;
   onPress: (url: string) => void;
   surfaceColor: string;
   colorScheme: 'light' | 'dark';
-}> = React.memo(({ url, title, image, onPress, surfaceColor, colorScheme }) => {
-  const internalPath = useMemo(() => parseZhihuUrl(url), [url]);
-  const isInternal = internalPath !== null;
-  const primaryColor = useThemeColor({}, 'primary');
+}> = React.memo(
+  ({ url, title, image, cardInfo, onPress, surfaceColor, colorScheme }) => {
+    const metadata = useMemo(() => parseLinkCardMetadata(cardInfo), [cardInfo]);
+    const display = asRecord(metadata?.display) as LinkCardDisplay | null;
+    const displayTitle = getString(display?.title);
+    const providedTitle = getString(title);
+    const usableTitle = !isLikelyUrl(providedTitle) ? providedTitle : undefined;
+    const cardUrl = getString(display?.card_open_url) || url;
+    const description = stripHtml(getString(display?.desc));
+    const internalPath = useMemo(() => parseZhihuUrl(cardUrl), [cardUrl]);
+    const isInternal = internalPath !== null;
+    const primaryColor = useThemeColor({}, 'primary');
+    const cardBorderColor = useThemeColor({}, 'contentBorderStrong');
+    const cardShadowColor = useThemeColor({}, 'shadow');
 
-  const parsedId = useMemo(() => {
-    if (!internalPath) return null;
-    const match = internalPath.match(
-      /^\/(question|answer|article|pin)\/(\d+)$/,
-    );
-    if (match) {
-      return {
-        type: match[1] as 'question' | 'answer' | 'article' | 'pin',
-        id: match[2],
-      };
-    }
-    return null;
-  }, [internalPath]);
-
-  const { data: fetchedData } = useQuery({
-    queryKey: ['linkcard', parsedId?.type, parsedId?.id],
-    queryFn: async () => {
-      if (!parsedId) return null;
-      try {
-        if (parsedId.type === 'answer') return await getAnswer(parsedId.id);
-        if (parsedId.type === 'question') return await getQuestion(parsedId.id);
-        if (parsedId.type === 'article') return await getArticle(parsedId.id);
-        if (parsedId.type === 'pin') return await getPin(parsedId.id);
-        return null;
-      } catch (err: any) {
-        if (err.response?.status === 404) {
-          return null;
-        }
-        throw err;
+    const parsedId = useMemo(() => {
+      if (!internalPath) return null;
+      const match = internalPath.match(
+        /^\/(question|answer|article|pin)\/(\d+)$/,
+      );
+      if (match) {
+        return {
+          type: match[1] as 'question' | 'answer' | 'article' | 'pin',
+          id: match[2],
+        };
       }
-    },
-    enabled: !!parsedId && !title,
-    staleTime: 10 * 60 * 1000,
-    retry: false,
-  });
+      return null;
+    }, [internalPath]);
 
-  const fetchedTitle =
-    fetchedData?.question?.title ||
-    fetchedData?.title ||
-    fetchedData?.excerpt_title ||
-    title;
+    const { data: fetchedData } = useQuery({
+      queryKey: ['linkcard', parsedId?.type, parsedId?.id],
+      queryFn: async () => {
+        if (!parsedId) return null;
+        try {
+          if (parsedId.type === 'answer') return await getAnswer(parsedId.id);
+          if (parsedId.type === 'question')
+            return await getQuestion(parsedId.id);
+          if (parsedId.type === 'article') return await getArticle(parsedId.id);
+          if (parsedId.type === 'pin') return await getPin(parsedId.id);
+          return null;
+        } catch (err: any) {
+          if (err.response?.status === 404) {
+            return null;
+          }
+          throw err;
+        }
+      },
+      enabled: !!parsedId && !displayTitle,
+      staleTime: 10 * 60 * 1000,
+      retry: false,
+    });
 
-  const fetchedImage =
-    image || fetchedData?.cover_url || fetchedData?.author?.avatar_url;
+    const fetchedTitle =
+      displayTitle ||
+      usableTitle ||
+      fetchedData?.question?.title ||
+      fetchedData?.title ||
+      fetchedData?.excerpt_title;
 
-  const fetchedSubtitle =
-    fetchedData?.author?.name || fetchedData?.question?.title || null;
+    const fetchedImage =
+      getImageUrl(image) ||
+      getLinkCardImage(display) ||
+      getImageUrl(fetchedData?.cover_url);
 
-  const fetchedStat =
-    fetchedData?.voteup_count != null
-      ? `${fetchedData.voteup_count} 赞同`
-      : fetchedData?.like_count != null
-        ? `${fetchedData.like_count} 喜欢`
-        : fetchedData?.answer_count != null
-          ? `${fetchedData.answer_count} 回答`
-          : null;
+    const fetchedSubtitle =
+      description ||
+      fetchedData?.author?.name ||
+      fetchedData?.question?.title ||
+      null;
 
-  const getLinkTypeIcon = () => {
-    if (url.includes('/question/')) return 'help-circle';
-    if (url.includes('/answer/')) return 'chatbubble-ellipses';
-    if (url.includes('/pin/')) return 'navigate';
-    return 'link';
-  };
+    const fetchedStat =
+      fetchedData?.voteup_count != null
+        ? `${fetchedData.voteup_count} 赞同`
+        : fetchedData?.like_count != null
+          ? `${fetchedData.like_count} 喜欢`
+          : fetchedData?.answer_count != null
+            ? `${fetchedData.answer_count} 回答`
+            : null;
 
-  return (
-    <View className="w-full" style={{ overflow: 'visible' }}>
-      <BouncyButton
-        onPress={() => onPress(url)}
-        className="w-full p-3 rounded-xl my-3"
-        style={[
-          {
-            backgroundColor: surfaceColor,
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor: 'rgba(150,150,150,0.15)',
-            shadowColor: Colors[colorScheme].shadow,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.05,
-            shadowRadius: 4,
-            elevation: 2,
-          },
-        ]}
-      >
-        <View className="bg-transparent" pointerEvents="none">
-          {fetchedTitle ? (
-            <Text
-              className="text-[15px] font-bold leading-5 mb-1.5"
-              numberOfLines={2}
-            >
-              {fetchedTitle}
-            </Text>
-          ) : (
-            <Text className="text-[14px] leading-5 mb-1.5" numberOfLines={1}>
-              {url}
-            </Text>
-          )}
-          {fetchedSubtitle && (
-            <Text type="secondary" className="text-xs mb-1" numberOfLines={1}>
-              {fetchedSubtitle}
-            </Text>
-          )}
-          <View className="flex-row items-center bg-transparent">
-            <Ionicons
-              name={getLinkTypeIcon() as any}
-              size={14}
-              color={primaryColor}
-            />
-            <Text type="secondary" className="text-xs ml-1">
-              {fetchedStat || (isInternal ? '知乎内容' : '外部链接')}
-            </Text>
+    const getLinkTypeIcon = () => {
+      if (url.includes('/question/')) return 'help-circle';
+      if (url.includes('/answer/')) return 'chatbubble-ellipses';
+      if (url.includes('/pin/')) return 'navigate';
+      return 'link';
+    };
+
+    return (
+      <View className="w-full" style={{ overflow: 'visible' }}>
+        <BouncyButton
+          onPress={() => onPress(cardUrl)}
+          className="w-full p-3 rounded-xl my-3"
+          style={[
+            {
+              backgroundColor: surfaceColor,
+              borderWidth: StyleSheet.hairlineWidth,
+              borderColor: cardBorderColor,
+              shadowColor: cardShadowColor,
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.05,
+              shadowRadius: 4,
+              elevation: 2,
+            },
+          ]}
+        >
+          <View className="bg-transparent" pointerEvents="none">
+            {fetchedTitle ? (
+              <Text
+                className="text-[15px] font-bold leading-5 mb-1.5"
+                numberOfLines={2}
+              >
+                {fetchedTitle}
+              </Text>
+            ) : (
+              <Text className="text-[14px] leading-5 mb-1.5" numberOfLines={1}>
+                {url}
+              </Text>
+            )}
+            {fetchedSubtitle && (
+              <Text type="secondary" className="text-xs mb-1" numberOfLines={1}>
+                {fetchedSubtitle}
+              </Text>
+            )}
+            {!description && (
+              <View className="flex-row items-center bg-transparent">
+                <Ionicons
+                  name={getLinkTypeIcon() as any}
+                  size={14}
+                  color={primaryColor}
+                />
+                <Text type="secondary" className="text-xs ml-1">
+                  {fetchedStat || (isInternal ? '知乎内容' : '外部链接')}
+                </Text>
+              </View>
+            )}
           </View>
-        </View>
-        {fetchedImage && (
-          <Image
-            source={{ uri: fetchedImage }}
-            className="w-full h-[120px] rounded-lg mt-2.5"
-            style={[
-              { backgroundColor: Colors[colorScheme].backgroundSecondary },
-            ]}
-          />
-        )}
-      </BouncyButton>
-    </View>
-  );
-});
+          {fetchedImage && (
+            <Image
+              source={{ uri: fetchedImage }}
+              className="w-full h-[120px] rounded-lg mt-2.5"
+              style={[
+                { backgroundColor: Colors[colorScheme].backgroundSecondary },
+              ]}
+            />
+          )}
+        </BouncyButton>
+      </View>
+    );
+  },
+);
 
 interface TextSlice {
   text: string;
@@ -350,6 +477,7 @@ const LazyImage: React.FC<{
   const [visible, setVisible] = useState(false);
   const containerRef = useRef<RNView>(null);
   const timerRef = useRef<any>(null);
+  const placeholderColor = useThemeColor({}, 'contentPlaceholder');
 
   useEffect(() => {
     if (visible) return;
@@ -382,8 +510,8 @@ const LazyImage: React.FC<{
   return (
     <RNView
       ref={containerRef}
-      style={style}
-      className="rounded-xl bg-[rgba(150,150,150,0.06)] justify-center items-center overflow-hidden"
+      style={[style, { backgroundColor: placeholderColor }]}
+      className="rounded-xl justify-center items-center overflow-hidden"
     >
       {visible ? (
         <Image
@@ -542,19 +670,53 @@ const LinkCardRenderer: CustomBlockRenderer = ({
   ...props
 }) => {
   const rawUrl = tnode.attributes.href;
+  const normalizedUrl = useNormalizedUrl(rawUrl || '');
+  const anchorRendererProps = useRendererProps('a');
   const rendererProps = useRendererProps('linkcard');
 
-  if (!rendererProps) return <TDefaultRenderer tnode={tnode} {...props} />;
-  const { onLinkCardPress, surfaceColor, colorScheme } = rendererProps as any;
+  if (!isLinkCardElement(tnode)) {
+    const onPress =
+      anchorRendererProps?.onPress && normalizedUrl
+        ? (event: GestureResponderEvent) =>
+            anchorRendererProps.onPress?.(
+              event,
+              normalizedUrl,
+              tnode.attributes,
+              (tnode.attributes.target as
+                | '_blank'
+                | '_self'
+                | '_parent'
+                | '_top'
+                | undefined) || '_blank',
+            )
+        : props.onPress;
+    return <TDefaultRenderer tnode={tnode} {...props} onPress={onPress} />;
+  }
+
+  if (!rendererProps) {
+    return <TDefaultRenderer tnode={tnode} {...props} />;
+  }
+  const { onLinkCardPress, surfaceColor, colorScheme, linkCardInfo } =
+    rendererProps as any;
 
   const url = rawUrl ? extractZhihuRedirectTarget(rawUrl) : rawUrl;
+  const metadata = getLinkCardMetadata(linkCardInfo, rawUrl, url);
+  const draftTitle = tnode.attributes['data-draft-title'];
+  const textTitle = getTNodeText(tnode).trim();
+  const title = !isLikelyUrl(draftTitle)
+    ? draftTitle
+    : !isLikelyUrl(textTitle)
+      ? textTitle
+      : undefined;
 
   if (url) {
     return (
       <View style={{ width: '100%' }}>
         <LinkCard
           url={url}
-          title={tnode.attributes['data-draft-title']}
+          title={title}
+          image={tnode.attributes['data-draft-cover']}
+          cardInfo={metadata}
           onPress={onLinkCardPress}
           surfaceColor={surfaceColor}
           colorScheme={colorScheme}
@@ -569,7 +731,7 @@ const LinkCardRenderer: CustomBlockRenderer = ({
 const renderers = {
   p: P_Renderer,
   img: IMG_Renderer,
-  linkcard: LinkCardRenderer,
+  a: LinkCardRenderer,
 };
 
 const IGNORED_DOM_TAGS = ['noscript'];
@@ -580,6 +742,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
     content,
     contentArray,
     segmentInfos,
+    linkCardInfo,
     objectId,
     type,
     onRefresh,
@@ -591,6 +754,9 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
     const textColor = useThemeColor({}, 'text');
     const textSecondaryColor = useThemeColor({}, 'textSecondary');
     const borderColor = useThemeColor({}, 'border');
+    const contentBorderColor = useThemeColor({}, 'contentBorder');
+    const shadowColor = useThemeColor({}, 'shadow');
+    const inverseTextColor = useThemeColor({}, 'textInverse');
     const surfaceColor = useThemeColor({}, 'surface');
     const router = useRouter();
 
@@ -738,8 +904,8 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
             const { attribs } = element;
             const originalToken = attribs['data-original-token']?.trim();
             let actualSrc = (
-              attribs['data-original'] ||
               attribs['data-actualsrc'] ||
+              attribs['data-original'] ||
               attribs.src ||
               ''
             ).trim();
@@ -761,14 +927,6 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
               attribs.width = attribs['data-rawwidth'];
             if (attribs['data-rawheight'])
               attribs.height = attribs['data-rawheight'];
-          }
-          if (element.name === 'a') {
-            const isLinkCard =
-              element.attribs?.class?.includes('LinkCard') ||
-              element.attribs?.['data-draft-type'] === 'link-card';
-            if (isLinkCard) {
-              element.name = 'linkcard';
-            }
           }
           if (element.name === 'p') {
             const pid = element.attribs['data-pid'];
@@ -806,6 +964,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
           onLinkCardPress: handleInternalLink,
           surfaceColor,
           colorScheme,
+          linkCardInfo,
         },
         img: {
           onPress: (src: string) => {
@@ -822,6 +981,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
       [
         segmentMap,
         handlePress,
+        linkCardInfo,
         colorScheme,
         handleInternalLink,
         surfaceColor,
@@ -908,7 +1068,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         },
         hr: {
           height: 1,
-          backgroundColor: 'rgba(150,150,150,0.15)',
+          backgroundColor: contentBorderColor,
           marginVertical: 20,
         },
         figure: { marginVertical: 12, alignItems: 'center' },
@@ -935,6 +1095,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         textColor,
         textSecondaryColor,
         borderColor,
+        contentBorderColor,
         surfaceColor,
         fontSizeScale,
         lineHeightScale,
@@ -1101,6 +1262,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
             <ZhihuDOMContent
               htmlContent={content || ''}
               segmentInfosStr={JSON.stringify(segmentInfos)}
+              linkCardInfoStr={JSON.stringify(linkCardInfo || {})}
               colorScheme={colorScheme}
               onReady={onReadyCallback}
               onImagePress={onImagePressCallback}
@@ -1211,8 +1373,8 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
               {
                 backgroundColor: surfaceColor,
                 borderWidth: StyleSheet.hairlineWidth,
-                borderColor: 'rgba(150,150,150,0.15)',
-                shadowColor: Colors[colorScheme].shadow,
+                borderColor: contentBorderColor,
+                shadowColor,
                 shadowOffset: { width: 0, height: 2 },
                 shadowOpacity: 0.08,
                 shadowRadius: 8,
@@ -1236,7 +1398,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
               className="flex-row items-center justify-between px-4 py-2.5 bg-transparent"
               style={{
                 borderTopWidth: StyleSheet.hairlineWidth,
-                borderTopColor: 'rgba(150,150,150,0.1)',
+                borderTopColor: contentBorderColor,
               }}
             >
               <Pressable
@@ -1246,7 +1408,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
                 <Ionicons
                   name="close-circle-outline"
                   size={18}
-                  color={Colors[colorScheme].textSecondary}
+                  color={textSecondaryColor}
                 />
                 <Text type="secondary" className="text-sm ml-1">
                   取消
@@ -1261,20 +1423,13 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
                 disabled={createReactionMutation.isPending}
               >
                 {createReactionMutation.isPending ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={Colors[colorScheme].textInverse}
-                  />
+                  <ActivityIndicator size="small" color={inverseTextColor} />
                 ) : (
                   <>
-                    <Ionicons
-                      name="heart"
-                      size={16}
-                      color={Colors[colorScheme].textInverse}
-                    />
+                    <Ionicons name="heart" size={16} color={inverseTextColor} />
                     <Text
                       className="text-sm font-bold ml-1"
-                      style={{ color: Colors[colorScheme].textInverse }}
+                      style={{ color: inverseTextColor }}
                     >
                       赞同
                     </Text>

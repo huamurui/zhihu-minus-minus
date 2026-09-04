@@ -10,7 +10,6 @@ import {
   analyzeHtml,
   loadManifest,
   normalizeFixtureHtml,
-  splitFixtureBlocks,
 } from '../tools/fixture-lib.mjs';
 
 const manifestPath = fileURLToPath(
@@ -28,13 +27,6 @@ test('normalizes captured escaped HTML values', () => {
   );
 });
 
-test('splits a legacy multi-sample fixture on blank lines', () => {
-  assert.deepEqual(
-    splitFixtureBlocks('<p>A</p>\n<span>A2</span>\n\n<p>B</p>'),
-    ['<p>A</p>\n<span>A2</span>', '<p>B</p>'],
-  );
-});
-
 test('normalizes escaped closing tags from captured API values', () => {
   assert.deepEqual(normalizeFixtureHtml('<p>A<\\/p>'), '<p>A</p>');
 });
@@ -45,26 +37,19 @@ test('discovers every unregistered inbox sample without manifest work', async ()
   );
   try {
     await writeFile(
-      path.join(directoryPath, 'new-sample.md'),
-      '<p>A</p>\n\n<p>B</p>',
+      path.join(directoryPath, 'new-answer.json'),
+      JSON.stringify({ content: '<p>JSON answer</p>', type: 'answer' }),
     );
     await writeFile(path.join(directoryPath, 'README.md'), '# ignored');
 
     const results = await analyzeFixtureDirectory(directoryPath);
     assert.deepEqual(
       results.map(({ id }) => id),
-      ['inbox:new-sample.md#0', 'inbox:new-sample.md#1'],
+      ['inbox:new-answer.json'],
     );
   } finally {
     await rm(directoryPath, { recursive: true, force: true });
   }
-});
-
-test('keeps a single-line legacy split compatible', () => {
-  assert.deepEqual(splitFixtureBlocks('<p>A</p>\n\n\n<p>B</p>'), [
-    '<p>A</p>',
-    '<p>B</p>',
-  ]);
 });
 
 test('excludes noscript fallback images from active image counts', () => {
@@ -74,6 +59,59 @@ test('excludes noscript fallback images from active image counts', () => {
   assert.equal(stats.totalImages, 2);
   assert.equal(stats.activeImages, 1);
   assert.equal(stats.noscripts, 1);
+});
+
+test('counts member mentions and topic tags in pin HTML', () => {
+  const stats = analyzeHtml(
+    '<a class="member_mention" href="/people/example">@example</a><a class="hash_tag" href="/topic/example">#example</a>',
+  );
+  assert.equal(stats.memberMentions, 1);
+  assert.equal(stats.topicTags, 1);
+});
+
+test('analyzes JSON API envelopes and asserts metadata beside content', async () => {
+  const directoryPath = await mkdtemp(
+    path.join(tmpdir(), 'rich-content-json-fixture-'),
+  );
+  try {
+    await writeFile(
+      path.join(directoryPath, 'answer.json'),
+      JSON.stringify({
+        type: 'answer',
+        content: '<p>正文</p><figure><img src="image.jpg" /></figure>',
+        content_need_truncated: true,
+        author: { vip_info: { is_vip: true } },
+        endorsements: [{}, {}],
+      }),
+    );
+    const manifestFilePath = path.join(directoryPath, 'manifest.json');
+    await writeFile(
+      manifestFilePath,
+      JSON.stringify({
+        version: 2,
+        cases: [
+          {
+            id: 'json-answer',
+            file: './answer.json',
+            contentPath: 'content',
+            expected: { paragraphs: 1, figures: 1, activeImages: 1 },
+            expectedMetadata: {
+              type: 'answer',
+              content_need_truncated: true,
+              'author.vip_info.is_vip': true,
+              'endorsements.length': 2,
+            },
+          },
+        ],
+      }),
+    );
+
+    const [fixture] = (await loadManifest(manifestFilePath)).cases;
+    const result = await analyzeFixtureCase(fixture, manifestFilePath);
+    assert.deepEqual(result.errors, []);
+  } finally {
+    await rm(directoryPath, { recursive: true, force: true });
+  }
 });
 
 test('all registered real-world fixtures retain their expected structure', async (t) => {

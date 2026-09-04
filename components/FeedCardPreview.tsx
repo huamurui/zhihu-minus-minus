@@ -150,6 +150,7 @@ export function FeedCardPreview({ item }: FeedCardPreviewProps) {
                   ? fullData.content
                   : undefined
               }
+              linkCardInfo={fullData?.link_card_info}
               objectId={item.id}
               type={typeKey}
               useNative={true}

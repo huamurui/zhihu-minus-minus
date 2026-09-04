@@ -85,6 +85,7 @@ interface StreamContentItem {
   created_time?: number;
   updated?: number;
   updated_time?: number;
+  link_card_info?: Record<string, string>;
   author?: { name?: string; headline?: string };
   question?: { id?: string | number; title?: string };
   relationship?: { voting?: number };
@@ -306,6 +307,7 @@ const StreamItem = forwardRef<StreamItemHandle, StreamItemProps>(
                       ? item.content
                       : undefined
                   }
+                  linkCardInfo={item.link_card_info}
                   useNative={true}
                 />
               ) : (
@@ -332,6 +334,7 @@ const StreamItem = forwardRef<StreamItemHandle, StreamItemProps>(
                     ? item.content
                     : undefined
                 }
+                linkCardInfo={item.link_card_info}
                 useNative={true}
               />
               <Pressable

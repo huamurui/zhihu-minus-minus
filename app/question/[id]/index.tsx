@@ -458,6 +458,7 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
                   type="answer"
                   content={item.content}
                   segmentInfos={item.segment_infos}
+                  linkCardInfo={item.link_card_info}
                   useNative={true}
                 />
                 {MetaInfo}
@@ -545,6 +546,7 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
                       type="answer"
                       content={item.content}
                       segmentInfos={item.segment_infos}
+                      linkCardInfo={item.link_card_info}
                     />
                     {MetaInfo}
                     <Pressable

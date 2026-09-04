@@ -160,6 +160,7 @@ export interface ZhihuArticle {
   author: ZhihuAuthor;
   type: 'article';
   url?: string;
+  link_card_info?: Record<string, string>;
   relationship?: {
     voting?: number;
   };
@@ -175,6 +176,7 @@ export interface ZhihuPin {
   author: ZhihuAuthor;
   type: 'pin';
   url?: string;
+  link_card_info?: Record<string, string>;
   relationship?: {
     voting?: number;
   };

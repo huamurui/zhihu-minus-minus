@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { colors, typography } from '@/constants/designTokens';
+import { colors, radii, typography } from '@/constants/designTokens';
 import { useSettingsStore } from '@/store/useSettingsStore';
 
 export interface TextSelectionInfo {
@@ -15,6 +15,7 @@ export interface TextSelectionInfo {
 export interface ZhihuDOMContentProps {
   htmlContent: string;
   segmentInfosStr?: string;
+  linkCardInfoStr?: string;
   colorScheme: 'light' | 'dark';
   onImagePress: (src: string) => void;
   onImageLongPress?: (src: string) => void;
@@ -28,6 +29,7 @@ export interface ZhihuDOMContentProps {
 export default React.memo(function ZhihuDOMContent({
   htmlContent,
   segmentInfosStr,
+  linkCardInfoStr,
   colorScheme,
   onImagePress,
   onImageLongPress,
@@ -40,7 +42,6 @@ export default React.memo(function ZhihuDOMContent({
   const [height, setHeight] = useState(400);
   const [_loading, _setLoading] = useState(true);
 
-  const isDark = colorScheme === 'dark';
   const textColor = colors[colorScheme].text;
   const { primaryColor: customPrimaryColor } = useSettingsStore();
   const primaryColor = customPrimaryColor || colors.light.primary;
@@ -114,6 +115,49 @@ export default React.memo(function ZhihuDOMContent({
           color: ${primaryColor};
           text-decoration: none;
         }
+        .zhihu-content a.zhihu-link-card {
+          display: block;
+          box-sizing: border-box;
+          max-width: 100%;
+          overflow: hidden;
+          margin: 16px 0;
+          padding: 14px 16px;
+          border: 1px solid ${colors[colorScheme].contentBorderStrong};
+          border-radius: ${radii.md}px;
+          background: ${colors[colorScheme].backgroundTertiary};
+          color: ${textColor};
+        }
+        .zhihu-link-card-title {
+          color: ${textColor};
+          font-size: ${typography.fontSize.bodyLarge}px;
+          font-weight: 600;
+          line-height: ${typography.lineHeight.compact};
+          display: -webkit-box;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 2;
+          overflow: hidden;
+          word-break: break-word;
+        }
+        .zhihu-link-card-desc {
+          margin-top: 4px;
+          color: ${colors[colorScheme].textSecondary};
+          font-size: ${typography.fontSize.caption}px;
+          line-height: ${typography.lineHeight.compact};
+          display: -webkit-box;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 1;
+          overflow: hidden;
+          word-break: break-word;
+        }
+        .zhihu-content a.zhihu-link-card img.zhihu-link-card-image {
+          display: block;
+          width: 100%;
+          height: 120px !important;
+          max-height: 120px;
+          object-fit: cover;
+          margin-top: 10px;
+          border-radius: ${radii.sm}px;
+        }
         .zhihu-content blockquote {
           border-left: 4px solid ${primaryColor};
           padding-left: 18px;
@@ -129,7 +173,7 @@ export default React.memo(function ZhihuDOMContent({
         .zhihu-content h3 { font-size: 18px; font-weight: bold; margin: 15px 0; line-height: 1.4; }
         .zhihu-content ul, .zhihu-content ol { padding-left: 20px; margin: 10px 0; }
         .zhihu-content li { margin-bottom: 8px; font-size: 17px; }
-        .zhihu-content hr { height: 1px; background-color: rgba(150,150,150,0.2); border: none; margin: 25px 0; }
+        .zhihu-content hr { height: 1px; background-color: ${colors[colorScheme].contentBorder}; border: none; margin: 25px 0; }
 
         .segment-interactable {
           text-decoration: underline dashed;
@@ -149,9 +193,88 @@ export default React.memo(function ZhihuDOMContent({
       <script>
         const htmlContent = ${JSON.stringify(htmlContent)};
         const segmentInfosStr = ${JSON.stringify(segmentInfosStr || '[]')};
+        const linkCardInfoStr = ${JSON.stringify(linkCardInfoStr || '{}')};
 
         const container = document.getElementById('content');
         container.innerHTML = htmlContent;
+
+        function getLinkCardInfo(href) {
+          let info;
+          try {
+            info = JSON.parse(linkCardInfoStr);
+          } catch (_) {
+            return null;
+          }
+          const value = info && info[href];
+          if (typeof value === 'string') {
+            try {
+              return JSON.parse(value);
+            } catch (_) {
+              return null;
+            }
+          }
+          return value && typeof value === 'object' ? value : null;
+        }
+
+        function getImageUrl(value) {
+          if (typeof value !== 'string') return '';
+          const candidate = value.trim();
+          if (!/^(https?:)?\\/\\//i.test(candidate)) return '';
+          return candidate.indexOf('//') === 0 ? 'https:' + candidate : candidate;
+        }
+
+        function getLinkCardImage(display) {
+          if (!display) return '';
+          const content = display.content;
+          const directImage = getImageUrl(display.image_url) || getImageUrl(display.cover_url) || getImageUrl(display.thumbnail);
+          if (directImage) return directImage;
+          if (!content || typeof content !== 'object') return '';
+          return getImageUrl(content.image_url) || getImageUrl(content.cover_url) || getImageUrl(content.thumbnail) || getImageUrl(content.url) || getImageUrl(content.src) || '';
+        }
+
+        function getCardText(value) {
+          if (typeof value !== 'string') return '';
+          const element = document.createElement('div');
+          element.innerHTML = value;
+          return (element.textContent || '').trim();
+        }
+
+        // Zhihu stores link cards as editor-only anchors. Turn them into
+        // visible cards before layout while keeping the anchor for clicks.
+        container.querySelectorAll('a[data-draft-type="link-card"], a.LinkCard').forEach((anchor) => {
+          const href = anchor.getAttribute('href') || '';
+          const info = getLinkCardInfo(href);
+          const display = info && info.display && typeof info.display === 'object' ? info.display : {};
+          const cardHref = typeof display.card_open_url === 'string' ? display.card_open_url : href;
+          const title = typeof display.title === 'string' ? display.title : getCardText(anchor.textContent) || href;
+          const desc = getCardText(display.desc);
+          const card = document.createElement('a');
+          card.href = cardHref;
+          card.className = 'zhihu-link-card';
+          card.setAttribute('data-link-card-url', cardHref);
+
+          const titleNode = document.createElement('div');
+          titleNode.className = 'zhihu-link-card-title';
+          titleNode.textContent = title;
+          card.appendChild(titleNode);
+
+          if (desc) {
+            const descNode = document.createElement('div');
+            descNode.className = 'zhihu-link-card-desc';
+            descNode.textContent = desc;
+            card.appendChild(descNode);
+          }
+
+          const image = getLinkCardImage(display) || getImageUrl(anchor.getAttribute('data-draft-cover'));
+          if (image) {
+            const imageNode = document.createElement('img');
+            imageNode.className = 'zhihu-link-card-image';
+            imageNode.src = image;
+            imageNode.alt = '';
+            card.appendChild(imageNode);
+          }
+          anchor.replaceWith(card);
+        });
 
         // Process images
         const images = container.querySelectorAll('img');
@@ -168,7 +291,7 @@ export default React.memo(function ZhihuDOMContent({
             img.parentNode?.replaceChild(textNode, img);
           } else if (!isFormula) {
             const originalToken = img.getAttribute('data-original-token');
-            let actualSrc = img.getAttribute('data-original') || img.getAttribute('data-actualsrc') || src;
+            let actualSrc = img.getAttribute('data-actualsrc') || img.getAttribute('data-original') || src;
 
             if (actualSrc && originalToken) {
               const cleanToken = originalToken.trim();
@@ -239,7 +362,7 @@ export default React.memo(function ZhihuDOMContent({
           if (footnotes.length > 0) {
             const footnoteList = document.createElement('div');
             footnoteList.style.marginTop = '40px';
-            footnoteList.style.borderTop = '1px solid rgba(150,150,150,0.2)';
+            footnoteList.style.borderTop = '1px solid ${colors[colorScheme].contentBorder}';
             footnoteList.style.paddingTop = '15px';
             footnoteList.style.fontSize = '14px';
 
@@ -262,7 +385,7 @@ export default React.memo(function ZhihuDOMContent({
               item.id = footnoteId;
               item.style.marginBottom = '8px';
               item.style.lineHeight = '1.5';
-              item.style.color = '${isDark ? '#aaa' : '#666'}';
+              item.style.color = '${colors[colorScheme].textSecondary}';
 
               item.innerHTML = '<a href="#' + refId + '" style="color:${primaryColor}; text-decoration:none; font-weight:bold;">[' + numero + ']</a> ' + text;
 
@@ -376,6 +499,21 @@ export default React.memo(function ZhihuDOMContent({
             return;
           }
           let target = e.target;
+          let cardTarget = target;
+          while (cardTarget && cardTarget !== container) {
+            if (
+              cardTarget.tagName === 'A' &&
+              cardTarget.classList.contains('zhihu-link-card')
+            ) {
+              e.preventDefault();
+              const href = cardTarget.getAttribute('data-link-card-url') || cardTarget.getAttribute('href');
+              if (href) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'link', href }));
+              }
+              return;
+            }
+            cardTarget = cardTarget.parentElement;
+          }
           while (target && target !== container) {
             if (target.tagName === 'IMG') {
               const src = target.getAttribute('src');

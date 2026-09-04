@@ -58,6 +58,7 @@ export interface AnswerDetail {
   biz_ext?: unknown;
   ip_info?: string;
   paid_info?: unknown;
+  link_card_info?: Record<string, string>;
 }
 
 export interface QuestionAnswersResponse {

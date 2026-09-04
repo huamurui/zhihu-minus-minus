@@ -397,6 +397,7 @@ export const AnswerDetailView = ({
             <ZhihuContent
               content={answer?.content || ''}
               segmentInfos={answer?.segment_infos}
+              linkCardInfo={answer?.link_card_info}
               objectId={id}
               type="answer"
               onRefresh={refetch}

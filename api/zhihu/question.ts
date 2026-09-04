@@ -18,6 +18,7 @@ export interface ZhihuQuestionDetail extends ZhihuQuestion {
   comment_count?: number;
   follower_count?: number;
   visit_count?: number;
+  link_card_info?: Record<string, string>;
 }
 
 export const QUESTION_INCLUDE =
