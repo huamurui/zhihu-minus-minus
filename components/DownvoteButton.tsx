@@ -9,6 +9,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { voteContent } from '@/api/zhihu/voters';
+import { colors } from '@/constants/designTokens';
 import { useThemeColor } from './Themed';
 import { useColorScheme } from './useColorScheme';
 
@@ -26,7 +27,7 @@ export const DownvoteButton = ({
   const [voted, setVoted] = useState(initialVoted);
   const [loading, setLoading] = useState(false);
   const scale = useSharedValue(1);
-  const _colorScheme = useColorScheme();
+  const colorScheme = useColorScheme();
   const tintColor = useThemeColor({}, 'primary');
 
   React.useEffect(() => {
@@ -84,7 +85,7 @@ export const DownvoteButton = ({
             isDownvoted || variant === 'minimal'
               ? tintColor
               : variant === 'default'
-                ? '#fff'
+                ? colors[colorScheme].textInverse
                 : tintColor
           }
         />
@@ -97,9 +98,9 @@ export const DownvoteButton = ({
               variant === 'minimal'
                 ? isDownvoted
                   ? tintColor
-                  : '#888'
+                  : colors[colorScheme].iconMuted
                 : isDownvoted
-                  ? '#fff'
+                  ? colors[colorScheme].textInverse
                   : tintColor
             }
           />

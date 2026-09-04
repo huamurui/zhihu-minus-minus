@@ -1,6 +1,12 @@
 import * as SecureStore from 'expo-secure-store';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { colors } from '@/constants/designTokens';
+import type {
+  ReadingBackground,
+  SurfaceStyle,
+  TextContrast,
+} from '@/constants/theme';
 import type { FilterMode, FilterQualityLevel } from '@/utils/feedFilter';
 
 const settingsStorage = {
@@ -18,7 +24,7 @@ function isValidHex(color: string | null | undefined): boolean {
 
 /** Sanitize a color value: returns the color if valid, null otherwise */
 function sanitizeColor(color: string | null | undefined): string | null {
-  return isValidHex(color) ? (color as string) : null;
+  return isValidHex(color) ? (color as string).toLowerCase() : null;
 }
 
 const VALID_FILTER_MODES: ReadonlyArray<FilterMode> = ['collapse', 'hide'];
@@ -27,6 +33,14 @@ const VALID_QUALITY_LEVELS: ReadonlyArray<FilterQualityLevel> = [
   'standard',
   'strict',
 ];
+const VALID_READING_BACKGROUNDS: ReadonlyArray<ReadingBackground> = [
+  'default',
+  'soft',
+  'warm',
+  'dim',
+];
+const VALID_TEXT_CONTRASTS: ReadonlyArray<TextContrast> = ['standard', 'high'];
+const VALID_SURFACE_STYLES: ReadonlyArray<SurfaceStyle> = ['layered', 'flat'];
 
 function isValidFilterMode(v: unknown): v is FilterMode {
   return typeof v === 'string' && (VALID_FILTER_MODES as string[]).includes(v);
@@ -35,6 +49,24 @@ function isValidFilterMode(v: unknown): v is FilterMode {
 function isValidQualityLevel(v: unknown): v is FilterQualityLevel {
   return (
     typeof v === 'string' && (VALID_QUALITY_LEVELS as string[]).includes(v)
+  );
+}
+
+function isValidReadingBackground(v: unknown): v is ReadingBackground {
+  return (
+    typeof v === 'string' && (VALID_READING_BACKGROUNDS as string[]).includes(v)
+  );
+}
+
+function isValidTextContrast(v: unknown): v is TextContrast {
+  return (
+    typeof v === 'string' && (VALID_TEXT_CONTRASTS as string[]).includes(v)
+  );
+}
+
+function isValidSurfaceStyle(v: unknown): v is SurfaceStyle {
+  return (
+    typeof v === 'string' && (VALID_SURFACE_STYLES as string[]).includes(v)
   );
 }
 
@@ -51,6 +83,9 @@ export interface AppSettings {
   fontSizeScale: number;
   lineHeightScale: number;
   primaryColor: string | null;
+  readingBackground: ReadingBackground;
+  textContrast: TextContrast;
+  surfaceStyle: SurfaceStyle;
   visibleTabs: TabKey[];
   defaultTab: TabKey;
   localCityName: string | null;
@@ -114,7 +149,10 @@ interface SettingsState extends AppSettings {
 const DEFAULT_SETTINGS: AppSettings = {
   fontSizeScale: 1.0,
   lineHeightScale: 1.5,
-  primaryColor: '#0084ff', // Zhihu Blue — the canonical default
+  primaryColor: colors.light.primary,
+  readingBackground: 'default',
+  textContrast: 'standard',
+  surfaceStyle: 'layered',
   visibleTabs: ['following', 'recommend', 'hot', 'daily', 'publish', 'profile'],
   defaultTab: 'recommend',
   localCityName: null,
@@ -168,6 +206,15 @@ export const useSettingsStore = create<SettingsState>()(
           }
           // 兜底：非法 hex 颜色退回默认（null）
           nextSettings.primaryColor = sanitizeColor(nextSettings.primaryColor);
+          if (!isValidReadingBackground(nextSettings.readingBackground)) {
+            nextSettings.readingBackground = 'default';
+          }
+          if (!isValidTextContrast(nextSettings.textContrast)) {
+            nextSettings.textContrast = 'standard';
+          }
+          if (!isValidSurfaceStyle(nextSettings.surfaceStyle)) {
+            nextSettings.surfaceStyle = 'layered';
+          }
           // 兜底：过滤 union 字段写入非枚举值时退回默认
           if (!isValidFilterMode(nextSettings.filterMode)) {
             nextSettings.filterMode = 'collapse';
@@ -182,11 +229,11 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'zhihu-settings-storage',
       storage: createJSONStorage(() => settingsStorage),
-      version: 9,
+      version: 10,
       migrate: (persistedState: any, version: number) => {
         // 清理历史脏数据：null 或非法 hex 都退回默认蓝
         const sanitized = sanitizeColor(persistedState?.primaryColor);
-        persistedState.primaryColor = sanitized ?? '#0084ff';
+        persistedState.primaryColor = sanitized ?? colors.light.primary;
 
         // 升级到 v3 时兜底新增的按压反馈参数
         if (version < 3) {
@@ -256,6 +303,22 @@ export const useSettingsStore = create<SettingsState>()(
           persistedState.enableHapticFeedback =
             persistedState.enableHapticFeedback ?? true;
         }
+
+        persistedState.readingBackground = isValidReadingBackground(
+          persistedState.readingBackground,
+        )
+          ? persistedState.readingBackground
+          : 'default';
+        persistedState.textContrast = isValidTextContrast(
+          persistedState.textContrast,
+        )
+          ? persistedState.textContrast
+          : 'standard';
+        persistedState.surfaceStyle = isValidSurfaceStyle(
+          persistedState.surfaceStyle,
+        )
+          ? persistedState.surfaceStyle
+          : 'layered';
 
         return persistedState as SettingsState;
       },

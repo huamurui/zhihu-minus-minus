@@ -19,6 +19,12 @@ import { Section, SettingItem } from '@/components/SettingItem';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
+import { designTokens } from '@/constants/designTokens';
+import {
+  READING_BACKGROUND_OPTIONS,
+  SURFACE_STYLE_OPTIONS,
+  TEXT_CONTRAST_OPTIONS,
+} from '@/constants/theme';
 import { type TabKey, useSettingsStore } from '@/store/useSettingsStore';
 
 // 开启 Android 下的 LayoutAnimation
@@ -34,18 +40,7 @@ export interface ColorPreset {
   value: string;
 }
 
-const PRESET_COLORS: ColorPreset[] = [
-  { name: '知乎蓝', value: '#0084ff' },
-  { name: '极客靛', value: '#6366f1' },
-  { name: '薄荷青', value: '#00a896' },
-  { name: '翡翠绿', value: '#10b981' },
-  { name: '落日橙', value: '#f97316' },
-  { name: '樱花粉', value: '#ec4899' },
-  { name: '蜜桃粉', value: '#ff758f' },
-  { name: '玫瑰红', value: '#f43f5e' },
-  { name: '紫罗兰', value: '#8b5cf6' },
-  { name: '静谧灰', value: '#64748b' },
-];
+const PRESET_COLORS: ColorPreset[] = designTokens.primaryPresets;
 
 export default function AppearanceSettings() {
   const insets = useSafeAreaInsets();
@@ -54,6 +49,9 @@ export default function AppearanceSettings() {
     fontSizeScale,
     lineHeightScale,
     primaryColor,
+    readingBackground,
+    textContrast,
+    surfaceStyle,
     visibleTabs,
     defaultTab,
     useWebView,
@@ -81,6 +79,7 @@ export default function AppearanceSettings() {
   };
 
   const tintColor = useThemeColor({}, 'primary');
+  const canvasColor = useThemeColor({}, 'background');
   const isDark = colorScheme === 'dark';
 
   const toggleTab = (tab: TabKey) => {
@@ -104,7 +103,9 @@ export default function AppearanceSettings() {
     <RNView
       style={[
         styles.container,
-        { backgroundColor: isDark ? '#000000' : '#F2F2F6' },
+        {
+          backgroundColor: canvasColor,
+        },
       ]}
     >
       <Stack.Screen
@@ -243,14 +244,16 @@ export default function AppearanceSettings() {
               );
             })}
             <Pressable
-              onPress={() => updateSettings({ primaryColor: '#0084ff' })}
+              onPress={() =>
+                updateSettings({ primaryColor: Colors.light.primary })
+              }
               style={[
                 styles.colorChip,
                 {
                   backgroundColor: Colors[colorScheme].backgroundTertiary,
                   borderColor:
-                    primaryColor === '#0084ff' || !primaryColor
-                      ? '#0084ff'
+                    primaryColor === Colors.light.primary || !primaryColor
+                      ? Colors.light.primary
                       : 'transparent',
                 },
               ]}
@@ -293,7 +296,125 @@ export default function AppearanceSettings() {
           )}
         </Section>
 
-        {/* 3. 按压反馈 */}
+        {/* 3. 阅读体验 */}
+        <Section title="阅读体验" colorScheme={colorScheme}>
+          <SettingItem
+            label="阅读背景"
+            icon="color-fill-outline"
+            colorScheme={colorScheme}
+          >
+            <RNView style={styles.optionRow}>
+              {READING_BACKGROUND_OPTIONS.map((option) => {
+                const isSelected = readingBackground === option.value;
+                return (
+                  <Pressable
+                    key={option.value}
+                    onPress={() =>
+                      updateSettings({ readingBackground: option.value })
+                    }
+                    style={[
+                      styles.optionChip,
+                      {
+                        backgroundColor: Colors[colorScheme].backgroundTertiary,
+                      },
+                      isSelected && { backgroundColor: tintColor },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.optionChipText,
+                        isSelected && {
+                          color: Colors[colorScheme].textInverse,
+                          fontWeight: 'bold',
+                        },
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </RNView>
+          </SettingItem>
+          <SettingItem
+            label="文字对比度"
+            icon="contrast-outline"
+            colorScheme={colorScheme}
+          >
+            <RNView style={styles.optionRow}>
+              {TEXT_CONTRAST_OPTIONS.map((option) => {
+                const isSelected = textContrast === option.value;
+                return (
+                  <Pressable
+                    key={option.value}
+                    onPress={() =>
+                      updateSettings({ textContrast: option.value })
+                    }
+                    style={[
+                      styles.optionChip,
+                      {
+                        backgroundColor: Colors[colorScheme].backgroundTertiary,
+                      },
+                      isSelected && { backgroundColor: tintColor },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.optionChipText,
+                        isSelected && {
+                          color: Colors[colorScheme].textInverse,
+                          fontWeight: 'bold',
+                        },
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </RNView>
+          </SettingItem>
+          <SettingItem
+            label="表面层次"
+            icon="layers-outline"
+            colorScheme={colorScheme}
+          >
+            <RNView style={styles.optionRow}>
+              {SURFACE_STYLE_OPTIONS.map((option) => {
+                const isSelected = surfaceStyle === option.value;
+                return (
+                  <Pressable
+                    key={option.value}
+                    onPress={() =>
+                      updateSettings({ surfaceStyle: option.value })
+                    }
+                    style={[
+                      styles.optionChip,
+                      {
+                        backgroundColor: Colors[colorScheme].backgroundTertiary,
+                      },
+                      isSelected && { backgroundColor: tintColor },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.optionChipText,
+                        isSelected && {
+                          color: Colors[colorScheme].textInverse,
+                          fontWeight: 'bold',
+                        },
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </RNView>
+          </SettingItem>
+        </Section>
+
+        {/* 4. 按压反馈 */}
         <Section title="交互与反馈" colorScheme={colorScheme}>
           <SettingItem
             label="震动反馈"
@@ -335,7 +456,7 @@ export default function AppearanceSettings() {
                     style={[
                       styles.tabChipText,
                       androidFeedbackType === 'ripple' && {
-                        color: '#fff',
+                        color: Colors[colorScheme].textInverse,
                         fontWeight: 'bold',
                       },
                     ]}
@@ -359,7 +480,7 @@ export default function AppearanceSettings() {
                     style={[
                       styles.tabChipText,
                       androidFeedbackType === 'scale-opacity' && {
-                        color: '#fff',
+                        color: Colors[colorScheme].textInverse,
                         fontWeight: 'bold',
                       },
                     ]}
@@ -496,7 +617,7 @@ export default function AppearanceSettings() {
           </SettingItem>
         </Section>
 
-        {/* 4. 栏目展示 */}
+        {/* 5. 栏目展示 */}
         <Section title="底部导航栏 (至少保留一个)" colorScheme={colorScheme}>
           {(Object.keys(TAB_LABELS) as TabKey[]).map((tab) => (
             <SettingItem
@@ -515,7 +636,7 @@ export default function AppearanceSettings() {
           ))}
         </Section>
 
-        {/* 5. 默认落地页 */}
+        {/* 6. 默认落地页 */}
         <Section title="默认启动页" colorScheme={colorScheme}>
           <RNView style={styles.tabGrid}>
             {visibleTabs.map((tab) => (
@@ -531,7 +652,10 @@ export default function AppearanceSettings() {
                 <Text
                   style={[
                     styles.tabChipText,
-                    defaultTab === tab && { color: '#fff', fontWeight: 'bold' },
+                    defaultTab === tab && {
+                      color: Colors[colorScheme].textInverse,
+                      fontWeight: 'bold',
+                    },
                   ]}
                 >
                   {TAB_LABELS[tab]}
@@ -541,7 +665,7 @@ export default function AppearanceSettings() {
           </RNView>
         </Section>
 
-        {/* 6. 实验性功能 */}
+        {/* 7. 实验性功能 */}
         <Section title="实验性功能 (默认关闭)" colorScheme={colorScheme}>
           <SettingItem
             label="启用 WebView 渲染"
@@ -781,8 +905,8 @@ function HslSlider({
             borderRadius: 10,
             backgroundColor: thumbColor,
             borderWidth: 2,
-            borderColor: '#fff',
-            shadowColor: '#000',
+            borderColor: Colors.light.textInverse,
+            shadowColor: Colors.light.shadow,
             shadowOpacity: 0.2,
             shadowRadius: 3,
             shadowOffset: { width: 0, height: 1 },
@@ -799,11 +923,13 @@ function ColorPickerSection({ primaryColor, onColorChange }: any) {
   const textColor = Colors[colorScheme].text;
   const borderColor = Colors[colorScheme].border;
 
-  const [hsl, setHsl] = useState(() => hexToHsl(primaryColor || '#0084ff'));
-  const [hexText, setHexText] = useState(primaryColor || '#0084ff');
+  const [hsl, setHsl] = useState(() =>
+    hexToHsl(primaryColor || Colors.light.primary),
+  );
+  const [hexText, setHexText] = useState(primaryColor || Colors.light.primary);
 
   useEffect(() => {
-    const target = primaryColor || '#0084ff';
+    const target = primaryColor || Colors.light.primary;
     setHexText(target);
     const newHsl = hexToHsl(target);
     setHsl((currentHsl) => {
@@ -870,7 +996,7 @@ function ColorPickerSection({ primaryColor, onColorChange }: any) {
             },
           ]}
           placeholder="#0084ff"
-          placeholderTextColor="#999"
+          placeholderTextColor={Colors[colorScheme].textTertiary}
           value={hexText}
           onChangeText={(val) => {
             const v = val.startsWith('#') ? val : val ? `#${val}` : '#';
@@ -881,7 +1007,8 @@ function ColorPickerSection({ primaryColor, onColorChange }: any) {
             }
           }}
           onBlur={() => {
-            if (hexText.length !== 7) setHexText(primaryColor || '#0084ff');
+            if (hexText.length !== 7)
+              setHexText(primaryColor || Colors.light.primary);
           }}
           maxLength={7}
           autoCapitalize="none"
@@ -979,6 +1106,22 @@ const styles = StyleSheet.create({
   },
   colorChipText: {
     fontSize: 14,
+  },
+  optionRow: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: 6,
+    marginLeft: 12,
+  },
+  optionChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  optionChipText: {
+    fontSize: 13,
   },
   tabGrid: {
     flexDirection: 'row',

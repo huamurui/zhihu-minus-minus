@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   previewContainer: {
-    shadowColor: '#000',
+    shadowColor: Colors.light.shadow,
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.15,
     shadowRadius: 16,
@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
     width: 250,
     borderRadius: 14,
     overflow: 'hidden',
-    shadowColor: '#000',
+    shadowColor: Colors.light.shadow,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.1,
     shadowRadius: 12,

@@ -28,7 +28,7 @@ import '../global.css';
 import * as Clipboard from 'expo-clipboard';
 import { AppState, type AppStateStatus, Linking } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import Colors from '@/constants/Colors';
+import { resolveThemeColors } from '@/constants/theme';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { consumeAppClipboardText } from '@/utils/clipboard';
 
@@ -83,9 +83,30 @@ function RootLayout() {
   const router = useRouter();
   const _colorScheme = useColorScheme();
   const isDark = useThemeStore((state) => state.isDark);
-  const theme = isDark ? DarkTheme : DefaultTheme;
-  const { primaryColor } = useSettingsStore();
-  const currentTint = primaryColor || Colors[isDark ? 'dark' : 'light'].primary;
+  const hasThemeHydrated = useThemeStore((state) => state.hasHydrated);
+  const { primaryColor, readingBackground, textContrast, surfaceStyle } =
+    useSettingsStore();
+  const appColorScheme = isDark ? 'dark' : 'light';
+  const appThemeColors = resolveThemeColors(appColorScheme, {
+    primaryColor,
+    readingBackground,
+    textContrast,
+    surfaceStyle,
+  });
+  const currentTint = appThemeColors.primary;
+  const baseNavigationTheme = isDark ? DarkTheme : DefaultTheme;
+  const theme = {
+    ...baseNavigationTheme,
+    colors: {
+      ...baseNavigationTheme.colors,
+      primary: currentTint,
+      background: appThemeColors.background,
+      card: appThemeColors.backgroundSecondary,
+      text: appThemeColors.text,
+      border: appThemeColors.border,
+      notification: appThemeColors.danger,
+    },
+  };
 
   // Sync NativeWind dark mode with zustand store
   useSyncThemeWithNativeWind();
@@ -182,8 +203,10 @@ function RootLayout() {
 
   // 这里简单处理：如果以后需要加载字体，可以写在这里
   useEffect(() => {
-    SplashScreen.hideAsync();
-  }, []);
+    if (hasThemeHydrated) {
+      void SplashScreen.hideAsync();
+    }
+  }, [hasThemeHydrated]);
   // throw new Error('test')
   return (
     <QueryClientProvider client={queryClient}>
@@ -206,10 +229,10 @@ function RootLayout() {
             <Stack
               screenOptions={{
                 headerStyle: {
-                  backgroundColor: isDark ? '#1a1a1a' : '#ffffff',
+                  backgroundColor: appThemeColors.backgroundSecondary,
                 },
                 headerTitleStyle: {
-                  color: isDark ? '#ffffff' : '#1a1a1a',
+                  color: appThemeColors.text,
                   fontWeight: 'bold',
                 },
                 headerTintColor: currentTint,

@@ -1,8 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { View as RNView, StyleSheet } from 'react-native';
-import { Text } from '@/components/Themed';
-import Colors from '@/constants/Colors';
+import { Text, useThemeColor } from '@/components/Themed';
 
 /**
  * 共享的设置页 UI 原语。两个设置页（外观与定制 / 过滤与推荐）共用，
@@ -17,9 +16,9 @@ export function Section({
   children: React.ReactNode;
   colorScheme: 'light' | 'dark';
 }) {
-  const isDark = colorScheme === 'dark';
-  const cardBg = isDark ? '#1C1C1E' : '#FFFFFF';
-  const dividerColor = isDark ? '#38383A' : '#E5E5EA';
+  void colorScheme;
+  const cardBg = useThemeColor({}, 'backgroundSecondary');
+  const dividerColor = useThemeColor({}, 'controlBorder');
 
   // Section 内子元素由调用处逐个写死，数量与顺序在编译期就已固定。
   const childArray = React.Children.toArray(children).filter(Boolean);
@@ -62,6 +61,10 @@ export function SettingItem({
   children: React.ReactNode;
   colorScheme: 'light' | 'dark';
 }) {
+  void colorScheme;
+  const controlBackground = useThemeColor({}, 'controlBackground');
+  const textColor = useThemeColor({}, 'text');
+
   return (
     <RNView style={styles.settingItem}>
       <RNView style={styles.settingLabelContainer}>
@@ -70,11 +73,11 @@ export function SettingItem({
             style={[
               styles.iconWrapper,
               {
-                backgroundColor: colorScheme === 'dark' ? '#2C2C2E' : '#F2F2F7',
+                backgroundColor: controlBackground,
               },
             ]}
           >
-            <Ionicons name={icon} size={16} color={Colors[colorScheme].text} />
+            <Ionicons name={icon} size={16} color={textColor} />
           </RNView>
         )}
         <Text style={styles.settingLabel}>{label}</Text>

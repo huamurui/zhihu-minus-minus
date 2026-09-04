@@ -1,8 +1,8 @@
-// NOTE: The default React Native styling doesn't support server rendering.
-// Server rendered styles should not change between the first render of the HTML
-// and the first render on the client. Typically, web developers will use CSS media queries
-// to render different styles on the client and server, these aren't directly supported in React Native
-// but can be achieved using a styling library like Nativewind.
+import { useThemeStore } from '@/store/useThemeStore';
+
+// Keep web and native on the same source of truth. Returning a hard-coded
+// light scheme here made web-only components ignore theme changes.
 export function useColorScheme() {
-  return 'light';
+  const isDark = useThemeStore((state) => state.isDark);
+  return isDark ? 'dark' : 'light';
 }

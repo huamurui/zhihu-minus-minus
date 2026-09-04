@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/components/useColorScheme';
+import { colors } from '@/constants/designTokens';
 import { useCollectionStore } from '@/store/useCollectionStore';
 import { BouncyButton } from './BouncyButton';
 import { Text, useThemeColor, View } from './Themed';
@@ -61,8 +62,10 @@ export function CollectionToastOverlay() {
   };
 
   // We enforce a solid dark pill regardless of theme because dark cards on a bright screen have extreme contrast and premium feel
-  const backgroundColor = isDark ? '#2c2c30' : '#1e1e24';
-  const textColor = '#ffffff';
+  const backgroundColor = isDark
+    ? colors.dark.backgroundTertiary
+    : colors.dark.toastSurface;
+  const textColor = colors.dark.text;
   const actionColor = useThemeColor({}, 'primary');
 
   return (

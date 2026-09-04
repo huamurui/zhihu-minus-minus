@@ -71,7 +71,7 @@ export default function InboxScreen() {
         <View className="relative">
           <Image
             source={{ uri: participant.avatar_url }}
-            className="w-[52px] h-[52px] rounded-full bg-[#eee]"
+            className="w-[52px] h-[52px] rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark"
           />
           {item.unread_count > 0 && (
             <View className="absolute top-0 right-0 bg-[#ff4d4f] rounded-full min-w-[18px] h-[18px] justify-center items-center px-1 border-2 border-white dark:border-black">

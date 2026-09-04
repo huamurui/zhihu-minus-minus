@@ -15,7 +15,9 @@ import {
   StyleSheet,
   type TextStyle,
 } from 'react-native';
-import Colors from '@/constants/Colors';
+import type Colors from '@/constants/Colors';
+import { typography } from '@/constants/designTokens';
+import { resolveThemeColors } from '@/constants/theme';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { useColorScheme } from './useColorScheme';
 
@@ -32,8 +34,15 @@ export function useThemeColor(
   colorName: (keyof typeof Colors.light & keyof typeof Colors.dark) | string,
 ) {
   const theme = useColorScheme();
-  const { primaryColor } = useSettingsStore();
+  const { primaryColor, readingBackground, textContrast, surfaceStyle } =
+    useSettingsStore();
   const colorFromProps = props[theme];
+  const themeColors = resolveThemeColors(theme, {
+    primaryColor,
+    readingBackground,
+    textContrast,
+    surfaceStyle,
+  });
 
   if (colorFromProps) {
     return colorFromProps;
@@ -46,18 +55,18 @@ export function useThemeColor(
       colorName === 'tint' ||
       colorName === 'tabIconSelected'
     ) {
-      return primaryColor;
+      return themeColors.primary;
     }
     if (colorName === 'primaryTransparent') {
-      return `${primaryColor}26`; // 15% opacity
+      return themeColors.primaryTransparent;
     }
     if (colorName === 'warning') {
-      return '#ffb400'; // Global warning gold color
+      return themeColors.warningAccent;
     }
     if (typeof colorName === 'string' && colorName.startsWith('primary_')) {
       const opacityHex = colorName.split('_')[1];
       if (opacityHex && opacityHex.length === 2) {
-        return `${primaryColor}${opacityHex}`;
+        return `${themeColors.primary}${opacityHex}`;
       }
     }
   } else {
@@ -67,24 +76,24 @@ export function useThemeColor(
       colorName === 'tint' ||
       colorName === 'tabIconSelected'
     ) {
-      return Colors[theme].primary;
+      return themeColors.primary;
     }
     if (colorName === 'primaryTransparent') {
-      return Colors[theme].primaryTransparent;
+      return themeColors.primaryTransparent;
     }
   }
 
   if (colorName === 'warning') {
-    return '#ffb400';
+    return themeColors.warningAccent;
   }
 
   // Fallback to static mapping
   const staticKey = colorName as keyof typeof Colors.light &
     keyof typeof Colors.dark;
-  if (staticKey && Colors[theme][staticKey]) {
-    return Colors[theme][staticKey];
+  if (staticKey && themeColors[staticKey]) {
+    return themeColors[staticKey];
   }
-  return Colors[theme].primary;
+  return themeColors.primary;
 }
 
 export function Text(
@@ -109,7 +118,7 @@ export function Text(
   } = props;
 
   let colorName: keyof typeof Colors.light & keyof typeof Colors.dark = 'text';
-  let defaultFontSize = 15;
+  let defaultFontSize = typography.fontSize.body;
   let defaultFontWeight: TextStyle['fontWeight'] = 'normal';
 
   if (type === 'secondary') {
@@ -122,15 +131,15 @@ export function Text(
     colorName = 'danger';
   } else if (type === 'title') {
     colorName = 'text';
-    defaultFontSize = 20;
+    defaultFontSize = typography.fontSize.title;
     defaultFontWeight = 'bold';
   } else if (type === 'subtitle') {
     colorName = 'text';
-    defaultFontSize = 17;
+    defaultFontSize = typography.fontSize.subtitle;
     defaultFontWeight = '600';
   } else if (type === 'caption') {
     colorName = 'textSecondary';
-    defaultFontSize = 12;
+    defaultFontSize = typography.fontSize.caption;
   }
 
   const color = useThemeColor(

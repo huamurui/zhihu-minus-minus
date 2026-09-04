@@ -14,6 +14,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import { useThemeColor } from '@/components/Themed';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { ImpactFeedbackStyle, impactAsync } from '@/utils/haptics';
 
@@ -38,7 +39,7 @@ export function BouncyButton({
   const settings = useSettingsStore();
   const pressOpacity = settings.pressOpacity ?? 0.82;
   const pressScale = settings.pressScale ?? 0.98;
-  const primaryColor = settings.primaryColor;
+  const primaryColor = useThemeColor({}, 'primary');
   const androidFeedbackType = settings.androidFeedbackType ?? 'ripple';
 
   // 是否启用物理动画（缩放与不透明度）
@@ -47,9 +48,7 @@ export function BouncyButton({
   const enableRipple = isAndroid && androidFeedbackType === 'ripple';
 
   // Android 水波纹颜色：跟随主题色，带透明度
-  const rippleColor = primaryColor
-    ? `${primaryColor}1A` // 10% opacity
-    : 'rgba(0,0,0,0.06)';
+  const rippleColor = `${primaryColor}1A`; // 10% opacity
 
   const scale = useSharedValue(1);
   const opacity = useSharedValue(1);

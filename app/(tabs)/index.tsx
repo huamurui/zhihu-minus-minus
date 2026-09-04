@@ -81,8 +81,6 @@ import { refreshInfiniteQuery } from '@/utils/query';
 import ProfileScreen from './profile';
 import PublishScreen from './publish';
 
-const _tintColor = Colors.light.tint; // Fallback or use colorScheme logic inside component
-
 // 统一的所有可滑动的页面索引
 // 0: 关注, 1: 推荐, 2: 热榜, 3: 日报, 4: 发布, 5: 我的
 const TABS = [

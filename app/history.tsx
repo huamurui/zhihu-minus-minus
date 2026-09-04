@@ -15,11 +15,15 @@ import {
   type ReadHistoryDataItem,
   type ReadHistoryResponse,
 } from '@/api/zhihu';
-import { Text, View } from '@/components/Themed';
+import { Text, useThemeColor, View } from '@/components/Themed';
+import { useColorScheme } from '@/components/useColorScheme';
+import Colors from '@/constants/Colors';
 import { formatDate } from '@/utils/date';
 
 export default function HistoryScreen() {
   const router = useRouter();
+  const colorScheme = useColorScheme();
+  const primaryColor = useThemeColor({}, 'primary');
   const queryClient = useQueryClient();
   const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -46,24 +50,24 @@ export default function HistoryScreen() {
 
   const historyItems = data?.pages.flatMap((page) => page.data) || [];
 
-  const makeItemKey = (item: ReadHistoryDataItem): string => {
+  const makeItemKey = useCallback((item: ReadHistoryDataItem): string => {
     const extra = item.data?.extra;
     return `${extra?.content_type || 'unknown'}-${extra?.content_token || ''}`;
-  };
+  }, []);
 
   const exitSelection = () => {
     setSelecting(false);
     setSelectedIds(new Set());
   };
 
-  const toggleSelect = (key: string) => {
+  const toggleSelect = useCallback((key: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
     });
-  };
+  }, []);
 
   const deleteMutation = useMutation({
     mutationFn: async (
@@ -139,7 +143,7 @@ export default function HistoryScreen() {
         }
       }
     },
-    [selecting, router],
+    [makeItemKey, router, selecting, toggleSelect],
   );
 
   const renderItem = ({ item }: { item: ReadHistoryDataItem }) => {
@@ -174,7 +178,9 @@ export default function HistoryScreen() {
               <Ionicons
                 name={isSelected ? 'checkbox' : 'square-outline'}
                 size={22}
-                color={isSelected ? '#0084ff' : '#999'}
+                color={
+                  isSelected ? primaryColor : Colors[colorScheme].textTertiary
+                }
               />
             </View>
           )}
@@ -218,11 +224,15 @@ export default function HistoryScreen() {
           headerRight: () =>
             selecting ? (
               <Pressable onPress={exitSelection}>
-                <Text style={{ color: '#0084ff', fontSize: 16 }}>完成</Text>
+                <Text style={{ color: primaryColor, fontSize: 16 }}>完成</Text>
               </Pressable>
             ) : historyItems.length > 0 ? (
               <Pressable onPress={handleClearAll}>
-                <Ionicons name="trash-outline" size={20} color="#999" />
+                <Ionicons
+                  name="trash-outline"
+                  size={20}
+                  color={Colors[colorScheme].textTertiary}
+                />
               </Pressable>
             ) : null,
         }}
@@ -240,7 +250,7 @@ export default function HistoryScreen() {
         onEndReachedThreshold={0.5}
         ListFooterComponent={() =>
           isFetchingNextPage ? (
-            <ActivityIndicator style={{ margin: 20 }} color="#0084ff" />
+            <ActivityIndicator style={{ margin: 20 }} color={primaryColor} />
           ) : historyItems.length > 0 && !hasNextPage ? (
             <Text type="secondary" className="text-center p-5 text-xs">
               — 已经到底了喵 —
@@ -250,7 +260,7 @@ export default function HistoryScreen() {
         ListEmptyComponent={() => (
           <View className="p-[50px] items-center">
             {isLoading ? (
-              <ActivityIndicator size="small" color="#0084ff" />
+              <ActivityIndicator size="small" color={primaryColor} />
             ) : (
               <Text type="secondary">这里空空如也喵</Text>
             )}
@@ -262,7 +272,8 @@ export default function HistoryScreen() {
       {selecting && selectedIds.size > 0 && (
         <Pressable
           onPress={handleDeleteSelected}
-          className="absolute bottom-8 left-8 right-8 bg-[#0084ff] py-3 rounded-xl items-center"
+          className="absolute bottom-8 left-8 right-8 py-3 rounded-xl items-center"
+          style={{ backgroundColor: primaryColor }}
         >
           <Text className="text-white text-base font-bold">
             删除选中 ({selectedIds.size})

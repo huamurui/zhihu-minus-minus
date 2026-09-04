@@ -126,7 +126,11 @@ export default function FilterSettings() {
     <RNView
       style={[
         styles.container,
-        { backgroundColor: isDark ? '#000000' : '#F2F2F6' },
+        {
+          backgroundColor: isDark
+            ? Colors.dark.background
+            : Colors.light.controlBackground,
+        },
       ]}
     >
       <Stack.Screen
@@ -145,7 +149,7 @@ export default function FilterSettings() {
             style={[
               styles.statsCard,
               {
-                backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF',
+                backgroundColor: Colors[colorScheme].backgroundSecondary,
                 borderColor: warn ? Colors[colorScheme].warning : 'transparent',
               },
             ]}
@@ -157,7 +161,7 @@ export default function FilterSettings() {
             <RNView
               style={[
                 styles.statsBarTrack,
-                { backgroundColor: isDark ? '#2C2C2E' : '#E5E5EA' },
+                { backgroundColor: Colors[colorScheme].controlBorder },
               ]}
             >
               <RNView
@@ -312,7 +316,7 @@ export default function FilterSettings() {
                         style={[
                           s.tabChipText,
                           filterQualityLevel === lvl.key && {
-                            color: '#fff',
+                            color: Colors[colorScheme].textInverse,
                             fontWeight: 'bold',
                           },
                         ]}
@@ -374,7 +378,7 @@ export default function FilterSettings() {
                       style={[
                         s.tabChipText,
                         filterMode === 'collapse' && {
-                          color: '#fff',
+                          color: Colors[colorScheme].textInverse,
                           fontWeight: 'bold',
                         },
                       ]}
@@ -396,7 +400,7 @@ export default function FilterSettings() {
                       style={[
                         s.tabChipText,
                         filterMode === 'hide' && {
-                          color: '#fff',
+                          color: Colors[colorScheme].textInverse,
                           fontWeight: 'bold',
                         },
                       ]}

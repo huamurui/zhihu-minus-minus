@@ -1,8 +1,6 @@
 import { StyleSheet } from 'react-native';
 import { AppDialog } from '@/components/overlays/AppDialog';
-import { Text } from '@/components/Themed';
-import { useColorScheme } from '@/components/useColorScheme';
-import Colors from '@/constants/Colors';
+import { Text, useThemeColor } from '@/components/Themed';
 
 export function ClipboardLinkModal({
   visible,
@@ -15,7 +13,7 @@ export function ClipboardLinkModal({
   onClose: () => void;
   onOpen: () => void;
 }) {
-  const colorScheme = useColorScheme();
+  const primaryColor = useThemeColor({}, 'primary');
 
   return (
     <AppDialog
@@ -29,10 +27,7 @@ export function ClipboardLinkModal({
         { label: '立即打开', onPress: onOpen, variant: 'primary' },
       ]}
     >
-      <Text
-        style={[styles.url, { color: Colors[colorScheme].primary }]}
-        numberOfLines={3}
-      >
+      <Text style={[styles.url, { color: primaryColor }]} numberOfLines={3}>
         {url}
       </Text>
     </AppDialog>

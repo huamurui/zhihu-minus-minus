@@ -291,7 +291,10 @@ export const CreationCard = React.forwardRef<
                 onPress={() => setExpanded(false)}
                 className="mt-3 py-2.5 flex-row items-center justify-center border-t border-gray-100 dark:border-gray-800"
               >
-                <Text className="text-sm text-primary font-bold mr-1">
+                <Text
+                  className="text-sm font-bold mr-1"
+                  style={{ color: primaryColor }}
+                >
                   收起
                   {type === 'answer'
                     ? '回答'
@@ -433,7 +436,11 @@ export const CreationCard = React.forwardRef<
                 }}
                 className="flex-row items-center ml-5 bg-transparent py-1"
               >
-                <Ionicons name="chatbubble-outline" size={16} color="#888" />
+                <Ionicons
+                  name="chatbubble-outline"
+                  size={16}
+                  color={Colors[colorScheme].iconMuted}
+                />
                 <Text className="ml-1 text-xs font-semibold">
                   {(item.comment_count ?? 0) > 0 ? item.comment_count : '0'}
                 </Text>
@@ -446,13 +453,17 @@ export const CreationCard = React.forwardRef<
                   <Ionicons
                     name={isCollected ? 'star' : 'star-outline'}
                     size={16}
-                    color={isCollected ? warningColor : '#888'}
+                    color={
+                      isCollected ? warningColor : Colors[colorScheme].iconMuted
+                    }
                   />
                   {displayCount > 0 && (
                     <Text
                       className="ml-1 text-xs font-semibold"
                       style={{
-                        color: isCollected ? warningColor : '#888',
+                        color: isCollected
+                          ? warningColor
+                          : Colors[colorScheme].iconMuted,
                       }}
                     >
                       {displayCount}
@@ -483,7 +494,11 @@ export const CreationCard = React.forwardRef<
               onPress={() => setMenuVisible(true)}
               className="p-1 -mr-1 bg-transparent"
             >
-              <Ionicons name="ellipsis-horizontal" size={18} color="#888" />
+              <Ionicons
+                name="ellipsis-horizontal"
+                size={18}
+                color={Colors[colorScheme].iconMuted}
+              />
             </BouncyButton>
           </View>
         </NativeView>

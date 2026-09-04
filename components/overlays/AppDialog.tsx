@@ -8,7 +8,7 @@ import {
   StyleSheet,
   useWindowDimensions,
 } from 'react-native';
-import { Text, View } from '@/components/Themed';
+import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 
@@ -41,6 +41,8 @@ export function AppDialog({
   dismissible = true,
 }: AppDialogProps) {
   const colorScheme = useColorScheme();
+  const primaryColor = useThemeColor({}, 'primary');
+  const primaryTransparent = useThemeColor({}, 'primaryTransparent');
   const { width } = useWindowDimensions();
   const [mounted, setMounted] = useState(visible);
   const mountedRef = useRef(visible);
@@ -109,7 +111,7 @@ export function AppDialog({
 
   const surface = Colors[colorScheme].backgroundSecondary;
   const tertiary = Colors[colorScheme].backgroundTertiary;
-  const primary = Colors[colorScheme].primary;
+  const primary = primaryColor;
 
   return (
     <Modal
@@ -149,10 +151,7 @@ export function AppDialog({
         >
           {icon ? (
             <View
-              style={[
-                styles.icon,
-                { backgroundColor: Colors[colorScheme].primaryTransparent },
-              ]}
+              style={[styles.icon, { backgroundColor: primaryTransparent }]}
             >
               <Ionicons name={icon} size={27} color={primary} />
             </View>
@@ -175,7 +174,9 @@ export function AppDialog({
                       ? Colors[colorScheme].danger
                       : tertiary;
                 const color =
-                  variant === 'secondary' ? Colors[colorScheme].text : '#fff';
+                  variant === 'secondary'
+                    ? Colors[colorScheme].text
+                    : Colors[colorScheme].textInverse;
                 return (
                   <Pressable
                     key={action.label}
@@ -215,7 +216,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 24,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: Colors.light.shadow,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.18,
     shadowRadius: 20,

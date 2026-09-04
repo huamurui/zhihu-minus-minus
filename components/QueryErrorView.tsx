@@ -14,6 +14,7 @@ export function QueryErrorView({
   compact = false,
 }: QueryErrorViewProps) {
   const primaryColor = useThemeColor({}, 'primary');
+  const mutedColor = useThemeColor({}, 'textTertiary');
 
   return (
     <View
@@ -22,7 +23,7 @@ export function QueryErrorView({
       <Ionicons
         name="cloud-offline-outline"
         size={compact ? 26 : 40}
-        color="#999"
+        color={mutedColor}
       />
       <Text type="secondary" className="text-center mt-2 text-sm">
         {message}
