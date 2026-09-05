@@ -12,6 +12,7 @@ import {
   Alert,
   Image,
   View as NativeView,
+  ScrollView,
   TextInput,
 } from 'react-native';
 import PagerView, {
@@ -137,6 +138,7 @@ const PROFILE_TABS = [
   { key: 'questions', label: '提问', countKey: 'question_count' },
   { key: 'pins', label: '想法', countKey: 'pins_count' },
 ] as const;
+const PROFILE_TAB_BAR_HEIGHT = 44;
 const AnimatedPagerView = Reanimated.createAnimatedComponent(PagerView);
 
 type ProfileTabKey = (typeof PROFILE_TABS)[number]['key'];
@@ -178,10 +180,14 @@ export default function UserDetailScreen() {
 
   // 动态测量 Header 高度
   const [headerHeight, setHeaderHeight] = useState(420);
-  const maxScroll = useSharedValue(370);
+  const [profileTabViewportWidth, setProfileTabViewportWidth] = useState(0);
+  const maxScroll = useSharedValue(420 - PROFILE_TAB_BAR_HEIGHT);
 
   const pagerRef = useRef<PagerView>(null);
-  const panStart = useRef({ x: 0, y: 0 });
+  const profileTabsScrollRef = useRef<ScrollView>(null);
+  const profileTabLayoutsRef = useRef<
+    Array<{ x: number; width: number } | undefined>
+  >([]);
 
   // 1. 各个 Tab 的独立滚动高度 (Shared Value)
   const scrollYActivities = useSharedValue(0);
@@ -200,18 +206,16 @@ export default function UserDetailScreen() {
   ]);
 
   // 3. 当前活跃的 Tab 索引与 PagerView 滑动状态
-  const activeIndex = useSharedValue(initialTabIndex);
   const activeIndexRef = useRef(initialTabIndex);
-  const pagerPosition = useSharedValue(initialTabIndex);
-  const pagerOffset = useSharedValue(0);
-  const profileTabBarWidth = useSharedValue(0);
+  const pagerProgress = useSharedValue(initialTabIndex);
+  const profileTabXs = useSharedValue<number[]>([]);
+  const profileTabWidths = useSharedValue<number[]>([]);
 
   const pageScrollHandler = useEvent<PagerViewOnPageScrollEvent>(
     (event) => {
       'worklet';
       if (event.eventName.endsWith('onPageScroll')) {
-        pagerPosition.value = event.position;
-        pagerOffset.value = event.offset;
+        pagerProgress.value = event.position + event.offset;
       }
     },
     ['onPageScroll'],
@@ -255,11 +259,13 @@ export default function UserDetailScreen() {
 
   // 5. 根据当前滑动进度和各个 Tab 的滚动高度，插值计算出 Header 的 translateY
   const headerAnimatedStyle = useAnimatedStyle(() => {
-    const p = pagerPosition.value;
-    const o = pagerOffset.value;
-
-    const idx1 = Math.max(0, Math.min(4, Math.floor(p)));
-    const idx2 = Math.max(0, Math.min(4, Math.ceil(p + o)));
+    const progress = Math.max(
+      0,
+      Math.min(PROFILE_TABS.length - 1, pagerProgress.value),
+    );
+    const idx1 = Math.floor(progress);
+    const idx2 = Math.ceil(progress);
+    const offset = progress - idx1;
 
     const y1 =
       idx1 === 0
@@ -284,7 +290,7 @@ export default function UserDetailScreen() {
               : scrollYPins.value;
 
     // 滑动过程中平滑插值
-    const currentScrollY = y1 + (y2 - y1) * o;
+    const currentScrollY = y1 + (y2 - y1) * offset;
 
     const translateY = interpolate(
       currentScrollY,
@@ -299,12 +305,45 @@ export default function UserDetailScreen() {
   });
 
   const profileTabIndicatorStyle = useAnimatedStyle(() => {
-    const tabWidth = profileTabBarWidth.value / PROFILE_TABS.length;
+    const progress = Math.max(
+      0,
+      Math.min(PROFILE_TABS.length - 1, pagerProgress.value),
+    );
+    const leftIndex = Math.floor(progress);
+    const rightIndex = Math.ceil(progress);
+    const offset = progress - leftIndex;
+    const leftWidth = profileTabWidths.value[leftIndex] || 0;
+    const rightWidth = profileTabWidths.value[rightIndex] || leftWidth;
+    const leftX = profileTabXs.value[leftIndex] || 0;
+    const rightX = profileTabXs.value[rightIndex] || leftX;
+
     return {
-      width: tabWidth,
-      transform: [{ translateX: pagerPosition.value * tabWidth }],
+      opacity: leftWidth > 0 ? 1 : 0,
+      width: leftWidth + (rightWidth - leftWidth) * offset,
+      transform: [{ translateX: leftX + (rightX - leftX) * offset }],
     };
   });
+
+  const recordProfileTabLayout = (idx: number, x: number, width: number) => {
+    profileTabLayoutsRef.current[idx] = { x, width };
+    // 多个 onLayout 会在同一批次触发。始终从同步 ref 重建完整数组，
+    // 避免连续读取 SharedValue 的旧快照时互相覆盖，只留下最后一个 Tab。
+    profileTabXs.value = PROFILE_TABS.map(
+      (_, tabIndex) => profileTabLayoutsRef.current[tabIndex]?.x || 0,
+    );
+    profileTabWidths.value = PROFILE_TABS.map(
+      (_, tabIndex) => profileTabLayoutsRef.current[tabIndex]?.width || 0,
+    );
+  };
+
+  const scrollProfileTabIntoView = (idx: number, animated: boolean) => {
+    const layout = profileTabLayoutsRef.current[idx];
+    if (!layout || profileTabViewportWidth <= 0) return;
+    profileTabsScrollRef.current?.scrollTo({
+      x: Math.max(0, layout.x + layout.width / 2 - profileTabViewportWidth / 2),
+      animated,
+    });
+  };
 
   // 6. 同步滚动高度以防止跳动
   const syncLists = (currentIdx: number) => {
@@ -342,10 +381,7 @@ export default function UserDetailScreen() {
     }
 
     pagerRef.current?.setPage(idx);
-    const tab = PROFILE_TABS[idx].key;
-    setActiveTab(tab);
-    activeIndex.value = idx;
-    activeIndexRef.current = idx;
+    scrollProfileTabIntoView(idx, true);
   };
 
   useEffect(() => {
@@ -904,49 +940,76 @@ export default function UserDetailScreen() {
 
   const renderTabsSelector = () => (
     <View
-      className="flex-row bg-transparent my-1 border-b border-gray-100 dark:border-gray-800"
+      className="bg-transparent border-b border-gray-100 dark:border-gray-800"
+      style={{ height: PROFILE_TAB_BAR_HEIGHT }}
       onLayout={(event) => {
-        profileTabBarWidth.value = event.nativeEvent.layout.width;
+        const width = event.nativeEvent.layout.width;
+        if (width !== profileTabViewportWidth) {
+          setProfileTabViewportWidth(width);
+        }
       }}
     >
-      {PROFILE_TABS.map((tab, idx) => {
-        const count = tab.countKey ? user?.[tab.countKey] : undefined;
-        const countStr = count !== undefined && count > 0 ? ` ${count}` : '';
-        const isActive = activeTab === tab.key;
-        return (
-          <BouncyButton
-            key={tab.key}
-            onPress={() => handleTabPress(idx)}
-            className="flex-1 py-2 items-center"
-          >
-            <Text
-              className="font-bold text-[14px]"
-              style={{
-                color: isActive
-                  ? primaryColor
-                  : Colors[colorScheme].textSecondary,
-              }}
-            >
-              {tab.label}
-              {countStr}
-            </Text>
-          </BouncyButton>
-        );
-      })}
-      <Reanimated.View
-        pointerEvents="none"
-        style={[
-          {
-            position: 'absolute',
-            left: 0,
-            bottom: 0,
-            height: 2.5,
-            borderRadius: 2,
-            backgroundColor: primaryColor,
-          },
-          profileTabIndicatorStyle,
-        ]}
-      />
+      <ScrollView
+        ref={profileTabsScrollRef}
+        horizontal
+        bounces={false}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ minWidth: '100%' }}
+      >
+        <NativeView className="flex-row" style={{ minWidth: '100%' }}>
+          {PROFILE_TABS.map((tab, idx) => {
+            const count = tab.countKey ? user?.[tab.countKey] : undefined;
+            const countStr =
+              count !== undefined && count > 0 ? ` ${count}` : '';
+            const isActive = activeTab === tab.key;
+            return (
+              <BouncyButton
+                key={tab.key}
+                onPress={() => handleTabPress(idx)}
+                onLayout={(event) => {
+                  const { x, width } = event.nativeEvent.layout;
+                  recordProfileTabLayout(idx, x, width);
+                }}
+                style={{
+                  minWidth: profileTabViewportWidth / PROFILE_TABS.length,
+                  height: PROFILE_TAB_BAR_HEIGHT,
+                  paddingHorizontal: 12,
+                  flexShrink: 0,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Text
+                  numberOfLines={1}
+                  className="font-bold text-[14px]"
+                  style={{
+                    color: isActive
+                      ? primaryColor
+                      : Colors[colorScheme].textSecondary,
+                  }}
+                >
+                  {tab.label}
+                  {countStr}
+                </Text>
+              </BouncyButton>
+            );
+          })}
+          <Reanimated.View
+            pointerEvents="none"
+            style={[
+              {
+                position: 'absolute',
+                left: 0,
+                bottom: 0,
+                height: 2.5,
+                borderRadius: 2,
+                backgroundColor: primaryColor,
+              },
+              profileTabIndicatorStyle,
+            ]}
+          />
+        </NativeView>
+      </ScrollView>
     </View>
   );
 
@@ -1129,7 +1192,8 @@ export default function UserDetailScreen() {
               const height = e.nativeEvent.layout.height;
               if (height > 0 && height !== headerHeight) {
                 setHeaderHeight(height);
-                maxScroll.value = height - 50; // 减去 Tab 栏高度，以保留 Tab 栏悬停在顶部
+                // 只保留固定高度的 Tab 栏悬停在顶部。
+                maxScroll.value = Math.max(0, height - PROFILE_TAB_BAR_HEIGHT);
               }
             }}
             style={[
@@ -1143,24 +1207,6 @@ export default function UserDetailScreen() {
                 backgroundColor: Colors[colorScheme].background,
               },
             ]}
-            onStartShouldSetResponder={(evt) => {
-              panStart.current = {
-                x: evt.nativeEvent.pageX,
-                y: evt.nativeEvent.pageY,
-              };
-              return false;
-            }}
-            onMoveShouldSetResponder={(evt) => {
-              const deltaX = Math.abs(
-                evt.nativeEvent.pageX - panStart.current.x,
-              );
-              const deltaY = Math.abs(
-                evt.nativeEvent.pageY - panStart.current.y,
-              );
-              // 拦截横向手势，使得在 Header 上的左滑右滑完全不发生切屏
-              return deltaX > deltaY && deltaX > 10;
-            }}
-            onResponderTerminationRequest={() => true}
           >
             {renderHeader()}
             {renderSearchBar()}
@@ -1189,8 +1235,10 @@ export default function UserDetailScreen() {
               const idx = e.nativeEvent.position;
               const tab = PROFILE_TABS[idx].key;
               setActiveTab(tab);
-              activeIndex.value = idx;
               activeIndexRef.current = idx;
+              requestAnimationFrame(() => {
+                scrollProfileTabIntoView(idx, true);
+              });
 
               // 亚像素微调滚动，强行触发 FlashList 的可见区重绘，防止显示空白
               const currentScrollY = getSharedValue(idx).value;
