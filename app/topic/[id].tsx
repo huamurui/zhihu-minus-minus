@@ -210,7 +210,7 @@ export default function TopicDetail() {
     activeTab,
     tintColor,
     colorScheme,
-    followMutation.isPending,
+    followMutation.mutate,
   ]);
 
   return (

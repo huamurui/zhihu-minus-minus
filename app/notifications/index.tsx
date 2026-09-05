@@ -48,7 +48,7 @@ export default function NotificationScreen() {
   useFocusEffect(
     useCallback(() => {
       markReadMutation.mutate();
-    }, []),
+    }, [markReadMutation.mutate]),
   );
 
   const {

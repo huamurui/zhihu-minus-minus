@@ -15,7 +15,8 @@
     "test:theme": "node --test tests/themeMode.test.mjs",
     "postinstall": "patch-package",
     "format": "biome format . --write",
-    "lint": "biome check . --write"
+    "lint": "biome check .",
+    "lint:fix": "biome check . --write"
   },
   "dependencies": {
     "@preeternal/react-native-cookie-manager": "^6.4.0",

@@ -7,7 +7,13 @@
       "contentPath": "content",
       "sourceType": "answer",
       "collectedAt": "2026-08-30",
-      "traits": ["long-form", "image", "figcaption", "json-envelope", "metadata"],
+      "traits": [
+        "long-form",
+        "image",
+        "figcaption",
+        "json-envelope",
+        "metadata"
+      ],
       "expected": {
         "paragraphs": 269,
         "headings": 0,
@@ -38,7 +44,14 @@
       "contentPath": "content",
       "sourceType": "article",
       "collectedAt": "2026-09-04",
-      "traits": ["article", "formula", "image", "list", "json-envelope", "metadata"],
+      "traits": [
+        "article",
+        "formula",
+        "image",
+        "list",
+        "json-envelope",
+        "metadata"
+      ],
       "expected": {
         "paragraphs": 70,
         "headings": 0,
@@ -67,7 +80,17 @@
       "contentPath": "target.content",
       "sourceType": "question_feed_card",
       "collectedAt": "2026-09-04",
-      "traits": ["feed-card", "answer-target", "long-form", "heading", "image", "link-card", "segment-interaction", "json-envelope", "metadata"],
+      "traits": [
+        "feed-card",
+        "answer-target",
+        "long-form",
+        "heading",
+        "image",
+        "link-card",
+        "segment-interaction",
+        "json-envelope",
+        "metadata"
+      ],
       "expected": {
         "paragraphs": 400,
         "headings": 30,
@@ -99,7 +122,13 @@
       "contentPath": "content_html",
       "sourceType": "pin",
       "collectedAt": "2026-09-04",
-      "traits": ["pin", "link-card", "question-card", "json-envelope", "metadata"],
+      "traits": [
+        "pin",
+        "link-card",
+        "question-card",
+        "json-envelope",
+        "metadata"
+      ],
       "expected": {
         "paragraphs": 2,
         "headings": 0,
@@ -134,7 +163,14 @@
       "contentPath": "content_html",
       "sourceType": "pin",
       "collectedAt": "2026-09-04",
-      "traits": ["pin", "member-mention", "image", "muted", "json-envelope", "metadata"],
+      "traits": [
+        "pin",
+        "member-mention",
+        "image",
+        "muted",
+        "json-envelope",
+        "metadata"
+      ],
       "expected": {
         "paragraphs": 6,
         "headings": 0,

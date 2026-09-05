@@ -37,7 +37,7 @@ Cookie、`z_c0`、`d_c0`、`_xsrf`、X-ZSE 请求头和完整 Axios config 都�
 - 登录态当前由 `useAuthStore` 主存到应用沙箱内的 `auth-storage.json`，并尝试以 SecureStore 保留兼容备份。调整此链路时要提供向后兼容迁移，不能静默丢失账号；
 - 真机捕获的知乎正文必须先脱敏，再放入 `features/rich-content/fixtures/`。
 
-当前请求层仍有已知 Cookie 日志风险，见 `docs/CODE_REVIEW_2026-08-31.md`。涉及该文件的改动应优先消除此风险。
+截至 2026-09-05，`api/client.ts` 原有完整 Cookie/config 日志已移除；登录 WebView 和 URL 解析异常仍输出完整 URL，存在敏感参数进入日志的风险。涉及这些链路时应补齐脱敏，详见 `docs/CODE_REVIEW_2026-09-05.md`。
 
 ## 实现约定
 
@@ -92,9 +92,9 @@ npm run analyze:rich-content
 ./node_modules/.bin/biome check .
 ```
 
-注意：当前 `npm run lint` 实际执行 `biome check . --write`，会修改文件。只读审查不要运行它；只有用户授权格式化或修复时才使用 `npm run lint` / `npm run format`，并逐项复核 diff。
+`npm run lint` 执行只读的 `biome check .`；需要应用 Biome 修复时使用 `npm run lint:fix`。`npm run lint:fix` 与 `npm run format` 会修改文件，运行后必须逐项复核 diff。
 
-截至 2026-08-31，`tsc --noEmit` 与 15 个富文本测试通过；全仓 Biome 仍有 23 个 error 和 322 个 warning。不要把这些存量问题误报为本次改动引入，也不要新增诊断。详细基线和优先级见 `docs/CODE_REVIEW_2026-08-31.md`。
+截至 2026-09-05（基于 `87c0712` 的未提交修复），`tsc --noEmit`、18 个富文本测试、7 个主题测试和 5 个用户资料测试通过，富文本分析的 6 个 fixture 校验通过；全仓 Biome 为 0 个 error、143 个 warning。不要把这些存量 warning 误报为本次改动引入，也不要新增诊断。详细基线和优先级见 `docs/CODE_REVIEW_2026-09-05.md`。
 
 ## 完成标准
 

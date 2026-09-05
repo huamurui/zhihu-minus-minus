@@ -154,7 +154,7 @@ npm run test:rich-content
 ./node_modules/.bin/biome check path/to/changed-file.ts
 ```
 
-全仓检查可运行 `./node_modules/.bin/biome check .`。截至 2026-08-31，全仓仍有存量 Hook 依赖、格式和宽泛类型诊断，详情见 [代码审查记录](./docs/CODE_REVIEW_2026-08-31.md)。当前 `npm run lint` 带有 `--write`，会直接修改文件，不应用作只读检查。
+全仓只读检查可运行 `npm run lint`；需要应用 Biome 修复时使用 `npm run lint:fix`，并逐项复核改动。截至 2026-09-05（基于 `87c0712` 的未提交修复），类型检查、18 个富文本测试、7 个主题测试和 5 个用户资料测试通过；全仓 Biome 为 0 个 error、143 个 warning，详情见 [最新代码审查记录](./docs/CODE_REVIEW_2026-09-05.md)。
 
 富文本模块的目录约定、fixture 与专项命令见 [features/rich-content/README.md](./features/rich-content/README.md)。面向自动化开发者的维护规则见 [AGENTS.md](./AGENTS.md)。
 
