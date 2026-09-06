@@ -38,3 +38,14 @@ Android 与 iOS 使用不同的 GitHub-hosted runner，但位于同一次 workfl
 ## Pull Request 检查
 
 `.github/workflows/ci.yml` 会在 Pull Request 及 `main` push 时运行 `npm ci`、类型检查、Biome、三组测试和富文本 fixture 分析。建议在分支保护规则中将 CI 的 **TypeScript, Biome and tests** job 设置为合并前必须通过。
+
+## 依赖更新策略
+
+Expo SDK 会约束 React Native 与大量 `expo-*` 包的兼容版本，不能把单个 Expo 模块直接跨 SDK 升级。因此 Dependabot 采用保守策略：
+
+- npm 普通版本更新每月检查一次，只允许 patch，并合并为一个 PR；
+- npm 安全更新单独分组，不受普通版本更新级别限制；
+- GitHub Actions 每月检查一次，只允许 minor/patch，并合并为一个 PR；
+- Expo SDK 主版本升级由维护者手动执行，并使用 `npx expo install --check` 校验整套依赖。
+
+依赖 PR 必须包含同步更新的 `package-lock.json` 并通过 `npm ci`。若 `npm ci` 报告 manifest 与 lock file 不一致，该 PR 不应合并。

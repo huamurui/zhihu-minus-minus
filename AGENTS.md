@@ -94,6 +94,8 @@ npm run analyze:rich-content
 
 `npm run check` 是 CI 和发布前的聚合质量门禁，依次执行类型检查、Biome、三组测试及富文本 fixture 分析。PR 与 `main` push 使用 `.github/workflows/ci.yml`；手动发布使用 `.github/workflows/build.yaml`，在同一次运行中汇总 Android 与 iOS artifact。发布前必须同步 `package.json` 与 `app.json` 的版本，并从 `main` 创建尚不存在的 `v<version>` tag。详见 `docs/RELEASING.md`。
 
+Dependabot 的 npm 普通更新只允许每月分组的 patch 更新；Expo SDK、React Native 及配套 `expo-*` 主版本升级必须手动统一进行，不能合并跨 SDK 的单包升级。依赖 PR 必须同步更新锁文件，并以 `npm ci` 成功作为前置条件。
+
 截至 2026-09-05（基于 `906aade` 的未提交工作流改动），聚合检查通过：18 个富文本测试、7 个主题测试、5 个用户资料测试及 6 个 fixture 校验通过；全仓 Biome 为 0 个 error、143 个 warning。不要把这些存量 warning 误报为本次改动引入，也不要新增诊断。详细基线和优先级见 `docs/CODE_REVIEW_2026-09-05.md`。
 
 ## 完成标准
