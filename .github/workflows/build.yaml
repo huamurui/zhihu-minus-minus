@@ -113,7 +113,7 @@ jobs:
         run: eas build --platform android --profile "$EAS_PROFILE" --local --non-interactive --output="${{ steps.android-artifact.outputs.path }}"
 
       - name: Upload Android artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-apk
           path: ${{ steps.android-artifact.outputs.path }}
@@ -204,7 +204,7 @@ jobs:
           echo "path=${ARTIFACT_DIR}/${IPA_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Upload iOS artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ios-unsigned-ipa
           path: ${{ steps.ios-artifact.outputs.path }}
