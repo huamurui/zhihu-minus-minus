@@ -13,6 +13,7 @@ export * from './daily';
 export * from './feed';
 export * from './following';
 export * from './history';
+export * from './image';
 export * from './me';
 export * from './member';
 export * from './moments';
