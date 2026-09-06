@@ -39,7 +39,7 @@
     "expo-crypto": "^55.0.9",
     "expo-dev-client": "~55.0.16",
     "expo-file-system": "~55.0.10",
-    "expo-font": "~55.0.4",
+    "expo-font": "~57.0.3",
     "expo-haptics": "~55.0.8",
     "expo-intent-launcher": "~55.0.8",
     "expo-linear-gradient": "~55.0.15",
