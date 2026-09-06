@@ -80,9 +80,7 @@ npm ci
 按改动范围运行验证，最低基线为：
 
 ```bash
-./node_modules/.bin/tsc --noEmit
-npm run test:rich-content
-./node_modules/.bin/biome check path/to/changed-file.ts
+npm run check
 ```
 
 补充检查：
@@ -94,7 +92,9 @@ npm run analyze:rich-content
 
 `npm run lint` 执行只读的 `biome check .`；需要应用 Biome 修复时使用 `npm run lint:fix`。`npm run lint:fix` 与 `npm run format` 会修改文件，运行后必须逐项复核 diff。
 
-截至 2026-09-05（基于 `87c0712` 的未提交修复），`tsc --noEmit`、18 个富文本测试、7 个主题测试和 5 个用户资料测试通过，富文本分析的 6 个 fixture 校验通过；全仓 Biome 为 0 个 error、143 个 warning。不要把这些存量 warning 误报为本次改动引入，也不要新增诊断。详细基线和优先级见 `docs/CODE_REVIEW_2026-09-05.md`。
+`npm run check` 是 CI 和发布前的聚合质量门禁，依次执行类型检查、Biome、三组测试及富文本 fixture 分析。PR 与 `main` push 使用 `.github/workflows/ci.yml`；手动发布使用 `.github/workflows/build.yaml`，在同一次运行中汇总 Android 与 iOS artifact。发布前必须同步 `package.json` 与 `app.json` 的版本，并从 `main` 创建尚不存在的 `v<version>` tag。详见 `docs/RELEASING.md`。
+
+截至 2026-09-05（基于 `906aade` 的未提交工作流改动），聚合检查通过：18 个富文本测试、7 个主题测试、5 个用户资料测试及 6 个 fixture 校验通过；全仓 Biome 为 0 个 error、143 个 warning。不要把这些存量 warning 误报为本次改动引入，也不要新增诊断。详细基线和优先级见 `docs/CODE_REVIEW_2026-09-05.md`。
 
 ## 完成标准
 

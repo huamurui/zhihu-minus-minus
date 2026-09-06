@@ -149,21 +149,19 @@ npm run ios
 ### 提交前验证
 
 ```bash
-./node_modules/.bin/tsc --noEmit
-npm run test:rich-content
-./node_modules/.bin/biome check path/to/changed-file.ts
+npm run check
 ```
 
-全仓只读检查可运行 `npm run lint`；需要应用 Biome 修复时使用 `npm run lint:fix`，并逐项复核改动。截至 2026-09-05（基于 `87c0712` 的未提交修复），类型检查、18 个富文本测试、7 个主题测试和 5 个用户资料测试通过；全仓 Biome 为 0 个 error、143 个 warning，详情见 [最新代码审查记录](./docs/CODE_REVIEW_2026-09-05.md)。
+`npm run check` 会依次执行 TypeScript、Biome、全部测试和富文本 fixture 分析。全仓只读检查也可单独运行 `npm run lint`；需要应用 Biome 修复时使用 `npm run lint:fix`，并逐项复核改动。截至 2026-09-05（基于 `906aade` 的未提交工作流改动），聚合检查通过；全仓 Biome 为 0 个 error、143 个 warning，详情见 [最新代码审查记录](./docs/CODE_REVIEW_2026-09-05.md)。
 
 富文本模块的目录约定、fixture 与专项命令见 [features/rich-content/README.md](./features/rich-content/README.md)。面向自动化开发者的维护规则见 [AGENTS.md](./AGENTS.md)。
 
-## 📦 GitHub Actions 自动打包发布
+## 📦 GitHub Actions
 
-本项目已配置 GitHub Actions 自动化构建工作流：
+本项目配置了两类 GitHub Actions 工作流：
 
-- **Android APK 构建与 Release**（[`.github/workflows/build.yaml`](.github/workflows/build.yaml)）
-- **iOS 未签名 IPA 构建**（[`.github/workflows/build-ios.yaml`](.github/workflows/build-ios.yaml)）
+- **Pull Request 与 main 分支质量检查**（[`.github/workflows/ci.yml`](.github/workflows/ci.yml)）
+- **同时构建 Android APK、iOS 未签名 IPA 并创建 Release**（[`.github/workflows/build.yaml`](.github/workflows/build.yaml)）
 
 ### 1. 前置准备 (Fork 与 Secrets 配置)
 
@@ -171,17 +169,16 @@ npm run test:rich-content
 2. **启用 Actions**：进入你 Fork 的仓库，点击 **Actions** 标签页，点击 *“I understand my workflows, go ahead and enable them”* 开启工作流权限。
 3. **配置密钥 (Secrets)**：在 Fork 仓库设置中（`Settings` -> `Secrets and variables` -> `Actions`）点击 **New repository secret** 添加：
    - `EXPO_TOKEN` *(Android 构建必填)*: 你的 Expo Token（需先在 [Expo 官网](https://expo.dev) 注册账号，然后在 [Access Tokens](https://expo.dev/settings/access-tokens) 页面新建并复制 Token）。
+   - `FIREBASE_ANDROID_JSON_B64` *(可选)*：需要 Firebase 配置时提供 base64 内容；未设置会自动跳过。
 
 ### 2. 触发打包步骤
 
-1. 进入你 Fork 的仓库页面，点击 **Actions** 标签页。
-2. 在左侧侧边栏中选择目标工作流：
-   - 打包 Android：选择 **Build and Release**
-   - 打包 iOS 未签名包：选择 **Build Unsigned iOS IPA**
-3. 点击右侧 **Run workflow** 下拉菜单，点击 **Run workflow** 启动打包。
+1. 同步修改 `package.json` 与 `app.json` 的版本号，提交并推送到 `main`。
+2. 进入仓库的 **Actions** 页面，选择 **Build Android + iOS and Release**。
+3. 点击 **Run workflow** 并选择 `main`。默认生成草稿 Release；勾选 `publish_release` 后会在成功构建后直接公开发布。
 
 > [!NOTE]
-> - **构建产物下载**：构建完成后，可在 Actions 运行记录下方的 **Artifacts** 区域下载打包好的 `.apk` 或未签名 `.ipa` 文件。
+> Ubuntu 和 macOS job 会在同一次运行中分别构建 APK 与 IPA，再由 Release job 自动下载两个 artifact、生成 `SHA256SUMS.txt` 并上传，无需手动中转 IPA。完整流程和失败重试说明见 [发布指南](./docs/RELEASING.md)。
 
 ## 🔐 登录说明
 
