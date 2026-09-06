@@ -32,7 +32,7 @@
     "axios": "^1.13.6",
     "babel-preset-expo": "~55.0.8",
     "expo": "~55.0.5",
-    "expo-blur": "~55.0.9",
+    "expo-blur": "~57.0.2",
     "expo-build-properties": "^55.0.9",
     "expo-clipboard": "~55.0.0",
     "expo-constants": "~55.0.7",
