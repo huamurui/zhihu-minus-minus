@@ -4,13 +4,16 @@
     {
       "id": "long-image-heavy-001",
       "file": "./cases/pig.json",
-      "contentPath": "content",
-      "sourceType": "answer",
-      "collectedAt": "2026-08-30",
+      "contentPath": "target.content",
+      "sourceType": "question_feed_card",
+      "collectedAt": "2026-09-07",
       "traits": [
+        "feed-card",
+        "answer-target",
         "long-form",
         "image",
         "figcaption",
+        "segment-interaction",
         "json-envelope",
         "metadata"
       ],
@@ -24,18 +27,22 @@
         "formulaImages": 0,
         "noscripts": 16,
         "videoBoxes": 0,
-        "linkCards": 0
+        "linkCards": 0,
+        "segmentInfos": 35
       },
       "expectedMetadata": {
-        "type": "answer",
-        "content_need_truncated": true,
-        "is_labeled": true,
-        "question.title": "为什么猪没在进化中灭绝？",
-        "endorsements.length": 2,
-        "reward_info.is_rewardable": true,
-        "relationship.voting": 1,
-        "reaction.relation.liked": false,
-        "can_comment.status": true
+        "type": "question_feed_card",
+        "target_type": "answer",
+        "target.type": "answer",
+        "target.content_need_truncated": false,
+        "target.allow_segment_interaction": 1,
+        "target.segment_infos.length": 35,
+        "target.question.title": "为什么猪没在进化中灭绝？",
+        "target.endorsements.length": 2,
+        "target.reward_info.is_rewardable": true,
+        "target.relationship.voting": 1,
+        "target.reaction.relation.liked": false,
+        "target.can_comment.status": true
       }
     },
     {
@@ -102,7 +109,8 @@
         "formulaImages": 0,
         "noscripts": 130,
         "videoBoxes": 0,
-        "linkCards": 1
+        "linkCards": 1,
+        "segmentInfos": 18
       },
       "expectedMetadata": {
         "type": "question_feed_card",

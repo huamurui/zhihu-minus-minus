@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import CookieManager from '@preeternal/react-native-cookie-manager';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import React from 'react';
 import {
   ActivityIndicator,
@@ -432,6 +432,14 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
           title="反馈与建议"
           onPress={() => router.push('/feedback')}
         />
+        {__DEV__ && (
+          <MenuItem
+            icon="bug-outline"
+            title="富文本测试案例（开发）"
+            color={accentColor}
+            onPress={() => router.push('/dev/rich-content' as Href)}
+          />
+        )}
       </View>
 
       {/* 退出登录按钮 */}

@@ -12,7 +12,7 @@
 npm run analyze:rich-content:inbox
 ```
 
-工具会递归扫描每个 JSON 文件，并读取根对象的 `content` 字段。数组或 `{ "data": [...] }` 之类的响应，先登记到 manifest 并用 `contentPath` 指向正文。这个阶段只做结构统计，不会因为尚未登记期望值而失败。
+工具会递归扫描每个 JSON 文件：普通对象默认读取根 `content`，`question_feed_card` 自动读取 `target.content` 与 `target.segment_infos`。数组或 `{ "data": [...] }` 之类的响应，先登记到 manifest 并用 `contentPath` 指向正文。这个阶段只做结构统计，不会因为尚未登记期望值而失败。
 
 ## 新增真实内容
 
@@ -60,6 +60,8 @@ JSON fixture 保留 API 返回对象本身，正文不再单独复制一份：
 
 `expectedMetadata` 的 key 是点号路径，value 做深比较；适合断言类型、权限/截断状态、徽章数量和关系状态等稳定行为字段。点赞数、评论数、时间戳、URL 查询参数等易变或带隐私的信息不要作为长期精确断言。JSON 中仍不得提交 Cookie、请求头、令牌、私密内容或未脱敏的个人联系方式。
 
+案例带有 `segment_infos` 时，分析器还会校验每条 segment 的 PID 唯一且存在于正文 `p[data-pid]` 中、mark 范围没有越过 `text`、交互计数类型正确，并检查 `seg_ids`。可在 `expected` 中加入 `segmentInfos` 固定条数。开发案例页会把校验后的数据原样传给正文渲染器；正文交互仍默认关闭。
+
 HTML 统计还包括 `memberMentions`（`a.member_mention`）和 `topicTags`（`a.hash_tag`）。如果知乎把卡片、图片或其他结构化节点放在 JSON 的 `content` 数组里，它们不会自动计入 HTML 的 `linkCards`/图片统计，应使用 `expectedMetadata` 对数组项断言；这正是 `pin-link-card-001`、`pin-member-mention-muted-001` 和 `pin-topic-tag-001` 的区别。
 
 ## 安全与隐私
@@ -71,7 +73,7 @@ HTML 统计还包括 `memberMentions`（`a.member_mention`）和 `topicTags`（`
 
 ## 现有种子样本
 
-`cases/pig.json` 是脱敏后的完整知乎 answer envelope，正文和正文外元数据一起覆盖无公式长图文的解析与渲染压力。
+`cases/pig.json` 是脱敏后的完整知乎 `question_feed_card` envelope，正文与 35 条 `segment_infos` 位于 `target`，用于覆盖无公式长图文、图片和段落交互的解析与渲染压力。
 
 `cases/question-feed-card-heavy.json` 是 `question_feed_card` envelope，正文位于 `target.content`，用于覆盖 feed card 包装、超长图文、link card、segment 信息和 answer 关系元数据。
 

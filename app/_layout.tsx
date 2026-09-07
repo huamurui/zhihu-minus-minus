@@ -244,6 +244,9 @@ function RootLayout() {
                 {/* 底部 Tab 主框架 */}
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
 
+                {/* 开发工具自带嵌套导航；生产环境会由 dev layout 重定向 */}
+                <Stack.Screen name="dev" options={{ headerShown: false }} />
+
                 {/* 文章详情页：从右侧推入 */}
                 <Stack.Screen
                   name="article/[id]"

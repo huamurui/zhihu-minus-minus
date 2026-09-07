@@ -32,6 +32,12 @@ npm run test:rich-content
 
 第一个分析命令校验 manifest 中的稳定案例；带 `inbox` 的命令递归扫描新投递文件，只输出结构统计，不要求先维护 manifest。对于完整知乎 API JSON，案例通过 `contentPath` 选择正文，同时可以用 `expectedMetadata` 覆盖作者、问题、徽章、反应、权限、截断状态、@ 提及和 # 话题等正文之外或 HTML 属性之外的行为输入。
 
+## 开发构建案例页
+
+开发构建可从“我的 → 富文本测试案例（开发）”打开案例列表。列表读取 `fixtures/manifest.json`，支持按 ID、来源类型和 trait 搜索；进入案例后可以在 RNRH 与现有 WebView 实现之间切换，并可重新挂载正文以观察冷渲染。正文交互默认关闭，也可用页面开关临时打开，以测试图片、链接、选择和段落操作；打开后需注意案例可能保留真实对象 ID。
+
+案例页只展示已经登记到 `fixtures/cases/` 与 manifest 的稳定样本，`inbox/` 不会直接进入 UI。新增并登记 JSON case 后，Metro 的 fixture context 会自动发现文件，不需要再修改页面注册表。生产构建不显示入口，直接访问 `/dev/*` 也会被重定向到首页。
+
 ## 当前范围
 
 项目已经完成测试集集中、首轮真机基线、列表正文复用、长按预览复用和 Pager 相邻回答预取。下一阶段不再把 RNRH 作为长期架构，而是按 [Renderer V2 迁移计划](./docs/renderer-v2-plan.md) 逐步替换：

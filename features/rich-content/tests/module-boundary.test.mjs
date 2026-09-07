@@ -45,3 +45,16 @@ test('application code imports rich content through the feature entry point', as
 
   assert.deepEqual(violations, []);
 });
+
+test('the fixture browser is only reachable from development builds', async () => {
+  const [devLayout, profileScreen] = await Promise.all([
+    readFile(path.join(REPO_ROOT, 'app/dev/_layout.tsx'), 'utf8'),
+    readFile(path.join(REPO_ROOT, 'app/(tabs)/profile.tsx'), 'utf8'),
+  ]);
+
+  assert.match(devLayout, /if \(!__DEV__\) return <Redirect href="\/" \/>/);
+  assert.match(
+    profileScreen,
+    /\{__DEV__ && \([\s\S]*title="富文本测试案例（开发）"/,
+  );
+});

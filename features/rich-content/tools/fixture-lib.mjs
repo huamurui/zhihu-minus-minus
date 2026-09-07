@@ -101,10 +101,15 @@ async function loadFixtureSource(filePath, contentPath) {
     );
   }
 
-  const selectedContent = getFixtureValue(document, contentPath ?? 'content');
+  const selectedContentPath =
+    contentPath ??
+    (getFixtureValue(document, 'type') === 'question_feed_card'
+      ? 'target.content'
+      : 'content');
+  const selectedContent = getFixtureValue(document, selectedContentPath);
   if (typeof selectedContent !== 'string') {
     throw new Error(
-      `JSON fixture ${filePath} must contain string content at ${contentPath ?? 'content'}`,
+      `JSON fixture ${filePath} must contain string content at ${selectedContentPath}`,
     );
   }
 
@@ -160,6 +165,113 @@ export function analyzeHtml(html) {
   };
 }
 
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function getFixtureEntity(document, sourceType) {
+  if (!isRecord(document)) return null;
+  if (sourceType === 'question_feed_card') {
+    return isRecord(document.target) ? document.target : null;
+  }
+  return document;
+}
+
+function getParagraphIds(html) {
+  return new Set(
+    Array.from(
+      html.matchAll(/<p\b[^>]*\bdata-pid=(?:"([^"]+)"|'([^']+)')[^>]*>/gi),
+      (match) => match[1] ?? match[2],
+    ),
+  );
+}
+
+export function analyzeSegmentInfos(document, sourceType, html) {
+  const entity = getFixtureEntity(document, sourceType);
+  const segmentInfos = entity?.segment_infos;
+  if (segmentInfos === undefined) return { count: 0, errors: [] };
+  if (!Array.isArray(segmentInfos)) {
+    return { count: 0, errors: ['segment_infos must be an array'] };
+  }
+
+  const paragraphIds = getParagraphIds(html);
+  const seenPids = new Set();
+  const errors = [];
+
+  segmentInfos.forEach((segment, segmentIndex) => {
+    const segmentPath = `segment_infos.${segmentIndex}`;
+    if (!isRecord(segment)) {
+      errors.push(`${segmentPath} must be an object`);
+      return;
+    }
+
+    if (typeof segment.pid !== 'string' || !segment.pid) {
+      errors.push(`${segmentPath}.pid must be a non-empty string`);
+    } else {
+      if (seenPids.has(segment.pid)) {
+        errors.push(`${segmentPath}.pid duplicates ${segment.pid}`);
+      }
+      seenPids.add(segment.pid);
+      if (!paragraphIds.has(segment.pid)) {
+        errors.push(`${segmentPath}.pid ${segment.pid} is absent from content`);
+      }
+    }
+
+    if (typeof segment.text !== 'string') {
+      errors.push(`${segmentPath}.text must be a string`);
+      return;
+    }
+    if (!Array.isArray(segment.marks)) {
+      errors.push(`${segmentPath}.marks must be an array`);
+      return;
+    }
+
+    segment.marks.forEach((mark, markIndex) => {
+      const markPath = `${segmentPath}.marks.${markIndex}`;
+      if (!isRecord(mark)) {
+        errors.push(`${markPath} must be an object`);
+        return;
+      }
+
+      if (
+        !Number.isInteger(mark.start_index) ||
+        !Number.isInteger(mark.end_index) ||
+        mark.start_index < 0 ||
+        mark.end_index < mark.start_index ||
+        mark.end_index > segment.text.length
+      ) {
+        errors.push(
+          `${markPath} range ${mark.start_index}:${mark.end_index} is invalid for text length ${segment.text.length}`,
+        );
+      }
+
+      const interaction = mark.seg_info ?? mark.master_seg_info;
+      if (!isRecord(interaction)) {
+        errors.push(`${markPath} must contain seg_info or master_seg_info`);
+        return;
+      }
+      if (
+        typeof interaction.like_count !== 'number' ||
+        typeof interaction.comment_count !== 'number' ||
+        typeof interaction.is_like !== 'boolean'
+      ) {
+        errors.push(`${markPath} contains invalid interaction counters`);
+      }
+      if (
+        interaction.seg_ids !== undefined &&
+        (!Array.isArray(interaction.seg_ids) ||
+          !interaction.seg_ids.every(
+            (segmentId) => typeof segmentId === 'string' && segmentId,
+          ))
+      ) {
+        errors.push(`${markPath}.seg_ids must contain non-empty strings`);
+      }
+    });
+  });
+
+  return { count: segmentInfos.length, errors };
+}
+
 export function compareExpected(actual, expected = {}) {
   return Object.entries(expected).flatMap(([key, expectedValue]) => {
     const actualValue = actual[key];
@@ -184,7 +296,15 @@ export async function analyzeFixtureCase(fixtureCase, manifestPath) {
     filePath,
     fixtureCase.contentPath,
   );
-  const stats = analyzeHtml(content);
+  const segmentAnalysis = analyzeSegmentInfos(
+    document,
+    fixtureCase.sourceType,
+    content,
+  );
+  const stats = {
+    ...analyzeHtml(content),
+    segmentInfos: segmentAnalysis.count,
+  };
   return {
     ...fixtureCase,
     filePath,
@@ -194,6 +314,7 @@ export async function analyzeFixtureCase(fixtureCase, manifestPath) {
       ...(document
         ? compareExpectedMetadata(document, fixtureCase.expectedMetadata)
         : []),
+      ...segmentAnalysis.errors,
     ],
   };
 }
@@ -218,15 +339,23 @@ export async function analyzeFixtureDirectory(directoryPath) {
   const results = [];
 
   for (const filePath of filePaths) {
-    const { content } = await loadFixtureSource(filePath);
+    const { content, document } = await loadFixtureSource(filePath);
     const relativePath = path.relative(directoryPath, filePath);
+    const segmentAnalysis = analyzeSegmentInfos(
+      document,
+      document?.type,
+      content,
+    );
     results.push({
       id: `inbox:${relativePath}`,
       filePath,
       sourceType: 'unregistered',
       traits: [],
-      stats: analyzeHtml(content),
-      errors: [],
+      stats: {
+        ...analyzeHtml(content),
+        segmentInfos: segmentAnalysis.count,
+      },
+      errors: segmentAnalysis.errors,
     });
   }
 
