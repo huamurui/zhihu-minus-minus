@@ -221,13 +221,15 @@ export interface CreateCommentResponse {
   id?: string | number;
   type?: string;
   content?: string;
+  reply_comment_id?: string | number | null;
+  reply_root_comment_id?: string | number | null;
   [key: string]: unknown;
 }
 
 export interface CreateCommentPayload {
   content: string;
   type: 'comment';
-  reply_to_comment_id?: string | number;
+  reply_comment_id?: string | number;
 }
 
 export const getComment = async (id: string | number): Promise<CommentItem> => {
@@ -375,7 +377,7 @@ export const createCommentV5 = async (
     type: 'comment',
   };
   if (replyToCommentId !== undefined) {
-    payload.reply_to_comment_id = replyToCommentId;
+    payload.reply_comment_id = replyToCommentId;
   }
 
   const res = await apiClient.post<CreateCommentResponse>(
