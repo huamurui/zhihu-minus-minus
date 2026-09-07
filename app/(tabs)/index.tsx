@@ -655,14 +655,14 @@ export default function HomeScreen() {
                 // 判断逻辑：当前在首页区域且当前子 Tab 有滚动
                 isScrollTop={
                   currentPage <
-                  currentTabs.filter(
-                    (t) => !['publish', 'profile'].includes(t),
-                  ).length && scrolledTabs[currentPage]
+                    currentTabs.filter(
+                      (t) => !['publish', 'profile'].includes(t),
+                    ).length && scrolledTabs[currentPage]
                 }
                 icon={
                   currentPage <
-                    currentTabs.filter((t) => !['publish', 'profile'].includes(t))
-                      .length
+                  currentTabs.filter((t) => !['publish', 'profile'].includes(t))
+                    .length
                     ? 'home'
                     : 'home-outline'
                 }
@@ -674,8 +674,8 @@ export default function HomeScreen() {
                 onPress={handleHomeTabPress}
                 color={
                   currentPage <
-                    currentTabs.filter((t) => !['publish', 'profile'].includes(t))
-                      .length
+                  currentTabs.filter((t) => !['publish', 'profile'].includes(t))
+                    .length
                     ? tintColor
                     : Colors[colorScheme].textSecondary
                 }
@@ -1592,7 +1592,7 @@ const styles = StyleSheet.create({
   navText: {
     fontSize: 15,
     fontWeight: '600',
-    transitionProperty: 'color'
+    transitionProperty: 'color',
   },
   topPill: {
     position: 'absolute',

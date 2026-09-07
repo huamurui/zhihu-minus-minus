@@ -110,62 +110,62 @@ export const FeedCard = ({ item, tab }: { item: FeedItem; tab?: string }) => {
   const menuOptions: MenuOption[] = [
     ...(engagementType
       ? [
-        {
-          key: 'like',
-          title: voted === 1 ? '取消赞同' : '赞同',
-          icon: voted === 1 ? 'caret-up' : 'caret-up-outline',
-          onPress: async () => {
-            const nextVoted = voted === 1 ? 0 : 1;
-            const nextCount = voted === 1 ? voteCount - 1 : voteCount + 1;
-            try {
-              const voteType =
-                item.type === 'pins'
-                  ? nextVoted === 1
-                    ? 'like'
-                    : 'unlike'
-                  : nextVoted === 1
-                    ? 'up'
-                    : 'neutral';
-              await voteContent(item.id, engagementType, voteType);
-              setVoted(nextVoted);
-              setVoteCount(nextCount);
-              showToast(nextVoted === 1 ? '已赞同' : '已取消赞同');
-            } catch {
-              console.error('投票失败');
-              showToast('操作失败，请稍后重试');
-            }
+          {
+            key: 'like',
+            title: voted === 1 ? '取消赞同' : '赞同',
+            icon: voted === 1 ? 'caret-up' : 'caret-up-outline',
+            onPress: async () => {
+              const nextVoted = voted === 1 ? 0 : 1;
+              const nextCount = voted === 1 ? voteCount - 1 : voteCount + 1;
+              try {
+                const voteType =
+                  item.type === 'pins'
+                    ? nextVoted === 1
+                      ? 'like'
+                      : 'unlike'
+                    : nextVoted === 1
+                      ? 'up'
+                      : 'neutral';
+                await voteContent(item.id, engagementType, voteType);
+                setVoted(nextVoted);
+                setVoteCount(nextCount);
+                showToast(nextVoted === 1 ? '已赞同' : '已取消赞同');
+              } catch {
+                console.error('投票失败');
+                showToast('操作失败，请稍后重试');
+              }
+            },
           },
-        },
-        {
-          key: 'comment',
-          title: '评论',
-          icon: 'chatbubble-outline',
-          onPress: () => {
-            const type =
-              item.type === 'articles'
-                ? 'article'
-                : item.type === 'answers'
-                  ? 'answer'
-                  : item.type.slice(0, -1);
-            router.push(
-              `/comments/${item.id}?type=${type}&count=${item.commentCount}`,
-            );
+          {
+            key: 'comment',
+            title: '评论',
+            icon: 'chatbubble-outline',
+            onPress: () => {
+              const type =
+                item.type === 'articles'
+                  ? 'article'
+                  : item.type === 'answers'
+                    ? 'answer'
+                    : item.type.slice(0, -1);
+              router.push(
+                `/comments/${item.id}?type=${type}&count=${item.commentCount}`,
+              );
+            },
           },
-        },
-      ]
+        ]
       : []),
     ...(isCollectable
       ? [
-        {
-          key: 'collect',
-          title: isCollected ? '取消收藏' : '移至收藏',
-          icon: isCollected ? 'star' : 'star-outline',
-          onPress: () => {
-            const typeStr = item.type === 'answers' ? 'answer' : 'article';
-            toggleCollect(item.id, typeStr, isCollected);
+          {
+            key: 'collect',
+            title: isCollected ? '取消收藏' : '移至收藏',
+            icon: isCollected ? 'star' : 'star-outline',
+            onPress: () => {
+              const typeStr = item.type === 'answers' ? 'answer' : 'article';
+              toggleCollect(item.id, typeStr, isCollected);
+            },
           },
-        },
-      ]
+        ]
       : []),
     {
       key: 'share',
