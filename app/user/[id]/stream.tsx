@@ -39,6 +39,7 @@ import {
   getMemberActivities,
   getMemberRelations,
   getMemberWithFallback,
+  MEMBER_ANSWERS_INCLUDE,
 } from '@/api/zhihu';
 import type { ZhihuMemberActivity } from '@/api/zhihu/member';
 import { BouncyButton } from '@/components/BouncyButton';
@@ -654,9 +655,7 @@ export default function UserStreamScreen() {
       }
 
       let include = '';
-      if (activeTab === 'answers')
-        include =
-          'data[*].content,data[*].voteup_count,data[*].comment_count,data[*].created_time,data[*].updated_time,data[*].excerpt,data[*].question.title,data[*].relationship.voting,data[*].relationship.is_thanked';
+      if (activeTab === 'answers') include = MEMBER_ANSWERS_INCLUDE;
       else if (activeTab === 'questions')
         include =
           'data[*].created,data[*].answer_count,data[*].follower_count,data[*].author,data[*].admin_closed_comment,data[*].relationship.is_following';
@@ -668,9 +667,12 @@ export default function UserStreamScreen() {
           'data[*].content,data[*].reaction_count,data[*].comment_count,data[*].created,data[*].relationship.voting';
 
       return getMemberRelations(targetId, activeTab, {
-        limit: 10,
-        offset: pageParam,
         include,
+        offset: pageParam,
+        limit: activeTab === 'answers' ? 20 : 10,
+        ...(activeTab === 'answers'
+          ? { sort_by: 'created', ws_qiangzhisafe: 0 }
+          : {}),
       });
     },
     initialPageParam: 0,

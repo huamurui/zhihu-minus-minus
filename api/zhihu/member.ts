@@ -8,6 +8,9 @@ import apiClient from '../client';
 export const MEMBER_INCLUDE =
   'url_token,answer_count,articles_count,question_count,pins_count,follower_count,following_count,headline,cover_url,description,voteup_count,thanked_count,favorited_count,is_following,mutual_followees_count';
 
+export const MEMBER_ANSWERS_INCLUDE =
+  'data[*].is_normal,admin_closed_comment,reward_info,is_collapsed,annotation_action,annotation_detail,collapse_reason,collapsed_by,suggest_edit,comment_count,can_comment,content,editable_content,attachment,voteup_count,reshipment_settings,comment_permission,created_time,updated_time,review_info,excerpt,paid_info,reaction_instruction,is_labeled,label_info,relationship.is_authorized,voting,is_author,is_thanked,is_nothelp,reaction,vessay_info;data[*].author.badge[?(type=best_answerer)].topics;data[*].author.kvip_info;data[*].author.vip_info;data[*].question.has_publishing_draft,relationship';
+
 const MEMBER_FALLBACK_INCLUDE =
   'id,url_token,name,avatar_url,follower_count,following_count,headline,cover_url,description,answer_count,articles_count,question_count,pins_count,voteup_count,is_following,mutual_followees_count';
 
@@ -100,6 +103,7 @@ export const getMemberRelations = async (
     offset?: number;
     include?: string;
     sort_by?: string;
+    ws_qiangzhisafe?: number;
   },
 ): Promise<ZhihuListResponse<ZhihuMemberRelation>> => {
   const endpoint = `/members/${id}/${type}`;

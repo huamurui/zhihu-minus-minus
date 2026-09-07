@@ -33,6 +33,7 @@ import {
   getMemberActivities,
   getMemberRelations,
   getMemberWithFallback,
+  MEMBER_ANSWERS_INCLUDE,
   searchContent,
   unfollowMember,
   type ZhihuMember,
@@ -449,13 +450,12 @@ export default function UserDetailScreen() {
     queryKey: ['user-answers', id, sortBy],
     queryFn: ({ pageParam = 0 }) => {
       const targetId = (user?.url_token || id) as string;
-      const include =
-        'data[*].is_normal,admin_closed_comment,content,voteup_count,comment_count,favlists_count,created_time,updated_time,excerpt,reaction,relationship.voting,relationship.is_author,relationship.is_thanked;data[*].author;data[*].question.title';
       return getMemberRelations(targetId, 'answers', {
-        limit: 20,
+        include: MEMBER_ANSWERS_INCLUDE,
         offset: pageParam,
-        include,
+        limit: 20,
         sort_by: sortBy,
+        ws_qiangzhisafe: 0,
       });
     },
     initialPageParam: 0,
