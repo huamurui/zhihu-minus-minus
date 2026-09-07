@@ -531,7 +531,6 @@ export default function HomeScreen() {
                         style={[
                           styles.navText,
                           currentPage === index && {
-                            fontWeight: 'bold',
                             color: tintColor,
                           },
                         ]}
@@ -655,14 +654,14 @@ export default function HomeScreen() {
                 // 判断逻辑：当前在首页区域且当前子 Tab 有滚动
                 isScrollTop={
                   currentPage <
-                    currentTabs.filter(
-                      (t) => !['publish', 'profile'].includes(t),
-                    ).length && scrolledTabs[currentPage]
+                  currentTabs.filter(
+                    (t) => !['publish', 'profile'].includes(t),
+                  ).length && scrolledTabs[currentPage]
                 }
                 icon={
                   currentPage <
-                  currentTabs.filter((t) => !['publish', 'profile'].includes(t))
-                    .length
+                    currentTabs.filter((t) => !['publish', 'profile'].includes(t))
+                      .length
                     ? 'home'
                     : 'home-outline'
                 }
@@ -674,8 +673,8 @@ export default function HomeScreen() {
                 onPress={handleHomeTabPress}
                 color={
                   currentPage <
-                  currentTabs.filter((t) => !['publish', 'profile'].includes(t))
-                    .length
+                    currentTabs.filter((t) => !['publish', 'profile'].includes(t))
+                      .length
                     ? tintColor
                     : Colors[colorScheme].textSecondary
                 }
@@ -1378,7 +1377,7 @@ function parseFollowingData(item: RawFeedItem): FeedItem | null {
     questionId:
       target.question?.id?.toString() ||
       (type === 'question' ? target.id?.toString() : ''),
-    actionText: item.action_text,
+    actionText: item.action_text + "·" + ,
     author: {
       id: target.author?.id || '',
       url_token: target.author?.url_token || '',
@@ -1584,7 +1583,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 4,
   },
-  navText: { fontSize: 15 },
+  navText: {
+    fontSize: 15,
+    fontWeight: '600',
+    transitionProperty: 'color'
+  },
   topPill: {
     position: 'absolute',
     width: 54,
