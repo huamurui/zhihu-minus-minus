@@ -64,6 +64,7 @@ import {
 } from '@/storage/feedExposureRepository';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
+import { formatRelativeTime } from '@/utils/date';
 import { supportsLocalFeedDedup } from '@/utils/feedDedup';
 import {
   applyFeedFilter,
@@ -1377,7 +1378,12 @@ function parseFollowingData(item: RawFeedItem): FeedItem | null {
     questionId:
       target.question?.id?.toString() ||
       (type === 'question' ? target.id?.toString() : ''),
-    actionText: item.action_text + "·" + ,
+    // 时间戳
+    actionText: item.action_text
+      ? `${item.action_text}${
+          item.updated_time ? `·${formatRelativeTime(item.updated_time)}` : ''
+        }`
+      : undefined,
     author: {
       id: target.author?.id || '',
       url_token: target.author?.url_token || '',
