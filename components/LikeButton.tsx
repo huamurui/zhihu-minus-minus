@@ -12,6 +12,7 @@ import { voteContent } from '@/api/zhihu';
 import Colors from '@/constants/Colors';
 import { colors } from '@/constants/designTokens';
 import { showToast } from '@/utils/toast';
+import { getZhihuErrorMessage } from '@/utils/zhihuError';
 import { BouncyButton } from './BouncyButton';
 import { Text, useThemeColor } from './Themed';
 import { useColorScheme } from './useColorScheme';
@@ -85,9 +86,8 @@ export const LikeButton = ({
         onVoteChange?.(nextVoted, newCount);
       }
       showToast(isUpvoted ? '已取消赞同' : '已赞同');
-    } catch {
-      console.error('投票失败');
-      showToast('操作失败，请稍后重试');
+    } catch (error: unknown) {
+      showToast(getZhihuErrorMessage(error));
     } finally {
       setLoading(false);
     }

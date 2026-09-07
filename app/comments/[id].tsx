@@ -15,7 +15,7 @@ import {
   Keyboard,
   Platform,
   StyleSheet,
-  TextInput,
+  type TextInput,
   useWindowDimensions,
 } from 'react-native';
 import Reanimated, {
@@ -26,11 +26,14 @@ import Reanimated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   type CommentItem,
+  type CommentResourceType,
   createAnswerComment,
   createArticleComment,
   createCommentReply,
+  createCommentV5,
   createPinComment,
   createQuestionComment,
+  deleteComment,
   getAnswerComments,
   getArticleCommentsV5 as getArticleComments,
   getPinCommentsV5 as getPinComments,
@@ -38,12 +41,18 @@ import {
 } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
 import { CommentActionSheet } from '@/components/CommentActionSheet';
+import {
+  CommentComposer,
+  type CommentDraft,
+} from '@/components/CommentComposer';
 import { CommentContent } from '@/components/CommentContent';
 import { LikeButton } from '@/components/LikeButton';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { formatDate } from '@/utils/date';
+import { buildZhihuContent, buildZhihuImageHtml } from '@/utils/zhihuContent';
+import { getZhihuErrorMessage } from '@/utils/zhihuError';
 
 export default function CommentScreen() {
   const { id, type, segmentId, count, text } = useLocalSearchParams<{
@@ -59,11 +68,13 @@ export default function CommentScreen() {
     null,
   );
   const [commentAction, setCommentAction] = useState<{
+    id: string | number;
     htmlContent: string;
     authorName: string;
+    canDelete: boolean;
   } | null>(null);
   const inputRef = React.useRef<TextInput>(null);
-  const _queryClient = useQueryClient();
+  const queryClient = useQueryClient();
   const _insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const borderColor = Colors[colorScheme].border;
@@ -74,6 +85,14 @@ export default function CommentScreen() {
   // 减去头像(32) + 间距(12) + 左右padding(30)
   const contentWidth = screenWidth - 32 - 12 - 30;
   const insets = _insets;
+  const commentResourceType: CommentResourceType =
+    type === 'question'
+      ? 'questions'
+      : type === 'article'
+        ? 'articles'
+        : type === 'pin'
+          ? 'pins'
+          : 'answers';
 
   // 键盘高度动画：解决键盘收起后输入框无法回到底部的 bug
   const keyboardHeight = useSharedValue(0);
@@ -145,7 +164,17 @@ export default function CommentScreen() {
   const comments = data?.pages.flatMap((page: any) => page.data || []) || [];
 
   const mutation = useMutation({
-    mutationFn: (content: string) => {
+    mutationFn: async ({ text: commentText, images }: CommentDraft) => {
+      const imageHtml = images.map(buildZhihuImageHtml).join('<br/>');
+      const content = buildZhihuContent(commentText, imageHtml);
+      if (replyTo && !segmentId) {
+        return createCommentV5(
+          commentResourceType,
+          id as string,
+          content,
+          replyTo.id,
+        );
+      }
       if (replyTo) return createCommentReply(replyTo.id, content);
       if (type === 'question')
         return createQuestionComment(id as string, content);
@@ -160,25 +189,62 @@ export default function CommentScreen() {
       setReplyTo(null);
       refetch();
     },
-    onError: (err: any) =>
-      Alert.alert('发布失败', err.response?.data?.error?.message || '未知错误'),
+    onError: (err: unknown) =>
+      Alert.alert('发布失败', getZhihuErrorMessage(err)),
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (commentId: string | number) => {
+      const response = await deleteComment(commentId);
+      if (!response.success) throw new Error('知乎未确认评论删除成功');
+      return response;
+    },
+    onSuccess: () => {
+      setCommentAction(null);
+      void refetch();
+      void queryClient.invalidateQueries({ queryKey: ['comments'] });
+      Alert.alert('删除成功', '评论已删除喵！');
+    },
+    onError: (err: unknown) =>
+      Alert.alert('删除失败', getZhihuErrorMessage(err)),
+  });
+
+  const submitComment = async (draft: CommentDraft) => {
+    await mutation.mutateAsync(draft);
+  };
 
   const goToProfile = (urlToken: string | number) => {
     if (urlToken) router.push(`/user/${urlToken}`);
   };
 
-  const handleLongPressComment = (htmlContent: string, authorName: string) => {
-    setCommentAction({ htmlContent, authorName });
+  const canDeleteComment = (item: CommentItem) =>
+    item.can_delete === true || item.allow_delete === true;
+
+  const requestDelete = (commentId: string | number) => {
+    Alert.alert('确认删除', '确定要删除这条评论吗？此操作不可撤销喵。', [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '删除',
+        style: 'destructive',
+        onPress: () => deleteMutation.mutate(commentId),
+      },
+    ]);
+  };
+
+  const handleLongPressComment = (item: CommentItem) => {
+    setCommentAction({
+      id: item.id,
+      htmlContent: item.content,
+      authorName: item.author.member.name,
+      canDelete: canDeleteComment(item),
+    });
   };
 
   const renderComment = ({ item }: { item: CommentItem }) => {
     return (
       <BouncyButton
         accessible={false}
-        onLongPress={() =>
-          handleLongPressComment(item.content, item.author.member.name)
-        }
+        onLongPress={() => handleLongPressComment(item)}
         delayLongPress={400}
         style={{
           paddingHorizontal: 15,
@@ -254,6 +320,20 @@ export default function CommentScreen() {
                     回复
                   </Text>
                 </BouncyButton>
+                {canDeleteComment(item) && (
+                  <BouncyButton
+                    disabled={deleteMutation.isPending}
+                    onPress={() => requestDelete(item.id)}
+                    style={{ marginLeft: 15, borderRadius: 4 }}
+                  >
+                    <Text
+                      className="text-xs font-medium py-1"
+                      style={{ color: Colors[colorScheme].danger }}
+                    >
+                      删除
+                    </Text>
+                  </BouncyButton>
+                )}
               </View>
             </View>
 
@@ -272,7 +352,9 @@ export default function CommentScreen() {
                   router.push(
                     `/comments/replies/${item.id}?parent=${encodeURIComponent(
                       JSON.stringify(item),
-                    )}`,
+                    )}&resourceId=${encodeURIComponent(
+                      String(id),
+                    )}&resourceType=${encodeURIComponent(commentResourceType)}`,
                   )
                 }
               >
@@ -447,73 +529,26 @@ export default function CommentScreen() {
           style={{
             borderRadius: 30,
             overflow: 'hidden',
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor,
-            paddingHorizontal: 5,
-            backgroundColor:
-              colorScheme === 'dark'
-                ? 'rgba(26,26,26,0.85)'
-                : 'rgba(255,255,255,0.9)',
           }}
         >
-          {replyTo && (
-            <View className="flex-row justify-between items-center px-[15px] pt-2.5 pb-0.5">
-              <Text type="secondary" className="text-xs">
-                正在回复 {replyTo.name}
-              </Text>
-              <BouncyButton
-                onPress={() => setReplyTo(null)}
-                style={{ borderRadius: 8 }}
-              >
-                <Ionicons
-                  name="close-circle"
-                  size={16}
-                  color={Colors[colorScheme].textSecondary}
-                />
-              </BouncyButton>
-            </View>
-          )}
-          <View className="flex-row items-end px-1 py-1">
-            <TextInput
-              ref={inputRef}
-              className="flex-1 min-h-[40px] max-h-[100px] px-3 pt-2.5 pb-2.5"
-              style={{ color: textColor, fontSize: 15 }}
-              placeholder={
-                replyTo
-                  ? `回复 ${replyTo.name}...`
-                  : '既然来了，就留下点什么吧...'
-              }
-              placeholderTextColor="#999"
-              value={inputText}
-              onChangeText={setInputText}
-              multiline
-              maxLength={1000}
-            />
-            <BouncyButton
-              disabled={!inputText.trim() || mutation.isPending}
-              onPress={() => mutation.mutate(inputText.trim())}
-              style={{
-                height: 40,
-                justifyContent: 'center',
-                paddingHorizontal: 15,
-                borderRadius: 20,
-              }}
-            >
-              {mutation.isPending ? (
-                <ActivityIndicator size="small" color={tintColor} />
-              ) : (
-                <Text
-                  className="font-semibold text-base"
-                  style={{
-                    color: tintColor,
-                    opacity: inputText.trim() ? 1 : 0.5,
-                  }}
-                >
-                  发布
-                </Text>
-              )}
-            </BouncyButton>
-          </View>
+          <CommentComposer
+            colorScheme={colorScheme}
+            borderColor={borderColor}
+            inputRef={inputRef}
+            inputText={inputText}
+            isSubmitting={mutation.isPending}
+            onChangeText={setInputText}
+            onSubmit={submitComment}
+            onCancelReply={() => setReplyTo(null)}
+            placeholder={
+              replyTo
+                ? `回复 ${replyTo.name}...`
+                : '既然来了，就留下点什么吧...'
+            }
+            replyToName={replyTo?.name}
+            textColor={textColor}
+            tintColor={tintColor}
+          />
         </BlurView>
       </Reanimated.View>
 
@@ -521,6 +556,10 @@ export default function CommentScreen() {
         visible={commentAction !== null}
         htmlContent={commentAction?.htmlContent ?? null}
         authorName={commentAction?.authorName ?? null}
+        canDelete={commentAction?.canDelete ?? false}
+        onDelete={() => {
+          if (commentAction) requestDelete(commentAction.id);
+        }}
         onClose={() => setCommentAction(null)}
       />
     </View>

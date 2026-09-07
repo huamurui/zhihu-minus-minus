@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import {
   useInfiniteQuery,
@@ -16,7 +15,7 @@ import {
   Keyboard,
   Platform,
   StyleSheet,
-  TextInput,
+  type TextInput,
   useWindowDimensions,
 } from 'react-native';
 import Reanimated, {
@@ -27,35 +26,49 @@ import Reanimated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   type CommentItem,
+  type CommentResourceType,
   createCommentReply,
+  createCommentV5,
+  deleteComment,
   getChildCommentsV5 as getChildComments,
   getComment,
 } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
 import { CommentActionSheet } from '@/components/CommentActionSheet';
+import {
+  CommentComposer,
+  type CommentDraft,
+} from '@/components/CommentComposer';
 import { CommentContent } from '@/components/CommentContent';
 import { LikeButton } from '@/components/LikeButton';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { formatDate } from '@/utils/date';
+import { buildZhihuContent, buildZhihuImageHtml } from '@/utils/zhihuContent';
+import { getZhihuErrorMessage } from '@/utils/zhihuError';
 
 export default function ReplyDetailScreen() {
-  const { id, parent } = useLocalSearchParams<{
+  const { id, parent, resourceId, resourceType } = useLocalSearchParams<{
     id: string;
     parent?: string;
+    resourceId?: string;
+    resourceType?: string;
   }>();
   const [inputText, setInputText] = useState('');
   const [replyTo, setReplyTo] = useState<{ id: string; name: string } | null>(
     null,
   );
   const [commentAction, setCommentAction] = useState<{
+    id: string | number;
     htmlContent: string;
     authorName: string;
+    canDelete: boolean;
+    returnToParent: boolean;
   } | null>(null);
   const inputRef = useRef<TextInput>(null);
   const router = useRouter();
-  const _queryClient = useQueryClient();
+  const queryClient = useQueryClient();
   const _insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const borderColor = Colors[colorScheme].border;
@@ -65,6 +78,13 @@ export default function ReplyDetailScreen() {
   // 减去头像(32) + 间距(12) + 左右padding(30)
   const contentWidth = screenWidth - 32 - 12 - 30;
   const insets = _insets;
+  const v5ResourceType: CommentResourceType | null =
+    resourceType === 'answers' ||
+    resourceType === 'questions' ||
+    resourceType === 'articles' ||
+    resourceType === 'pins'
+      ? resourceType
+      : null;
 
   // 键盘高度动画：解决键盘收起后输入框无法回到底部的 bug
   const keyboardHeight = useSharedValue(0);
@@ -146,37 +166,102 @@ export default function ReplyDetailScreen() {
     0;
 
   const mutation = useMutation({
-    mutationFn: (content: string) =>
-      createCommentReply(
+    mutationFn: async ({ text: commentText, images }: CommentDraft) => {
+      const imageHtml = images.map(buildZhihuImageHtml).join('<br/>');
+      const content = buildZhihuContent(commentText, imageHtml);
+      if (resourceId && v5ResourceType) {
+        return createCommentV5(
+          v5ResourceType,
+          resourceId,
+          content,
+          replyTo?.id || id,
+        );
+      }
+      return createCommentReply(
         id as string,
         content,
         replyTo ? { reply_to_comment_id: replyTo.id } : {},
-      ),
+      );
+    },
     onSuccess: () => {
       Alert.alert('发布成功喵！');
       setInputText('');
       setReplyTo(null);
       refetch();
     },
-    onError: (err: any) =>
-      Alert.alert('发布失败', err.response?.data?.error?.message || '未知错误'),
+    onError: (err: unknown) =>
+      Alert.alert('发布失败', getZhihuErrorMessage(err)),
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async ({
+      commentId,
+      returnToParent,
+    }: {
+      commentId: string | number;
+      returnToParent: boolean;
+    }) => {
+      const response = await deleteComment(commentId);
+      if (!response.success) throw new Error('知乎未确认评论删除成功');
+      return { response, returnToParent };
+    },
+    onSuccess: ({ returnToParent }) => {
+      setCommentAction(null);
+      void queryClient.invalidateQueries({ queryKey: ['comments'] });
+      if (returnToParent) {
+        router.back();
+      } else {
+        void refetch();
+      }
+      Alert.alert('删除成功', '评论已删除喵！');
+    },
+    onError: (err: unknown) =>
+      Alert.alert('删除失败', getZhihuErrorMessage(err)),
+  });
+
+  const submitComment = async (draft: CommentDraft) => {
+    await mutation.mutateAsync(draft);
+  };
 
   const goToProfile = (urlToken: string | number) => {
     if (urlToken) router.push(`/user/${urlToken}`);
   };
 
-  const handleLongPressComment = (htmlContent: string, authorName: string) => {
-    setCommentAction({ htmlContent, authorName });
+  const canDeleteComment = (item: CommentItem) =>
+    item.can_delete === true || item.allow_delete === true;
+
+  const requestDelete = (
+    commentId: string | number,
+    returnToParent = false,
+  ) => {
+    Alert.alert('确认删除', '确定要删除这条评论吗？此操作不可撤销喵。', [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '删除',
+        style: 'destructive',
+        onPress: () => deleteMutation.mutate({ commentId, returnToParent }),
+      },
+    ]);
+  };
+
+  const handleLongPressComment = (
+    item: CommentItem,
+    returnToParent = false,
+  ) => {
+    setCommentAction({
+      id: item.id,
+      htmlContent: item.content,
+      authorName: item.author.member.name,
+      canDelete: canDeleteComment(item),
+      returnToParent,
+    });
   };
 
   const renderReply = ({ item }: { item: CommentItem }) => {
     return (
       <BouncyButton
         accessible={false}
-        onLongPress={() =>
-          handleLongPressComment(item.content, item.author.member.name)
-        }
+        onLongPress={() => handleLongPressComment(item)}
         delayLongPress={400}
         style={{
           borderRadius: 0,
@@ -267,6 +352,20 @@ export default function ReplyDetailScreen() {
                     回复
                   </Text>
                 </BouncyButton>
+                {canDeleteComment(item) && (
+                  <BouncyButton
+                    disabled={deleteMutation.isPending}
+                    onPress={() => requestDelete(item.id)}
+                    style={{ marginLeft: 15, borderRadius: 4 }}
+                  >
+                    <Text
+                      className="text-xs font-medium py-1"
+                      style={{ color: Colors[colorScheme].danger }}
+                    >
+                      删除
+                    </Text>
+                  </BouncyButton>
+                )}
               </View>
             </View>
           </View>
@@ -288,12 +387,7 @@ export default function ReplyDetailScreen() {
           accessible={false}
           className="flex-row p-[15px] bg-transparent"
           style={{ borderRadius: 0 }}
-          onLongPress={() =>
-            handleLongPressComment(
-              parentComment.content,
-              parentComment.author.member.name,
-            )
-          }
+          onLongPress={() => handleLongPressComment(parentComment, true)}
           delayLongPress={400}
         >
           <BouncyButton
@@ -372,6 +466,20 @@ export default function ReplyDetailScreen() {
                     回复
                   </Text>
                 </BouncyButton>
+                {canDeleteComment(parentComment) && (
+                  <BouncyButton
+                    disabled={deleteMutation.isPending}
+                    onPress={() => requestDelete(parentComment.id, true)}
+                    style={{ marginLeft: 15, borderRadius: 4 }}
+                  >
+                    <Text
+                      className="text-xs font-medium py-1"
+                      style={{ color: Colors[colorScheme].danger }}
+                    >
+                      删除
+                    </Text>
+                  </BouncyButton>
+                )}
               </View>
             </View>
           </View>
@@ -453,71 +561,22 @@ export default function ReplyDetailScreen() {
           style={{
             borderRadius: 30,
             overflow: 'hidden',
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor,
-            paddingHorizontal: 5,
-            backgroundColor:
-              colorScheme === 'dark'
-                ? 'rgba(26,26,26,0.85)'
-                : 'rgba(255,255,255,0.9)',
           }}
         >
-          {replyTo && (
-            <View className="flex-row justify-between items-center px-[15px] pt-2.5 pb-0.5">
-              <Text type="secondary" className="text-xs">
-                正在回复 {replyTo.name}
-              </Text>
-              <BouncyButton
-                onPress={() => setReplyTo(null)}
-                style={{ borderRadius: 8 }}
-              >
-                <Ionicons
-                  name="close-circle"
-                  size={16}
-                  color={Colors[colorScheme].textSecondary}
-                />
-              </BouncyButton>
-            </View>
-          )}
-          <View className="flex-row items-end px-1 py-1">
-            <TextInput
-              ref={inputRef}
-              className="flex-1 min-h-[35px] max-h-[100px] px-3 pt-2.5 pb-2.5"
-              style={{ color: textColor, fontSize: 15 }}
-              placeholder={
-                replyTo ? `回复 ${replyTo.name}...` : '说点什么吧...'
-              }
-              placeholderTextColor="#999"
-              value={inputText}
-              onChangeText={setInputText}
-              multiline
-              maxLength={1000}
-            />
-            <BouncyButton
-              disabled={!inputText.trim() || mutation.isPending}
-              onPress={() => mutation.mutate(inputText.trim())}
-              style={{
-                height: 40,
-                justifyContent: 'center',
-                paddingHorizontal: 15,
-                borderRadius: 20,
-              }}
-            >
-              {mutation.isPending ? (
-                <ActivityIndicator size="small" color={tintColor} />
-              ) : (
-                <Text
-                  className="font-semibold text-base"
-                  style={{
-                    color: tintColor,
-                    opacity: inputText.trim() ? 1 : 0.5,
-                  }}
-                >
-                  发布
-                </Text>
-              )}
-            </BouncyButton>
-          </View>
+          <CommentComposer
+            colorScheme={colorScheme}
+            borderColor={borderColor}
+            inputRef={inputRef}
+            inputText={inputText}
+            isSubmitting={mutation.isPending}
+            onChangeText={setInputText}
+            onSubmit={submitComment}
+            onCancelReply={() => setReplyTo(null)}
+            placeholder={replyTo ? `回复 ${replyTo.name}...` : '说点什么吧...'}
+            replyToName={replyTo?.name}
+            textColor={textColor}
+            tintColor={tintColor}
+          />
         </BlurView>
       </Reanimated.View>
 
@@ -525,6 +584,12 @@ export default function ReplyDetailScreen() {
         visible={commentAction !== null}
         htmlContent={commentAction?.htmlContent ?? null}
         authorName={commentAction?.authorName ?? null}
+        canDelete={commentAction?.canDelete ?? false}
+        onDelete={() => {
+          if (commentAction) {
+            requestDelete(commentAction.id, commentAction.returnToParent);
+          }
+        }}
         onClose={() => setCommentAction(null)}
       />
     </View>

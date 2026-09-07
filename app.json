@@ -261,6 +261,12 @@
       "expo-sharing",
       "expo-file-system",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "允许知乎--访问你的照片，以便在评论中上传图片。"
+        }
+      ],
+      [
         "@sentry/react-native",
         {
           "organization": "huamumu",
