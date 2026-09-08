@@ -207,6 +207,57 @@ export function serializePublishingMarkdown(
   return blocks.join('');
 }
 
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&amp;/gi, '&');
+}
+
+function stripHtmlTags(value: string): string {
+  return value.replace(/<[^>]+>/g, '');
+}
+
+/** Convert the editable HTML returned by Zhihu back into the editor's small Markdown subset. */
+export function deserializePublishingHtml(html: string): string {
+  let markdown = html
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<(?:script|style)[^>]*>[\s\S]*?<\/(?:script|style)>/gi, '');
+
+  markdown = markdown.replace(
+    /<img\b[^>]*?(?:src|data-original-src)=["']([^"']+)["'][^>]*>/gi,
+    (_match, rawUrl: string) => {
+      const safeUrl = getSafeUrl(rawUrl);
+      return safeUrl ? `![图片](${safeUrl})` : '';
+    },
+  );
+  markdown = markdown.replace(
+    /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi,
+    (_match, rawUrl: string, rawLabel: string) => {
+      const label = decodeHtmlEntities(stripHtmlTags(rawLabel)).trim();
+      const safeUrl = getSafeUrl(rawUrl);
+      return safeUrl && label ? `[${label}](${safeUrl})` : label;
+    },
+  );
+  markdown = markdown
+    .replace(/<(?:strong|b)\b[^>]*>([\s\S]*?)<\/(?:strong|b)>/gi, '**$1**')
+    .replace(/<(?:em|i)\b[^>]*>([\s\S]*?)<\/(?:em|i)>/gi, '*$1*')
+    .replace(/<code\b[^>]*>([\s\S]*?)<\/code>/gi, '`$1`')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<li\b[^>]*>/gi, '- ')
+    .replace(/<blockquote\b[^>]*>/gi, '> ')
+    .replace(/<\/?(?:p|div|h[1-6]|li|blockquote)\b[^>]*>/gi, '\n')
+    .replace(/<[^>]+>/g, '');
+
+  return decodeHtmlEntities(markdown)
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 /** Pins use plain paragraph HTML; their images live in `data.media.medias`. */
 export function serializePinText(text: string): string {
   const normalized = text.replace(/\r\n?/g, '\n').trim();

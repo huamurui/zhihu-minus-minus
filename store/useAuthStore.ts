@@ -70,9 +70,13 @@ interface AuthState {
   cookies: string | null;
   me: ZhihuMeInfo | null; // 存储个人详细信息
   setCookies: (cookies: string) => void;
+  updateActiveAccountCookies: (cookies: string) => void;
   setMe: (me: ZhihuMeInfo) => void;
   addAccount: (cookies: string, me: ZhihuMeInfo) => void;
-  switchAccount: (index: number) => void;
+  switchAccount: (
+    index: number,
+    verifiedSession?: { cookies: string; me: ZhihuMeInfo },
+  ) => void;
   removeAccount: (index: number) => void;
   logout: () => void;
 }
@@ -100,6 +104,21 @@ export const useAuthStore = create<AuthState>()(
 
       setCookies: (cookies) => {
         set({ cookies });
+      },
+
+      updateActiveAccountCookies: (cookies) => {
+        const { accounts, activeAccountIndex } = get();
+        if (activeAccountIndex < 0 || activeAccountIndex >= accounts.length) {
+          set({ cookies });
+          return;
+        }
+        const nextAccounts = [...accounts];
+        nextAccounts[activeAccountIndex] = {
+          ...nextAccounts[activeAccountIndex],
+          cookies,
+          last_updated: Date.now(),
+        };
+        set({ accounts: nextAccounts, cookies });
       },
 
       setMe: (me) => {
@@ -146,7 +165,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      switchAccount: (index) => {
+      switchAccount: (index, verifiedSession) => {
         if (index === -1) {
           set({
             activeAccountIndex: -1,
@@ -158,10 +177,24 @@ export const useAuthStore = create<AuthState>()(
         const { accounts } = get();
         if (index >= 0 && index < accounts.length) {
           const account = accounts[index];
+          const nextAccount = verifiedSession
+            ? {
+                ...account,
+                cookies: verifiedSession.cookies,
+                me: verifiedSession.me,
+                last_updated: Date.now(),
+              }
+            : account;
+          const nextAccounts = verifiedSession
+            ? accounts.map((item, accountIndex) =>
+                accountIndex === index ? nextAccount : item,
+              )
+            : accounts;
           set({
+            accounts: nextAccounts,
             activeAccountIndex: index,
-            cookies: account.cookies,
-            me: account.me,
+            cookies: nextAccount.cookies,
+            me: nextAccount.me,
           });
         }
       },

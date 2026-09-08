@@ -31,6 +31,7 @@ import { ActionSheet } from '@/components/overlays/ActionSheet';
 import { ShareMenu } from '@/components/ShareMenu';
 import { Text, ThemedIcon, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
+import { VoterListModal } from '@/components/VoterListModal';
 import Colors from '@/constants/Colors';
 import { RICH_CONTENT_STALE_TIME, ZhihuContent } from '@/features/rich-content';
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
@@ -88,6 +89,7 @@ export const AnswerDetailView = ({
   const [isLiked, setIsLiked] = React.useState(false);
   const [menuVisible, setMenuVisible] = React.useState(false);
   const [isSharing, setIsSharing] = React.useState(false);
+  const [votersVisible, setVotersVisible] = React.useState(false);
   const [hasBeenFocused, setHasBeenFocused] = React.useState(isFocused);
 
   React.useEffect(() => {
@@ -521,6 +523,14 @@ export const AnswerDetailView = ({
         }
       />
 
+      <VoterListModal
+        visible={votersVisible}
+        onClose={() => setVotersVisible(false)}
+        contentType="answer"
+        contentId={id}
+        count={answer?.voteup_count}
+      />
+
       <ActionSheet
         visible={menuVisible && !isSharing}
         onClose={() => setMenuVisible(false)}
@@ -546,6 +556,21 @@ export const AnswerDetailView = ({
             label: '分享回答',
             onPress: () => setIsSharing(true),
           },
+          ...(answer?.relationship?.is_author
+            ? [
+                {
+                  key: 'edit',
+                  icon: 'create-outline' as const,
+                  label: '编辑回答',
+                  onPress: () => {
+                    const targetQuestionId = answer.question?.id || questionId;
+                    if (targetQuestionId) {
+                      router.push(`/question/write/${targetQuestionId}`);
+                    }
+                  },
+                },
+              ]
+            : []),
           ...(answer?.relationship?.is_author
             ? [
                 {

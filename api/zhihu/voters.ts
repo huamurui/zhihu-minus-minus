@@ -16,6 +16,45 @@ export interface ZhihuVoteResponse {
   [key: string]: unknown;
 }
 
+export interface ZhihuVoter {
+  id: string;
+  url_token?: string;
+  name: string;
+  avatar_url?: string;
+  headline?: string;
+  is_following?: boolean;
+}
+
+export interface ZhihuVotersResponse {
+  data: ZhihuVoter[];
+  paging?: {
+    is_end?: boolean;
+    next?: string;
+  };
+}
+
+export const getAnswerVoters = async (
+  id: string | number,
+  limit = 20,
+  offset = 0,
+): Promise<ZhihuVotersResponse> => {
+  const res = await apiClient.get<ZhihuVotersResponse>(
+    `/answers/${id}/upvoters?limit=${limit}&offset=${offset}`,
+  );
+  return res.data;
+};
+
+export const getPinVoters = async (
+  id: string | number,
+  limit = 20,
+  offset = 0,
+): Promise<ZhihuVotersResponse> => {
+  const res = await apiClient.get<ZhihuVotersResponse>(
+    `/pins/${id}/upvoters?limit=${limit}&offset=${offset}`,
+  );
+  return res.data;
+};
+
 export const voteContent = async (
   id: string | number,
   type: 'answers' | 'articles' | 'questions' | 'pins' | 'comments',

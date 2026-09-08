@@ -23,6 +23,7 @@ export interface AnswerDetail {
   question?: AnswerQuestion;
   author: ZhihuAuthor;
   content: string;
+  editable_content?: string;
   excerpt: string;
   created_time: number;
   created_time_name?: string;
@@ -182,7 +183,7 @@ export const getAnswer = async (
   include?: string,
 ): Promise<AnswerDetail> => {
   const defaultInclude =
-    'content,paid_info,can_comment,excerpt,thanks_count,voteup_count,comment_count,visited_count,reaction,ip_info,question.topics,author.is_following,reaction.relation.voting,segment_infos,favlists_count';
+    'content,editable_content,paid_info,can_comment,excerpt,thanks_count,voteup_count,comment_count,visited_count,reaction,ip_info,question.topics,author.is_following,reaction.relation.voting,segment_infos,favlists_count';
   const res = await apiClient.get(
     `/answers/${id}?include=${include || defaultInclude}`,
   );
@@ -269,7 +270,7 @@ export async function publishAnswer(
           }
         : { isPublished: false, disabled: 1 },
       extra_info: {
-        ...(!isPublished && { question_id: questionIdString }),
+        question_id: questionIdString,
         publisher: 'pc',
         include: ANSWER_PUBLISH_INCLUDE,
         pc_business_params: businessParams,

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,11 +9,17 @@ import {
   ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { createAnswer, getQuestion } from '@/api/zhihu';
+import {
+  createAnswer,
+  getAnswer,
+  getQuestion,
+  updateAnswer,
+} from '@/api/zhihu';
 import type { UploadedImage } from '@/api/zhihu/image';
 import { BouncyButton } from '@/components/BouncyButton';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import {
+  deserializePublishingHtml,
   PublishingEditor,
   serializePublishingMarkdown,
 } from '@/features/publishing';
@@ -28,25 +34,65 @@ export default function WriteAnswerScreen() {
   const [content, setContent] = useState('');
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [editorBusy, setEditorBusy] = useState(false);
+  const initializedAnswerId = useRef<string | null>(null);
 
   const { data: question, isLoading: qLoading } = useQuery({
     queryKey: ['question', id],
     queryFn: () => getQuestion(id as string),
   });
 
+  const existingAnswerId = (() => {
+    const myAnswer = question?.relationship?.my_answer;
+    if (!myAnswer || myAnswer.is_deleted) return undefined;
+    const answerId = myAnswer.id ?? myAnswer.answer_id;
+    return answerId === undefined ? undefined : String(answerId);
+  })();
+
+  const { data: existingAnswer, isLoading: answerLoading } = useQuery({
+    queryKey: ['answer-edit', existingAnswerId],
+    queryFn: () => getAnswer(existingAnswerId as string),
+    enabled: !!existingAnswerId,
+  });
+
+  useEffect(() => {
+    if (!existingAnswerId) {
+      initializedAnswerId.current = null;
+      return;
+    }
+    if (!existingAnswer || initializedAnswerId.current === existingAnswerId) {
+      return;
+    }
+    const editableContent =
+      existingAnswer.editable_content || existingAnswer.content || '';
+    setContent(deserializePublishingHtml(editableContent));
+    initializedAnswerId.current = existingAnswerId;
+  }, [existingAnswer, existingAnswerId]);
+
   const mutation = useMutation({
-    mutationFn: () =>
-      createAnswer(
-        id as string,
-        serializePublishingMarkdown(content, uploadedImages),
-      ),
+    mutationFn: () => {
+      const html = serializePublishingMarkdown(content, uploadedImages);
+      return existingAnswerId
+        ? updateAnswer(id as string, existingAnswerId, html)
+        : createAnswer(id as string, html);
+    },
     onSuccess: () => {
-      Alert.alert('发布成功', '你的回答已发布喵！');
+      Alert.alert(
+        existingAnswerId ? '保存成功' : '发布成功',
+        existingAnswerId ? '你的回答修改已保存喵！' : '你的回答已发布喵！',
+      );
       queryClient.invalidateQueries({ queryKey: ['question-answers', id] });
+      if (existingAnswerId) {
+        queryClient.invalidateQueries({
+          queryKey: ['answer-detail', existingAnswerId],
+        });
+      }
       router.back();
     },
     onError: (error: unknown) =>
-      Alert.alert('发布失败', getZhihuErrorMessage(error)),
+      Alert.alert(
+        existingAnswerId ? '保存失败' : '发布失败',
+        getZhihuErrorMessage(error),
+      ),
   });
 
   const handlePublish = () => {
@@ -61,7 +107,7 @@ export default function WriteAnswerScreen() {
     mutation.mutate();
   };
 
-  if (qLoading) {
+  if (qLoading || answerLoading) {
     return (
       <View className="flex-1 justify-center items-center">
         <ActivityIndicator size="large" color={primaryColor} />
@@ -73,7 +119,7 @@ export default function WriteAnswerScreen() {
     <View className="flex-1">
       <Stack.Screen
         options={{
-          headerTitle: '写回答',
+          headerTitle: existingAnswerId ? '编辑回答' : '写回答',
           headerRight: () => (
             <BouncyButton
               className="px-3 py-2 rounded-full"
@@ -88,7 +134,7 @@ export default function WriteAnswerScreen() {
                   className="text-base font-bold mr-[15px]"
                   style={{ color: primaryColor }}
                 >
-                  发布
+                  {existingAnswerId ? '保存' : '发布'}
                 </Text>
               )}
             </BouncyButton>

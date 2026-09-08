@@ -39,8 +39,18 @@ interface PinContentData {
 
 export const getPin = async (id: string | number) => {
   const include =
-    'author,author.is_following,content,content_html,created,like_count,comment_count,relationship.voting';
+    'author,author.is_following,content,content_html,created,like_count,comment_count,relationship.voting,topics';
   const res = await client.get(`/pins/${id}?include=${include}`);
+  return res.data;
+};
+
+export const votePinPoll = async (
+  pollId: string | number,
+  optionIds: Array<string | number>,
+) => {
+  const res = await client.post(`/polls/${pollId}`, {
+    options: optionIds.map(String),
+  });
   return res.data;
 };
 
