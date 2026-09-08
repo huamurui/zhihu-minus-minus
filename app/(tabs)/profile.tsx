@@ -11,6 +11,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { verifyZhihuSession } from '@/api/session';
 import { getMe, getMemberWithFallback } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
 import { BottomSheet } from '@/components/overlays/BottomSheet';
@@ -187,10 +188,24 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
       return;
     }
 
-    switchAccount(index);
+    let verifiedSession:
+      | Awaited<ReturnType<typeof verifyZhihuSession>>
+      | undefined;
+    if (index !== -1) {
+      try {
+        verifiedSession = await verifyZhihuSession(targetCookies ?? '');
+      } catch {
+        Alert.alert('切换失败', '目标账号的登录信息已失效，请重新登录。');
+        sessionChangeInFlight.current = false;
+        setSessionChanging(false);
+        return;
+      }
+    }
+
+    switchAccount(index, verifiedSession);
     queryClient.clear();
     setAccountModalVisible(false);
-    await syncSessionWithFeedback(targetCookies);
+    await syncSessionWithFeedback(verifiedSession?.cookies ?? targetCookies);
     sessionChangeInFlight.current = false;
     setSessionChanging(false);
   };

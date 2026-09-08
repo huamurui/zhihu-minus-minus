@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  deserializePublishingHtml,
   serializePinText,
   serializePublishingMarkdown,
 } from '../features/publishing/serializer.ts';
@@ -63,5 +64,14 @@ test('serializes pin text without treating it as rich Markdown', () => {
   assert.equal(
     serializePinText('第一行 **不是粗体**\n\n<script>'),
     '<p>第一行 **不是粗体**</p><p><br></p><p>&lt;script&gt;</p>',
+  );
+});
+
+test('deserializes editable answer HTML into the publishing Markdown subset', () => {
+  assert.equal(
+    deserializePublishingHtml(
+      '<p>普通 <strong>粗体</strong> 和 <a href="https://example.com">链接</a></p><ul><li>一</li><li>二</li></ul>',
+    ),
+    '普通 **粗体** 和 [链接](https://example.com/)\n- 一\n- 二',
   );
 });

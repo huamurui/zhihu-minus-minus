@@ -90,6 +90,64 @@ const customEncode = (bytes: Uint8Array) => {
   return out;
 };
 
+function encodeUtf8(value: string): Uint8Array {
+  const bytes: number[] = [];
+  for (const character of value) {
+    const codePoint = character.codePointAt(0) ?? 0;
+    if (codePoint <= 0x7f) {
+      bytes.push(codePoint);
+    } else if (codePoint <= 0x7ff) {
+      bytes.push(0xc0 | (codePoint >> 6), 0x80 | (codePoint & 0x3f));
+    } else if (codePoint <= 0xffff) {
+      bytes.push(
+        0xe0 | (codePoint >> 12),
+        0x80 | ((codePoint >> 6) & 0x3f),
+        0x80 | (codePoint & 0x3f),
+      );
+    } else {
+      bytes.push(
+        0xf0 | (codePoint >> 18),
+        0x80 | ((codePoint >> 12) & 0x3f),
+        0x80 | ((codePoint >> 6) & 0x3f),
+        0x80 | (codePoint & 0x3f),
+      );
+    }
+  }
+  return new Uint8Array(bytes);
+}
+
+/** Encrypt the x-zse-83 form payload used by Zhihu's web token refresh flow. */
+export const encryptZseV4 = (input: string): string => {
+  const inputBytes = encodeUtf8(input);
+  const plain = new Uint8Array(2 + inputBytes.length);
+  plain[0] = 210;
+  plain.set(inputBytes, 2);
+
+  const pad = 16 - (plain.length % 16);
+  const padded = new Uint8Array(plain.length + pad);
+  padded.set(plain);
+  padded.fill(pad, plain.length);
+
+  const cipher = new Uint8Array(padded.length);
+  const firstBlock = new Uint8Array(16);
+  for (let index = 0; index < 16; index += 1) {
+    firstBlock[index] = padded[index] ^ KEY16[index] ^ 42;
+  }
+
+  let previous = encryptBlock(firstBlock);
+  cipher.set(previous, 0);
+  for (let offset = 16; offset < padded.length; offset += 16) {
+    const block = new Uint8Array(16);
+    for (let index = 0; index < 16; index += 1) {
+      block[index] = padded[offset + index] ^ previous[index];
+    }
+    previous = encryptBlock(block);
+    cipher.set(previous, offset);
+  }
+
+  return customEncode(cipher);
+};
+
 /**
  * 生成知乎 x-zse-96 签名 (2.0版本) - 移植自 zhi-purity
  * @param path 请求路径 (如 /api/v4/me?include=is_realname)

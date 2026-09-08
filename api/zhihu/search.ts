@@ -17,6 +17,15 @@ export const searchContent = async (
     restricted_scene?: string;
     restricted_field?: string;
     restricted_value?: string;
+    vertical?: 'answer' | 'article' | 'zvideo';
+    sort?: 'created_time' | 'upvoted_count';
+    time_interval?:
+      | 'a_day'
+      | 'a_week'
+      | 'a_month'
+      | 'three_months'
+      | 'half_a_year'
+      | 'a_year';
   },
 ): Promise<ZhihuSearchResponse> => {
   const params = new URLSearchParams({
@@ -30,6 +39,19 @@ export const searchContent = async (
     show_all_topics: '0',
     search_source: 'Normal',
   });
+  if (options?.vertical) {
+    params.set('vertical', options.vertical);
+    params.set('vertical_info', '0,0,0,0,0,0,0,0,0,0,0,0');
+    params.set('search_source', 'Filter');
+  }
+  if (options?.sort) {
+    params.set('sort', options.sort);
+    params.set('search_source', 'Filter');
+  }
+  if (options?.time_interval) {
+    params.set('time_interval', options.time_interval);
+    params.set('search_source', 'Filter');
+  }
   if (options?.restricted_scene)
     params.append('restricted_scene', options.restricted_scene);
   if (options?.restricted_field)
