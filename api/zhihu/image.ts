@@ -15,6 +15,8 @@ export interface ZhihuImage {
   imageKey?: string;
   src: string;
   originalSrc?: string;
+  watermark?: string;
+  watermarkSrc?: string;
 }
 
 export interface UploadedImage extends ZhihuImage {
@@ -32,7 +34,7 @@ interface UploadToken {
 interface UploadFile {
   image_id: string | number;
   state: number;
-  publish_state: number;
+  publish_state?: number;
   object_key?: string;
 }
 
@@ -47,6 +49,8 @@ interface ImageDetailResponse {
   src?: string;
   original_hash?: string;
   original_src?: string;
+  watermark?: string;
+  watermark_src?: string;
 }
 
 const IMAGE_API_URL = 'https://api.zhihu.com/images';
@@ -252,6 +256,8 @@ function normalizeImage(
     imageKey: data.original_hash,
     src: data.src,
     originalSrc: data.original_src,
+    watermark: data.watermark,
+    watermarkSrc: data.watermark_src,
   };
 }
 
@@ -267,13 +273,13 @@ async function getImageAfterUpload(
   imageId: string | number,
 ): Promise<ZhihuImage> {
   let lastError: unknown;
-  for (let attempt = 0; attempt < 4; attempt += 1) {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
     try {
       return await getImage(imageId);
     } catch (error) {
       lastError = error;
-      if (attempt === 3) break;
-      await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+      if (attempt === 7) break;
+      await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
     }
   }
   throw lastError instanceof Error
@@ -351,17 +357,17 @@ export async function uploadImage(
   }
 
   const imageId = String(file.image_id);
-  const needsUpload = file.state !== 1 || file.publish_state !== 1;
+  // state=1 means Zhihu already has this hash and intentionally omits the
+  // short-lived upload token. Only state=2 requires an OSS upload.
+  const needsUpload = file.state === 2;
+  const objectKey = file.object_key ?? `v2-${fileInfo.md5.toLowerCase()}`;
   if (needsUpload) {
     const token = response.data.upload_token;
     if (!token?.access_id || !token.access_key || !token.access_token) {
-      throw new Error('知乎图片上传凭证无效');
-    }
-    if (!file.object_key) {
-      throw new Error('知乎图片上传路径无效');
+      throw new Error('知乎没有返回新图片的上传凭证，请稍后重试');
     }
 
-    await uploadToObjectStorage(asset, token, file.object_key);
+    await uploadToObjectStorage(asset, token, objectKey);
     await markImageUploadSuccessful(imageId);
   }
 
@@ -369,7 +375,7 @@ export async function uploadImage(
   const dimensions = getImageDimensions(asset);
   return {
     ...image,
-    imageKey: file.object_key ?? image.imageKey,
+    imageKey: image.imageKey ?? objectKey,
     ...dimensions,
   };
 }

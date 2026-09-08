@@ -7,25 +7,27 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createAnswer, getQuestion } from '@/api/zhihu';
+import type { UploadedImage } from '@/api/zhihu/image';
 import { BouncyButton } from '@/components/BouncyButton';
 import { Text, useThemeColor, View } from '@/components/Themed';
-import { useColorScheme } from '@/components/useColorScheme';
-import Colors from '@/constants/Colors';
+import {
+  PublishingEditor,
+  serializePublishingMarkdown,
+} from '@/features/publishing';
+import { getZhihuErrorMessage } from '@/utils/zhihuError';
 
 export default function WriteAnswerScreen() {
-  const colorScheme = useColorScheme();
   const primaryColor = useThemeColor({}, 'primary');
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const _insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [content, setContent] = useState('');
-
-  const textColor = Colors[colorScheme].text;
+  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
+  const [editorBusy, setEditorBusy] = useState(false);
 
   const { data: question, isLoading: qLoading } = useQuery({
     queryKey: ['question', id],
@@ -33,16 +35,18 @@ export default function WriteAnswerScreen() {
   });
 
   const mutation = useMutation({
-    mutationFn: (text: string) => createAnswer(id as string, text),
+    mutationFn: () =>
+      createAnswer(
+        id as string,
+        serializePublishingMarkdown(content, uploadedImages),
+      ),
     onSuccess: () => {
       Alert.alert('发布成功', '你的回答已发布喵！');
       queryClient.invalidateQueries({ queryKey: ['question-answers', id] });
       router.back();
     },
-    onError: (err: any) => {
-      console.error(err.response?.data);
-      Alert.alert('发布失败', err.response?.data?.error?.message || '未知错误');
-    },
+    onError: (error: unknown) =>
+      Alert.alert('发布失败', getZhihuErrorMessage(error)),
   });
 
   const handlePublish = () => {
@@ -50,7 +54,11 @@ export default function WriteAnswerScreen() {
       Alert.alert('提示', '请输入回答内容');
       return;
     }
-    mutation.mutate(content.trim());
+    if (editorBusy) {
+      Alert.alert('图片上传中', '请等待图片上传完成后再发布。');
+      return;
+    }
+    mutation.mutate();
   };
 
   if (qLoading) {
@@ -70,7 +78,7 @@ export default function WriteAnswerScreen() {
             <BouncyButton
               className="px-3 py-2 rounded-full"
               onPress={handlePublish}
-              disabled={mutation.isPending || !content.trim()}
+              disabled={mutation.isPending || editorBusy || !content.trim()}
               style={{ opacity: !content.trim() ? 0.5 : 1 }}
             >
               {mutation.isPending ? (
@@ -97,16 +105,16 @@ export default function WriteAnswerScreen() {
           <Text className="text-lg font-bold mb-5 leading-[26px]">
             {question?.title}
           </Text>
-          <TextInput
-            className="text-base leading-6 min-h-[300px]"
-            style={{ color: textColor }}
-            placeholder="知乎致力于建设友善的讨论氛围，建议在此写下你的真知灼见..."
-            placeholderTextColor={Colors[colorScheme].textTertiary}
-            multiline
-            textAlignVertical="top"
-            value={content}
-            onChangeText={setContent}
+          <PublishingEditor
             autoFocus
+            contentType="answer"
+            disabled={mutation.isPending}
+            minHeight={300}
+            onBusyChange={setEditorBusy}
+            onChangeText={setContent}
+            onImagesChange={setUploadedImages}
+            placeholder="知乎致力于建设友善的讨论氛围，建议在此写下你的真知灼见..."
+            value={content}
           />
         </ScrollView>
       </KeyboardAvoidingView>

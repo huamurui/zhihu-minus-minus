@@ -19,6 +19,7 @@ export * from './member';
 export * from './moments';
 export * from './notification';
 export * from './pin';
+export * from './publishing';
 export * from './question';
 export * from './search';
 export * from './topic';

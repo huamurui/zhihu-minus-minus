@@ -263,7 +263,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "允许知乎--访问你的照片，以便在评论中上传图片。"
+          "photosPermission": "允许知乎--访问你的照片，以便在评论和正文中上传图片。"
         }
       ],
       [

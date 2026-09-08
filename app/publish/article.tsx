@@ -12,10 +12,16 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createArticle } from '@/api/zhihu';
+import type { UploadedImage } from '@/api/zhihu/image';
 import { BouncyButton } from '@/components/BouncyButton';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
+import {
+  PublishingEditor,
+  serializePublishingMarkdown,
+} from '@/features/publishing';
+import { getZhihuErrorMessage } from '@/utils/zhihuError';
 
 export default function PublishArticleScreen() {
   const insets = useSafeAreaInsets();
@@ -29,18 +35,29 @@ export default function PublishArticleScreen() {
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [topics, setTopics] = useState('');
+  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
+  const [editorBusy, setEditorBusy] = useState(false);
 
   const mutation = useMutation({
-    mutationFn: () => createArticle(title.trim(), content.trim()),
+    mutationFn: () =>
+      createArticle(
+        title.trim(),
+        serializePublishingMarkdown(content, uploadedImages),
+        {
+          topics: topics
+            .split(/[,，\n]/)
+            .map((topic) => topic.trim())
+            .filter(Boolean),
+        },
+      ),
     onSuccess: () => {
       Alert.alert('发布成功', '您的文章已发布！');
       queryClient.invalidateQueries({ queryKey: ['feeds'] });
       router.back();
     },
-    onError: (err: any) => {
-      console.error(err);
-      Alert.alert('发布失败', err.response?.data?.error?.message || '未知错误');
-    },
+    onError: (error: unknown) =>
+      Alert.alert('发布失败', getZhihuErrorMessage(error)),
   });
 
   const handlePublish = () => {
@@ -52,11 +69,23 @@ export default function PublishArticleScreen() {
       Alert.alert('提示', '请输入文章内容');
       return;
     }
+    if (!topics.trim()) {
+      Alert.alert('提示', '文章至少需要选择一个话题');
+      return;
+    }
+    if (editorBusy) {
+      Alert.alert('图片上传中', '请等待图片上传完成后再发布。');
+      return;
+    }
     mutation.mutate();
   };
 
   const isPublishEnabled =
-    title.trim().length > 0 && content.trim().length > 0 && !mutation.isPending;
+    title.trim().length > 0 &&
+    content.trim().length > 0 &&
+    topics.trim().length > 0 &&
+    !editorBusy &&
+    !mutation.isPending;
 
   return (
     <View className="flex-1">
@@ -70,7 +99,7 @@ export default function PublishArticleScreen() {
         >
           <Ionicons name="close" size={28} color={textColor} />
         </BouncyButton>
-        <Text className="text-lg font-bold">写文章(WIP)</Text>
+        <Text className="text-lg font-bold">写文章</Text>
         <BouncyButton
           disabled={!isPublishEnabled}
           onPress={handlePublish}
@@ -106,13 +135,22 @@ export default function PublishArticleScreen() {
             autoFocus
           />
           <TextInput
-            className="text-lg py-4 min-h-[400px]"
-            style={{ color: textColor, textAlignVertical: 'top' }}
-            placeholder="正文内容"
+            className="text-sm py-4 border-b"
+            style={{ color: textColor, borderBottomColor: borderCol }}
+            placeholder="话题，用逗号分隔（必填）"
             placeholderTextColor={secondaryColor}
-            multiline
-            value={content}
+            value={topics}
+            onChangeText={setTopics}
+          />
+          <PublishingEditor
+            contentType="article"
+            disabled={mutation.isPending}
+            minHeight={400}
+            onBusyChange={setEditorBusy}
             onChangeText={setContent}
+            onImagesChange={setUploadedImages}
+            placeholder="正文内容"
+            value={content}
           />
         </ScrollView>
       </KeyboardAvoidingView>
