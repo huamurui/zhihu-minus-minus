@@ -1591,7 +1591,7 @@ const styles = StyleSheet.create({
   },
   navText: {
     fontSize: 15,
-    fontWeight: '600'
+    fontWeight: '600',
   },
   topPill: {
     position: 'absolute',
