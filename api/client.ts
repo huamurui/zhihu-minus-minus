@@ -107,12 +107,12 @@ apiClient.interceptors.request.use(async (config) => {
   if (cookie) {
     config.headers.Cookie = cookie;
     const dc0 = getDc0(cookie);
+    const xsrf = getXsrf(cookie);
+    if (xsrf) {
+      config.headers['x-xsrftoken'] = xsrf;
+    }
     if (dc0) {
       config.headers['X-Udid'] = dc0.split('|')[0]; // 添加 X-Udid 头
-      const xsrf = getXsrf(cookie);
-      if (xsrf) {
-        config.headers['x-xsrftoken'] = xsrf;
-      }
       const body = config.data
         ? typeof config.data === 'string'
           ? config.data
@@ -120,11 +120,21 @@ apiClient.interceptors.request.use(async (config) => {
         : null;
 
       const fullUrl = apiClient.getUri(config);
-      const zse96 = await signRequest96(fullUrl, body, cookie);
-      config.headers['x-zse-96'] = zse96;
-      config.headers['x-zse-93'] = ZSE_VERSION;
+      const hostname = new URL(fullUrl).hostname;
+      // Zhuanlan's draft editor uses its own CSRF/Origin contract and does not
+      // require the www.zhihu.com X-ZSE signature.
+      if (hostname !== 'zhuanlan.zhihu.com') {
+        const zse96 = await signRequest96(fullUrl, body, cookie);
+        config.headers['x-zse-96'] = zse96;
+        config.headers['x-zse-93'] = ZSE_VERSION;
+      }
       config.headers['x-requested-with'] = 'fetch';
-      config.headers.Referer = 'https://www.zhihu.com/';
+      if (!config.headers.Referer) {
+        config.headers.Referer =
+          hostname === 'zhuanlan.zhihu.com'
+            ? 'https://zhuanlan.zhihu.com/write'
+            : 'https://www.zhihu.com/';
+      }
       config.headers['User-Agent'] =
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36';
     }

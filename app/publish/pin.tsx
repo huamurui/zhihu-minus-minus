@@ -7,16 +7,18 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createPin } from '@/api/zhihu';
+import type { UploadedImage } from '@/api/zhihu/image';
 import { BouncyButton } from '@/components/BouncyButton';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
+import { PublishingMediaPicker, serializePinText } from '@/features/publishing';
+import { getZhihuErrorMessage } from '@/utils/zhihuError';
 
 export default function PublishPinScreen() {
   const insets = useSafeAreaInsets();
@@ -28,30 +30,42 @@ export default function PublishPinScreen() {
   const secondaryColor = Colors[colorScheme].textSecondary;
   const borderCol = Colors[colorScheme].border;
 
+  const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [images, setImages] = useState<UploadedImage[]>([]);
+  const [mediaBusy, setMediaBusy] = useState(false);
 
   const mutation = useMutation({
-    mutationFn: () => createPin(content.trim()),
+    mutationFn: () =>
+      createPin(serializePinText(content), {
+        title,
+        images,
+      }),
     onSuccess: () => {
       Alert.alert('发布成功', '您的想法已发布！');
       queryClient.invalidateQueries({ queryKey: ['feeds'] });
       router.back();
     },
-    onError: (err: any) => {
-      console.error(err);
-      Alert.alert('发布失败', err.response?.data?.error?.message || '未知错误');
-    },
+    onError: (error: unknown) =>
+      Alert.alert('发布失败', getZhihuErrorMessage(error)),
   });
 
   const handlePublish = () => {
-    if (!content.trim()) {
-      Alert.alert('提示', '请输入想法内容');
+    if (!content.trim() && images.length === 0) {
+      Alert.alert('提示', '请输入想法内容或添加图片');
+      return;
+    }
+    if (mediaBusy) {
+      Alert.alert('图片尚未准备好', '请等待上传完成，或重试、移除失败的图片。');
       return;
     }
     mutation.mutate();
   };
 
-  const isPublishEnabled = content.trim().length > 0 && !mutation.isPending;
+  const isPublishEnabled =
+    (content.trim().length > 0 || images.length > 0) &&
+    !mediaBusy &&
+    !mutation.isPending;
 
   return (
     <View className="flex-1">
@@ -94,38 +108,46 @@ export default function PublishPinScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <TextInput
-            multiline
-            autoFocus
-            placeholder="这一刻的想法..."
+            value={title}
+            onChangeText={setTitle}
+            editable={!mutation.isPending}
+            placeholder="标题（可选）"
             placeholderTextColor={secondaryColor}
-            className="text-lg leading-7 min-h-[200px]"
-            style={{ color: textColor, textAlignVertical: 'top' }}
+            maxLength={100}
+            style={{
+              color: textColor,
+              borderBottomColor: borderCol,
+              borderBottomWidth: 1,
+              fontSize: 19,
+              fontWeight: '600',
+              paddingBottom: 12,
+              paddingHorizontal: 0,
+            }}
+          />
+          <TextInput
+            autoFocus
             value={content}
             onChangeText={setContent}
+            editable={!mutation.isPending}
+            multiline
+            placeholder="这一刻的想法..."
+            placeholderTextColor={secondaryColor}
+            textAlignVertical="top"
+            style={{
+              color: textColor,
+              fontSize: 17,
+              lineHeight: 27,
+              minHeight: 230,
+              paddingHorizontal: 0,
+              paddingTop: 16,
+            }}
+          />
+          <PublishingMediaPicker
+            disabled={mutation.isPending}
+            onBusyChange={setMediaBusy}
+            onImagesChange={setImages}
           />
         </ScrollView>
-
-        <View
-          className="flex-row px-5 py-3 justify-around bg-transparent"
-          style={{
-            paddingBottom: insets.bottom + 20,
-            borderTopWidth: 0.5,
-            borderTopColor: borderCol,
-          }}
-        >
-          <Pressable className="p-2">
-            <Ionicons name="image-outline" size={24} color={tintColor} />
-          </Pressable>
-          <Pressable className="p-2">
-            <Ionicons name="videocam-outline" size={24} color={tintColor} />
-          </Pressable>
-          <Pressable className="p-2">
-            <Ionicons name="at-outline" size={24} color={tintColor} />
-          </Pressable>
-          <Pressable className="p-2">
-            <Ionicons name="happy-outline" size={24} color={tintColor} />
-          </Pressable>
-        </View>
       </KeyboardAvoidingView>
     </View>
   );

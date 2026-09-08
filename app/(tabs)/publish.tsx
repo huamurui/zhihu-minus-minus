@@ -15,7 +15,7 @@ const PUBLISH_OPTIONS = [
   },
   {
     id: 'article',
-    title: '写文章(WIP)',
+    title: '写文章',
     subtitle: '记录生活点滴',
     icon: 'document-text-outline',
     colorType: 'warning',
@@ -29,12 +29,19 @@ const PUBLISH_OPTIONS = [
   },
   {
     id: 'question',
-    title: '提问题(WIP)',
+    title: '提问题',
     subtitle: '向世界发问',
     icon: 'help-circle-outline',
     colorType: 'danger',
   },
 ] as const;
+
+const PUBLISH_ROUTES = {
+  answer: '/publish/answer',
+  article: '/publish/article',
+  pin: '/publish/pin',
+  question: '/publish/question',
+} as const;
 
 export default function PublishView() {
   const insets = useSafeAreaInsets();
@@ -49,8 +56,8 @@ export default function PublishView() {
     danger: useThemeColor({}, 'danger'),
   };
 
-  const handlePublish = (id: string) => {
-    router.push(`/publish/${id}` as any);
+  const handlePublish = (id: keyof typeof PUBLISH_ROUTES) => {
+    router.push(PUBLISH_ROUTES[id]);
   };
 
   return (
