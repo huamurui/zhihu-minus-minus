@@ -205,7 +205,6 @@ export const FeedCard = ({ item, tab }: { item: FeedItem; tab?: string }) => {
             backgroundColor: Colors[colorScheme].backgroundSecondary,
             borderRadius: 12,
             opacity: previewVisible ? 0 : 1,
-            elevation: Platform.OS === 'android' ? 1 : 0,
           },
           isQuestionType ? { paddingBottom: 10 } : undefined,
         ]}

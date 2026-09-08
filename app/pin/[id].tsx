@@ -223,7 +223,7 @@ export default function PinDetailScreen() {
 
       {/* 底部交互栏 */}
       <View
-        className="absolute left-5 right-5 z-[1000] shadow-black/10 shadow-[0_10px_20px] elevation-10"
+        className="absolute left-5 right-5 z-[1000]"
         style={{ bottom: insets.bottom > 0 ? insets.bottom : 15 }}
       >
         <BlurView

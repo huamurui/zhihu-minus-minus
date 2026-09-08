@@ -238,13 +238,6 @@ export const CreationCard = React.forwardRef<
             borderWidth: 1.5,
             borderColor: isCollapsedHighlighted ? primaryColor : 'transparent',
           },
-          isCollapsedHighlighted && {
-            shadowColor: primaryColor,
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: 0.3,
-            shadowRadius: 6,
-            elevation: 5,
-          },
         ]}
         className="p-4 mb-2.5"
       >

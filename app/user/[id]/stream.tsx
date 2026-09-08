@@ -272,13 +272,6 @@ const StreamItem = forwardRef<StreamItemHandle, StreamItemProps>(
             borderWidth: 1.5,
             borderColor: isCollapsedHighlighted ? primaryColor : 'transparent',
           },
-          isCollapsedHighlighted && {
-            shadowColor: primaryColor,
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: 0.3,
-            shadowRadius: 6,
-            elevation: 5,
-          },
         ]}
         className="p-4 mb-2.5"
       >
@@ -970,7 +963,7 @@ export default function UserStreamScreen() {
           />
 
           <Reanimated.View
-            className="absolute left-5 right-5 h-[54px] rounded-[27px] overflow-hidden z-[1000] shadow-black/20 shadow-lg elevation-10"
+            className="absolute left-5 right-5 h-[54px] rounded-[27px] overflow-hidden z-[1000]"
             style={[
               {
                 bottom: insets.bottom,

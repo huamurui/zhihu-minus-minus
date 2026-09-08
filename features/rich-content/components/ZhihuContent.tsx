@@ -267,11 +267,6 @@ export const LinkCard: React.FC<{
               backgroundColor: surfaceColor,
               borderWidth: StyleSheet.hairlineWidth,
               borderColor: cardBorderColor,
-              shadowColor: cardShadowColor,
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.05,
-              shadowRadius: 4,
-              elevation: 2,
             },
           ]}
         >
@@ -1375,11 +1370,6 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
                 backgroundColor: surfaceColor,
                 borderWidth: StyleSheet.hairlineWidth,
                 borderColor: contentBorderColor,
-                shadowColor,
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.08,
-                shadowRadius: 8,
-                elevation: 4,
               },
             ]}
           >

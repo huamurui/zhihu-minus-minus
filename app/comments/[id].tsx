@@ -449,11 +449,6 @@ export default function CommentScreen() {
                   borderRadius: 14,
                   marginHorizontal: 14,
                   marginTop: 6,
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 4,
-                  elevation: 2,
                 }}
               >
                 <View className="flex-row items-center mb-1 bg-transparent">

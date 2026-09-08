@@ -144,18 +144,7 @@ export default function ChatScreen() {
                   ? 'bg-gray-800 rounded-tl-sm'
                   : 'bg-white rounded-tl-sm'
             }`}
-            style={[
-              isMe && { backgroundColor: primaryColor },
-              !isMe && !isDark
-                ? {
-                    shadowColor: Colors.light.shadow,
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.1,
-                    shadowRadius: 2,
-                    elevation: 2,
-                  }
-                : {},
-            ]}
+            style={[isMe && { backgroundColor: primaryColor }]}
           >
             {messageInfo.content_type === 0 ? (
               <Text

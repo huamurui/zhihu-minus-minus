@@ -1402,7 +1402,7 @@ export default function QuestionDetail() {
         />
 
         <Reanimated.View
-          className="absolute left-5 right-5 h-[54px] rounded-[27px] overflow-hidden z-[1000] shadow-black/20 shadow-lg elevation-10"
+          className="absolute left-5 right-5 h-[54px] rounded-[27px] overflow-hidden z-[1000]"
           style={[
             {
               bottom: insets.bottom,

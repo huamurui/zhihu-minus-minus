@@ -81,11 +81,6 @@ export const HotCard = ({ item }: { item: HotItem }) => {
       style={{
         backgroundColor: Colors[colorScheme].backgroundSecondary,
         borderRadius: 14,
-        shadowColor: colors[colorScheme].cardShadow,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 1,
-        shadowRadius: 10,
-        elevation: 3,
       }}
       className="p-4 mb-3 mx-4 "
     >

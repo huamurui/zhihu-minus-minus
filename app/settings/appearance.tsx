@@ -920,11 +920,6 @@ function HslSlider({
                 backgroundColor: thumbColor,
                 borderWidth: 2,
                 borderColor: Colors.light.textInverse,
-                shadowColor: Colors.light.shadow,
-                shadowOpacity: 0.2,
-                shadowRadius: 3,
-                shadowOffset: { width: 0, height: 1 },
-                elevation: 3,
               },
               thumbAnimatedStyle,
             ]}
