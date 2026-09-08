@@ -30,10 +30,10 @@ const QUALITY_LEVELS: {
   key: 'loose' | 'standard' | 'strict';
   label: string;
 }[] = [
-    { key: 'loose', label: '宽松' },
-    { key: 'standard', label: '标准' },
-    { key: 'strict', label: '严格' },
-  ];
+  { key: 'loose', label: '宽松' },
+  { key: 'standard', label: '标准' },
+  { key: 'strict', label: '严格' },
+];
 
 export default function FilterSettings() {
   const insets = useSafeAreaInsets();
@@ -514,7 +514,6 @@ export default function FilterSettings() {
           </SettingItem>
         </Section>
 
-
         <Section title="服务端请求参数" colorScheme={colorScheme}>
           <Toggle
             label="发送 desktop=true"
@@ -569,7 +568,6 @@ export default function FilterSettings() {
             </Text>
           </RNView>
         </Section>
-
       </ScrollView>
     </RNView>
   );
