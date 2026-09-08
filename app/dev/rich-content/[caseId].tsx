@@ -1,22 +1,38 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { View as RNView, ScrollView, StyleSheet, Switch } from 'react-native';
+import { type Href, Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Linking,
+  View as RNView,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  useWindowDimensions,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BouncyButton } from '@/components/BouncyButton';
 import { Text, useThemeColor } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
-import { ZhihuContent } from '@/features/rich-content';
+import {
+  type EnrichedNormalizationResult,
+  ZhihuContent,
+  ZhihuEnrichedContent,
+} from '@/features/rich-content';
 import { getRichContentDevFixture } from '@/features/rich-content/dev/fixtures';
 import { useSettingsStore } from '@/store/useSettingsStore';
+import { extractZhihuRedirectTarget, parseZhihuUrl } from '@/utils/url';
+
+type RendererKind = 'rnrh' | 'webview' | 'enriched';
 
 export default function RichContentFixtureDetailScreen() {
+  const router = useRouter();
   const params = useLocalSearchParams<{ caseId?: string | string[] }>();
   const caseId = Array.isArray(params.caseId)
     ? params.caseId[0]
     : params.caseId;
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const colorScheme = useColorScheme() ?? 'light';
   const primaryColor = useThemeColor({}, 'primary');
   const backgroundColor = useThemeColor({}, 'background');
@@ -26,6 +42,11 @@ export default function RichContentFixtureDetailScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const [mountIndex, setMountIndex] = useState(0);
   const [interactionsEnabled, setInteractionsEnabled] = useState(false);
+  const [renderer, setRenderer] = useState<RendererKind>(() =>
+    useWebView ? 'webview' : 'rnrh',
+  );
+  const [normalizationResult, setNormalizationResult] =
+    useState<EnrichedNormalizationResult | null>(null);
 
   const fixture = useMemo(
     () => (caseId ? getRichContentDevFixture(caseId) : null),
@@ -35,9 +56,33 @@ export default function RichContentFixtureDetailScreen() {
   useEffect(() => {
     if (!caseId) return;
     setInteractionsEnabled(false);
+    setNormalizationResult(null);
     setMountIndex(0);
     scrollViewRef.current?.scrollTo({ y: 0, animated: false });
   }, [caseId]);
+
+  const selectRenderer = useCallback(
+    (nextRenderer: RendererKind) => {
+      setRenderer(nextRenderer);
+      if (nextRenderer !== 'enriched') {
+        updateSettings({ useWebView: nextRenderer === 'webview' });
+      }
+    },
+    [updateSettings],
+  );
+
+  const handleLinkPress = useCallback(
+    (url: string) => {
+      const realUrl = extractZhihuRedirectTarget(url);
+      const internalPath = parseZhihuUrl(realUrl);
+      if (internalPath && internalPath !== '/') {
+        router.push(internalPath as Href);
+        return;
+      }
+      void Linking.openURL(realUrl).catch(() => undefined);
+    },
+    [router],
+  );
 
   if (!fixture) {
     return (
@@ -58,9 +103,11 @@ export default function RichContentFixtureDetailScreen() {
   const usesStructuredPinContent = Boolean(fixture.contentArray);
   const rendererLabel = usesStructuredPinContent
     ? 'Pin 结构化内容'
-    : useWebView
+    : renderer === 'webview'
       ? 'WebView / DOM'
-      : 'RNRH';
+      : renderer === 'enriched'
+        ? 'EnrichedText（实验）'
+        : 'RNRH';
 
   return (
     <RNView style={[styles.screen, { backgroundColor }]}>
@@ -96,11 +143,11 @@ export default function RichContentFixtureDetailScreen() {
               </Text>
               <RNView style={styles.rendererButtons}>
                 <BouncyButton
-                  onPress={() => updateSettings({ useWebView: false })}
+                  onPress={() => selectRenderer('rnrh')}
                   disabled={usesStructuredPinContent}
                   style={[
                     styles.rendererButton,
-                    !useWebView && !usesStructuredPinContent
+                    renderer === 'rnrh' && !usesStructuredPinContent
                       ? { backgroundColor: primaryColor }
                       : { borderColor },
                   ]}
@@ -108,7 +155,7 @@ export default function RichContentFixtureDetailScreen() {
                   <Text
                     style={[
                       styles.rendererButtonText,
-                      !useWebView && !usesStructuredPinContent
+                      renderer === 'rnrh' && !usesStructuredPinContent
                         ? { color: Colors[colorScheme].textInverse }
                         : undefined,
                     ]}
@@ -117,11 +164,11 @@ export default function RichContentFixtureDetailScreen() {
                   </Text>
                 </BouncyButton>
                 <BouncyButton
-                  onPress={() => updateSettings({ useWebView: true })}
+                  onPress={() => selectRenderer('webview')}
                   disabled={usesStructuredPinContent}
                   style={[
                     styles.rendererButton,
-                    useWebView && !usesStructuredPinContent
+                    renderer === 'webview' && !usesStructuredPinContent
                       ? { backgroundColor: primaryColor }
                       : { borderColor },
                   ]}
@@ -129,12 +176,33 @@ export default function RichContentFixtureDetailScreen() {
                   <Text
                     style={[
                       styles.rendererButtonText,
-                      useWebView && !usesStructuredPinContent
+                      renderer === 'webview' && !usesStructuredPinContent
                         ? { color: Colors[colorScheme].textInverse }
                         : undefined,
                     ]}
                   >
                     WebView
+                  </Text>
+                </BouncyButton>
+                <BouncyButton
+                  onPress={() => selectRenderer('enriched')}
+                  disabled={usesStructuredPinContent}
+                  style={[
+                    styles.rendererButton,
+                    renderer === 'enriched' && !usesStructuredPinContent
+                      ? { backgroundColor: primaryColor }
+                      : { borderColor },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.rendererButtonText,
+                      renderer === 'enriched' && !usesStructuredPinContent
+                        ? { color: Colors[colorScheme].textInverse }
+                        : undefined,
+                    ]}
+                  >
+                    Enriched
                   </Text>
                 </BouncyButton>
               </RNView>
@@ -150,8 +218,17 @@ export default function RichContentFixtureDetailScreen() {
             </BouncyButton>
           </RNView>
           <Text type="secondary" style={styles.rendererHint}>
-            当前：{rendererLabel}。切换项与“外观与定制”中的实验设置共用。
+            当前：{rendererLabel}。RNRH / WebView 与“外观与定制”设置共用；
+            Enriched 仅在本开发页生效。
           </Text>
+          {renderer === 'enriched' ? (
+            <Text type="secondary" style={styles.rendererHint}>
+              单一 native text surface · selectable（需打开正文交互）·{' '}
+              {normalizationResult
+                ? `${normalizationResult.inlineImageCount} 个行内附件 · ${normalizationResult.blockImageCount} 个块图降级 · ${normalizationResult.diagnostics.length} 条诊断`
+                : '正在规范化 HTML'}
+            </Text>
+          ) : null}
 
           <RNView
             style={[
@@ -187,15 +264,26 @@ export default function RichContentFixtureDetailScreen() {
           pointerEvents={interactionsEnabled ? 'auto' : 'none'}
           style={styles.content}
         >
-          <ZhihuContent
-            key={`${fixture.id}:${rendererLabel}:${mountIndex}`}
-            content={fixture.content}
-            contentArray={fixture.contentArray}
-            segmentInfos={fixture.segmentInfos}
-            linkCardInfo={fixture.linkCardInfo}
-            objectId={fixture.objectId}
-            type={fixture.rendererType}
-          />
+          {renderer === 'enriched' && !usesStructuredPinContent ? (
+            <ZhihuEnrichedContent
+              key={`${fixture.id}:${rendererLabel}:${mountIndex}`}
+              htmlContent={fixture.content}
+              contentWidth={Math.max(1, width - 32)}
+              onLinkPress={handleLinkPress}
+              onNormalized={setNormalizationResult}
+            />
+          ) : (
+            <ZhihuContent
+              key={`${fixture.id}:${rendererLabel}:${mountIndex}`}
+              content={fixture.content}
+              contentArray={fixture.contentArray}
+              segmentInfos={fixture.segmentInfos}
+              linkCardInfo={fixture.linkCardInfo}
+              objectId={fixture.objectId}
+              type={fixture.rendererType}
+              useNative={renderer === 'rnrh'}
+            />
+          )}
         </RNView>
       </ScrollView>
     </RNView>
@@ -227,7 +315,7 @@ const styles = StyleSheet.create({
   },
   rendererControl: { flex: 1 },
   toolbarLabel: { fontSize: 11, marginBottom: 7 },
-  rendererButtons: { flexDirection: 'row', gap: 8 },
+  rendererButtons: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   rendererButton: {
     minWidth: 74,
     paddingHorizontal: 12,

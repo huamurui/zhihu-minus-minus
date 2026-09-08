@@ -8,6 +8,17 @@ export type {
   ZhihuDOMContentProps,
 } from './components/ZhihuDOMContent';
 export {
+  ZhihuEnrichedContent,
+  type ZhihuEnrichedContentProps,
+} from './components/ZhihuEnrichedContent';
+export {
+  type EnrichedFallbackKind,
+  type EnrichedNormalizationDiagnostic,
+  type EnrichedNormalizationOptions,
+  type EnrichedNormalizationResult,
+  normalizeZhihuHtmlForEnriched,
+} from './normalization/normalizeZhihuHtml';
+export {
   getNeighborAnswerIds,
   getRichContentQueryKey,
   hasInlineRichContent,

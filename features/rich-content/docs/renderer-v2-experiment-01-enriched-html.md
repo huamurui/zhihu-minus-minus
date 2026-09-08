@@ -1,5 +1,43 @@
 经过进一步调研，当前不准备立即完整重写 RNRH，也暂不把 WebView / FlashList / 自研 Native Rich Text 作为唯一既定路线。
 
+## 实施状态（2026-09-08）
+
+第一批 JS / Fabric 接入已经完成，但尚未宣称实验通过：
+
+* 安装 `react-native-enriched-html@1.1.1`，该版本支持项目当前的 React Native 0.83 / Fabric；
+* 增加 `normalizeZhihuHtmlForEnriched`，将知乎 HTML 收窄为库支持的 canonical dialect；
+* 只保留允许的 URL scheme，移除 script/form 等节点，并对 unsupported node 产生可观测诊断；
+* `eeimg=1` 保持 inline `<img>`，`eeimg=2` 和普通 block image 显式记录降级；
+* 开发案例页已增加 `Enriched` 第三后端，可与 RNRH / WebView 渲染同一份稳定 fixture；
+* 新增 normalization、危险 URL、link card、inline / block attachment 回归测试。
+
+第二批已经补上公式 SVG attachment 与基础排版对齐：
+
+* 通过 `patch-package` 小范围扩展上游图片 attachment；Android 使用 AndroidSVG rasterize，iOS 复用项目已有的 `SDWebImageSVGCoder`；
+* 公式 SVG 随当前正文颜色着色，兼容浅色 / 深色主题；远程图片失败日志不再包含完整 URL；
+* 缺失 `width` / `height` 的公式沿用现有 RNRH 后端的尺寸 fallback：行内高度 22、按 `alt` 估宽，块公式使用正文宽度和高度 60；
+* 正文字号和行高、h1-h6、引用、代码和列表中 Enriched 可配置的部分，已经参考现有 `ZhihuContent` 统一视觉层级；列表使用较紧凑的缩进，标记颜色继承正文色；
+* 代码背景使用现有 renderer 的 `border` token，并绕开 Enriched 对不透明背景自动降 alpha 后在浅色主题几乎不可见的问题；normalization 同时移除了 block 之间仅用于格式化源码的空白，避免它们变成额外文本行；
+* Android app debug 构建与 iOS `ReactNativeEnrichedHtml` Simulator target 均已编译通过。
+
+这仍不是公式排版的最终形态。知乎公式端点返回的 SVG 在自身 `width` / `height`（`ex`）和 `vertical-align` 中携带精确 metrics，但 Enriched 当前 `<img>` 模型只接收固定整数尺寸，不接收 baseline offset。第一阶段先消除裂图并取得可比较结果；精确 intrinsic metrics 和 baseline 仍属于下文的 Attachment metrics 扩展，需要真机对照后再做。
+
+基础排版也仍有一组明确的库边界：`htmlStyle` 暂不开放普通段落与标题的上下间距、引用背景与内边距、inline code 内边距、图片圆角、分隔线及图注样式。因此本轮只对齐公开配置能够稳定表达的部分，没有通过插入空行伪造 margin（那会污染复制文本和连续 selection）。这些差异应在真机对照后，再决定是否值得增加通用的 paragraph / attachment style native extension。
+
+当前上游只读 `EnrichedText` 已有 `selectable`，但没有 `onSelectionChange`；`htmlStyle` 的 underline 也只有开关和颜色，没有 thickness / offset / line style。因此这两项仍明确属于下一批 native extension，不在本批伪造 JS 事件或视觉模拟。
+
+真机验证入口：
+
+```text
+我的
+ -> 富文本测试案例（开发）
+ -> 选择案例
+ -> Enriched
+ -> 打开“正文交互”
+```
+
+推荐先使用 `article-formula-heavy-001` 检查连续段落、345 个 inline formula 和一个 block image，再使用 `long-image-heavy-001` 检查长文与 block image 降级。由于新增了原生依赖，不能使用 Expo Go；需要重新 prebuild 并编译 development build。
+
 目前更值得先验证的是：
 
 ```text

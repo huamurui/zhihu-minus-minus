@@ -55,11 +55,13 @@
     "expo-status-bar": "~55.0.4",
     "expo-symbols": "~55.0.5",
     "expo-web-browser": "~55.0.9",
+    "htmlparser2": "^7.2.0",
     "katex": "^0.16.45",
     "nativewind": "^4.2.2",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-native": "0.83.2",
+    "react-native-enriched-html": "^1.1.1",
     "react-native-gesture-handler": "~2.30.0",
     "react-native-image-zoom-viewer": "^3.0.1",
     "react-native-pager-view": "8.0.0",
@@ -81,6 +83,10 @@
     "@types/react": "~19.2.2",
     "patch-package": "^8.0.1",
     "typescript": "~5.9.2"
+  },
+  "overrides": {
+    "@tiptap/extension-bubble-menu": "3.27.1",
+    "@tiptap/extension-floating-menu": "3.27.1"
   },
   "private": true
 }

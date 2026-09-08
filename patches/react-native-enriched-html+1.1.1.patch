@@ -1,0 +1,203 @@
+diff --git a/node_modules/react-native-enriched-html/ReactNativeEnrichedHtml.podspec b/node_modules/react-native-enriched-html/ReactNativeEnrichedHtml.podspec
+index 0af0fb0..fb6a8ab 100644
+--- a/node_modules/react-native-enriched-html/ReactNativeEnrichedHtml.podspec
++++ b/node_modules/react-native-enriched-html/ReactNativeEnrichedHtml.podspec
+@@ -28,4 +28,6 @@ else
+   s.dependency "React-Core"
+ end
+ 
++s.dependency "SDWebImageSVGCoder", "~> 1.7.0"
++
+ end
+diff --git a/node_modules/react-native-enriched-html/android/build.gradle b/node_modules/react-native-enriched-html/android/build.gradle
+index cd36195..bfc1e5b 100644
+--- a/node_modules/react-native-enriched-html/android/build.gradle
++++ b/node_modules/react-native-enriched-html/android/build.gradle
+@@ -95,6 +95,7 @@ def kotlin_version = getExtOrDefault("kotlinVersion")
+ 
+ dependencies {
+ 	implementation "com.facebook.react:react-android"
++	implementation "com.caverock:androidsvg-aar:1.4"
+ 	implementation 'org.ccil.cowan.tagsoup:tagsoup:1.2.1'
+ 	implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+ }
+diff --git a/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/common/AsyncDrawable.kt b/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/common/AsyncDrawable.kt
+index 6198ead..770b0ae 100644
+--- a/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/common/AsyncDrawable.kt
++++ b/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/common/AsyncDrawable.kt
+@@ -1,12 +1,14 @@
+ package com.swmansion.enriched.common
+ 
+ import android.content.res.Resources
++import android.graphics.Bitmap
+ import android.graphics.BitmapFactory
+ import android.graphics.Canvas
+ import android.graphics.Color
+ import android.graphics.ColorFilter
+ import android.graphics.ImageDecoder
+ import android.graphics.PixelFormat
++import android.graphics.RectF
+ import android.graphics.drawable.AnimatedImageDrawable
+ import android.graphics.drawable.Drawable
+ import android.os.Build
+@@ -14,18 +16,26 @@ import android.os.Handler
+ import android.os.Looper
+ import android.util.Log
+ import androidx.core.graphics.drawable.toDrawable
++import com.caverock.androidsvg.SVG
+ import com.swmansion.enriched.R
++import java.io.ByteArrayInputStream
+ import java.net.URL
+ import java.nio.ByteBuffer
+ import java.util.concurrent.Executors
+ 
+ class AsyncDrawable(
+   private val url: String,
++  width: Int,
++  height: Int,
+ ) : Drawable() {
++  private val targetWidth = (width * Resources.getSystem().displayMetrics.density).toInt().coerceAtLeast(1)
++  private val targetHeight = (height * Resources.getSystem().displayMetrics.density).toInt().coerceAtLeast(1)
+   private var internalDrawable: Drawable = Color.TRANSPARENT.toDrawable()
+   private val mainHandler = Handler(Looper.getMainLooper())
+   private val executor = Executors.newSingleThreadExecutor()
+   var isLoaded = false
++  var isFormulaSvg = false
++    private set
+ 
+   init {
+     internalDrawable.bounds = bounds
+@@ -37,8 +47,7 @@ class AsyncDrawable(
+     executor.execute {
+       try {
+         isLoaded = false
+-        val inputStream = URL(url).openStream()
+-        val bytes = inputStream.readBytes()
++        val bytes = URL(url).openStream().use { it.readBytes() }
+         val d = prepareDrawable(bytes)
+ 
+         // Switch to Main Thread to update UI
+@@ -51,7 +60,7 @@ class AsyncDrawable(
+           }
+         }
+       } catch (e: Exception) {
+-        Log.e("AsyncDrawable", "Failed to load: $url", e)
++        Log.e("AsyncDrawable", "Failed to load remote image", e)
+ 
+         loadPlaceholderImage()
+       } finally {
+@@ -62,6 +71,8 @@ class AsyncDrawable(
+   }
+ 
+   private fun prepareDrawable(bytes: ByteArray): Drawable? {
++    prepareSvgDrawable(bytes)?.let { return it }
++
+     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+       try {
+         val buffer = ByteBuffer.wrap(bytes)
+@@ -69,7 +80,7 @@ class AsyncDrawable(
+ 
+         val drawable =
+           ImageDecoder.decodeDrawable(source) { decoder, _, _ ->
+-            decoder.setTargetSize(bounds.width(), bounds.height())
++            decoder.setTargetSize(targetWidth, targetHeight)
+           }
+ 
+         if (drawable is AnimatedImageDrawable) {
+@@ -93,6 +104,28 @@ class AsyncDrawable(
+     }
+   }
+ 
++  private fun prepareSvgDrawable(bytes: ByteArray): Drawable? {
++    val prefix = bytes.decodeToString(0, minOf(bytes.size, 512)).trimStart('\uFEFF', ' ', '\t', '\r', '\n')
++    if (!prefix.startsWith("<svg", ignoreCase = true) &&
++      !(prefix.startsWith("<?xml", ignoreCase = true) && prefix.contains("<svg", ignoreCase = true))
++    ) {
++      return null
++    }
++
++    isFormulaSvg = url.contains("/equation")
++
++    return try {
++      val bitmap = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888)
++      val canvas = Canvas(bitmap)
++      val svg = SVG.getFromInputStream(ByteArrayInputStream(bytes))
++      svg.renderToCanvas(canvas, RectF(0f, 0f, targetWidth.toFloat(), targetHeight.toFloat()))
++      bitmap.toDrawable(Resources.getSystem())
++    } catch (e: Exception) {
++      Log.w("AsyncDrawable", "SVG decoder failed", e)
++      null
++    }
++  }
++
+   private fun loadPlaceholderImage() {
+     internalDrawable = ResourceManager.getDrawableResource(R.drawable.broken_image)
+   }
+diff --git a/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/common/spans/EnrichedImageSpan.kt b/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/common/spans/EnrichedImageSpan.kt
+index ba09436..795bd82 100644
+--- a/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/common/spans/EnrichedImageSpan.kt
++++ b/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/common/spans/EnrichedImageSpan.kt
+@@ -43,6 +43,9 @@ open class EnrichedImageSpan :
+     paint: Paint,
+   ) {
+     val drawable = drawable
++    if (drawable is AsyncDrawable && drawable.isFormulaSvg) {
++      drawable.setTint(paint.color)
++    }
+     canvas.withSave {
+       val transY = bottom - drawable.bounds.bottom - paint.fontMetricsInt.descent
+       translate(x, transY.toFloat())
+@@ -138,7 +141,7 @@ open class EnrichedImageSpan :
+       var cleanPath = src
+ 
+       if (cleanPath.startsWith("http://") || cleanPath.startsWith("https://")) {
+-        return AsyncDrawable(cleanPath)
++        return AsyncDrawable(cleanPath, width, height)
+       }
+ 
+       if (cleanPath.startsWith("file://")) {
+diff --git a/node_modules/react-native-enriched-html/ios/interfaces/ImageAttachment.mm b/node_modules/react-native-enriched-html/ios/interfaces/ImageAttachment.mm
+index c852966..177fb43 100644
+--- a/node_modules/react-native-enriched-html/ios/interfaces/ImageAttachment.mm
++++ b/node_modules/react-native-enriched-html/ios/interfaces/ImageAttachment.mm
+@@ -1,5 +1,6 @@
+ #import "ImageAttachment.h"
+ #import "ImageExtension.h"
++#import <SDWebImageSVGCoder/SDImageSVGCoder.h>
+ 
+ // NSTextStorage frequently recreates NSTextAttachment objects during attribute
+ // invalidation (e.g. on every keystroke). Without this cache each recreation
+@@ -82,12 +83,27 @@ - (void)loadAsync {
+   dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+     NSData *bytes = [NSData dataWithContentsOfURL:url];
+ 
+-    // We pass all image data (including static formats like PNG or JPEG)
+-    // through the animated image parser. It safely acts as a universal parser,
+-    // returning a single-frame UIImage for static formats and an animated
+-    // UIImage for GIFs and WebPs.
+-    UIImage *img = bytes ? [UIImage animatedImageWithData:bytes]
+-                         : [UIImage systemImageNamed:@"photo"];
++    UIImage *img = nil;
++    if (bytes != nil) {
++      if (@available(iOS 13.0, *)) {
++        SDImageSVGCoder *svgCoder = [SDImageSVGCoder sharedCoder];
++        if ([svgCoder canDecodeFromData:bytes]) {
++          img = [svgCoder decodedImageWithData:bytes options:nil];
++          if ([self.uri containsString:@"/equation"]) {
++            img = [img imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
++          }
++        }
++      }
++
++      // The animated image parser also acts as the regular PNG/JPEG/WebP/GIF
++      // decoder. Keep it as the fallback for every non-SVG format.
++      if (img == nil) {
++        img = [UIImage animatedImageWithData:bytes];
++      }
++    }
++    if (img == nil) {
++      img = [UIImage systemImageNamed:@"photo"];
++    }
+ 
+     dispatch_async(dispatch_get_main_queue(), ^{
+       if (bytes != nil && img != nil && self.uri.length > 0) {
