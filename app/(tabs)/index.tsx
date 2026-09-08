@@ -836,6 +836,9 @@ const FeedList = React.forwardRef<
     const {
       enableLocalFeedDedup,
       enableFeedCacheOnLaunch,
+      recommendRequestIncludeDesktop,
+      recommendRequestIncludeAdInterval,
+      recommendRequestAdInterval,
       enableLocalFeedFilter,
       filterMode,
       filterShowReason,
@@ -1030,6 +1033,27 @@ const FeedList = React.forwardRef<
         }
       },
     ).current;
+    const recommendationRequestKey = useMemo(
+      () =>
+        tab === 'recommend'
+          ? {
+              includeDesktop: recommendRequestIncludeDesktop,
+              includeAdInterval: recommendRequestIncludeAdInterval,
+              adInterval: recommendRequestAdInterval,
+            }
+          : null,
+      [
+        recommendRequestAdInterval,
+        recommendRequestIncludeAdInterval,
+        recommendRequestIncludeDesktop,
+        tab,
+      ],
+    );
+    const feedQueryKey = useMemo(
+      () =>
+        ['zhihu-feed', queryAccountKey, tab, recommendationRequestKey] as const,
+      [queryAccountKey, recommendationRequestKey, tab],
+    );
     const {
       data,
       fetchNextPage,
@@ -1039,7 +1063,7 @@ const FeedList = React.forwardRef<
       isRefetching,
       refetch,
     } = useInfiniteQuery({
-      queryKey: ['zhihu-feed', queryAccountKey, tab],
+      queryKey: feedQueryKey,
       queryFn: async ({ pageParam = FEED_URLS[tab] }) => {
         if (!cookies && tab === 'following')
           return { items: [], nextUrl: null };
@@ -1056,7 +1080,7 @@ const FeedList = React.forwardRef<
           }
 
           console.log(
-            `🌐 [queryFn] Requesting URL: ${requestUrl} (tab=${tab}, isRefreshing=${isRefreshing})`,
+            `🌐 [queryFn] Requesting feed (tab=${tab}, isRefreshing=${isRefreshing})`,
           );
           const data = await getFeed(requestUrl);
           const rawItems = data.data || [];
@@ -1126,7 +1150,7 @@ const FeedList = React.forwardRef<
           tab === 'local' ? 'zhihu://local-feed' : FEED_URLS[tab];
         await refreshInfiniteQuery(
           queryClient,
-          ['zhihu-feed', queryAccountKey, tab],
+          feedQueryKey,
           refetch,
           initialParam,
         );
@@ -1140,7 +1164,7 @@ const FeedList = React.forwardRef<
       localDedupEnabled,
       onRefreshStateChange,
       queryClient,
-      queryAccountKey,
+      feedQueryKey,
       refetch,
       tab,
     ]);

@@ -561,13 +561,50 @@ export const FEED_URLS = {
   hot: 'https://www.zhihu.com/api/v3/feed/topstory/hot-lists/total?limit=50',
 } as const;
 
+export interface RecommendRequestOptions {
+  includeDesktop: boolean;
+  includeAdInterval: boolean;
+  adInterval: number;
+}
+
+const RECOMMEND_FEED_PATH = '/api/v3/feed/topstory/recommend';
+
+/**
+ * Apply the optional recommendation query parameters to every recommendation
+ * page, including URLs returned by paging.next. Existing session_token values
+ * are intentionally preserved but are never generated or hardcoded here.
+ */
+export function buildRecommendRequestUrl(
+  url: string,
+  options: RecommendRequestOptions,
+): string {
+  if (!url.includes(RECOMMEND_FEED_PATH)) return url;
+
+  try {
+    const parsedUrl = new URL(url);
+    if (options.includeDesktop) {
+      parsedUrl.searchParams.set('desktop', 'true');
+    } else {
+      parsedUrl.searchParams.delete('desktop');
+    }
+    if (options.includeAdInterval) {
+      parsedUrl.searchParams.set('ad_interval', String(options.adInterval));
+    } else {
+      parsedUrl.searchParams.delete('ad_interval');
+    }
+    return parsedUrl.toString();
+  } catch {
+    return url;
+  }
+}
+
 export const getFeed = async (url: string): Promise<ZhihuFeedResponse> => {
   let finalUrl = url;
   const { cookies } = useAuthStore.getState();
   const isRefreshRequest = url.includes('action=up') || url.includes('t=');
 
   // 如果未登录且请求的是推荐页初始接口，则切换为游客接口
-  if (!cookies && url.includes('feed/topstory/recommend')) {
+  if (!cookies && finalUrl.includes('feed/topstory/recommend')) {
     finalUrl =
       'https://www.zhihu.com/api/v3/explore/guest/feeds?limit=15&ws_qiangzhisafe=0';
     if (isRefreshRequest) {
@@ -606,6 +643,19 @@ export const getFeed = async (url: string): Promise<ZhihuFeedResponse> => {
       'zhihu://local-feed/',
       'https://api.zhihu.com/feed-root/section/',
     );
+  }
+
+  if (cookies) {
+    const {
+      recommendRequestIncludeDesktop,
+      recommendRequestIncludeAdInterval,
+      recommendRequestAdInterval,
+    } = useSettingsStore.getState();
+    finalUrl = buildRecommendRequestUrl(finalUrl, {
+      includeDesktop: recommendRequestIncludeDesktop,
+      includeAdInterval: recommendRequestIncludeAdInterval,
+      adInterval: recommendRequestAdInterval,
+    });
   }
 
   const res = await apiClient.get<ZhihuFeedResponse>(finalUrl);
