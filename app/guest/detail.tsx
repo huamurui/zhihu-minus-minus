@@ -42,7 +42,7 @@ export default function GuestDetailScreen() {
         style={[styles.centerContainer, { backgroundColor }]}
         type="default"
       >
-        <Stack.Screen options={{ headerShown: false }} />
+        <Stack.Screen options={{ headerShown: false, title: '内容预览' }} />
         <Ionicons
           name="alert-circle-outline"
           size={48}
@@ -97,7 +97,7 @@ export default function GuestDetailScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor }]} type="default">
-      <Stack.Screen options={{ headerShown: false }} />
+      <Stack.Screen options={{ headerShown: false, title: '内容预览' }} />
 
       {/* 顶部标题导航栏 */}
       <View

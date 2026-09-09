@@ -212,6 +212,7 @@ export default function AnswerDetailScreen() {
   if (loadingInitial && !initialAnswer) {
     return (
       <View className="flex-1 justify-center items-center">
+        <Stack.Screen options={{ headerShown: false, title: '回答' }} />
         <ActivityIndicator color={primaryColor} />
       </View>
     );
@@ -219,7 +220,7 @@ export default function AnswerDetailScreen() {
 
   return (
     <View className="flex-1">
-      <Stack.Screen options={{ headerShown: false }} />
+      <Stack.Screen options={{ headerShown: false, title: '回答' }} />
 
       {/* Header Bar */}
       <View

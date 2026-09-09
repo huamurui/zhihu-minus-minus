@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { Linking, ScrollView, StyleSheet } from 'react-native';
 import { BouncyButton } from '@/components/BouncyButton';
 import { Text, useThemeColor, View } from '@/components/Themed';
@@ -15,6 +15,7 @@ export default function FeedbackScreen() {
 
   return (
     <View className="flex-1">
+      <Stack.Screen options={{ headerShown: false, title: '反馈与建议' }} />
       {/* 顶部标题栏 */}
       <View
         type="surface"

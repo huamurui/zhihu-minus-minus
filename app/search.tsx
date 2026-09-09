@@ -371,7 +371,7 @@ export default function SearchScreen() {
 
   return (
     <View className="flex-1">
-      <Stack.Screen options={{ headerShown: false }} />
+      <Stack.Screen options={{ headerShown: false, title: '搜索' }} />
 
       {/* Header */}
       <View className="pt-[45px] pb-2.5 px-[5px]" style={{ backgroundColor }}>

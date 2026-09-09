@@ -806,7 +806,7 @@ export default function UserStreamScreen() {
         backgroundColor: Colors[colorScheme].background,
       }}
     >
-      <Stack.Screen options={{ headerShown: false }} />
+      <Stack.Screen options={{ headerShown: false, title: '个人动态' }} />
       {isUserLoading ? (
         <View className="flex-1 items-center justify-center bg-transparent">
           <ActivityIndicator color={primaryColor} />

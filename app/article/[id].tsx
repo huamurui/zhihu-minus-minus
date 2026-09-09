@@ -203,6 +203,7 @@ export default function ArticleDetail() {
   if (isLoading) {
     return (
       <View className="flex-1 justify-center items-center">
+        <Stack.Screen options={{ headerShown: false, title: '正文' }} />
         <ActivityIndicator size="large" color={primaryColor} />
         <Text className="mt-3">正赶往知识的荒原...喵</Text>
       </View>
@@ -212,6 +213,7 @@ export default function ArticleDetail() {
   if (!data) {
     return (
       <View className="flex-1 justify-center items-center px-6">
+        <Stack.Screen options={{ headerShown: false, title: '正文' }} />
         <Ionicons
           name="compass-outline"
           size={48}
@@ -239,7 +241,7 @@ export default function ArticleDetail() {
   return (
     <View className="flex-1">
       {/* Hide native header */}
-      <Stack.Screen options={{ headerShown: false }} />
+      <Stack.Screen options={{ headerShown: false, title: '正文' }} />
 
       {/* Floating Header Bar */}
       <View

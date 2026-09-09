@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -70,6 +70,7 @@ export default function PublishQuestionScreen() {
 
   return (
     <View className="flex-1">
+      <Stack.Screen options={{ headerShown: false, title: '提问题' }} />
       <View
         className="flex-row items-center justify-between px-4 pb-3"
         style={{ paddingTop: insets.top + 10 }}
