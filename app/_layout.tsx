@@ -239,18 +239,13 @@ function RootLayout() {
                   },
                   headerTintColor: currentTint,
                   headerShadowVisible: false,
+                  headerBackButtonDisplayMode: 'minimal',
                 }}
               >
                 {/* 底部 Tab 主框架 */}
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-
-                {/* 文章详情页：从右侧推入 */}
                 <Stack.Screen
-                  name="article/[id]"
-                  options={{
-                    headerTitle: '正文',
-                    headerBackTitle: '返回',
-                  }}
+                  name="(tabs)"
+                  options={{ headerShown: false, title: '知乎' }}
                 />
 
                 {/* 登录页：建议做成从底部弹出的 Modal */}
@@ -258,7 +253,6 @@ function RootLayout() {
                   name="login/index"
                   options={{
                     presentation: 'modal',
-                    headerTitle: '登录知乎',
                     headerLeft: () => null,
                   }}
                 />

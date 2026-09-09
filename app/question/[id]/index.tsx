@@ -1263,7 +1263,7 @@ export default function QuestionDetail() {
 
   return (
     <View type="default" className="flex-1">
-      <Stack.Screen options={{ headerShown: false }} />
+      <Stack.Screen options={{ headerShown: false, title: '问题' }} />
 
       <ShareMenu
         visible={isSharing}
