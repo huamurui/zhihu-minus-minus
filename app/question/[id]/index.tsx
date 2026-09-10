@@ -6,6 +6,7 @@ import {
 } from '@shopify/flash-list';
 import {
   type InfiniteData,
+  useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
@@ -47,7 +48,6 @@ import Reanimated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import client from '@/api/client';
 import {
   type AnswerDetail,
   deleteAnswer,
@@ -58,6 +58,7 @@ import { followMember, unfollowMember } from '@/api/zhihu/member';
 import {
   followQuestion,
   getQuestion,
+  getQuestionAnswers,
   unfollowQuestion,
   type ZhihuQuestionDetail,
 } from '@/api/zhihu/question';
@@ -77,7 +78,6 @@ import {
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
 import { useScrollHeaderAnim } from '@/hooks/useScrollAnimation';
 import { useViewableItems } from '@/hooks/useViewableItems';
-import { useZhihuInfiniteQuery } from '@/hooks/useZhihuInfiniteQuery';
 import { useCollectionStore } from '@/store/useCollectionStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ZhihuAuthor } from '@/types/zhihu';
@@ -319,7 +319,7 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
     ) : null;
 
     const followMutation = useOptimisticToggle<
-      InfiniteData<QuestionAnswersResponse, number>
+      InfiniteData<QuestionAnswersResponse, number | string>
     >({
       queryKey: ['question-answers', questionId, sortBy],
       mutationFn: async () => {
@@ -806,17 +806,24 @@ export default function QuestionDetail() {
     isRefetching,
     isPending: answersPending,
     isError: answersError,
-  } = useZhihuInfiniteQuery<QuestionAnswersResponse>({
+  } = useInfiniteQuery<
+    QuestionAnswersResponse,
+    Error,
+    InfiniteData<QuestionAnswersResponse, number | string>,
+    ['question-answers', string, AnswerSort],
+    number | string
+  >({
     queryKey: ['question-answers', id, sortBy],
     queryFn: async ({ pageParam = 0 }) => {
       const include =
         'data[*].content,excerpt,voteup_count,comment_count,favlists_count,author.name,author.avatar_url,author.headline,author.is_following,relationship.voting,relationship.is_author,created_time,updated_time,ip_info,segment_infos';
-      const res = await client.get<QuestionAnswersResponse>(
-        `/questions/${id}/answers?include=${include}&limit=20&offset=${pageParam}&sort_by=${sortBy}`,
-      );
-      return res.data;
+      return getQuestionAnswers(id as string, pageParam, sortBy, include);
     },
     initialPageParam: 0,
+    getNextPageParam: (lastPage) => {
+      if (lastPage.paging?.is_end) return undefined;
+      return lastPage.paging?.next;
+    },
   });
 
   const handleRefresh = useCallback(() => {
