@@ -1231,7 +1231,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         {contentArray ? (
           renderPinContent()
         ) : !useWebView || useNativeFallback || useNative ? (
-          <View className="px-1">
+          <View>
             <RenderHtml
               contentWidth={width - 40}
               source={{ html: `<div>${content}</div>` }}

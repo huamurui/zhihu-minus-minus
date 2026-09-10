@@ -290,8 +290,6 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
       item.content?.includes('<figure');
     const excerpt = isLongContent ? `${rawText.substring(0, 100)}...` : rawText;
 
-    const { fontSizeScale, lineHeightScale } = useSettingsStore();
-
     // Shared meta info component to avoid repetition
     const metaText = [
       item.created_time ? `发布于 ${formatDate(item.created_time)}` : null,
@@ -475,8 +473,8 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
                   <View style={{ height: 180, overflow: 'hidden' }}>
                     <Text
                       style={{
-                        fontSize: 17 * fontSizeScale,
-                        lineHeight: 17 * lineHeightScale,
+                        fontSize: 17,
+                        lineHeight: 17 * 1.5,
                         color: Colors[colorScheme].text,
                         marginBottom: 14,
                       }}
