@@ -27,6 +27,8 @@ import PagerView, {
 import Animated, {
   Extrapolate,
   interpolate,
+  interpolateColor,
+  type SharedValue,
   useAnimatedStyle,
   useEvent,
   useSharedValue,
@@ -54,6 +56,7 @@ import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { hasReusableAnswerDetail } from '@/features/rich-content';
+import { useCollapsibleChromeScroll } from '@/hooks/useCollapsibleChromeScroll';
 import {
   type FeedCacheContext,
   feedCacheRepository,
@@ -101,10 +104,16 @@ type FeedListItem = FeedItem | HotItem | CollapsedGroup;
 const AUTO_HIDE_NAV_TABS: readonly TabType[] = [
   'following',
   'recommend',
+  'local',
   'hot',
   'daily',
 ];
+const TOP_NAV_HEIGHT = 50;
+const BOTTOM_NAV_HEIGHT = 64;
 const AnimatedPagerView = Animated.createAnimatedComponent(PagerView);
+const AnimatedFlashList = Animated.createAnimatedComponent(
+  FlashList,
+) as typeof FlashList;
 
 function isTabType(value: string): value is TabType {
   return (TABS as readonly string[]).includes(value);
@@ -117,12 +126,6 @@ interface TabListHandle {
 
 interface FeedListHandle extends TabListHandle {
   refresh: () => void;
-}
-
-interface ScrollMotion {
-  direction: 'up' | 'down' | null;
-  directionStartOffset: number;
-  lastOffset: number;
 }
 
 // 隐藏模式下被过滤项不占行，一页内容可能所剩无几甚至为空——列表不足一屏时
@@ -178,13 +181,16 @@ export default function HomeScreen() {
 
   // 核心状态：共享滚动位置
   const scrollX = useSharedValue(initialPageIndex);
-  const chromeVisibility = useSharedValue(1);
+  const topNavOffset = useSharedValue(0);
+  const bottomNavOffset = useSharedValue(0);
   const pagerRef = useRef<PagerView>(null);
   const pageScrollHandler = useEvent<PagerViewOnPageScrollEvent>(
     (event) => {
       'worklet';
       if (event.eventName.endsWith('onPageScroll')) {
         scrollX.value = event.position + event.offset;
+        topNavOffset.value = 0;
+        bottomNavOffset.value = 0;
       }
     },
     ['onPageScroll'],
@@ -193,6 +199,7 @@ export default function HomeScreen() {
 
   const tintColor = useThemeColor({}, 'primary');
   const textColor = useThemeColor({}, 'text');
+  const secondaryTextColor = useThemeColor({}, 'textSecondary');
   const indicatorBgColor = useThemeColor({}, 'primary_26');
   const [currentPage, setCurrentPage] = useState(initialPageIndex);
   const [guestCookieReady, setGuestCookieReady] = useState(false);
@@ -238,90 +245,36 @@ export default function HomeScreen() {
     {},
   );
   const listRefs = useRef<Array<TabListHandle | null>>([]);
-  const scrollMotionRef = useRef<Record<number, ScrollMotion>>({});
-  const isChromeHiddenRef = useRef(false);
 
-  const setChromeHidden = useCallback(
-    (hidden: boolean) => {
-      if (isChromeHiddenRef.current === hidden) return;
-      isChromeHiddenRef.current = hidden;
-      chromeVisibility.value = withTiming(hidden ? 0 : 1, { duration: 180 });
-    },
-    [chromeVisibility],
-  );
+  const showChrome = useCallback(() => {
+    topNavOffset.value = 0;
+    bottomNavOffset.value = 0;
+  }, [bottomNavOffset, topNavOffset]);
 
   const handleRefreshStateChange = useCallback(
     (pageIndex: number, isRefreshing: boolean) => {
       if (isRefreshing && pageIndex === currentPage) {
-        setChromeHidden(false);
+        showChrome();
       }
       setRefreshingTabs((prev) => {
         if (prev[pageIndex] === isRefreshing) return prev;
         return { ...prev, [pageIndex]: isRefreshing };
       });
     },
-    [currentPage, setChromeHidden],
+    [currentPage, showChrome],
   );
 
   const isCurrentRefreshing = refreshingTabs[currentPage] || false;
 
-  const SCROLL_THRESHOLD_SHOW = 300;
-  const SCROLL_THRESHOLD_HIDE = 200;
-
-  const handleScrollUpdate = useCallback(
-    (pageIndex: number, offset: number) => {
+  const handleScrolledChange = useCallback(
+    (pageIndex: number, scrolled: boolean) => {
       setScrolledTabs((prev) => {
         const currentlyScrolled = prev[pageIndex] || false;
-        let nextScrolled = currentlyScrolled;
-
-        if (!currentlyScrolled && offset > SCROLL_THRESHOLD_SHOW) {
-          nextScrolled = true;
-        } else if (currentlyScrolled && offset < SCROLL_THRESHOLD_HIDE) {
-          nextScrolled = false;
-        }
-
-        if (currentlyScrolled === nextScrolled) return prev;
-        return { ...prev, [pageIndex]: nextScrolled };
+        if (currentlyScrolled === scrolled) return prev;
+        return { ...prev, [pageIndex]: scrolled };
       });
-
-      const previousMotion = scrollMotionRef.current[pageIndex] ?? {
-        direction: null,
-        directionStartOffset: offset,
-        lastOffset: offset,
-      };
-      const delta = offset - previousMotion.lastOffset;
-      const direction =
-        delta > 1 ? 'down' : delta < -1 ? 'up' : previousMotion.direction;
-
-      if (direction !== previousMotion.direction) {
-        previousMotion.direction = direction;
-        previousMotion.directionStartOffset = offset;
-      }
-      previousMotion.lastOffset = offset;
-      scrollMotionRef.current[pageIndex] = previousMotion;
-
-      if (pageIndex !== currentPage) return;
-      const currentTab = currentTabs[pageIndex];
-      if (!currentTab || !AUTO_HIDE_NAV_TABS.includes(currentTab)) {
-        setChromeHidden(false);
-        return;
-      }
-
-      if (offset <= 24) {
-        setChromeHidden(false);
-        return;
-      }
-
-      const directionDistance = Math.abs(
-        offset - previousMotion.directionStartOffset,
-      );
-      if (direction === 'down' && offset > 80 && directionDistance >= 24) {
-        setChromeHidden(true);
-      } else if (direction === 'up' && directionDistance >= 16) {
-        setChromeHidden(false);
-      }
     },
-    [currentPage, currentTabs, setChromeHidden],
+    [],
   );
 
   const handleHomeTabPress = () => {
@@ -376,33 +329,23 @@ export default function HomeScreen() {
       [0, -100],
       Extrapolate.CLAMP,
     );
-    const scrollTranslateY = interpolate(
-      chromeVisibility.value,
-      [0, 1],
-      [-80, 0],
-      Extrapolate.CLAMP,
-    );
+    const hideDistance = insets.top + TOP_NAV_HEIGHT;
+    const visibility = 1 - topNavOffset.value / hideDistance;
     return {
-      opacity: opacity * chromeVisibility.value,
-      transform: [{ translateY: translateY + scrollTranslateY }],
+      opacity: opacity * visibility,
+      transform: [{ translateY: translateY - topNavOffset.value }],
       pointerEvents:
-        scrollX.value > fadeStart + 0.5 || chromeVisibility.value < 0.5
-          ? 'none'
-          : 'auto',
+        scrollX.value > fadeStart + 0.5 || visibility <= 0 ? 'none' : 'auto',
     };
   });
 
   const bottomNavAnimStyle = useAnimatedStyle(() => {
-    const translateY = interpolate(
-      chromeVisibility.value,
-      [0, 1],
-      [96, 0],
-      Extrapolate.CLAMP,
-    );
+    const hideDistance = insets.bottom + BOTTOM_NAV_HEIGHT;
+    const visibility = 1 - bottomNavOffset.value / hideDistance;
     return {
-      opacity: chromeVisibility.value,
-      transform: [{ translateY }],
-      pointerEvents: chromeVisibility.value < 0.5 ? 'none' : 'auto',
+      opacity: visibility,
+      transform: [{ translateY: bottomNavOffset.value }],
+      pointerEvents: visibility <= 0 ? 'none' : 'auto',
     };
   });
 
@@ -528,17 +471,13 @@ export default function HomeScreen() {
                         { width: 54, paddingHorizontal: 0 },
                       ]}
                     >
-                      <Text
-                        style={[
-                          styles.navText,
-                          currentPage === index && {
-                            color: tintColor,
-                          },
-                        ]}
-                        type={currentPage === index ? 'default' : 'secondary'}
-                      >
-                        {labels[tab]}
-                      </Text>
+                      <TopTabLabel
+                        index={index}
+                        label={labels[tab]}
+                        scrollX={scrollX}
+                        activeColor={tintColor}
+                        inactiveColor={secondaryTextColor}
+                      />
                     </BouncyButton>
                   );
                 })}
@@ -561,7 +500,7 @@ export default function HomeScreen() {
         initialPage={initialPageIndex}
         onPageScroll={pageScrollHandler}
         onPageSelected={(e) => {
-          setChromeHidden(false);
+          showChrome();
           setCurrentPage(e.nativeEvent.position);
         }}
       >
@@ -575,7 +514,15 @@ export default function HomeScreen() {
                     listRefs.current[idx] = element;
                   }}
                   insets={insets}
-                  onScroll={(offset) => handleScrollUpdate(idx, offset)}
+                  chrome={{
+                    enabled: isFocused && currentPage === idx,
+                    topOffset: topNavOffset,
+                    bottomOffset: bottomNavOffset,
+                    topHideDistance: insets.top + TOP_NAV_HEIGHT,
+                    bottomHideDistance: insets.bottom + BOTTOM_NAV_HEIGHT,
+                    onScrolledChange: (scrolled) =>
+                      handleScrolledChange(idx, scrolled),
+                  }}
                   onRefreshStateChange={(isRefreshing) =>
                     handleRefreshStateChange(idx, isRefreshing)
                   }
@@ -605,7 +552,13 @@ export default function HomeScreen() {
                   isActive={isFocused && currentPage === idx}
                   insets={insets}
                   guestCookieReady={guestCookieReady}
-                  onScroll={(offset) => handleScrollUpdate(idx, offset)}
+                  topNavOffset={topNavOffset}
+                  bottomNavOffset={bottomNavOffset}
+                  topHideDistance={insets.top + TOP_NAV_HEIGHT}
+                  bottomHideDistance={insets.bottom + BOTTOM_NAV_HEIGHT}
+                  onScrolledChange={(scrolled) =>
+                    handleScrolledChange(idx, scrolled)
+                  }
                   onRefreshStateChange={(isRefreshing) =>
                     handleRefreshStateChange(idx, isRefreshing)
                   }
@@ -756,6 +709,37 @@ export default function HomeScreen() {
   );
 }
 
+function TopTabLabel({
+  index,
+  label,
+  scrollX,
+  activeColor,
+  inactiveColor,
+}: {
+  index: number;
+  label: string;
+  scrollX: SharedValue<number>;
+  activeColor: string;
+  inactiveColor: string;
+}) {
+  const animatedStyle = useAnimatedStyle(() => {
+    const distanceFromSelection = Math.min(1, Math.abs(scrollX.value - index));
+    return {
+      color: interpolateColor(
+        distanceFromSelection,
+        [0, 1],
+        [activeColor, inactiveColor],
+      ),
+    };
+  });
+
+  return (
+    <Animated.Text style={[styles.navText, animatedStyle]}>
+      {label}
+    </Animated.Text>
+  );
+}
+
 const _AnimatedIcon = Animated.createAnimatedComponent(Ionicons);
 
 function BottomTabIcon({
@@ -823,12 +807,27 @@ const FeedList = React.forwardRef<
     isActive: boolean;
     insets: EdgeInsets;
     guestCookieReady: boolean;
-    onScroll?: (offset: number) => void;
+    topNavOffset: SharedValue<number>;
+    bottomNavOffset: SharedValue<number>;
+    topHideDistance: number;
+    bottomHideDistance: number;
+    onScrolledChange?: (scrolled: boolean) => void;
     onRefreshStateChange?: (isRefreshing: boolean) => void;
   }
 >(
   (
-    { tab, isActive, insets, guestCookieReady, onScroll, onRefreshStateChange },
+    {
+      tab,
+      isActive,
+      insets,
+      guestCookieReady,
+      topNavOffset,
+      bottomNavOffset,
+      topHideDistance,
+      bottomHideDistance,
+      onScrolledChange,
+      onRefreshStateChange,
+    },
     ref,
   ) => {
     const queryClient = useQueryClient();
@@ -1229,6 +1228,14 @@ const FeedList = React.forwardRef<
     ]);
 
     const flashListRef = useRef<FlashListRef<FeedListItem>>(null);
+    const scrollHandler = useCollapsibleChromeScroll({
+      enabled: isActive && AUTO_HIDE_NAV_TABS.includes(tab),
+      topOffset: topNavOffset,
+      bottomOffset: bottomNavOffset,
+      topHideDistance,
+      bottomHideDistance,
+      onScrolledChange,
+    });
 
     // 过滤开启下，列表可能因大量过滤/折叠短到无法滚动，onEndReached 就此失效。
     // 这里主动补页把可渲染行数补到 MIN_RENDERABLE_ITEMS，并以
@@ -1268,7 +1275,7 @@ const FeedList = React.forwardRef<
     }));
 
     return (
-      <FlashList
+      <AnimatedFlashList
         ref={flashListRef}
         showsVerticalScrollIndicator={false}
         data={flattenedData}
@@ -1306,8 +1313,8 @@ const FeedList = React.forwardRef<
             style={{ opacity: 0 }}
           />
         }
-        onScroll={(e) => onScroll?.(e.nativeEvent.contentOffset.y)}
-        scrollEventThrottle={100}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
         contentContainerStyle={{
           paddingTop: insets.top + 70,
           paddingBottom: 120,
