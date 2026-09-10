@@ -968,6 +968,13 @@ export default function UserStreamScreen() {
               {
                 bottom: insets.bottom,
               },
+              colorScheme === 'light' && {
+                shadowColor: Colors.light.shadow,
+                shadowOffset: { width: 0, height: 10 },
+                shadowOpacity: 0.2,
+                shadowRadius: 15,
+                elevation: 10,
+              },
               footerAnimatedStyle,
             ]}
           >

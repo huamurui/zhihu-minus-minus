@@ -420,7 +420,12 @@ export default function HomeScreen() {
     <View style={styles.container}>
       {/* 1. 顶部 Tab 导航 (Home 专属) */}
       <Animated.View
-        style={[styles.topNavContainer, { top: insets.top }, topNavAnimStyle]}
+        style={[
+          styles.topNavContainer,
+          colorScheme === 'light' && styles.lightTranslucentShadow,
+          { top: insets.top },
+          topNavAnimStyle,
+        ]}
       >
         <BlurView
           intensity={100}
@@ -573,6 +578,7 @@ export default function HomeScreen() {
       <Animated.View
         style={[
           styles.bottomBarContainer,
+          colorScheme === 'light' && styles.lightTranslucentShadow,
           { bottom: insets.bottom, width: containerWidth },
           bottomNavAnimStyle,
         ]}
@@ -1643,6 +1649,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     alignSelf: 'center',
     zIndex: 1001,
+  },
+  lightTranslucentShadow: {
+    shadowColor: Colors.light.shadow,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.14,
+    shadowRadius: 12,
+    elevation: 6,
   },
   bottomBlur: { borderRadius: 32, overflow: 'hidden', height: 64 },
   bottomNavItems: {

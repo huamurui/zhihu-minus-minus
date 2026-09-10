@@ -440,7 +440,16 @@ export const AnswerDetailView = ({
       {/* Footer Actions */}
       <View
         className="absolute left-5 right-5 z-[1000]"
-        style={{ bottom: insets.bottom }}
+        style={[
+          colorScheme === 'light' && {
+            shadowColor: Colors.light.shadow,
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.1,
+            shadowRadius: 20,
+            elevation: 10,
+          },
+          { bottom: insets.bottom },
+        ]}
       >
         <BlurView
           intensity={130}
