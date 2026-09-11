@@ -22,7 +22,17 @@ const apiClient = axios.create({
 const requestIds = new WeakMap<object, string>();
 let requestSequence = 0;
 const retriedRequests = new WeakSet<object>();
-const refreshPromises = new Map<string, Promise<boolean>>();
+
+interface SessionRefreshResult {
+  success: boolean;
+  invalidateSession: boolean;
+}
+
+const refreshPromises = new Map<string, Promise<SessionRefreshResult>>();
+
+export interface ApiRequestOptions {
+  signal?: AbortSignal;
+}
 
 function getSafePath(url?: string) {
   if (!url) return '<unknown>';
@@ -200,8 +210,12 @@ function persistResponseCookies(
   return mergedCookie;
 }
 
-async function performZhihuSessionRefresh(cookie: string): Promise<boolean> {
-  if (!hasAuthenticationCookie(cookie)) return false;
+async function performZhihuSessionRefresh(
+  cookie: string,
+): Promise<SessionRefreshResult> {
+  if (!hasAuthenticationCookie(cookie)) {
+    return { success: false, invalidateSession: false };
+  }
   const accountIndexAtStart = useAuthStore.getState().activeAccountIndex;
 
   const refreshClient = axios.create({
@@ -229,14 +243,16 @@ async function performZhihuSessionRefresh(cookie: string): Promise<boolean> {
     );
     const tokenCookie = persistResponseCookies(tokenResponse, cookie);
     if (useAuthStore.getState().activeAccountIndex !== accountIndexAtStart) {
-      return false;
+      return { success: false, invalidateSession: false };
     }
     const refreshToken = getStringField(tokenResponse.data, 'refresh_token');
-    if (!refreshToken) return false;
+    if (!refreshToken) {
+      return { success: false, invalidateSession: true };
+    }
     // Account switching can happen while the first refresh request is in
     // flight. Do not exchange the old account's token after that switch.
     if (useAuthStore.getState().activeAccountIndex !== accountIndexAtStart) {
-      return false;
+      return { success: false, invalidateSession: false };
     }
 
     const timestamp = Date.now();
@@ -273,21 +289,34 @@ async function performZhihuSessionRefresh(cookie: string): Promise<boolean> {
       },
     );
     if (useAuthStore.getState().activeAccountIndex !== accountIndexAtStart) {
-      return false;
+      return { success: false, invalidateSession: false };
     }
     const finalCookie = persistResponseCookies(
       oauthResponse,
       tokenCookie || cookie,
     );
-    return hasAuthenticationCookie(
-      useAuthStore.getState().cookies || finalCookie || tokenCookie || cookie,
-    );
-  } catch {
-    return false;
+    return {
+      success: hasAuthenticationCookie(
+        useAuthStore.getState().cookies || finalCookie || tokenCookie || cookie,
+      ),
+      invalidateSession: !hasAuthenticationCookie(
+        useAuthStore.getState().cookies || finalCookie || tokenCookie || cookie,
+      ),
+    };
+  } catch (error) {
+    const status = axios.isAxiosError(error)
+      ? error.response?.status
+      : undefined;
+    return {
+      success: false,
+      // A rejected refresh with 401/403 means the refresh token is no longer
+      // valid. Network errors and 5xx responses should leave the session alone.
+      invalidateSession: status === 401 || status === 403,
+    };
   }
 }
 
-function refreshZhihuSession(cookie: string): Promise<boolean> {
+function refreshZhihuSession(cookie: string): Promise<SessionRefreshResult> {
   const existing = refreshPromises.get(cookie);
   if (existing) return existing;
 
@@ -380,16 +409,26 @@ apiClient.interceptors.response.use(
     const requestId = getRequestId(error.config);
     const method = error.config?.method?.toUpperCase() || '<unknown>';
     const path = getSafePath(error.config?.url);
+    let sessionInvalidated = false;
     if (error.response?.status === 401) {
       const requestCookie = getHeaderValue(error.config?.headers, 'Cookie');
       if (error.config && requestCookie && !retriedRequests.has(error.config)) {
         retriedRequests.add(error.config);
-        if (await refreshZhihuSession(requestCookie)) {
+        const refreshResult = await refreshZhihuSession(requestCookie);
+        if (refreshResult.success) {
           return apiClient.request(error.config);
+        }
+        const authState = useAuthStore.getState();
+        if (
+          refreshResult.invalidateSession &&
+          authState.cookies === requestCookie
+        ) {
+          authState.updateActiveAccountCookies('');
+          sessionInvalidated = true;
+          console.warn(`⚠️ [API ${requestId}] 登录状态已失效，请重新登录`);
         }
       }
       persistResponseCookies(error.response, requestCookie);
-      console.warn(`⚠️ [API ${requestId}] ${method} ${path} Status: 401`);
     } else if (error.response) {
       persistResponseCookies(error.response);
     }
@@ -422,11 +461,12 @@ apiClient.interceptors.response.use(
       return Promise.reject(error); // 拦截 40352，不抛出红屏错误
     }
 
-    if (error.response?.status === 404) {
-      console.warn(`⚠️ [API ${requestId}] ${method} ${path} Status: 404`);
-    } else if (error.response?.status !== 401) {
-      console.error(
-        `❌ [API ${requestId}] ${method} ${path} Status: ${error.response?.status || 'network-error'}`,
+    const status = error.response?.status;
+    const shouldLogTransientFailure =
+      !status || status === 408 || status === 429 || status >= 500;
+    if (shouldLogTransientFailure && !sessionInvalidated) {
+      console.warn(
+        `⚠️ [API ${requestId}] ${method} ${path} Status: ${status || 'network-error'}`,
       );
     }
     return Promise.reject(error);

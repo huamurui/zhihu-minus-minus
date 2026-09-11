@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet } from 'react-native';
 import { getCollection, getCollectionDetail } from '@/api/zhihu';
 import { CreationCard } from '@/components/CreationCard';
+import { QueryErrorView } from '@/components/QueryErrorView';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -20,7 +21,11 @@ export default function CollectionDetailScreen() {
     navigation.setOptions({ title: '收藏夹' });
   }, [navigation]);
 
-  const { data: collection } = useQuery({
+  const {
+    data: collection,
+    isError: collectionError,
+    refetch: refetchCollection,
+  } = useQuery({
     queryKey: ['collection-detail', id],
     queryFn: () => getCollection(id as string),
   });
@@ -33,6 +38,7 @@ export default function CollectionDetailScreen() {
     isFetchingNextPage,
     refetch,
     isRefetching,
+    isError: contentsError,
   } = useInfiniteQuery({
     queryKey: ['collection-contents', id],
     queryFn: ({ pageParam = 0 }) =>
@@ -57,14 +63,24 @@ export default function CollectionDetailScreen() {
           borderBottomColor: borderColor,
         }}
       >
-        <Text className="text-xl font-bold">
-          {collection?.title || '收藏夹内容'}
-        </Text>
-        {collection?.description ? (
-          <Text type="secondary" className="text-sm mt-2.5 leading-5">
-            {collection.description}
-          </Text>
-        ) : null}
+        {collectionError ? (
+          <QueryErrorView
+            compact
+            message="收藏夹信息加载失败"
+            onRetry={() => void refetchCollection()}
+          />
+        ) : (
+          <>
+            <Text className="text-xl font-bold">
+              {collection?.title || '收藏夹内容'}
+            </Text>
+            {collection?.description ? (
+              <Text type="secondary" className="text-sm mt-2.5 leading-5">
+                {collection.description}
+              </Text>
+            ) : null}
+          </>
+        )}
       </View>
 
       <FlashList
@@ -87,6 +103,12 @@ export default function CollectionDetailScreen() {
           <View className="flex-1 p-[100px] items-center">
             {isLoading ? (
               <ActivityIndicator color={primaryColor} />
+            ) : contentsError ? (
+              <QueryErrorView
+                compact
+                message="收藏内容加载失败"
+                onRetry={() => void refetch()}
+              />
             ) : (
               <Text type="secondary">这个收藏夹空空如也喵</Text>
             )}

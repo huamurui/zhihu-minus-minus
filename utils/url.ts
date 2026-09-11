@@ -125,8 +125,8 @@ export function parseZhihuUrl(url: string | null): string | null {
   try {
     const path = extractPath(url);
     return path ? normalizeSupportedPath(path) : null;
-  } catch (err) {
-    console.error('[URL Parser] Failed to parse:', url, err);
+  } catch {
+    console.error('[URL Parser] Failed to parse URL');
     return null;
   }
 }

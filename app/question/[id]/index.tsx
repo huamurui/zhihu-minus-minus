@@ -54,7 +54,7 @@ import {
   deleteAnswer,
   type QuestionAnswersResponse,
 } from '@/api/zhihu/answer';
-import { addReadHistory } from '@/api/zhihu/history';
+import { recordReadHistory } from '@/api/zhihu/history';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
 import {
   followQuestion,
@@ -85,6 +85,7 @@ import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ZhihuAuthor } from '@/types/zhihu';
 import { formatDate } from '@/utils/date';
 import { refreshInfiniteQuery } from '@/utils/query';
+import { getZhihuErrorMessage } from '@/utils/zhihuError';
 
 const AnimatedFlashList = Reanimated.createAnimatedComponent(
   FlashList,
@@ -358,6 +359,9 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
       onSuccess: () => {
         Alert.alert('删除成功', '你的回答已删除喵！');
         queryClient.invalidateQueries({ queryKey: ['question-answers'] });
+      },
+      onError: (error) => {
+        Alert.alert('删除失败', getZhihuErrorMessage(error));
       },
     });
 
@@ -871,7 +875,7 @@ export default function QuestionDetail() {
         !recordedAnswerIds.current.has(id)
       ) {
         recordedAnswerIds.current.add(id);
-        addReadHistory({ content_token: id, content_type: 'answer' });
+        recordReadHistory({ content_token: id, content_type: 'answer' });
       }
 
       if (!expanded) {
@@ -1045,7 +1049,7 @@ export default function QuestionDetail() {
 
   React.useEffect(() => {
     if (enableBrowseHistory && question?.id) {
-      addReadHistory({
+      recordReadHistory({
         content_token: String(question.id),
         content_type: 'question',
       });

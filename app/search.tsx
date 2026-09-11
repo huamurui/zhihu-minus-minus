@@ -15,6 +15,7 @@ import { getSearchSuggest, searchContent } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
 import { FeedCard } from '@/components/FeedCard';
 import { BottomSheet } from '@/components/overlays/BottomSheet';
+import { QueryErrorView } from '@/components/QueryErrorView';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { UserCard } from '@/components/UserCard';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -115,7 +116,7 @@ export default function SearchScreen() {
 
   const { data: suggestions } = useQuery({
     queryKey: ['search-suggest', debouncedQuery],
-    queryFn: () => getSearchSuggest(debouncedQuery),
+    queryFn: ({ signal }) => getSearchSuggest(debouncedQuery, { signal }),
     enabled: debouncedQuery.length > 0 && !isSearching,
   });
 
@@ -125,6 +126,8 @@ export default function SearchScreen() {
     hasNextPage,
     isFetchingNextPage,
     isLoading,
+    isError,
+    refetch,
   } = useInfiniteQuery({
     queryKey: [
       'search-results',
@@ -134,11 +137,12 @@ export default function SearchScreen() {
       sortFilter,
       timeFilter,
     ],
-    queryFn: ({ pageParam = 0 }) =>
+    queryFn: ({ pageParam = 0, signal }) =>
       searchContent(debouncedQuery, pageParam as number, 20, searchType, {
         vertical: searchType === 'general' ? contentFilter : undefined,
         sort: searchType === 'general' ? sortFilter : undefined,
         time_interval: searchType === 'general' ? timeFilter : undefined,
+        signal,
       }),
     enabled: isSearching && debouncedQuery.length > 0,
     initialPageParam: 0,
@@ -664,7 +668,12 @@ export default function SearchScreen() {
             ListFooterComponent: isFetchingNextPage ? (
               <ActivityIndicator style={{ padding: 20 }} color={tintColor} />
             ) : null,
-            ListEmptyComponent: !isLoading ? (
+            ListEmptyComponent: isError ? (
+              <QueryErrorView
+                message="搜索失败"
+                onRetry={() => void refetch()}
+              />
+            ) : !isLoading ? (
               <View className="flex-1 items-center justify-center px-10 py-24">
                 <Ionicons
                   name={emptyStateIcon}

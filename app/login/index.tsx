@@ -145,7 +145,14 @@ export default function LoginScreen() {
         }}
         onNavigationStateChange={(navState) => {
           const { url } = navState;
-          console.log('🌐 导航至:', url);
+          let safeUrl = url.split('?')[0];
+          try {
+            const parsedUrl = new URL(url);
+            safeUrl = `${parsedUrl.origin}${parsedUrl.pathname}`;
+          } catch {
+            // Keep only the URL path when navigation reports a non-standard URL.
+          }
+          console.log('🌐 导航至:', safeUrl);
           if (
             url === 'https://www.zhihu.com/' ||
             url === 'https://www.zhihu.com'

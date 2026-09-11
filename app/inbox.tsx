@@ -5,6 +5,7 @@ import { useCallback, useEffect } from 'react';
 import { ActivityIndicator, Image, StyleSheet } from 'react-native';
 import { getInbox, type InboxThread } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
+import { QueryErrorView } from '@/components/QueryErrorView';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -31,9 +32,11 @@ export default function InboxScreen() {
     isFetchingNextPage,
     refetch,
     isRefetching,
+    isError,
   } = useInfiniteQuery({
     queryKey: ['inbox'],
-    queryFn: ({ pageParam = '' }) => getInbox(pageParam as string),
+    queryFn: ({ pageParam = '', signal }) =>
+      getInbox(pageParam as string, { signal }),
     initialPageParam: '',
     getNextPageParam: (lastPage) => {
       if (!lastPage || lastPage.paging?.is_end) return undefined;
@@ -118,6 +121,12 @@ export default function InboxScreen() {
           <View className="flex-1 p-[100px] items-center">
             {isLoading ? (
               <ActivityIndicator color={primaryColor} />
+            ) : isError ? (
+              <QueryErrorView
+                compact
+                message="私信加载失败"
+                onRetry={() => void refetch()}
+              />
             ) : (
               <Text type="secondary">暂无私信</Text>
             )}

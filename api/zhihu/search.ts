@@ -1,9 +1,13 @@
 import type { ZhihuSearchResponse } from '../../types/zhihu';
-import apiClient from '../client';
+import apiClient, { type ApiRequestOptions } from '../client';
 
-export const getSearchSuggest = async (query: string) => {
+export const getSearchSuggest = async (
+  query: string,
+  options: ApiRequestOptions = {},
+) => {
   const res = await apiClient.get(
     `/search/suggest?q=${encodeURIComponent(query)}`,
+    { signal: options.signal },
   );
   return res.data;
 };
@@ -26,6 +30,7 @@ export const searchContent = async (
       | 'three_months'
       | 'half_a_year'
       | 'a_year';
+    signal?: AbortSignal;
   },
 ): Promise<ZhihuSearchResponse> => {
   const params = new URLSearchParams({
@@ -59,7 +64,9 @@ export const searchContent = async (
   if (options?.restricted_value)
     params.append('restricted_value', options.restricted_value);
 
-  const res = await apiClient.get(`/search_v3?${params.toString()}`);
+  const res = await apiClient.get(`/search_v3?${params.toString()}`, {
+    signal: options?.signal,
+  });
   return res.data;
 };
 
