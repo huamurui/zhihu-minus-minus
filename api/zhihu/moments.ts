@@ -1,5 +1,10 @@
 import type { ZhihuPaging } from '@/types/zhihu';
 import apiClient from '../client';
+import {
+  buildZhihuAppMomentOriginUrl,
+  getZhihuAppEndpointHeaders,
+} from './appApi';
+import type { RawFeedItem } from './feed';
 
 // ==========================================
 // 1. 类型定义
@@ -24,6 +29,11 @@ export interface RecentMomentItem {
 export interface RecentMomentsResponse {
   data: RecentMomentItem[];
   paging: ZhihuPaging;
+}
+
+export interface MomentOriginResponse {
+  data: RawFeedItem[];
+  paging?: ZhihuPaging;
 }
 
 // ==========================================
@@ -61,5 +71,17 @@ export const markRecentMomentsRead = async (
       },
     },
   );
+  return response.data;
+};
+
+/** Resolve the original items grouped by an App moments card. */
+export const fetchMomentOrigin = async (
+  momentId: string,
+  limit = 20,
+): Promise<MomentOriginResponse> => {
+  const url = buildZhihuAppMomentOriginUrl(momentId, { limit });
+  const response = await apiClient.get<MomentOriginResponse>(url, {
+    headers: getZhihuAppEndpointHeaders(url),
+  });
   return response.data;
 };

@@ -4,6 +4,7 @@ export type {
   ZhihuPaging,
 } from '@/types/zhihu';
 export * from './answer';
+export * from './appApi';
 export * from './article';
 export * from './chat';
 export * from './collection';
@@ -21,6 +22,7 @@ export * from './notification';
 export * from './pin';
 export * from './publishing';
 export * from './question';
+export * from './questionFeed';
 export * from './search';
 export * from './topic';
 export * from './voters';

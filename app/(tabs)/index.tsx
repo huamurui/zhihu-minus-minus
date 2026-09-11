@@ -536,18 +536,6 @@ export default function HomeScreen() {
                 <PublishScreen />
               ) : tab === 'profile' ? (
                 <ProfileScreen isActive={isFocused && currentPage === idx} />
-              ) : !cookies && tab === 'following' ? (
-                <View style={styles.loginPrompt}>
-                  <Text style={styles.loginText} type="secondary">
-                    登录后才能看此栏目哦
-                  </Text>
-                  <BouncyButton
-                    style={[styles.loginBtn, { backgroundColor: tintColor }]}
-                    onPress={() => router.push('/login')}
-                  >
-                    <Text style={styles.loginBtnText}>去登录</Text>
-                  </BouncyButton>
-                </View>
               ) : (
                 <FeedList
                   ref={(element) => {
@@ -1070,8 +1058,6 @@ const FeedList = React.forwardRef<
     } = useInfiniteQuery({
       queryKey: feedQueryKey,
       queryFn: async ({ pageParam = FEED_URLS[tab] }) => {
-        if (!cookies && tab === 'following')
-          return { items: [], nextUrl: null };
         try {
           let requestUrl = pageParam as string;
           const isInitialUrl =
@@ -1359,7 +1345,9 @@ const FeedList = React.forwardRef<
             <FeedCard item={item as FeedItem} tab={tab} />
           );
         }}
-        ListHeaderComponent={tab === 'following' ? <RecentMoments /> : null}
+        ListHeaderComponent={
+          cookies && tab === 'following' ? <RecentMoments /> : null
+        }
         ListFooterComponent={
           isFetchingNextPage ? (
             <ActivityIndicator style={{ margin: 20 }} />
@@ -1676,16 +1664,6 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     left: 10,
   },
-
-  loginPrompt: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingBottom: 100,
-  },
-  loginText: { fontSize: 16, marginTop: 20, marginBottom: 30 },
-  loginBtn: { paddingHorizontal: 40, paddingVertical: 12, borderRadius: 25 },
-  loginBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 });
 
 function TopLoadingBar({ color }: { color: string }) {
