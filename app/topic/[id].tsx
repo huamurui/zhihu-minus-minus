@@ -16,6 +16,7 @@ import {
 } from '@/api/zhihu/topic';
 import { BouncyButton } from '@/components/BouncyButton';
 import { FeedCard } from '@/components/FeedCard';
+import { QueryErrorView } from '@/components/QueryErrorView';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -37,7 +38,12 @@ export default function TopicDetail() {
     'hot' | 'top-answers' | 'unanswered' | 'structure'
   >('top-answers');
 
-  const { data: topic, isLoading: topicLoading } = useQuery({
+  const {
+    data: topic,
+    isLoading: topicLoading,
+    isError: topicError,
+    refetch: refetchTopic,
+  } = useQuery({
     queryKey: ['topic', id],
     queryFn: () => getTopic(id),
   });
@@ -65,11 +71,13 @@ export default function TopicDetail() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    isError: feedError,
     refetch,
     isRefetching,
   } = useZhihuInfiniteQuery({
     queryKey: ['topic-feed', id, activeTab],
-    queryFn: ({ pageParam = 0 }) => getTopicFeed(id, activeTab, pageParam),
+    queryFn: ({ pageParam = 0, signal }) =>
+      getTopicFeed(id, activeTab, pageParam, { signal }),
     initialPageParam: 0,
     enabled: activeTab !== 'structure',
   });
@@ -82,25 +90,38 @@ export default function TopicDetail() {
     );
   }, [queryClient, id, activeTab, refetch]);
 
-  const { data: parentsData, isLoading: parentsLoading } = useQuery({
+  const {
+    data: parentsData,
+    isLoading: parentsLoading,
+    isError: parentsError,
+    refetch: refetchParents,
+  } = useQuery({
     queryKey: ['topic-parents', id],
     queryFn: () => getTopicParents(id),
     enabled: activeTab === 'structure',
   });
 
-  const { data: childrenData, isLoading: childrenLoading } = useQuery({
+  const {
+    data: childrenData,
+    isLoading: childrenLoading,
+    isError: childrenError,
+    refetch: refetchChildren,
+  } = useQuery({
     queryKey: ['topic-children', id],
     queryFn: () => getTopicChildren(id),
     enabled: activeTab === 'structure',
   });
 
-  const { data: bestAnswerersData, isLoading: bestAnswerersLoading } = useQuery(
-    {
-      queryKey: ['topic-best-answerers', id],
-      queryFn: () => getBestAnswerers(id),
-      enabled: activeTab === 'structure',
-    },
-  );
+  const {
+    data: bestAnswerersData,
+    isLoading: bestAnswerersLoading,
+    isError: bestAnswerersError,
+    refetch: refetchBestAnswerers,
+  } = useQuery({
+    queryKey: ['topic-best-answerers', id],
+    queryFn: () => getBestAnswerers(id),
+    enabled: activeTab === 'structure',
+  });
 
   const items = useMemo(() => {
     if (activeTab === 'structure') return [];
@@ -114,6 +135,15 @@ export default function TopicDetail() {
   const renderHeader = useMemo(() => {
     if (!topic && topicLoading)
       return <ActivityIndicator style={{ marginTop: 100 }} />;
+    if (!topic && topicError) {
+      return (
+        <QueryErrorView
+          compact
+          message="话题加载失败"
+          onRetry={() => void refetchTopic()}
+        />
+      );
+    }
     if (!topic) return null;
 
     return (
@@ -207,10 +237,12 @@ export default function TopicDetail() {
   }, [
     topic,
     topicLoading,
+    topicError,
     activeTab,
     tintColor,
     colorScheme,
     followMutation.mutate,
+    refetchTopic,
   ]);
 
   return (
@@ -246,6 +278,12 @@ export default function TopicDetail() {
                 isLoading={
                   parentsLoading || childrenLoading || bestAnswerersLoading
                 }
+                hasError={parentsError || childrenError || bestAnswerersError}
+                onRetry={() => {
+                  void refetchParents();
+                  void refetchChildren();
+                  void refetchBestAnswerers();
+                }}
               />
             )}
           </>
@@ -274,7 +312,13 @@ export default function TopicDetail() {
         ListEmptyComponent={() =>
           !feedLoading &&
           items.length === 0 &&
-          activeTab !== 'structure' && (
+          activeTab !== 'structure' &&
+          (feedError ? (
+            <QueryErrorView
+              message="话题内容加载失败"
+              onRetry={() => void refetch()}
+            />
+          ) : (
             <View className="items-center justify-center mt-20 bg-transparent">
               <Ionicons
                 name="document-text-outline"
@@ -285,7 +329,7 @@ export default function TopicDetail() {
                 暂无内容
               </Text>
             </View>
-          )
+          ))
         }
       />
     </View>
@@ -297,11 +341,15 @@ function TopicStructureView({
   childTopics,
   bestAnswerers,
   isLoading,
+  hasError,
+  onRetry,
 }: {
   parents: any[];
   childTopics: any[];
   bestAnswerers: any[];
   isLoading: boolean;
+  hasError: boolean;
+  onRetry: () => void;
 }) {
   const router = useRouter();
   const primaryColor = useThemeColor({}, 'primary');
@@ -311,6 +359,12 @@ function TopicStructureView({
       <View className="p-10 items-center bg-transparent">
         <ActivityIndicator color={primaryColor} />
       </View>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <QueryErrorView compact message="话题结构加载失败" onRetry={onRetry} />
     );
   }
 

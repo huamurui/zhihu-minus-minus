@@ -51,6 +51,7 @@ import { BouncyButton } from '@/components/BouncyButton';
 import { DailyList } from '@/components/DailyList';
 import { FeedCard } from '@/components/FeedCard';
 import { HotCard, type HotItem } from '@/components/HotCard';
+import { QueryErrorView } from '@/components/QueryErrorView';
 import { RecentMoments } from '@/components/RecentMoments';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -1053,59 +1054,56 @@ const FeedList = React.forwardRef<
       hasNextPage,
       isFetchingNextPage,
       isLoading,
+      isError,
       isRefetching,
       refetch,
     } = useInfiniteQuery({
       queryKey: feedQueryKey,
-      queryFn: async ({ pageParam = FEED_URLS[tab] }) => {
-        try {
-          let requestUrl = pageParam as string;
-          const isInitialUrl =
-            (requestUrl === FEED_URLS[tab] ||
-              requestUrl === 'zhihu://local-feed' ||
-              requestUrl.includes('feed/topstory/recommend')) &&
-            !requestUrl.includes('action=down');
-          if (isRefreshing && isInitialUrl) {
-            const sep = requestUrl.includes('?') ? '&' : '?';
-            requestUrl = `${requestUrl}${sep}action=up&t=${Date.now()}`;
-          }
-
-          console.log(
-            `🌐 [queryFn] Requesting feed (tab=${tab}, isRefreshing=${isRefreshing})`,
-          );
-          const data = await getFeed(requestUrl);
-          const rawItems = data.data || [];
-          seedAnswerDetailsFromFeed(queryClient, rawItems);
-          let items: Array<FeedItem | HotItem>;
-          if (tab === 'following')
-            items = rawItems
-              .map((item: RawFeedItem) => parseFollowingData(item))
-              .filter(Boolean) as FeedItem[];
-          else if (tab === 'recommend' || tab === 'local')
-            items = rawItems
-              .map((item: RawFeedItem) => parseRecommendData(item))
-              .filter(Boolean) as FeedItem[];
-          else
-            items = rawItems.map((item: RawFeedItem, index: number) =>
-              parseHotData(item, index),
-            );
-
-          const nextUrl =
-            data.paging?.next?.replace('http://', 'https://') ?? null;
-
-          if (launchCacheContext && isInitialUrl && items.length > 0) {
-            void feedCacheRepository
-              .saveFeedCache(launchCacheContext, items, nextUrl)
-              .catch((err) => console.warn('保存启动 Feed 缓存失败', err));
-          }
-
-          return {
-            items,
-            nextUrl,
-          };
-        } catch {
-          return { items: [], nextUrl: null };
+      queryFn: async ({ pageParam = FEED_URLS[tab], signal }) => {
+        let requestUrl = pageParam as string;
+        const isInitialUrl =
+          (requestUrl === FEED_URLS[tab] ||
+            requestUrl === 'zhihu://local-feed' ||
+            requestUrl.includes('feed/topstory/recommend')) &&
+          !requestUrl.includes('action=down');
+        if (isRefreshing && isInitialUrl) {
+          const sep = requestUrl.includes('?') ? '&' : '?';
+          requestUrl = `${requestUrl}${sep}action=up&t=${Date.now()}`;
         }
+
+        console.log(
+          `🌐 [queryFn] Requesting feed (tab=${tab}, isRefreshing=${isRefreshing})`,
+        );
+        const data = await getFeed(requestUrl, { signal });
+        const rawItems = data.data || [];
+        seedAnswerDetailsFromFeed(queryClient, rawItems);
+        let items: Array<FeedItem | HotItem>;
+        if (tab === 'following')
+          items = rawItems
+            .map((item: RawFeedItem) => parseFollowingData(item))
+            .filter(Boolean) as FeedItem[];
+        else if (tab === 'recommend' || tab === 'local')
+          items = rawItems
+            .map((item: RawFeedItem) => parseRecommendData(item))
+            .filter(Boolean) as FeedItem[];
+        else
+          items = rawItems.map((item: RawFeedItem, index: number) =>
+            parseHotData(item, index),
+          );
+
+        const nextUrl =
+          data.paging?.next?.replace('http://', 'https://') ?? null;
+
+        if (launchCacheContext && isInitialUrl && items.length > 0) {
+          void feedCacheRepository
+            .saveFeedCache(launchCacheContext, items, nextUrl)
+            .catch((err) => console.warn('保存启动 Feed 缓存失败', err));
+        }
+
+        return {
+          items,
+          nextUrl,
+        };
       },
       initialPageParam: FEED_URLS[tab],
       getNextPageParam: (lastPage) => lastPage.nextUrl,
@@ -1373,6 +1371,11 @@ const FeedList = React.forwardRef<
             <View className="flex-1 items-center justify-center mt-[100px] bg-transparent">
               <ActivityIndicator size="large" color={tintColor} />
             </View>
+          ) : isError ? (
+            <QueryErrorView
+              message="Feed 加载失败"
+              onRetry={() => void refetch()}
+            />
           ) : (
             <View className="flex-1 items-center justify-center mt-[100px] bg-transparent">
               <Text type="secondary">暂无内容 喵~</Text>

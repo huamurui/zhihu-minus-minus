@@ -1,4 +1,4 @@
-import apiClient from '../client';
+import apiClient, { type ApiRequestOptions } from '../client';
 
 export const TOPIC_INCLUDE =
   'introduction,questions_count,best_answers_count,followers_count,is_following,header_card';
@@ -12,6 +12,7 @@ export const getTopicFeed = async (
   id: string | number,
   type: string = 'hot',
   offset: number = 0,
+  options: ApiRequestOptions = {},
 ) => {
   const typeMapping: Record<string, string> = {
     hot: 'hot',
@@ -23,6 +24,7 @@ export const getTopicFeed = async (
     'data[*].target.content,voteup_count,comment_count,author.name,author.avatar_url,author.headline,author.is_following,relationship.voting,relationship.is_author,created_time,segment_infos';
   const res = await apiClient.get(
     `/topics/${id}/feeds/${feedType}?include=${include}&limit=20&offset=${offset}`,
+    { signal: options.signal },
   );
   return res.data;
 };

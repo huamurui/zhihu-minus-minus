@@ -1,4 +1,41 @@
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
+import axios from 'axios';
+
+function getResponseStatus(error: unknown): number | undefined {
+  if (!axios.isAxiosError(error)) return undefined;
+  return error.response?.status;
+}
+
+function isVerificationError(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) return false;
+  const data = error.response?.data;
+  if (!data || typeof data !== 'object' || !('error' in data)) return false;
+  const detail = data.error;
+  return (
+    typeof detail === 'object' &&
+    detail !== null &&
+    'code' in detail &&
+    detail.code === 40352
+  );
+}
+
+/** Retry only transient request failures; client errors need user/action changes. */
+export function shouldRetryQuery(
+  failureCount: number,
+  error: unknown,
+): boolean {
+  if (axios.isCancel(error)) return false;
+  if (isVerificationError(error)) return false;
+
+  const status = getResponseStatus(error);
+  if (status !== undefined) {
+    return status === 408 || status === 429 || status >= 500
+      ? failureCount < 2
+      : false;
+  }
+
+  return axios.isAxiosError(error) && failureCount < 2;
+}
 
 /**
  * Reset one TanStack infinite query to its initial state and refetch active observers.

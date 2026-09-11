@@ -16,12 +16,13 @@ import {
   getArticleColumnCard,
   unfollowColumn,
 } from '@/api/zhihu/column';
-import { addReadHistory } from '@/api/zhihu/history';
+import { recordReadHistory } from '@/api/zhihu/history';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
 import { BouncyButton } from '@/components/BouncyButton';
 import { DownvoteButton } from '@/components/DownvoteButton';
 import { LikeButton } from '@/components/LikeButton';
 import { ActionSheet } from '@/components/overlays/ActionSheet';
+import { QueryErrorView } from '@/components/QueryErrorView';
 import { ShareMenu } from '@/components/ShareMenu';
 import { Text, ThemedIcon, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -53,7 +54,12 @@ export default function ArticleDetail() {
   const scrollY = useRef(new Animated.Value(0)).current;
 
   // 1. 获取日报详情
-  const { data: dailyData, isLoading: dailyLoading } = useQuery({
+  const {
+    data: dailyData,
+    isLoading: dailyLoading,
+    isError: dailyError,
+    refetch: refetchDaily,
+  } = useQuery({
     queryKey: ['daily-article', id],
     queryFn: () => getDailyDetail(id as string),
     enabled: source === 'daily',
@@ -62,7 +68,12 @@ export default function ArticleDetail() {
   });
 
   // 2. 获取知乎普通文章详情
-  const { data: zhihuData, isLoading: zhihuLoading } = useQuery({
+  const {
+    data: zhihuData,
+    isLoading: zhihuLoading,
+    isError: zhihuError,
+    refetch: refetchZhihu,
+  } = useQuery({
     queryKey: ['zhihu-article', id],
     queryFn: () => getArticle(id as string),
     enabled: source !== 'daily',
@@ -72,12 +83,17 @@ export default function ArticleDetail() {
 
   const isLoading = isDaily ? dailyLoading : zhihuLoading;
   const data = isDaily ? dailyData : zhihuData;
+  const isError = isDaily ? dailyError : zhihuError;
+  const refetchContent = isDaily ? refetchDaily : refetchZhihu;
 
   const enableBrowseHistory = useSettingsStore((s) => s.enableBrowseHistory);
 
   useEffect(() => {
     if (enableBrowseHistory && id) {
-      addReadHistory({ content_token: id as string, content_type: 'article' });
+      recordReadHistory({
+        content_token: id as string,
+        content_type: 'article',
+      });
     }
   }, [enableBrowseHistory, id]);
 
@@ -211,6 +227,17 @@ export default function ArticleDetail() {
   }
 
   if (!data) {
+    if (isError) {
+      return (
+        <View className="flex-1 justify-center items-center px-6">
+          <Stack.Screen options={{ headerShown: false, title: '正文' }} />
+          <QueryErrorView
+            message="正文加载失败"
+            onRetry={() => void refetchContent()}
+          />
+        </View>
+      );
+    }
     return (
       <View className="flex-1 justify-center items-center px-6">
         <Stack.Screen options={{ headerShown: false, title: '正文' }} />

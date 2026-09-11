@@ -1,8 +1,8 @@
-import type { AxiosResponse } from 'axios';
+import axios, { type AxiosResponse } from 'axios';
 import type { ReactNode } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
-import apiClient from '../client';
+import apiClient, { type ApiRequestOptions } from '../client';
 import {
   buildZhihuAppMomentsUrl,
   buildZhihuAppRecommendUrl,
@@ -604,7 +604,10 @@ export function buildRecommendRequestUrl(
   }
 }
 
-export const getFeed = async (url: string): Promise<ZhihuFeedResponse> => {
+export const getFeed = async (
+  url: string,
+  options: ApiRequestOptions = {},
+): Promise<ZhihuFeedResponse> => {
   let finalUrl = url;
   const { cookies } = useAuthStore.getState();
   const isRefreshRequest = url.includes('action=up') || url.includes('t=');
@@ -630,7 +633,9 @@ export const getFeed = async (url: string): Promise<ZhihuFeedResponse> => {
     try {
       const sectionsRes = await apiClient.get<{
         data?: Array<{ section_id?: string; section_name?: string }>;
-      }>('https://api.zhihu.com/feed-root/sections/query/v2');
+      }>('https://api.zhihu.com/feed-root/sections/query/v2', {
+        signal: options.signal,
+      });
       const sections = sectionsRes.data?.data || [];
       const localSection = sections.find(
         (section) =>
@@ -647,7 +652,8 @@ export const getFeed = async (url: string): Promise<ZhihuFeedResponse> => {
       } else {
         throw new Error('未找到同城版块');
       }
-    } catch {
+    } catch (error) {
+      if (axios.isCancel(error)) throw error;
       console.warn('获取同城版块失败，回退到推荐流');
       finalUrl = FEED_URLS.recommend;
     }
@@ -675,8 +681,10 @@ export const getFeed = async (url: string): Promise<ZhihuFeedResponse> => {
   try {
     res = await apiClient.get<ZhihuFeedResponse>(finalUrl, {
       headers: getZhihuAppEndpointHeaders(finalUrl),
+      signal: options.signal,
     });
   } catch (error) {
+    if (axios.isCancel(error)) throw error;
     // Some installs may not yet have all device credentials that the App
     // endpoint expects. Keep the previous browser guest feed as a
     // compatibility fallback instead of leaving a first-time user with no feed.
@@ -684,7 +692,9 @@ export const getFeed = async (url: string): Promise<ZhihuFeedResponse> => {
     let fallbackUrl =
       'https://www.zhihu.com/api/v3/explore/guest/feeds?limit=15&ws_qiangzhisafe=0';
     if (isRefreshRequest) fallbackUrl += `&t=${Date.now()}`;
-    res = await apiClient.get<ZhihuFeedResponse>(fallbackUrl);
+    res = await apiClient.get<ZhihuFeedResponse>(fallbackUrl, {
+      signal: options.signal,
+    });
   }
 
   if (url.startsWith('zhihu://local-feed')) {

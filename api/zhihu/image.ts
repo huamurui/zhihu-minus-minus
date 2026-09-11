@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { CryptoDigestAlgorithm, digest } from 'expo-crypto';
 import * as FileSystem from 'expo-file-system/legacy';
 import apiClient from '../client';
@@ -278,6 +279,19 @@ async function getImageAfterUpload(
       return await getImage(imageId);
     } catch (error) {
       lastError = error;
+      const isPendingProcessing =
+        error instanceof Error && error.message === '知乎图片尚未处理完成';
+      const status = axios.isAxiosError(error)
+        ? error.response?.status
+        : undefined;
+      const isTransientRequestError =
+        axios.isAxiosError(error) &&
+        !axios.isCancel(error) &&
+        (status === undefined ||
+          status === 408 ||
+          status === 429 ||
+          status >= 500);
+      if (!isPendingProcessing && !isTransientRequestError) throw error;
       if (attempt === 7) break;
       await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
     }

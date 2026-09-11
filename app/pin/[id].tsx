@@ -11,11 +11,12 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { addReadHistory } from '@/api/zhihu/history';
+import { recordReadHistory } from '@/api/zhihu/history';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
 import { getPin, votePinPoll } from '@/api/zhihu/pin';
 import { BouncyButton } from '@/components/BouncyButton';
 import { LikeButton } from '@/components/LikeButton';
+import { QueryErrorView } from '@/components/QueryErrorView';
 import { ShareMenu } from '@/components/ShareMenu';
 import { Text, ThemedIcon, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -49,6 +50,7 @@ export default function PinDetailScreen() {
   const {
     data: pin,
     isLoading,
+    isError,
     refetch,
   } = useQuery({
     queryKey: ['pin-detail', id],
@@ -76,7 +78,7 @@ export default function PinDetailScreen() {
 
   useEffect(() => {
     if (enableBrowseHistory && pin?.id) {
-      addReadHistory({ content_token: String(pin.id), content_type: 'pin' });
+      recordReadHistory({ content_token: String(pin.id), content_type: 'pin' });
     }
   }, [enableBrowseHistory, pin?.id]);
 
@@ -112,6 +114,13 @@ export default function PinDetailScreen() {
         <Text type="secondary" className="mt-2.5">
           载入想法中...喵
         </Text>
+      </View>
+    );
+
+  if (!pin && isError)
+    return (
+      <View type="default" className="flex-1 justify-center items-center px-6">
+        <QueryErrorView message="想法加载失败" onRetry={() => void refetch()} />
       </View>
     );
 
