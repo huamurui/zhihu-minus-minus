@@ -22,7 +22,7 @@ import { Text, ThemedIcon, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import { VoterListModal } from '@/components/VoterListModal';
 import Colors from '@/constants/Colors';
-import { ZhihuContent } from '@/features/rich-content';
+import { RICH_CONTENT_STALE_TIME, ZhihuContent } from '@/features/rich-content';
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ZhihuPin, ZhihuPinPoll } from '@/types/zhihu';
@@ -55,6 +55,7 @@ export default function PinDetailScreen() {
   } = useQuery({
     queryKey: ['pin-detail', id],
     queryFn: () => getPin(id as string),
+    staleTime: RICH_CONTENT_STALE_TIME,
     retry: (failureCount, err: any) =>
       err?.response?.status === 404 ? false : failureCount < 2,
   });

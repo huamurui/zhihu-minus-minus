@@ -10,6 +10,7 @@ import {
 } from '@/api/zhihu/collection';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useCollectionStore } from '@/store/useCollectionStore';
+import { updateContentInteractionCaches } from '@/utils/contentCache';
 import { showToast as baseShowToast } from '@/utils/toast';
 
 export function useCollectionAction() {
@@ -42,6 +43,11 @@ export function useCollectionAction() {
       const idStr = variables.id.toString();
       setCollectedStatus(idStr, true);
       updateCollectedCountOffset(idStr, 1);
+      updateContentInteractionCaches(queryClient, {
+        type: variables.type === 'answer' ? 'answers' : 'articles',
+        id: variables.id,
+        isCollected: true,
+      });
 
       // Invalidate queries so detail views sync
       queryClient.invalidateQueries({
@@ -92,6 +98,11 @@ export function useCollectionAction() {
       const idStr = variables.id.toString();
       setCollectedStatus(idStr, false);
       updateCollectedCountOffset(idStr, -1);
+      updateContentInteractionCaches(queryClient, {
+        type: variables.type === 'answer' ? 'answers' : 'articles',
+        id: variables.id,
+        isCollected: false,
+      });
 
       // Invalidate queries
       queryClient.invalidateQueries({

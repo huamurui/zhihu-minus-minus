@@ -1,14 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Platform, View as RNView, Share } from 'react-native';
+import { View as RNView, Share } from 'react-native';
 import Animated, { SharedTransition } from 'react-native-reanimated';
+import { hasAuthenticationCookie } from '@/api/client';
 import { type FeedItem, voteContent } from '@/api/zhihu';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { useCollectionAction } from '@/hooks/useCollectionAction';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useCollectionStore } from '@/store/useCollectionStore';
+import {
+  seedRichContentFromFeedItem,
+  updateContentInteractionCaches,
+} from '@/utils/contentCache';
 import { ImpactFeedbackStyle, impactAsync } from '@/utils/haptics';
 import { showToast } from '@/utils/toast';
 import { BouncyButton } from './BouncyButton';
@@ -23,6 +29,7 @@ const slowTransition = SharedTransition.duration(600);
 
 export const FeedCard = ({ item, tab }: { item: FeedItem; tab?: string }) => {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { cookies } = useAuthStore();
   const [menuVisible, setMenuVisible] = useState(false);
   const isQuestionType = item.type === 'questions';
@@ -81,6 +88,14 @@ export const FeedCard = ({ item, tab }: { item: FeedItem; tab?: string }) => {
       return;
     }
 
+    // FeedCard 可能来自首页、搜索、用户页或话题页。把卡片已有的正文
+    // 写入统一详情缓存，避免只有首页 queryFn 执行时才能享受到加速。
+    seedRichContentFromFeedItem(
+      queryClient,
+      item,
+      hasAuthenticationCookie(cookies),
+    );
+
     const params = {
       id: item.id,
       title: cleanTitle,
@@ -116,7 +131,10 @@ export const FeedCard = ({ item, tab }: { item: FeedItem; tab?: string }) => {
             icon: voted === 1 ? 'caret-up' : 'caret-up-outline',
             onPress: async () => {
               const nextVoted = voted === 1 ? 0 : 1;
-              const nextCount = voted === 1 ? voteCount - 1 : voteCount + 1;
+              const nextCount = Math.max(
+                0,
+                voted === 1 ? voteCount - 1 : voteCount + 1,
+              );
               try {
                 const voteType =
                   item.type === 'pins'
@@ -129,6 +147,12 @@ export const FeedCard = ({ item, tab }: { item: FeedItem; tab?: string }) => {
                 await voteContent(item.id, engagementType, voteType);
                 setVoted(nextVoted);
                 setVoteCount(nextCount);
+                updateContentInteractionCaches(queryClient, {
+                  type: engagementType,
+                  id: item.id,
+                  voted: nextVoted,
+                  voteCount: nextCount,
+                });
                 showToast(nextVoted === 1 ? '已赞同' : '已取消赞同');
               } catch {
                 console.error('投票失败');

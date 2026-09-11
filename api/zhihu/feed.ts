@@ -344,6 +344,8 @@ export interface FeedItem {
   // —— 本地过滤所需的结构化信号（实测推荐流可用字段，见 utils/feedFilter.ts）——
   /** `answer_type === 'PAID'` 或 `paid_info != null` 即知乎盐选付费内容 */
   answerType?: string;
+  /** 推荐流正文是否被截断；被截断的正文不能作为详情缓存 */
+  contentNeedTruncated?: boolean;
   /** 推广/利益声明标记，话题流返回、推荐流通常不返回 */
   isLabeled?: boolean;
   /** author.is_org —— 机构号 */

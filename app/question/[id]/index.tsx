@@ -70,7 +70,7 @@ import { ShareMenu } from '@/components/ShareMenu';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
-import { ZhihuContent } from '@/features/rich-content';
+import { RICH_CONTENT_STALE_TIME, ZhihuContent } from '@/features/rich-content';
 import { useCollectionAction } from '@/hooks/useCollectionAction';
 import {
   type GestureScrollViewRef,
@@ -1003,6 +1003,7 @@ export default function QuestionDetail() {
   } = useQuery({
     queryKey: ['question', id, isAuthenticated],
     queryFn: async () => await getQuestion(id as string),
+    staleTime: RICH_CONTENT_STALE_TIME,
   });
 
   const followMutation = useOptimisticToggle<ZhihuQuestionDetail>({

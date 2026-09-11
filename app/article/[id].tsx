@@ -1,16 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { BlurView } from 'expo-blur';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Image, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getArticle, getDailyDetail } from '@/api/zhihu';
-import {
-  fastCollectArticle,
-  getArticleCollectionStatus,
-  removeArticleFromCollection,
-} from '@/api/zhihu/collection';
+import { getArticleCollectionStatus } from '@/api/zhihu/collection';
 import {
   followColumn,
   getArticleColumnCard,
@@ -27,13 +23,13 @@ import { ShareMenu } from '@/components/ShareMenu';
 import { Text, ThemedIcon, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
-import { ZhihuContent } from '@/features/rich-content';
+import { RICH_CONTENT_STALE_TIME, ZhihuContent } from '@/features/rich-content';
+import { useCollectionAction } from '@/hooks/useCollectionAction';
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
 import { useCollectionStore } from '@/store/useCollectionStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ZhihuArticle } from '@/types/zhihu';
 import { formatDate } from '@/utils/date';
-import { showToast } from '@/utils/toast';
 
 export default function ArticleDetail() {
   const colorScheme = useColorScheme();
@@ -77,6 +73,7 @@ export default function ArticleDetail() {
     queryKey: ['zhihu-article', id],
     queryFn: () => getArticle(id as string),
     enabled: source !== 'daily',
+    staleTime: RICH_CONTENT_STALE_TIME,
     retry: (failureCount, err: any) =>
       err?.response?.status === 404 ? false : failureCount < 2,
   });
@@ -98,58 +95,42 @@ export default function ArticleDetail() {
   }, [enableBrowseHistory, id]);
 
   // 3. 获取文章被收藏状态
-  const { data: collectionStatus, refetch: refetchCollectionStatus } = useQuery(
-    {
-      queryKey: ['article-collection-status', id],
-      queryFn: () => getArticleCollectionStatus(id as string),
-      enabled: !!id && !isDaily && !isLoading,
-      staleTime: 60 * 1000, // 1 minute
-    },
-  );
+  const { data: collectionStatus, isFetchedAfterMount } = useQuery({
+    queryKey: ['article-collection-status', id],
+    queryFn: () => getArticleCollectionStatus(id as string),
+    enabled: !!id && !isDaily && !isLoading,
+    staleTime: 60 * 1000, // 1 minute
+  });
 
   const setCollectedStatus = useCollectionStore(
     (state) => state.setCollectedStatus,
   );
 
-  const isCollected = collectionStatus?.data?.some(
+  const statusCollected = collectionStatus?.data?.some(
     (item: any) => item.is_favorited,
   );
-  const favoritedCollection = collectionStatus?.data?.find(
-    (item: any) => item.is_favorited,
+  const storeCollected = useCollectionStore(
+    (state) => state.collectedStatusMap[String(id)],
   );
+  const activeCollected = storeCollected ?? statusCollected ?? false;
+  const storeCollectedRef = useRef(storeCollected);
+  const { toggleCollect, isPending: collectionPending } = useCollectionAction();
 
   useEffect(() => {
-    if (collectionStatus && id) {
+    storeCollectedRef.current = storeCollected;
+  }, [storeCollected]);
+
+  useEffect(() => {
+    if (
+      collectionStatus &&
+      id &&
+      (isFetchedAfterMount || storeCollectedRef.current === undefined)
+    ) {
       const activeCollected =
         collectionStatus?.data?.some((item: any) => item.is_favorited) || false;
       setCollectedStatus(id as string, activeCollected);
     }
-  }, [collectionStatus, id, setCollectedStatus]);
-
-  const collectMutation = useMutation({
-    mutationFn: async () => {
-      if (isCollected && favoritedCollection) {
-        return removeArticleFromCollection(
-          favoritedCollection.id,
-          id as string,
-        );
-      }
-      return fastCollectArticle(id as string);
-    },
-    onSuccess: (res) => {
-      refetchCollectionStatus();
-      if (!isCollected) {
-        const folderName = res?.collection?.title || '默认收藏夹';
-        useCollectionStore
-          .getState()
-          .showToast(id as string, 'article', `已收藏到「${folderName}」`);
-      } else {
-        showToast('已取消收藏');
-      }
-    },
-    onError: (err: any) =>
-      showToast(err.response?.data?.error?.message || '无法处理请求'),
-  });
+  }, [collectionStatus, id, isFetchedAfterMount, setCollectedStatus]);
 
   // 4. 关注作者逻辑
   const followMutation = useOptimisticToggle<ZhihuArticle>({
@@ -532,7 +513,7 @@ export default function ArticleDetail() {
               <View className="flex-row items-center bg-transparent">
                 <LikeButton
                   id={id as string}
-                  count={data.voteup_count || 0}
+                  count={data.voteup_count ?? 0}
                   voted={data.relationship?.voting === 1 ? 1 : 0}
                   type="articles"
                   variant="minimal"
@@ -612,10 +593,12 @@ export default function ArticleDetail() {
           },
           {
             key: 'collection',
-            icon: isCollected ? 'star' : 'star-outline',
-            label: isCollected ? '取消收藏' : '移至收藏',
-            color: isCollected ? warningColor : undefined,
-            onPress: () => collectMutation.mutate(),
+            icon: activeCollected ? 'star' : 'star-outline',
+            label: activeCollected ? '取消收藏' : '移至收藏',
+            color: activeCollected ? warningColor : undefined,
+            disabled: collectionPending,
+            onPress: () =>
+              toggleCollect(id as string, 'article', activeCollected),
           },
           {
             key: 'share',

@@ -18,11 +18,7 @@ import Reanimated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type AnswerDetail, deleteAnswer, getAnswer } from '@/api/zhihu';
-import {
-  fastCollectAnswer,
-  getAnswerCollectionStatus,
-  removeFromCollection,
-} from '@/api/zhihu/collection';
+import { getAnswerCollectionStatus } from '@/api/zhihu/collection';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
 import { BouncyButton } from '@/components/BouncyButton';
 import { DownvoteButton } from '@/components/DownvoteButton';
@@ -34,11 +30,11 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { VoterListModal } from '@/components/VoterListModal';
 import Colors from '@/constants/Colors';
 import { RICH_CONTENT_STALE_TIME, ZhihuContent } from '@/features/rich-content';
+import { useCollectionAction } from '@/hooks/useCollectionAction';
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
 import { useScrollHeaderAnim } from '@/hooks/useScrollAnimation';
 import { useCollectionStore } from '@/store/useCollectionStore';
 import { formatDate } from '@/utils/date';
-import { showToast } from '@/utils/toast';
 
 const _slowTransition = SharedTransition.duration(600);
 
@@ -157,23 +153,18 @@ export const AnswerDetailView = ({
     ]);
   };
 
-  const { data: collectionStatus, refetch: refetchCollectionStatus } = useQuery(
-    {
-      queryKey: ['answer-collection-status', id],
-      queryFn: () => getAnswerCollectionStatus(id),
-      enabled: !!id && hasBeenFocused,
-      staleTime: 60 * 1000, // 1 minute
-    },
-  );
+  const { data: collectionStatus, isFetchedAfterMount } = useQuery({
+    queryKey: ['answer-collection-status', id],
+    queryFn: () => getAnswerCollectionStatus(id),
+    enabled: !!id && hasBeenFocused,
+    staleTime: 60 * 1000, // 1 minute
+  });
 
   const setCollectedStatus = useCollectionStore(
     (state) => state.setCollectedStatus,
   );
 
-  const isCollected = collectionStatus?.data?.some(
-    (item: any) => item.is_favorited,
-  );
-  const favoritedCollection = collectionStatus?.data?.find(
+  const statusCollected = collectionStatus?.data?.some(
     (item: any) => item.is_favorited,
   );
 
@@ -184,45 +175,29 @@ export const AnswerDetailView = ({
     answer?.reaction?.relation?.faved ||
     answer?.relationship?.is_favorited ||
     false;
-  const _activeCollected =
+  const activeCollected =
     storeCollected !== undefined
       ? storeCollected
-      : isCollected !== undefined
-        ? isCollected
+      : statusCollected !== undefined
+        ? statusCollected
         : rawIsFaved;
-  const storeOffset = useCollectionStore(
-    (state) => state.collectedCountOffsetMap[id.toString()] || 0,
-  );
-  const _displayCount = (answer?.favlists_count || 0) + storeOffset;
+  const storeCollectedRef = useRef(storeCollected);
+  const { toggleCollect, isPending: collectionPending } = useCollectionAction();
 
   React.useEffect(() => {
-    if (collectionStatus) {
+    storeCollectedRef.current = storeCollected;
+  }, [storeCollected]);
+
+  React.useEffect(() => {
+    if (
+      collectionStatus &&
+      (isFetchedAfterMount || storeCollectedRef.current === undefined)
+    ) {
       const activeCollected =
         collectionStatus?.data?.some((item: any) => item.is_favorited) || false;
       setCollectedStatus(id, activeCollected);
     }
-  }, [collectionStatus, id, setCollectedStatus]);
-
-  const collectMutation = useMutation({
-    mutationFn: async () => {
-      if (isCollected && favoritedCollection)
-        return removeFromCollection(favoritedCollection.id, id);
-      return fastCollectAnswer(id);
-    },
-    onSuccess: (res) => {
-      refetchCollectionStatus();
-      if (!isCollected) {
-        const folderName = res?.collection?.title || '默认收藏夹';
-        useCollectionStore
-          .getState()
-          .showToast(id, 'answer', `已收藏到「${folderName}」`);
-      } else {
-        showToast('已取消收藏');
-      }
-    },
-    onError: (err: any) =>
-      showToast(err.response?.data?.error?.message || '无法处理请求'),
-  });
+  }, [collectionStatus, id, isFetchedAfterMount, setCollectedStatus]);
 
   const goToProfile = () => {
     const token = answer?.author?.url_token || answer?.author?.id;
@@ -468,8 +443,11 @@ export const AnswerDetailView = ({
             <View className="flex-row items-center bg-transparent">
               <LikeButton
                 id={answer?.id ?? ''}
-                count={answer?.voteup_count || '-'}
-                voted={answer?.reaction?.relation?.vote === 'UP' ? 1 : 0}
+                count={answer?.voteup_count ?? 0}
+                voted={
+                  answer?.relationship?.voting ??
+                  (answer?.reaction?.relation?.vote === 'UP' ? 1 : 0)
+                }
                 variant="minimal"
               />
               <View className="w-2.5 bg-transparent" />
@@ -554,10 +532,11 @@ export const AnswerDetailView = ({
           },
           {
             key: 'collection',
-            icon: isCollected ? 'star' : 'star-outline',
-            label: isCollected ? '取消收藏' : '移至收藏',
-            color: isCollected ? warningColor : undefined,
-            onPress: () => collectMutation.mutate(),
+            icon: activeCollected ? 'star' : 'star-outline',
+            label: activeCollected ? '取消收藏' : '移至收藏',
+            color: activeCollected ? warningColor : undefined,
+            disabled: collectionPending,
+            onPress: () => toggleCollect(id, 'answer', activeCollected),
           },
           {
             key: 'share',

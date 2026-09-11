@@ -41,6 +41,7 @@ export function hasReusableAnswerDetail(target: FeedAnswerTarget): boolean {
 export function getRichContentQueryKey(
   type: RichContentEntityType,
   id: string,
+  isAuthenticated?: boolean,
 ) {
   const keyByType: Record<RichContentEntityType, string> = {
     answers: 'answer-detail',
@@ -48,6 +49,10 @@ export function getRichContentQueryKey(
     pins: 'pin-detail',
     questions: 'question',
   };
+
+  if (type === 'questions' && isAuthenticated !== undefined) {
+    return [keyByType[type], id, isAuthenticated] as const;
+  }
 
   return [keyByType[type], id] as const;
 }

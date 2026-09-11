@@ -1438,6 +1438,8 @@ function parseFollowingData(item: RawFeedItem): FeedItem | null {
       target.favorite_count || target.reaction?.statistics?.favorites || 0,
     voted: target.relationship?.voting || 0,
     type: appType,
+    answerType: normalizeAnswerType(target),
+    contentNeedTruncated: target.content_need_truncated,
     topics: target.topics?.map((topic) => ({
       id: topic.id,
       name: topic.name,
@@ -1537,6 +1539,7 @@ function parseRecommendData(item: RawFeedItem): FeedItem | null {
     // 大小写按接口而异——实测游客推荐流返回小写 `normal`，话题流返回大写
     // `NORMAL`/`PAID`，故统一大写后再比较，避免漏判。
     answerType: normalizeAnswerType(target),
+    contentNeedTruncated: target.content_need_truncated,
     isLabeled: Boolean(target.is_labeled),
     isOrgAuthor: Boolean(target.author?.is_org),
     isAdvertiser: Boolean(target.author?.is_advertiser),

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { ActivityIndicator, Image, ScrollView, StyleSheet } from 'react-native';
+import { hasAuthenticationCookie } from '@/api/client';
 import {
   type FeedItem,
   getAnswer,
@@ -15,6 +16,7 @@ import {
   RICH_CONTENT_STALE_TIME,
   ZhihuContent,
 } from '@/features/rich-content';
+import { useAuthStore } from '@/store/useAuthStore';
 import { Text, useThemeColor, View } from './Themed';
 
 interface FeedCardPreviewProps {
@@ -35,6 +37,7 @@ function getResponseStatus(error: unknown) {
 export function FeedCardPreview({ item }: FeedCardPreviewProps) {
   const colorScheme = useColorScheme();
   const primaryColor = useThemeColor({}, 'primary');
+  const cookies = useAuthStore((state) => state.cookies);
   const isVideo = item.type === 'videos';
   const typeKey =
     item.type === 'answers'
@@ -51,6 +54,7 @@ export function FeedCardPreview({ item }: FeedCardPreviewProps) {
     : getRichContentQueryKey(
         item.type as Exclude<typeof item.type, 'videos'>,
         item.id,
+        hasAuthenticationCookie(cookies),
       );
 
   const { data: fullData, isLoading } = useQuery({
