@@ -20,6 +20,7 @@ import { LikeButton } from '@/components/LikeButton';
 import { ActionSheet } from '@/components/overlays/ActionSheet';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { ShareMenu } from '@/components/ShareMenu';
+import { StableAvatar } from '@/components/StableAvatar';
 import { Text, ThemedIcon, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -82,6 +83,7 @@ export default function ArticleDetail() {
   const data = isDaily ? dailyData : zhihuData;
   const isError = isDaily ? dailyError : zhihuError;
   const refetchContent = isDaily ? refetchDaily : refetchZhihu;
+  const authorAvatarUrl = !isDaily ? data?.author?.avatar_url : undefined;
 
   const enableBrowseHistory = useSettingsStore((s) => s.enableBrowseHistory);
 
@@ -197,7 +199,7 @@ export default function ArticleDetail() {
     extrapolate: 'clamp',
   });
 
-  if (isLoading) {
+  if (isLoading && !data) {
     return (
       <View className="flex-1 justify-center items-center">
         <Stack.Screen options={{ headerShown: false, title: '正文' }} />
@@ -353,8 +355,8 @@ export default function ArticleDetail() {
                 onPress={goToProfile}
                 className="flex-row items-center flex-1 bg-transparent"
               >
-                <Image
-                  source={{ uri: data.author?.avatar_url }}
+                <StableAvatar
+                  uri={authorAvatarUrl}
                   className="w-11 h-11 rounded-full"
                 />
                 <View className="ml-3 flex-1 bg-transparent">

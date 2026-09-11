@@ -1,7 +1,7 @@
 import { type QueryKey, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator } from 'react-native';
 import {
   followMember,
   unfollowMember,
@@ -14,6 +14,7 @@ import Colors from '@/constants/Colors';
 import { useAuthStore } from '@/store/useAuthStore';
 import type { ZhihuBadge } from '@/types/zhihu';
 import { showToast } from '@/utils/toast';
+import { StableAvatar } from './StableAvatar';
 import { Text, useThemeColor, View } from './Themed';
 
 interface UserCardProps {
@@ -21,7 +22,10 @@ interface UserCardProps {
   invalidateQueryKeys?: readonly QueryKey[];
 }
 
-export const UserCard = ({ user, invalidateQueryKeys = [] }: UserCardProps) => {
+const UserCardComponent = ({
+  user,
+  invalidateQueryKeys = [],
+}: UserCardProps) => {
   const router = useRouter();
   const queryClient = useQueryClient();
   const cookies = useAuthStore((state) => state.cookies);
@@ -99,10 +103,7 @@ export const UserCard = ({ user, invalidateQueryKeys = [] }: UserCardProps) => {
       style={{ borderBottomWidth: 0.5, borderBottomColor: borderColor }}
       onPress={() => router.push(`/user/${user.url_token || user.id}`)}
     >
-      <Image
-        source={{ uri: user.avatar_url }}
-        className="w-12 h-11 rounded-full"
-      />
+      <StableAvatar uri={user.avatar_url} className="w-12 h-11 rounded-full" />
       <View className="flex-1 ml-3 bg-transparent">
         <View className="flex-row items-center bg-transparent">
           <Text className="text-base font-semibold" numberOfLines={1}>
@@ -173,3 +174,39 @@ export const UserCard = ({ user, invalidateQueryKeys = [] }: UserCardProps) => {
     </BouncyButton>
   );
 };
+
+function areUserCardPropsEqual(
+  previous: Readonly<UserCardProps>,
+  next: Readonly<UserCardProps>,
+): boolean {
+  const previousUser = previous.user;
+  const nextUser = next.user;
+  if (
+    previousUser.id !== nextUser.id ||
+    previousUser.url_token !== nextUser.url_token ||
+    previousUser.name !== nextUser.name ||
+    previousUser.avatar_url !== nextUser.avatar_url ||
+    previousUser.headline !== nextUser.headline ||
+    previousUser.is_following !== nextUser.is_following ||
+    previousUser.follower_count !== nextUser.follower_count ||
+    previousUser.answer_count !== nextUser.answer_count
+  ) {
+    return false;
+  }
+
+  const previousBestAnswerer = previousUser.badge?.some(
+    (badge: ZhihuBadge) => badge.type === 'best_answerer',
+  );
+  const nextBestAnswerer = nextUser.badge?.some(
+    (badge: ZhihuBadge) => badge.type === 'best_answerer',
+  );
+  if (previousBestAnswerer !== nextBestAnswerer) return false;
+
+  return (
+    JSON.stringify(previous.invalidateQueryKeys) ===
+    JSON.stringify(next.invalidateQueryKeys)
+  );
+}
+
+export const UserCard = React.memo(UserCardComponent, areUserCardPropsEqual);
+UserCard.displayName = 'UserCard';

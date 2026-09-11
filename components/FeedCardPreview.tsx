@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { ActivityIndicator, Image, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
 import { hasAuthenticationCookie } from '@/api/client';
 import {
   type FeedItem,
@@ -17,6 +17,7 @@ import {
   ZhihuContent,
 } from '@/features/rich-content';
 import { useAuthStore } from '@/store/useAuthStore';
+import { StableAvatar } from './StableAvatar';
 import { Text, useThemeColor, View } from './Themed';
 
 interface FeedCardPreviewProps {
@@ -98,8 +99,8 @@ export function FeedCardPreview({ item }: FeedCardPreviewProps) {
     >
       {/* Author Profile */}
       <View className="flex-row items-center mb-3 bg-transparent">
-        <Image
-          source={{ uri: item.author.avatar }}
+        <StableAvatar
+          uri={item.author.avatar}
           className="w-7 h-7 rounded-full"
         />
         <View className="ml-2 bg-transparent flex-1">

@@ -1217,6 +1217,11 @@ const FeedList = React.forwardRef<
       expandedCollapsedKeys,
     ]);
 
+    const listExtraData = useMemo(
+      () => ({ expandedCollapsedKeys, filterMode, filterRules }),
+      [expandedCollapsedKeys, filterMode, filterRules],
+    );
+
     const flashListRef = useRef<FlashListRef<FeedListItem>>(null);
     const scrollHandler = useCollapsibleChromeScroll({
       enabled: isActive && AUTO_HIDE_NAV_TABS.includes(tab),
@@ -1269,13 +1274,7 @@ const FeedList = React.forwardRef<
         ref={flashListRef}
         showsVerticalScrollIndicator={false}
         data={flattenedData}
-        extraData={{
-          expandedCollapsedKeys,
-          filterMode,
-          filterRules,
-          isRefreshing,
-          isRefetching,
-        }}
+        extraData={listExtraData}
         keyExtractor={(item, index) => {
           if (isCollapsedGroup(item)) return `collapsed-${item.groupKey}`;
           const key = getInMemoryFeedKey(item);

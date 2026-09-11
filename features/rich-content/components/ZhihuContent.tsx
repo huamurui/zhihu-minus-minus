@@ -1185,6 +1185,9 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
       setViewerImage(src);
       setViewerVisible(true);
     }, []);
+    const onImageLongPressCallback = useCallback((src: string) => {
+      setActionSheetUrl(src);
+    }, []);
     const onSegmentPressCallback = useCallback(
       (pid: string) => {
         const segment = segmentMap.get(pid);
@@ -1234,6 +1237,10 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
       () => ({ backgroundColor: 'transparent', minHeight: 400 }),
       [],
     );
+    const nativeContentSource = useMemo(
+      () => ({ html: `<div>${content || ''}</div>` }),
+      [content],
+    );
 
     if (!shouldRender && !contentArray) {
       return (
@@ -1251,7 +1258,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
           <View>
             <RenderHtml
               contentWidth={width - 40}
-              source={{ html: `<div>${content}</div>` }}
+              source={nativeContentSource}
               renderers={renderers as any}
               tagsStyles={tagsStyles as any}
               classesStyles={classesStyles as any}
@@ -1279,7 +1286,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
               colorScheme={colorScheme}
               onReady={onReadyCallback}
               onImagePress={onImagePressCallback}
-              onImageLongPress={(src) => setActionSheetUrl(src)}
+              onImageLongPress={onImageLongPressCallback}
               onLinkPress={handleInternalLink}
               onSegmentPress={onSegmentPressCallback}
               onTextSelected={

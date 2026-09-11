@@ -26,7 +26,6 @@ import React, {
 import {
   ActivityIndicator,
   Alert,
-  Image,
   View as NativeView,
   Pressable,
   useWindowDimensions,
@@ -67,6 +66,7 @@ import { BouncyButton } from '@/components/BouncyButton';
 import { LikeButton } from '@/components/LikeButton';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { ShareMenu } from '@/components/ShareMenu';
+import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -411,8 +411,8 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
               }
               className="flex-row flex-1 items-center bg-transparent"
             >
-              <Image
-                source={{ uri: item.author?.avatar_url }}
+              <StableAvatar
+                uri={item.author?.avatar_url}
                 className="w-[34px] h-[34px] rounded-[17px]"
               />
               <View className="flex-1 ml-2.5 bg-transparent">
@@ -1073,7 +1073,7 @@ export default function QuestionDetail() {
             {question?.title || initialTitle || '加载中...'}
           </Text>
         </Reanimated.View>
-        {qLoading ? (
+        {qLoading && !question ? (
           <View className="h-[100px] justify-center bg-transparent">
             <ActivityIndicator size="small" color={primaryColor} />
           </View>
@@ -1578,8 +1578,8 @@ export default function QuestionDetail() {
           ]}
         >
           <View className="items-center bg-transparent mt-10">
-            <Image
-              source={{ uri: swipedAuthor.avatar_url }}
+            <StableAvatar
+              uri={swipedAuthor.avatar_url}
               style={{ width: 90, height: 90, borderRadius: 45 }}
             />
             <Text

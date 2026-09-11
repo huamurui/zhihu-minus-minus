@@ -3,13 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BlurView } from 'expo-blur';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  ScrollView,
-  StyleSheet,
-} from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { recordReadHistory } from '@/api/zhihu/history';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
@@ -18,6 +12,7 @@ import { BouncyButton } from '@/components/BouncyButton';
 import { LikeButton } from '@/components/LikeButton';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { ShareMenu } from '@/components/ShareMenu';
+import { StableAvatar } from '@/components/StableAvatar';
 import { Text, ThemedIcon, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import { VoterListModal } from '@/components/VoterListModal';
@@ -108,7 +103,7 @@ export default function PinDetailScreen() {
     if (token) router.push(`/user/${token}`);
   }, [pin?.author, router]);
 
-  if (isLoading)
+  if (isLoading && !pin)
     return (
       <View type="default" className="flex-1 justify-center items-center">
         <ActivityIndicator size="large" color={primaryColor} />
@@ -198,8 +193,8 @@ export default function PinDetailScreen() {
             onPress={goToProfile}
             className="flex-row items-center flex-1 bg-transparent"
           >
-            <Image
-              source={{ uri: pin?.author?.avatar_url }}
+            <StableAvatar
+              uri={pin?.author?.avatar_url}
               className="w-11 h-11 rounded-full"
             />
             <View className="ml-3 flex-1 bg-transparent">

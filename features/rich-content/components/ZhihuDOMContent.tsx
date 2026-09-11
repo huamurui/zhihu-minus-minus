@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { colors, radii, typography } from '@/constants/designTokens';
@@ -632,10 +632,14 @@ export default React.memo(function ZhihuDOMContent({
     </html>
   `;
 
+  // WebView treats a newly-created source object as a new document. Keep it
+  // stable when a parent re-renders without changing the HTML string.
+  const source = useMemo(() => ({ html }), [html]);
+
   return (
     <View style={[{ width: '100%', height }, style]}>
       <WebView
-        source={{ html }}
+        source={source}
         style={{ backgroundColor: 'transparent' }}
         scrollEnabled={false}
         onMessage={(event) => {

@@ -1,19 +1,21 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { Image, Pressable, ScrollView } from 'react-native';
+import React from 'react';
+import { Pressable, ScrollView } from 'react-native';
 import {
   fetchRecentMoments,
   markRecentMomentsRead,
   type RecentMomentItem,
   type RecentMomentsResponse,
 } from '@/api/zhihu';
+import { StableAvatar } from './StableAvatar';
 import { Text, useThemeColor, View } from './Themed';
 import { useColorScheme } from './useColorScheme';
 
 /**
  * 最近更新的用户头像栏 (朋友圈/动态更新提示)
  */
-export function RecentMoments() {
+function RecentMomentsComponent() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const _colorScheme = useColorScheme();
@@ -111,8 +113,8 @@ export function RecentMoments() {
                     item.unread_count > 0 ? primaryColor : 'transparent',
                 }}
               >
-                <Image
-                  source={{ uri: item.actor.avatar_url }}
+                <StableAvatar
+                  uri={item.actor.avatar_url}
                   className="w-[52px] h-[52px] rounded-full bg-black/5 dark:bg-white/5"
                 />
               </View>
@@ -149,3 +151,6 @@ export function RecentMoments() {
     </View>
   );
 }
+
+export const RecentMoments = React.memo(RecentMomentsComponent);
+RecentMoments.displayName = 'RecentMoments';

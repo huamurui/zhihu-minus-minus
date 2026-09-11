@@ -3,7 +3,7 @@ import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef } from 'react';
-import { ActivityIndicator, Image } from 'react-native';
+import { ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   type FeedItem,
@@ -15,6 +15,7 @@ import {
 import { BouncyButton } from '@/components/BouncyButton';
 import { FeedCard } from '@/components/FeedCard';
 import { QueryErrorView } from '@/components/QueryErrorView';
+import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -201,8 +202,8 @@ export default function UserStreamScreen() {
           />
         </BouncyButton>
         {member?.avatar_url ? (
-          <Image
-            source={{ uri: member.avatar_url }}
+          <StableAvatar
+            uri={member.avatar_url}
             className="w-9 h-9 rounded-full mr-2.5"
           />
         ) : null}

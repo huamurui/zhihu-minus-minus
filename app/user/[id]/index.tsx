@@ -6,7 +6,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -42,6 +42,7 @@ import { addReadHistory } from '@/api/zhihu/history';
 import { BouncyButton } from '@/components/BouncyButton';
 import { FeedCard } from '@/components/FeedCard';
 import { QueryErrorView } from '@/components/QueryErrorView';
+import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -169,7 +170,6 @@ export default function UserDetailScreen() {
   const initialTabIndex = PROFILE_TABS.findIndex(
     (profileTab) => profileTab.key === initialTab,
   );
-
   const [activeTab, setActiveTab] = useState<ProfileTabKey>(initialTab);
   const [visitedTabs, setVisitedTabs] = useState<Record<string, boolean>>({
     [initialTab]: true,
@@ -415,6 +415,10 @@ export default function UserDetailScreen() {
     queryFn: () => getMemberWithFallback(id),
     enabled: !!id,
   });
+  const profileAvatarSource = useMemo(
+    () => ({ uri: user?.avatar_url || (initialAvatar as string) }),
+    [initialAvatar, user?.avatar_url],
+  );
   const isMe = isOwnMemberProfile(id, me, user);
 
   const enableBrowseHistory = useSettingsStore((s) => s.enableBrowseHistory);
@@ -783,7 +787,7 @@ export default function UserDetailScreen() {
       <View type="surface" className="px-5 pt-0 pb-4 rounded-b-[24px]">
         <View className="flex-row justify-between items-end -mt-10">
           <Reanimated.Image
-            source={{ uri: user?.avatar_url || (initialAvatar as string) }}
+            source={profileAvatarSource}
             className="w-20 h-20 rounded-[40px] border-4 border-white dark:border-[#1e1e22]"
             sharedTransitionTag={`avatar-${user?.url_token || id}`}
           />
@@ -851,10 +855,8 @@ export default function UserDetailScreen() {
               <Text className="font-bold">{user?.mutual_followees_count}</Text>{' '}
               位共同关注
             </Text>
-            <Image
-              source={{
-                uri: 'https://pic1.zhimg.com/v2-abed1a8c04702bc9e7ba3d3d82bc7591_s.jpg',
-              }}
+            <StableAvatar
+              uri="https://pic1.zhimg.com/v2-abed1a8c04702bc9e7ba3d3d82bc7591_s.jpg"
               className="w-5 h-5 rounded-full ml-2"
             />
           </BouncyButton>

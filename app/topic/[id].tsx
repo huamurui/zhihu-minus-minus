@@ -17,6 +17,7 @@ import {
 import { BouncyButton } from '@/components/BouncyButton';
 import { FeedCard } from '@/components/FeedCard';
 import { QueryErrorView } from '@/components/QueryErrorView';
+import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -382,8 +383,8 @@ function TopicStructureView({
                 className="flex-row items-center mb-4"
                 onPress={() => router.push(`/user/${item.member.url_token}`)}
               >
-                <Image
-                  source={{ uri: item.member.avatar_url }}
+                <StableAvatar
+                  uri={item.member.avatar_url}
                   className="w-12 h-12 rounded-full mr-3"
                 />
                 <View className="flex-1">

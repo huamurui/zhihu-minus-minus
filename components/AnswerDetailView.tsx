@@ -6,7 +6,6 @@ import React, { useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   type ScrollView as NativeScrollView,
   StyleSheet,
 } from 'react-native';
@@ -25,6 +24,7 @@ import { DownvoteButton } from '@/components/DownvoteButton';
 import { LikeButton } from '@/components/LikeButton';
 import { ActionSheet } from '@/components/overlays/ActionSheet';
 import { ShareMenu } from '@/components/ShareMenu';
+import { StableAvatar } from '@/components/StableAvatar';
 import { Text, ThemedIcon, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import { VoterListModal } from '@/components/VoterListModal';
@@ -183,6 +183,7 @@ export const AnswerDetailView = ({
         : rawIsFaved;
   const storeCollectedRef = useRef(storeCollected);
   const { toggleCollect, isPending: collectionPending } = useCollectionAction();
+  const authorAvatarUrl = answer?.author?.avatar_url;
 
   React.useEffect(() => {
     storeCollectedRef.current = storeCollected;
@@ -258,8 +259,8 @@ export const AnswerDetailView = ({
               onPress={goToProfile}
               className="flex-row items-center justify-center mt-1 bg-transparent"
             >
-              <Image
-                source={{ uri: answer?.author?.avatar_url }}
+              <StableAvatar
+                uri={authorAvatarUrl}
                 className="w-4 h-4 rounded-full mr-1"
               />
               <Text
@@ -295,8 +296,8 @@ export const AnswerDetailView = ({
             onPress={goToProfile}
             className="flex-row items-center flex-1 bg-transparent"
           >
-            <Image
-              source={{ uri: answer?.author?.avatar_url }}
+            <StableAvatar
+              uri={authorAvatarUrl}
               className="w-11 h-11 rounded-full"
             />
             <View className="ml-3 flex-1 bg-transparent">
@@ -339,14 +340,14 @@ export const AnswerDetailView = ({
           </BouncyButton>
         </View>
 
-        {queryLoading ? (
+        {queryLoading && !answer ? (
           <View className="h-[200px] justify-center items-center bg-transparent">
             <ActivityIndicator size="small" color={primaryColor} />
             <Text type="secondary" className="mt-[15px]">
               正在斟酌文字...喵
             </Text>
           </View>
-        ) : isError || (error as any)?.response?.status === 404 ? (
+        ) : (isError || (error as any)?.response?.status === 404) && !answer ? (
           <View className="h-[300px] justify-center items-center px-6 bg-transparent">
             <Ionicons name="compass-outline" size={48} color={secondaryColor} />
             <Text className="text-base font-bold mt-4 mb-2 text-foreground dark:text-foreground-dark">

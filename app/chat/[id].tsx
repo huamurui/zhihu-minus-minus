@@ -9,7 +9,6 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -21,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getMessages, sendMessage } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
 import { QueryErrorView } from '@/components/QueryErrorView';
+import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -139,8 +139,8 @@ export default function ChatScreen() {
         className={`flex-row px-4 py-2 ${isMe ? 'justify-end' : 'justify-start'} bg-transparent`}
       >
         {!isMe && (
-          <Image
-            source={{ uri: avatarUrl }}
+          <StableAvatar
+            uri={avatarUrl}
             className="w-10 h-10 rounded-full bg-gray-200 mr-3"
           />
         )}
@@ -177,8 +177,8 @@ export default function ChatScreen() {
         </View>
 
         {isMe && (
-          <Image
-            source={{ uri: avatarUrl }}
+          <StableAvatar
+            uri={avatarUrl}
             className="w-10 h-10 rounded-full bg-gray-200 ml-3"
           />
         )}

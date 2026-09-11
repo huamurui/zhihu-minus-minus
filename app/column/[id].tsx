@@ -14,6 +14,7 @@ import {
 import { recordReadHistory } from '@/api/zhihu/history';
 import { BouncyButton } from '@/components/BouncyButton';
 import { QueryErrorView } from '@/components/QueryErrorView';
+import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -170,8 +171,8 @@ export default function ColumnDetail() {
               )
             }
           >
-            <Image
-              source={{ uri: column.author.avatar_url }}
+            <StableAvatar
+              uri={column.author.avatar_url}
               className="w-6 h-6 rounded-full"
             />
             <Text type="secondary" className="text-xs ml-2">

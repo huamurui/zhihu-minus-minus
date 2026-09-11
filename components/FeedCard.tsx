@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View as RNView, Share } from 'react-native';
 import Animated, { SharedTransition } from 'react-native-reanimated';
 import { hasAuthenticationCookie } from '@/api/client';
@@ -27,7 +27,78 @@ import { Text, useThemeColor, View } from './Themed';
 
 const slowTransition = SharedTransition.duration(600);
 
-export const FeedCard = ({ item, tab }: { item: FeedItem; tab?: string }) => {
+interface FeedCardProps {
+  item: FeedItem;
+  tab?: string;
+}
+
+function areFeedContentEqual(
+  previous: FeedItem['content'],
+  next: FeedItem['content'],
+): boolean {
+  if (previous === next) return true;
+  if (!Array.isArray(previous) || !Array.isArray(next)) return false;
+  if (previous.length !== next.length) return false;
+
+  return previous.every((previousSegment, index) => {
+    const nextSegment = next[index];
+    return (
+      previousSegment === nextSegment ||
+      (previousSegment.type === nextSegment.type &&
+        previousSegment.content === nextSegment.content &&
+        previousSegment.url === nextSegment.url &&
+        previousSegment.data_draft_title === nextSegment.data_draft_title &&
+        previousSegment.data_draft_cover === nextSegment.data_draft_cover &&
+        previousSegment.thumbnail === nextSegment.thumbnail)
+    );
+  });
+}
+
+function areFeedTopicsEqual(
+  previous: FeedItem['topics'],
+  next: FeedItem['topics'],
+): boolean {
+  if (previous === next) return true;
+  if (!previous || !next || previous.length !== next.length) return false;
+  return previous.every(
+    (topic, index) =>
+      topic.id === next[index]?.id && topic.name === next[index]?.name,
+  );
+}
+
+function areFeedCardPropsEqual(
+  previous: Readonly<FeedCardProps>,
+  next: Readonly<FeedCardProps>,
+): boolean {
+  if (previous.tab !== next.tab) return false;
+  const previousItem = previous.item;
+  const nextItem = next.item;
+  if (previousItem === nextItem) return true;
+
+  return (
+    previousItem.id === nextItem.id &&
+    previousItem.type === nextItem.type &&
+    previousItem.title === nextItem.title &&
+    previousItem.titleString === nextItem.titleString &&
+    previousItem.questionId === nextItem.questionId &&
+    previousItem.actionText === nextItem.actionText &&
+    previousItem.excerpt === nextItem.excerpt &&
+    areFeedContentEqual(previousItem.content, nextItem.content) &&
+    previousItem.image === nextItem.image &&
+    previousItem.voteCount === nextItem.voteCount &&
+    previousItem.commentCount === nextItem.commentCount &&
+    previousItem.favlistsCount === nextItem.favlistsCount &&
+    previousItem.voted === nextItem.voted &&
+    previousItem.author.id === nextItem.author.id &&
+    previousItem.author.url_token === nextItem.author.url_token &&
+    previousItem.author.name === nextItem.author.name &&
+    previousItem.author.avatar === nextItem.author.avatar &&
+    previousItem.author.headline === nextItem.author.headline &&
+    areFeedTopicsEqual(previousItem.topics, nextItem.topics)
+  );
+}
+
+const FeedCardComponent = ({ item, tab }: FeedCardProps) => {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { cookies } = useAuthStore();
@@ -66,6 +137,25 @@ export const FeedCard = ({ item, tab }: { item: FeedItem; tab?: string }) => {
 
   const cleanTitle =
     typeof item.title === 'string' ? item.title : item.titleString || '';
+  const authorAvatarSource = useMemo(
+    () => ({ uri: item.author.avatar }),
+    [item.author.avatar],
+  );
+  const thumbnailSource = useMemo(
+    () => (item.image ? { uri: item.image } : undefined),
+    [item.image],
+  );
+  const isAuthenticated = hasAuthenticationCookie(cookies);
+
+  useEffect(() => {
+    if (isGuest) return;
+
+    // FeedCard is shared by the home feed, search, topic and user pages.
+    // Prewarm the matching detail cache for every source as soon as a card
+    // with reusable inline content is mounted.
+    seedRichContentFromFeedItem(queryClient, item, isAuthenticated);
+  }, [isAuthenticated, isGuest, item, queryClient]);
+
   const openDetail = () => {
     if (isVideoType) {
       router.push({
@@ -90,11 +180,7 @@ export const FeedCard = ({ item, tab }: { item: FeedItem; tab?: string }) => {
 
     // FeedCard 可能来自首页、搜索、用户页或话题页。把卡片已有的正文
     // 写入统一详情缓存，避免只有首页 queryFn 执行时才能享受到加速。
-    seedRichContentFromFeedItem(
-      queryClient,
-      item,
-      hasAuthenticationCookie(cookies),
-    );
+    seedRichContentFromFeedItem(queryClient, item, isAuthenticated);
 
     const params = {
       id: item.id,
@@ -258,7 +344,7 @@ export const FeedCard = ({ item, tab }: { item: FeedItem; tab?: string }) => {
           className="flex-row items-center mb-2"
         >
           <Animated.Image
-            source={{ uri: item.author.avatar }}
+            source={authorAvatarSource}
             className="w-[22px] h-[22px] rounded-full"
             sharedTransitionTag={`avatar-${item.author.url_token || item.author.id}`}
           />
@@ -326,7 +412,7 @@ export const FeedCard = ({ item, tab }: { item: FeedItem; tab?: string }) => {
           </View>
           {item.image && (
             <Animated.Image
-              source={{ uri: item.image }}
+              source={thumbnailSource}
               className="w-[100px] h-[75px] rounded-md ml-2.5 mt-1"
               sharedTransitionTag={`image-${item.id}`}
             />
@@ -446,3 +532,6 @@ export const FeedCard = ({ item, tab }: { item: FeedItem; tab?: string }) => {
     </RNView>
   );
 };
+
+export const FeedCard = React.memo(FeedCardComponent, areFeedCardPropsEqual);
+FeedCard.displayName = 'FeedCard';

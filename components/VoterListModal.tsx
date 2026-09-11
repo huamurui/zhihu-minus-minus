@@ -1,11 +1,12 @@
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Image, StyleSheet } from 'react-native';
+import { ActivityIndicator, StyleSheet } from 'react-native';
 import type { ZhihuVoter, ZhihuVotersResponse } from '@/api/zhihu/voters';
 import { getAnswerVoters, getPinVoters } from '@/api/zhihu/voters';
 import { BouncyButton } from '@/components/BouncyButton';
 import { BottomSheet } from '@/components/overlays/BottomSheet';
+import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -70,7 +71,7 @@ export function VoterListModal({
         }}
       >
         {item.avatar_url ? (
-          <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
+          <StableAvatar uri={item.avatar_url} style={styles.avatar} />
         ) : (
           <View
             style={[
