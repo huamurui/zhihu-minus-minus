@@ -49,6 +49,8 @@ export interface ZhihuAppQuestionFeedsParams {
   show_detail?: 0 | 1;
   limit?: number;
   offset?: number;
+  cursor?: string;
+  session_id?: string;
 }
 
 /** Query accepted by `GET /moments_v3`. */

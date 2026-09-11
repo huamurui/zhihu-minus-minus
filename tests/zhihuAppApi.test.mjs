@@ -55,6 +55,8 @@ test('maps question answer sort and paging parameters to native feeds', () => {
       order: 'updated',
       limit: 20,
       offset: 40,
+      cursor: 'next-cursor',
+      session_id: 'session-id',
     }),
   );
 
@@ -66,6 +68,8 @@ test('maps question answer sort and paging parameters to native feeds', () => {
   assert.equal(url.searchParams.get('order'), 'updated');
   assert.equal(url.searchParams.get('show_detail'), '1');
   assert.equal(url.searchParams.get('offset'), '40');
+  assert.equal(url.searchParams.get('cursor'), 'next-cursor');
+  assert.equal(url.searchParams.get('session_id'), 'session-id');
 });
 
 test('builds moments and origin requests', () => {

@@ -159,8 +159,8 @@ export async function buildZhihuAuthHeaders(
   return headers;
 }
 
-function hasAuthenticationCookie(cookie: string) {
-  return /(?:^|;\s*)z_c0=/.test(cookie);
+export function hasAuthenticationCookie(cookie: string | null | undefined) {
+  return typeof cookie === 'string' && /(?:^|;\s*)z_c0=/.test(cookie);
 }
 
 function getStringField(value: unknown, field: string): string | null {

@@ -48,6 +48,7 @@ import Reanimated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { hasAuthenticationCookie } from '@/api/client';
 import {
   type AnswerDetail,
   deleteAnswer,
@@ -78,6 +79,7 @@ import {
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
 import { useScrollHeaderAnim } from '@/hooks/useScrollAnimation';
 import { useViewableItems } from '@/hooks/useViewableItems';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useCollectionStore } from '@/store/useCollectionStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ZhihuAuthor } from '@/types/zhihu';
@@ -104,6 +106,7 @@ interface AnswerItemProps {
   onShare?: (item: AnswerDetail) => void;
   questionId: string;
   sortBy: AnswerSort;
+  isAuthenticated: boolean;
   screenTranslateX: SharedValue<number>;
   scrollGestureRef: GestureScrollViewRef;
   onSwipeStart?: (author: ZhihuAuthor) => void;
@@ -120,6 +123,7 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
       onShare,
       questionId,
       sortBy,
+      isAuthenticated,
       screenTranslateX,
       scrollGestureRef,
       onSwipeStart,
@@ -321,7 +325,7 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
     const followMutation = useOptimisticToggle<
       InfiniteData<QuestionAnswersResponse, number | string>
     >({
-      queryKey: ['question-answers', questionId, sortBy],
+      queryKey: ['question-answers', questionId, sortBy, isAuthenticated],
       mutationFn: async () => {
         const pid = item.author?.url_token || item.author?.id;
         if (!pid) return;
@@ -728,6 +732,9 @@ export default function QuestionDetail() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
+  const isAuthenticated = useAuthStore((state) =>
+    hasAuthenticationCookie(state.cookies),
+  );
   const backgroundColor = Colors[colorScheme].background;
   const textColor = Colors[colorScheme].text;
   const queryClient = useQueryClient();
@@ -810,10 +817,10 @@ export default function QuestionDetail() {
     QuestionAnswersResponse,
     Error,
     InfiniteData<QuestionAnswersResponse, number | string>,
-    ['question-answers', string, AnswerSort],
+    ['question-answers', string, AnswerSort, boolean],
     number | string
   >({
-    queryKey: ['question-answers', id, sortBy],
+    queryKey: ['question-answers', id, sortBy, isAuthenticated],
     queryFn: async ({ pageParam = 0 }) => {
       const include =
         'data[*].content,excerpt,voteup_count,comment_count,favlists_count,author.name,author.avatar_url,author.headline,author.is_following,relationship.voting,relationship.is_author,created_time,updated_time,ip_info,segment_infos';
@@ -829,10 +836,10 @@ export default function QuestionDetail() {
   const handleRefresh = useCallback(() => {
     return refreshInfiniteQuery(
       queryClient,
-      ['question-answers', id, sortBy],
+      ['question-answers', id, sortBy, isAuthenticated],
       refetch,
     );
-  }, [queryClient, id, sortBy, refetch]);
+  }, [queryClient, id, sortBy, isAuthenticated, refetch]);
 
   const answers = useMemo(() => {
     const all = answersData?.pages.flatMap((page) => page.data) || [];
@@ -990,12 +997,12 @@ export default function QuestionDetail() {
     isError: questionError,
     refetch: refetchQuestion,
   } = useQuery({
-    queryKey: ['question', id],
+    queryKey: ['question', id, isAuthenticated],
     queryFn: async () => await getQuestion(id as string),
   });
 
   const followMutation = useOptimisticToggle<ZhihuQuestionDetail>({
-    queryKey: ['question', id],
+    queryKey: ['question', id, isAuthenticated],
     isActive: question?.relationship?.is_following,
     mutationFn: async () => {
       if (question?.relationship?.is_following)
@@ -1355,6 +1362,7 @@ export default function QuestionDetail() {
               }}
               questionId={id}
               sortBy={sortBy}
+              isAuthenticated={isAuthenticated}
               screenTranslateX={screenTranslateX}
               scrollGestureRef={scrollGestureRef}
               onSwipeStart={setSwipedAuthor}

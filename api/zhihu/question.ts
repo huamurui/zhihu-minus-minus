@@ -1,5 +1,6 @@
+import { useAuthStore } from '@/store/useAuthStore';
 import type { ZhihuPaging, ZhihuQuestion } from '@/types/zhihu';
-import apiClient from '../client';
+import apiClient, { hasAuthenticationCookie } from '../client';
 import type {
   AnswerDetail,
   AnswerQuestion,
@@ -54,18 +55,17 @@ export const getQuestion = async (
   id: string | number,
   include?: string,
 ): Promise<ZhihuQuestionDetail> => {
-  const url = buildZhihuAppQuestionUrl(id, include);
-  try {
-    const res = await apiClient.get<ZhihuQuestionDetail>(url, {
-      headers: getZhihuAppEndpointHeaders(url),
+  if (hasAuthenticationCookie(useAuthStore.getState().cookies)) {
+    const res = await apiClient.get<ZhihuQuestionDetail>(`/questions/${id}`, {
+      params: { include: include || QUESTION_INCLUDE },
     });
     return res.data;
-  } catch {
-    // Keep the web read route as a compatibility fallback for older clients.
   }
-  const res = await apiClient.get<ZhihuQuestionDetail>(
-    `/questions/${id}?include=${include || QUESTION_INCLUDE}`,
-  );
+
+  const url = buildZhihuAppQuestionUrl(id, include);
+  const res = await apiClient.get<ZhihuQuestionDetail>(url, {
+    headers: getZhihuAppEndpointHeaders(url),
+  });
   return res.data;
 };
 
@@ -75,6 +75,9 @@ export const getQuestionAnswers = async (
   sortBy: 'default' | 'created',
   include: string,
 ): Promise<QuestionAnswersResponse> => {
+  const isAuthenticated = hasAuthenticationCookie(
+    useAuthStore.getState().cookies,
+  );
   const offset =
     typeof pageParam === 'number'
       ? pageParam
@@ -83,19 +86,8 @@ export const getQuestionAnswers = async (
             'offset',
           ) || 0,
         );
-  const url =
-    typeof pageParam === 'string'
-      ? pageParam
-      : buildZhihuAppQuestionFeedsUrl(id, {
-          order: sortBy === 'created' ? 'updated' : 'default',
-          ...(offset > 0 ? { limit: 20, offset } : {}),
-        });
-  try {
-    const res = await apiClient.get<ZhihuAppQuestionFeedsResponse>(url, {
-      headers: getZhihuAppEndpointHeaders(url),
-    });
-    return normalizeZhihuAppQuestionFeeds(res.data);
-  } catch {
+
+  if (isAuthenticated) {
     const res = await apiClient.get<QuestionAnswersResponse>(
       `/questions/${id}/answers`,
       {
@@ -104,6 +96,19 @@ export const getQuestionAnswers = async (
     );
     return res.data;
   }
+
+  const url =
+    typeof pageParam === 'string'
+      ? pageParam
+      : buildZhihuAppQuestionFeedsUrl(id, {
+          order: sortBy === 'created' ? 'updated' : 'default',
+          limit: 10,
+          offset,
+        });
+  const res = await apiClient.get<ZhihuAppQuestionFeedsResponse>(url, {
+    headers: getZhihuAppEndpointHeaders(url),
+  });
+  return normalizeZhihuAppQuestionFeeds(res.data);
 };
 
 export const getRelatedQuestionObjects = async (
