@@ -8,6 +8,7 @@ import {
 import { type Href, Stack, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert } from 'react-native';
+import { hasAuthenticationCookie } from '@/api/client';
 import {
   batchDelReadHistory,
   getReadHistory,
@@ -16,16 +17,21 @@ import {
   type ReadHistoryResponse,
 } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
+import { QueryErrorView } from '@/components/QueryErrorView';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
+import { useAuthStore } from '@/store/useAuthStore';
 import { formatDate } from '@/utils/date';
+import { getZhihuErrorMessage } from '@/utils/zhihuError';
 
 export default function HistoryScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const primaryColor = useThemeColor({}, 'primary');
   const queryClient = useQueryClient();
+  const cookies = useAuthStore((state) => state.cookies);
+  const isAuthenticated = hasAuthenticationCookie(cookies);
   const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -37,9 +43,12 @@ export default function HistoryScreen() {
     isFetchingNextPage,
     refetch,
     isRefetching,
+    isError,
   } = useInfiniteQuery({
     queryKey: ['read-history'],
-    queryFn: ({ pageParam = 0 }) => getReadHistory(20, pageParam as number),
+    queryFn: ({ pageParam = 0, signal }) =>
+      getReadHistory(20, pageParam as number, { signal }),
+    enabled: isAuthenticated,
     initialPageParam: 0,
     getNextPageParam: (lastPage: ReadHistoryResponse) => {
       if (!lastPage || lastPage.paging?.is_end) return undefined;
@@ -80,6 +89,9 @@ export default function HistoryScreen() {
       exitSelection();
       queryClient.invalidateQueries({ queryKey: ['read-history'] });
     },
+    onError: (error) => {
+      Alert.alert('删除失败', getZhihuErrorMessage(error));
+    },
   });
 
   const clearAllMutation = useMutation({
@@ -88,6 +100,9 @@ export default function HistoryScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['read-history'] });
+    },
+    onError: (error) => {
+      Alert.alert('清空失败', getZhihuErrorMessage(error));
     },
   });
 
@@ -266,8 +281,16 @@ export default function HistoryScreen() {
         }
         ListEmptyComponent={() => (
           <View className="p-[50px] items-center">
-            {isLoading ? (
+            {!isAuthenticated ? (
+              <Text type="secondary">登录后才能查看浏览历史喵</Text>
+            ) : isLoading ? (
               <ActivityIndicator size="small" color={primaryColor} />
+            ) : isError ? (
+              <QueryErrorView
+                compact
+                message="浏览历史加载失败"
+                onRetry={() => void refetch()}
+              />
             ) : (
               <Text type="secondary">这里空空如也喵</Text>
             )}

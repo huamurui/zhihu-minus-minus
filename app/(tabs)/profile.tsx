@@ -6,15 +6,16 @@ import React from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   RefreshControl,
   ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { verifyZhihuSession } from '@/api/session';
 import { getMe, getMemberWithFallback } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
 import { BottomSheet } from '@/components/overlays/BottomSheet';
 import { QueryErrorView } from '@/components/QueryErrorView';
+import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { ThemeModeSelector } from '@/components/ThemeModeSelector';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -187,10 +188,24 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
       return;
     }
 
-    switchAccount(index);
+    let verifiedSession:
+      | Awaited<ReturnType<typeof verifyZhihuSession>>
+      | undefined;
+    if (index !== -1) {
+      try {
+        verifiedSession = await verifyZhihuSession(targetCookies ?? '');
+      } catch {
+        Alert.alert('切换失败', '目标账号的登录信息已失效，请重新登录。');
+        sessionChangeInFlight.current = false;
+        setSessionChanging(false);
+        return;
+      }
+    }
+
+    switchAccount(index, verifiedSession);
     queryClient.clear();
     setAccountModalVisible(false);
-    await syncSessionWithFeedback(targetCookies);
+    await syncSessionWithFeedback(verifiedSession?.cookies ?? targetCookies);
     sessionChangeInFlight.current = false;
     setSessionChanging(false);
   };
@@ -248,8 +263,8 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
             className="flex-row items-center mb-[25px]"
             onPress={() => router.push(`/user/${me.url_token || me.id}`)}
           >
-            <Image
-              source={{ uri: me.avatar_url }}
+            <StableAvatar
+              uri={me.avatar_url}
               className="w-16 h-16 rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark"
             />
             <View className="flex-1 ml-[15px] bg-transparent">
@@ -475,8 +490,8 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
                   disabled={sessionChanging}
                   className="flex-row items-center py-4 flex-1 border-b border-gray-100 dark:border-gray-800 bg-transparent"
                 >
-                  <Image
-                    source={{ uri: account.me?.avatar_url }}
+                  <StableAvatar
+                    uri={account.me?.avatar_url}
                     className="w-12 h-12 rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark"
                   />
                   <View className="flex-1 ml-4 bg-transparent">

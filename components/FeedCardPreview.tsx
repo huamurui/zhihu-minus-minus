@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { ActivityIndicator, Image, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
+import { hasAuthenticationCookie } from '@/api/client';
 import {
   type FeedItem,
   getAnswer,
@@ -15,6 +16,8 @@ import {
   RICH_CONTENT_STALE_TIME,
   ZhihuContent,
 } from '@/features/rich-content';
+import { useAuthStore } from '@/store/useAuthStore';
+import { StableAvatar } from './StableAvatar';
 import { Text, useThemeColor, View } from './Themed';
 
 interface FeedCardPreviewProps {
@@ -35,6 +38,7 @@ function getResponseStatus(error: unknown) {
 export function FeedCardPreview({ item }: FeedCardPreviewProps) {
   const colorScheme = useColorScheme();
   const primaryColor = useThemeColor({}, 'primary');
+  const cookies = useAuthStore((state) => state.cookies);
   const isVideo = item.type === 'videos';
   const typeKey =
     item.type === 'answers'
@@ -51,6 +55,7 @@ export function FeedCardPreview({ item }: FeedCardPreviewProps) {
     : getRichContentQueryKey(
         item.type as Exclude<typeof item.type, 'videos'>,
         item.id,
+        hasAuthenticationCookie(cookies),
       );
 
   const { data: fullData, isLoading } = useQuery({
@@ -94,8 +99,8 @@ export function FeedCardPreview({ item }: FeedCardPreviewProps) {
     >
       {/* Author Profile */}
       <View className="flex-row items-center mb-3 bg-transparent">
-        <Image
-          source={{ uri: item.author.avatar }}
+        <StableAvatar
+          uri={item.author.avatar}
           className="w-7 h-7 rounded-full"
         />
         <View className="ml-2 bg-transparent flex-1">

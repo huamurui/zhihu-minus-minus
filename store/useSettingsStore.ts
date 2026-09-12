@@ -17,14 +17,22 @@ const settingsStorage = {
 };
 
 /** Returns true only for a complete, well-formed 6-digit hex color like "#0084ff" */
-function isValidHex(color: string | null | undefined): boolean {
-  if (!color) return false;
+function isValidHex(color: unknown): color is string {
+  if (typeof color !== 'string') return false;
   return /^#[0-9a-fA-F]{6}$/.test(color);
 }
 
 /** Sanitize a color value: returns the color if valid, null otherwise */
-function sanitizeColor(color: string | null | undefined): string | null {
-  return isValidHex(color) ? (color as string).toLowerCase() : null;
+function sanitizeColor(color: unknown): string | null {
+  return isValidHex(color) ? color.toLowerCase() : null;
+}
+
+function normalizePersistedSettingsState(
+  value: unknown,
+): Record<string, unknown> {
+  return value && typeof value === 'object'
+    ? { ...(value as Record<string, unknown>) }
+    : {};
 }
 
 const VALID_FILTER_MODES: ReadonlyArray<FilterMode> = ['collapse', 'hide'];
@@ -41,6 +49,7 @@ const VALID_READING_BACKGROUNDS: ReadonlyArray<ReadingBackground> = [
 ];
 const VALID_TEXT_CONTRASTS: ReadonlyArray<TextContrast> = ['standard', 'high'];
 const VALID_SURFACE_STYLES: ReadonlyArray<SurfaceStyle> = ['layered', 'flat'];
+const DEFAULT_RECOMMEND_AD_INTERVAL = -10;
 
 function isValidFilterMode(v: unknown): v is FilterMode {
   return typeof v === 'string' && (VALID_FILTER_MODES as string[]).includes(v);
@@ -68,6 +77,12 @@ function isValidSurfaceStyle(v: unknown): v is SurfaceStyle {
   return (
     typeof v === 'string' && (VALID_SURFACE_STYLES as string[]).includes(v)
   );
+}
+
+function sanitizeRecommendAdInterval(value: unknown): number {
+  return typeof value === 'number' && Number.isSafeInteger(value)
+    ? value
+    : DEFAULT_RECOMMEND_AD_INTERVAL;
 }
 
 export type TabKey =
@@ -106,6 +121,12 @@ export interface AppSettings {
   enableLocalFeedDedup: boolean;
   /** 是否在冷启动时保留上次的推荐流内容 */
   enableFeedCacheOnLaunch: boolean;
+  /** 推荐请求是否附加 desktop=true */
+  recommendRequestIncludeDesktop: boolean;
+  /** 推荐请求是否附加 ad_interval */
+  recommendRequestIncludeAdInterval: boolean;
+  /** 推荐请求的 ad_interval 值 */
+  recommendRequestAdInterval: number;
 
   // —— 本地内容过滤（见 utils/feedFilter.ts）——
   /** 过滤总开关。默认关：行为改变型功能不在升级后静默生效。 */
@@ -166,6 +187,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   enableBrowseHistory: true,
   enableLocalFeedDedup: false,
   enableFeedCacheOnLaunch: false,
+  recommendRequestIncludeDesktop: true,
+  recommendRequestIncludeAdInterval: true,
+  recommendRequestAdInterval: DEFAULT_RECOMMEND_AD_INTERVAL,
   enableLocalFeedFilter: false,
   filterMode: 'collapse',
   filterShowReason: true,
@@ -215,6 +239,19 @@ export const useSettingsStore = create<SettingsState>()(
           if (!isValidSurfaceStyle(nextSettings.surfaceStyle)) {
             nextSettings.surfaceStyle = 'layered';
           }
+          if (
+            typeof nextSettings.recommendRequestIncludeDesktop !== 'boolean'
+          ) {
+            nextSettings.recommendRequestIncludeDesktop = true;
+          }
+          if (
+            typeof nextSettings.recommendRequestIncludeAdInterval !== 'boolean'
+          ) {
+            nextSettings.recommendRequestIncludeAdInterval = true;
+          }
+          nextSettings.recommendRequestAdInterval = sanitizeRecommendAdInterval(
+            nextSettings.recommendRequestAdInterval,
+          );
           // 兜底：过滤 union 字段写入非枚举值时退回默认
           if (!isValidFilterMode(nextSettings.filterMode)) {
             nextSettings.filterMode = 'collapse';
@@ -229,8 +266,10 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'zhihu-settings-storage',
       storage: createJSONStorage(() => settingsStorage),
-      version: 10,
-      migrate: (persistedState: any, version: number) => {
+      version: 11,
+      migrate: (rawPersistedState: unknown, version: number) => {
+        const persistedState =
+          normalizePersistedSettingsState(rawPersistedState);
         // 清理历史脏数据：null 或非法 hex 都退回默认蓝
         const sanitized = sanitizeColor(persistedState?.primaryColor);
         persistedState.primaryColor = sanitized ?? colors.light.primary;
@@ -260,6 +299,17 @@ export const useSettingsStore = create<SettingsState>()(
         if (version < 7) {
           persistedState.enableFeedCacheOnLaunch =
             persistedState.enableFeedCacheOnLaunch ?? false;
+        }
+
+        if (version < 11) {
+          persistedState.recommendRequestIncludeDesktop =
+            persistedState.recommendRequestIncludeDesktop ?? true;
+          persistedState.recommendRequestIncludeAdInterval =
+            persistedState.recommendRequestIncludeAdInterval ?? true;
+          persistedState.recommendRequestAdInterval =
+            sanitizeRecommendAdInterval(
+              persistedState.recommendRequestAdInterval,
+            );
         }
 
         // 升级到 v8 时兜底本地内容过滤字段
@@ -319,8 +369,19 @@ export const useSettingsStore = create<SettingsState>()(
         )
           ? persistedState.surfaceStyle
           : 'layered';
+        persistedState.recommendRequestIncludeDesktop =
+          typeof persistedState.recommendRequestIncludeDesktop === 'boolean'
+            ? persistedState.recommendRequestIncludeDesktop
+            : true;
+        persistedState.recommendRequestIncludeAdInterval =
+          typeof persistedState.recommendRequestIncludeAdInterval === 'boolean'
+            ? persistedState.recommendRequestIncludeAdInterval
+            : true;
+        persistedState.recommendRequestAdInterval = sanitizeRecommendAdInterval(
+          persistedState.recommendRequestAdInterval,
+        );
 
-        return persistedState as SettingsState;
+        return persistedState as unknown as SettingsState;
       },
     },
   ),

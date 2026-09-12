@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { colors, radii, typography } from '@/constants/designTokens';
@@ -161,11 +161,17 @@ export default React.memo(function ZhihuDOMContent({
         .zhihu-content blockquote {
           border-left: 4px solid ${primaryColor};
           padding-left: 18px;
-          background-color: ${colors[colorScheme].backgroundSecondary};
+          background-color: transparent;
           padding: 12px 18px;
           margin: 15px 0;
-          font-style: italic;
-          color: ${textColor};
+          font-size: ${typography.fontSize.subtitle}px;
+          line-height: ${typography.lineHeight.reading};
+          color: ${colors[colorScheme].textSecondary};
+        }
+        .zhihu-content blockquote p {
+          color: ${colors[colorScheme].textSecondary};
+          font-size: ${typography.fontSize.subtitle}px;
+          line-height: ${typography.lineHeight.reading};
         }
         .zhihu-content h1, .zhihu-content h2, .zhihu-content h3 { color: ${textColor}; }
         .zhihu-content h1 { font-size: 22px; font-weight: bold; margin: 20px 0; line-height: 1.4; }
@@ -626,10 +632,14 @@ export default React.memo(function ZhihuDOMContent({
     </html>
   `;
 
+  // WebView treats a newly-created source object as a new document. Keep it
+  // stable when a parent re-renders without changing the HTML string.
+  const source = useMemo(() => ({ html }), [html]);
+
   return (
     <View style={[{ width: '100%', height }, style]}>
       <WebView
-        source={{ html }}
+        source={source}
         style={{ backgroundColor: 'transparent' }}
         scrollEnabled={false}
         onMessage={(event) => {

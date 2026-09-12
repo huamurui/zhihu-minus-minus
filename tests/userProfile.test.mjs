@@ -3,6 +3,9 @@ import test from 'node:test';
 import { parseZhihuUrl } from '../utils/url.ts';
 import {
   getNextPageOffset,
+  getNextRecentActivityCursor,
+  getRecentActivityReadBoundary,
+  getRecentActivityTargetId,
   isOwnMemberProfile,
   isSameMember,
   normalizeUserFeedType,
@@ -38,6 +41,7 @@ test('does not treat every loaded profile as the signed-in member', () => {
 test('normalizes profile content types without treating videos as answers', () => {
   assert.equal(normalizeUserFeedType('answer'), 'answers');
   assert.equal(normalizeUserFeedType('articles'), 'articles');
+  assert.equal(normalizeUserFeedType('moments_pin'), 'pins');
   assert.equal(normalizeUserFeedType('zvideo'), 'videos');
   assert.equal(normalizeUserFeedType('videos'), 'videos');
   assert.equal(normalizeUserFeedType('unsupported'), null);
@@ -55,6 +59,42 @@ test('reads pagination offsets through URLSearchParams', () => {
     undefined,
   );
   assert.equal(getNextPageOffset(undefined), undefined);
+});
+
+test('reads recent activity timestamp cursors and page numbers', () => {
+  assert.deepEqual(
+    getNextRecentActivityCursor(
+      'https://api.zhihu.com/moments/recent/people/member-id/activities?action=down&offset=1787412683057&page_num=2',
+    ),
+    { offset: 1787412683057, pageNum: 2 },
+  );
+  assert.equal(
+    getNextRecentActivityCursor(
+      '/moments/recent/people/member-id/activities?offset=1787412683057',
+    ),
+    undefined,
+  );
+  assert.equal(getNextRecentActivityCursor(undefined), undefined);
+});
+
+test('recovers exact oversized pin ids from activity URLs', () => {
+  assert.equal(
+    getRecentActivityTargetId({
+      id: 2077095966344327700,
+      type: 'moments_pin',
+      url: 'https://www.zhihu.com/pin/2077095966344327531?native=1',
+    }),
+    '2077095966344327531',
+  );
+  assert.equal(getRecentActivityTargetId({ id: 123, type: 'answer' }), 123);
+});
+
+test('places the read boundary using the entry-time unread snapshot', () => {
+  assert.equal(getRecentActivityReadBoundary(5, 7, false), 5);
+  assert.equal(getRecentActivityReadBoundary(9, 7, false), undefined);
+  assert.equal(getRecentActivityReadBoundary(9, 7, true), 7);
+  assert.equal(getRecentActivityReadBoundary(0, 7, true), undefined);
+  assert.equal(getRecentActivityReadBoundary(Number.NaN, 7, true), undefined);
 });
 
 test('normalizes public Zhihu video links to the internal video route', () => {

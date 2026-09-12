@@ -27,6 +27,7 @@ interface ActionSheetProps {
   options: ActionSheetOption[];
   headerContent?: React.ReactNode;
   cancelLabel?: string;
+  hapticFeedback?: boolean;
 }
 
 export function ActionSheet({
@@ -37,6 +38,7 @@ export function ActionSheet({
   options,
   headerContent,
   cancelLabel = '取消',
+  hapticFeedback = true,
 }: ActionSheetProps) {
   const colorScheme = useColorScheme();
   const primaryTransparent = useThemeColor({}, 'primaryTransparent');
@@ -44,8 +46,10 @@ export function ActionSheet({
   const pendingAction = useRef<ActionSheetOption['onPress'] | null>(null);
 
   useEffect(() => {
-    if (visible) void impactAsync(ImpactFeedbackStyle.Medium);
-  }, [visible]);
+    if (visible && hapticFeedback) {
+      void impactAsync(ImpactFeedbackStyle.Medium);
+    }
+  }, [visible, hapticFeedback]);
 
   const handleClosed = () => {
     onClose();

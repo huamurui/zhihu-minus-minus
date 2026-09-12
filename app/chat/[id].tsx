@@ -9,7 +9,6 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -20,10 +19,14 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getMessages, sendMessage } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
+import { QueryErrorView } from '@/components/QueryErrorView';
+import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { useAuthStore } from '@/store/useAuthStore';
+import { showToast } from '@/utils/toast';
+import { getZhihuErrorMessage } from '@/utils/zhihuError';
 
 export default function ChatScreen() {
   const { id, name } = useLocalSearchParams<{ id: string; name: string }>();
@@ -47,18 +50,26 @@ export default function ChatScreen() {
     });
   }, [navigation, name]);
 
-  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useInfiniteQuery({
-      queryKey: ['chat', id],
-      queryFn: ({ pageParam = '' }) => getMessages(id, pageParam as string),
-      initialPageParam: '',
-      getNextPageParam: (lastPage) => {
-        if (!lastPage || lastPage.paging?.is_end) return undefined;
-        return lastPage.paging?.next;
-      },
-      // Simple polling every 5 seconds
-      refetchInterval: 5000,
-    });
+  const {
+    data,
+    isLoading,
+    isError,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch,
+  } = useInfiniteQuery({
+    queryKey: ['chat', id],
+    queryFn: ({ pageParam = '', signal }) =>
+      getMessages(id, pageParam as string, { signal }),
+    initialPageParam: '',
+    getNextPageParam: (lastPage) => {
+      if (!lastPage || lastPage.paging?.is_end) return undefined;
+      return lastPage.paging?.next;
+    },
+    // Simple polling every 5 seconds
+    refetchInterval: 5000,
+  });
 
   const sendMutation = useMutation({
     mutationFn: (text: string) => sendMessage(id, text),
@@ -72,7 +83,8 @@ export default function ChatScreen() {
       queryClient.invalidateQueries({ queryKey: ['chat', id] });
     },
     onError: (err) => {
-      console.error('Failed to send message:', err);
+      console.error('发送消息失败');
+      showToast(getZhihuErrorMessage(err));
     },
   });
 
@@ -127,8 +139,8 @@ export default function ChatScreen() {
         className={`flex-row px-4 py-2 ${isMe ? 'justify-end' : 'justify-start'} bg-transparent`}
       >
         {!isMe && (
-          <Image
-            source={{ uri: avatarUrl }}
+          <StableAvatar
+            uri={avatarUrl}
             className="w-10 h-10 rounded-full bg-gray-200 mr-3"
           />
         )}
@@ -144,18 +156,7 @@ export default function ChatScreen() {
                   ? 'bg-gray-800 rounded-tl-sm'
                   : 'bg-white rounded-tl-sm'
             }`}
-            style={[
-              isMe && { backgroundColor: primaryColor },
-              !isMe && !isDark
-                ? {
-                    shadowColor: Colors.light.shadow,
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.1,
-                    shadowRadius: 2,
-                    elevation: 2,
-                  }
-                : {},
-            ]}
+            style={[isMe && { backgroundColor: primaryColor }]}
           >
             {messageInfo.content_type === 0 ? (
               <Text
@@ -176,8 +177,8 @@ export default function ChatScreen() {
         </View>
 
         {isMe && (
-          <Image
-            source={{ uri: avatarUrl }}
+          <StableAvatar
+            uri={avatarUrl}
             className="w-10 h-10 rounded-full bg-gray-200 ml-3"
           />
         )}
@@ -222,7 +223,18 @@ export default function ChatScreen() {
             ) : null
           }
           ListEmptyComponent={() =>
-            !isLoading ? (
+            !isLoading && isError ? (
+              <View
+                className="flex-1 items-center justify-center p-10 bg-transparent"
+                style={{ transform: [{ scaleY: -1 }] }}
+              >
+                <QueryErrorView
+                  compact
+                  message="聊天记录加载失败"
+                  onRetry={() => void refetch()}
+                />
+              </View>
+            ) : !isLoading ? (
               <View
                 className="flex-1 items-center justify-center p-10 bg-transparent"
                 style={{ transform: [{ scaleY: -1 }] }}

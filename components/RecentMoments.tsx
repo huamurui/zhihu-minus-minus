@@ -1,15 +1,23 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { Image, Pressable, ScrollView } from 'react-native';
-import { fetchRecentMoments } from '@/api/zhihu';
+import React from 'react';
+import { Pressable, ScrollView } from 'react-native';
+import {
+  fetchRecentMoments,
+  markRecentMomentsRead,
+  type RecentMomentItem,
+  type RecentMomentsResponse,
+} from '@/api/zhihu';
+import { StableAvatar } from './StableAvatar';
 import { Text, useThemeColor, View } from './Themed';
 import { useColorScheme } from './useColorScheme';
 
 /**
  * 最近更新的用户头像栏 (朋友圈/动态更新提示)
  */
-export function RecentMoments() {
+function RecentMomentsComponent() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const _colorScheme = useColorScheme();
   const primaryColor = useThemeColor({}, 'primary');
   const dangerColor = useThemeColor({}, 'danger');
@@ -28,6 +36,52 @@ export function RecentMoments() {
     return null;
   }
 
+  const markReadOnPress = (item: RecentMomentItem) => {
+    const readToken = item.brief || item.id;
+    if (item.unread_count <= 0 || !readToken) return;
+
+    queryClient.setQueryData<RecentMomentsResponse>(
+      ['recent-moments'],
+      (current) =>
+        current
+          ? {
+              ...current,
+              data: current.data.map((currentItem) =>
+                currentItem.actor.id === item.actor.id
+                  ? { ...currentItem, unread_count: 0 }
+                  : currentItem,
+              ),
+            }
+          : current,
+    );
+
+    const restoreUnreadCount = () => {
+      queryClient.setQueryData<RecentMomentsResponse>(
+        ['recent-moments'],
+        (current) =>
+          current
+            ? {
+                ...current,
+                data: current.data.map((currentItem) =>
+                  currentItem.actor.id === item.actor.id
+                    ? { ...currentItem, unread_count: item.unread_count }
+                    : currentItem,
+                ),
+              }
+            : current,
+      );
+    };
+
+    void markRecentMomentsRead(readToken)
+      .then((result) => {
+        if (!result.success) restoreUnreadCount();
+      })
+      .catch(() => {
+        restoreUnreadCount();
+        console.warn('标记最近动态已读失败');
+      });
+  };
+
   return (
     <View className="bg-transparent border-b-[0.5px] border-black/5 dark:border-white/5">
       <ScrollView
@@ -38,12 +92,16 @@ export function RecentMoments() {
         {data.data.map((item) => (
           <Pressable
             key={item.actor.id}
-            onPress={() =>
+            onPress={() => {
+              markReadOnPress(item);
               router.push({
-                pathname: `/user/${item.actor.url_token || item.actor.id}/stream`,
-                params: { type: 'answers' },
-              } as any)
-            }
+                pathname: '/user/[id]/stream',
+                params: {
+                  id: item.actor.url_token || item.actor.id,
+                  unreadCount: String(item.unread_count),
+                },
+              });
+            }}
             className="items-center mr-4 w-[64px]"
           >
             <View className="relative mb-1.5 bg-transparent">
@@ -55,8 +113,8 @@ export function RecentMoments() {
                     item.unread_count > 0 ? primaryColor : 'transparent',
                 }}
               >
-                <Image
-                  source={{ uri: item.actor.avatar_url }}
+                <StableAvatar
+                  uri={item.actor.avatar_url}
                   className="w-[52px] h-[52px] rounded-full bg-black/5 dark:bg-white/5"
                 />
               </View>
@@ -93,3 +151,6 @@ export function RecentMoments() {
     </View>
   );
 }
+
+export const RecentMoments = React.memo(RecentMomentsComponent);
+RecentMoments.displayName = 'RecentMoments';

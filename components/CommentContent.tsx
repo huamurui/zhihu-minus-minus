@@ -1,5 +1,4 @@
-import type React from 'react';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Image } from 'react-native';
 import { BouncyButton } from '@/components/BouncyButton';
 import { ImagePreviewModal } from '@/components/ImagePreviewModal';
@@ -10,7 +9,7 @@ interface CommentContentProps {
   width: number;
 }
 
-export const CommentContent: React.FC<CommentContentProps> = ({
+const CommentContentComponent: React.FC<CommentContentProps> = ({
   htmlContent,
 }) => {
   const textColor = useThemeColor({}, 'text');
@@ -96,3 +95,6 @@ export const CommentContent: React.FC<CommentContentProps> = ({
     </View>
   );
 };
+
+export const CommentContent = React.memo(CommentContentComponent);
+CommentContent.displayName = 'CommentContent';

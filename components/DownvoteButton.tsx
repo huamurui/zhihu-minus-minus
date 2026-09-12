@@ -10,6 +10,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { voteContent } from '@/api/zhihu/voters';
 import { colors } from '@/constants/designTokens';
+import { showToast } from '@/utils/toast';
+import { getZhihuErrorMessage } from '@/utils/zhihuError';
 import { BouncyButton } from './BouncyButton';
 import { useThemeColor } from './Themed';
 import { useColorScheme } from './useColorScheme';
@@ -57,7 +59,8 @@ export const DownvoteButton = ({
       await voteContent(id, type, voteType);
       setVoted(nextVoted);
     } catch (err) {
-      console.error('投票失败:', err);
+      console.error('投票失败');
+      showToast(getZhihuErrorMessage(err));
     } finally {
       setLoading(false);
     }

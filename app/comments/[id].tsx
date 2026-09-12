@@ -11,7 +11,6 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Keyboard,
   Platform,
   StyleSheet,
@@ -47,6 +46,7 @@ import {
 } from '@/components/CommentComposer';
 import { CommentContent } from '@/components/CommentContent';
 import { LikeButton } from '@/components/LikeButton';
+import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -261,8 +261,8 @@ export default function CommentScreen() {
             }
             style={{ borderRadius: 16 }}
           >
-            <Image
-              source={{ uri: item.author.member.avatar_url }}
+            <StableAvatar
+              uri={item.author.member.avatar_url}
               className="w-8 h-8 rounded-full"
             />
           </BouncyButton>
@@ -365,8 +365,8 @@ export default function CommentScreen() {
                       key={child.id}
                       className="flex-row items-start mb-2 bg-transparent"
                     >
-                      <Image
-                        source={{ uri: child.author?.member?.avatar_url }}
+                      <StableAvatar
+                        uri={child.author?.member?.avatar_url}
                         className="w-[18px] h-[18px] rounded-full mr-2"
                       />
                       <View className="flex-1 bg-transparent">
@@ -449,11 +449,6 @@ export default function CommentScreen() {
                   borderRadius: 14,
                   marginHorizontal: 14,
                   marginTop: 6,
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 4,
-                  elevation: 2,
                 }}
               >
                 <View className="flex-row items-center mb-1 bg-transparent">

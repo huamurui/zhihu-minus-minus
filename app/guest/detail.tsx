@@ -6,6 +6,7 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { FeedItem } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
+import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -42,7 +43,7 @@ export default function GuestDetailScreen() {
         style={[styles.centerContainer, { backgroundColor }]}
         type="default"
       >
-        <Stack.Screen options={{ headerShown: false }} />
+        <Stack.Screen options={{ headerShown: false, title: '内容预览' }} />
         <Ionicons
           name="alert-circle-outline"
           size={48}
@@ -97,7 +98,7 @@ export default function GuestDetailScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor }]} type="default">
-      <Stack.Screen options={{ headerShown: false }} />
+      <Stack.Screen options={{ headerShown: false, title: '内容预览' }} />
 
       {/* 顶部标题导航栏 */}
       <View
@@ -173,8 +174,8 @@ export default function GuestDetailScreen() {
           {/* 2. 作者卡片 (如果有) */}
           {item.author ? (
             <View className="flex-row items-center px-5 py-3 bg-transparent">
-              <Image
-                source={{ uri: item.author.avatar }}
+              <StableAvatar
+                uri={item.author.avatar}
                 className="w-10 h-10 rounded-full"
               />
               <View className="ml-3 flex-1 bg-transparent">

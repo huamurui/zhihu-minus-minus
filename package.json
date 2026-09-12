@@ -1,7 +1,7 @@
 {
   "name": "zhihu--",
   "main": "expo-router/entry",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "scripts": {
     "start": "expo start",
     "prebuild": "expo prebuild",
@@ -11,10 +11,12 @@
     "analyze:rich-content": "node features/rich-content/tools/analyze-fixtures.mjs",
     "analyze:rich-content:inbox": "node features/rich-content/tools/analyze-fixtures.mjs --inbox",
     "typecheck": "tsc --noEmit",
-    "test": "npm run test:rich-content && npm run test:theme && npm run test:user-profile",
+    "test": "npm run test:rich-content && npm run test:theme && npm run test:user-profile && npm run test:publishing && npm run test:zhihu-app-api",
     "test:rich-content": "node --test features/rich-content/tests/*.test.mjs",
+    "test:publishing": "node --experimental-strip-types --test tests/publishing.test.mjs",
     "test:user-profile": "node --experimental-strip-types --test tests/userProfile.test.mjs",
     "test:theme": "node --test tests/themeMode.test.mjs",
+    "test:zhihu-app-api": "node --experimental-strip-types --test tests/zhihuAppApi.test.mjs",
     "postinstall": "patch-package",
     "format": "biome format . --write",
     "lint": "biome check .",

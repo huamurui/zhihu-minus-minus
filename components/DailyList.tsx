@@ -11,12 +11,21 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
+import type { EdgeInsets } from 'react-native-safe-area-context';
 import { getDailyBefore, getDailyLatest } from '@/api/zhihu';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
+import {
+  type CollapsibleChromeScrollOptions,
+  useCollapsibleChromeScroll,
+} from '@/hooks/useCollapsibleChromeScroll';
 import { refreshInfiniteQuery } from '@/utils/query';
 import { BouncyButton } from './BouncyButton';
+
+const AnimatedFlashList = Animated.createAnimatedComponent(
+  FlashList,
+) as typeof FlashList;
 
 // --- 类型定义 ---
 type Story = {
@@ -27,6 +36,11 @@ type Story = {
   type?: number;
 };
 type ListItem = { type: 'date'; date: string } | { type: 'story'; data: Story };
+
+interface DailyListHandle {
+  scrollToOffset: (args: { offset: number; animated?: boolean }) => void;
+  refresh: () => void;
+}
 
 // --- 辅助函数：格式化日期 ---
 const formatDate = (dateStr: string) => {
@@ -90,13 +104,13 @@ const SkeletonCard = () => {
 };
 
 export const DailyList = React.forwardRef<
-  any,
+  DailyListHandle,
   {
-    insets: any;
-    onScroll?: (offset: number) => void;
+    insets: EdgeInsets;
+    chrome: CollapsibleChromeScrollOptions;
     onRefreshStateChange?: (isRefreshing: boolean) => void;
   }
->(({ insets, onScroll, onRefreshStateChange }, ref) => {
+>(({ insets, chrome, onRefreshStateChange }, ref) => {
   const queryClient = useQueryClient();
   const router = useRouter();
   const colorScheme = useColorScheme();
@@ -151,10 +165,11 @@ export const DailyList = React.forwardRef<
     return items;
   }, [data]);
 
-  const flashListRef = React.useRef<FlashListRef<any>>(null);
+  const flashListRef = React.useRef<FlashListRef<ListItem>>(null);
+  const scrollHandler = useCollapsibleChromeScroll(chrome);
 
   React.useImperativeHandle(ref, () => ({
-    scrollToOffset: (args: any) => flashListRef.current?.scrollToOffset(args),
+    scrollToOffset: (args) => flashListRef.current?.scrollToOffset(args),
     refresh: handleRefresh,
   }));
 
@@ -194,11 +209,11 @@ export const DailyList = React.forwardRef<
 
   return (
     <View className="flex-1">
-      <FlashList
+      <AnimatedFlashList
         ref={flashListRef}
         showsVerticalScrollIndicator={false}
         data={flattenedData}
-        keyExtractor={(item: any, index: number) =>
+        keyExtractor={(item: ListItem, index: number) =>
           item.type === 'date' ? item.date : item.data.id.toString() + index
         }
         {...({ estimatedItemSize: 100 } as any)}
@@ -208,13 +223,13 @@ export const DailyList = React.forwardRef<
         onEndReachedThreshold={0.5}
         onRefresh={handleRefresh}
         refreshing={showRefreshing}
-        onScroll={(e) => onScroll?.(e.nativeEvent.contentOffset.y)}
+        onScroll={scrollHandler}
         scrollEventThrottle={16}
         contentContainerStyle={{
           paddingTop: insets.top + 70,
           paddingBottom: 110,
         }}
-        renderItem={({ item }: { item: any }) => {
+        renderItem={({ item }: { item: ListItem }) => {
           if (item.type === 'date') {
             return (
               <View className="bg-transparent">

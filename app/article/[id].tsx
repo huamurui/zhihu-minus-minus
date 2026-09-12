@@ -1,38 +1,36 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { BlurView } from 'expo-blur';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Image, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getArticle, getDailyDetail } from '@/api/zhihu';
-import {
-  fastCollectArticle,
-  getArticleCollectionStatus,
-  removeArticleFromCollection,
-} from '@/api/zhihu/collection';
+import { getArticleCollectionStatus } from '@/api/zhihu/collection';
 import {
   followColumn,
   getArticleColumnCard,
   unfollowColumn,
 } from '@/api/zhihu/column';
-import { addReadHistory } from '@/api/zhihu/history';
+import { recordReadHistory } from '@/api/zhihu/history';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
 import { BouncyButton } from '@/components/BouncyButton';
 import { DownvoteButton } from '@/components/DownvoteButton';
 import { LikeButton } from '@/components/LikeButton';
 import { ActionSheet } from '@/components/overlays/ActionSheet';
+import { QueryErrorView } from '@/components/QueryErrorView';
 import { ShareMenu } from '@/components/ShareMenu';
+import { StableAvatar } from '@/components/StableAvatar';
 import { Text, ThemedIcon, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
-import { ZhihuContent } from '@/features/rich-content';
+import { RICH_CONTENT_STALE_TIME, ZhihuContent } from '@/features/rich-content';
+import { useCollectionAction } from '@/hooks/useCollectionAction';
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
 import { useCollectionStore } from '@/store/useCollectionStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ZhihuArticle } from '@/types/zhihu';
 import { formatDate } from '@/utils/date';
-import { showToast } from '@/utils/toast';
 
 export default function ArticleDetail() {
   const colorScheme = useColorScheme();
@@ -53,7 +51,12 @@ export default function ArticleDetail() {
   const scrollY = useRef(new Animated.Value(0)).current;
 
   // 1. 获取日报详情
-  const { data: dailyData, isLoading: dailyLoading } = useQuery({
+  const {
+    data: dailyData,
+    isLoading: dailyLoading,
+    isError: dailyError,
+    refetch: refetchDaily,
+  } = useQuery({
     queryKey: ['daily-article', id],
     queryFn: () => getDailyDetail(id as string),
     enabled: source === 'daily',
@@ -62,78 +65,74 @@ export default function ArticleDetail() {
   });
 
   // 2. 获取知乎普通文章详情
-  const { data: zhihuData, isLoading: zhihuLoading } = useQuery({
+  const {
+    data: zhihuData,
+    isLoading: zhihuLoading,
+    isError: zhihuError,
+    refetch: refetchZhihu,
+  } = useQuery({
     queryKey: ['zhihu-article', id],
     queryFn: () => getArticle(id as string),
     enabled: source !== 'daily',
+    staleTime: RICH_CONTENT_STALE_TIME,
     retry: (failureCount, err: any) =>
       err?.response?.status === 404 ? false : failureCount < 2,
   });
 
   const isLoading = isDaily ? dailyLoading : zhihuLoading;
   const data = isDaily ? dailyData : zhihuData;
+  const isError = isDaily ? dailyError : zhihuError;
+  const refetchContent = isDaily ? refetchDaily : refetchZhihu;
+  const authorAvatarUrl = !isDaily ? data?.author?.avatar_url : undefined;
 
   const enableBrowseHistory = useSettingsStore((s) => s.enableBrowseHistory);
 
   useEffect(() => {
     if (enableBrowseHistory && id) {
-      addReadHistory({ content_token: id as string, content_type: 'article' });
+      recordReadHistory({
+        content_token: id as string,
+        content_type: 'article',
+      });
     }
   }, [enableBrowseHistory, id]);
 
   // 3. 获取文章被收藏状态
-  const { data: collectionStatus, refetch: refetchCollectionStatus } = useQuery(
-    {
-      queryKey: ['article-collection-status', id],
-      queryFn: () => getArticleCollectionStatus(id as string),
-      enabled: !!id && !isDaily && !isLoading,
-      staleTime: 60 * 1000, // 1 minute
-    },
-  );
+  const { data: collectionStatus, isFetchedAfterMount } = useQuery({
+    queryKey: ['article-collection-status', id],
+    queryFn: () => getArticleCollectionStatus(id as string),
+    enabled: !!id && !isDaily && !isLoading,
+    staleTime: 60 * 1000, // 1 minute
+  });
 
   const setCollectedStatus = useCollectionStore(
     (state) => state.setCollectedStatus,
   );
 
-  const isCollected = collectionStatus?.data?.some(
+  const statusCollected = collectionStatus?.data?.some(
     (item: any) => item.is_favorited,
   );
-  const favoritedCollection = collectionStatus?.data?.find(
-    (item: any) => item.is_favorited,
+  const storeCollected = useCollectionStore(
+    (state) => state.collectedStatusMap[String(id)],
   );
+  const activeCollected = storeCollected ?? statusCollected ?? false;
+  const storeCollectedRef = useRef(storeCollected);
+  const { toggleCollect, isPending: collectionPending } = useCollectionAction();
 
   useEffect(() => {
-    if (collectionStatus && id) {
+    storeCollectedRef.current = storeCollected;
+  }, [storeCollected]);
+
+  useEffect(() => {
+    if (
+      collectionStatus &&
+      id &&
+      (isFetchedAfterMount || storeCollectedRef.current === undefined)
+    ) {
       const activeCollected =
         collectionStatus?.data?.some((item: any) => item.is_favorited) || false;
       setCollectedStatus(id as string, activeCollected);
     }
-  }, [collectionStatus, id, setCollectedStatus]);
-
-  const collectMutation = useMutation({
-    mutationFn: async () => {
-      if (isCollected && favoritedCollection) {
-        return removeArticleFromCollection(
-          favoritedCollection.id,
-          id as string,
-        );
-      }
-      return fastCollectArticle(id as string);
-    },
-    onSuccess: (res) => {
-      refetchCollectionStatus();
-      if (!isCollected) {
-        const folderName = res?.collection?.title || '默认收藏夹';
-        useCollectionStore
-          .getState()
-          .showToast(id as string, 'article', `已收藏到「${folderName}」`);
-      } else {
-        showToast('已取消收藏');
-      }
-    },
-    onError: (err: any) =>
-      showToast(err.response?.data?.error?.message || '无法处理请求'),
-  });
+  }, [collectionStatus, id, isFetchedAfterMount, setCollectedStatus]);
 
   // 4. 关注作者逻辑
   const followMutation = useOptimisticToggle<ZhihuArticle>({
@@ -200,9 +199,10 @@ export default function ArticleDetail() {
     extrapolate: 'clamp',
   });
 
-  if (isLoading) {
+  if (isLoading && !data) {
     return (
       <View className="flex-1 justify-center items-center">
+        <Stack.Screen options={{ headerShown: false, title: '正文' }} />
         <ActivityIndicator size="large" color={primaryColor} />
         <Text className="mt-3">正赶往知识的荒原...喵</Text>
       </View>
@@ -210,8 +210,20 @@ export default function ArticleDetail() {
   }
 
   if (!data) {
+    if (isError) {
+      return (
+        <View className="flex-1 justify-center items-center px-6">
+          <Stack.Screen options={{ headerShown: false, title: '正文' }} />
+          <QueryErrorView
+            message="正文加载失败"
+            onRetry={() => void refetchContent()}
+          />
+        </View>
+      );
+    }
     return (
       <View className="flex-1 justify-center items-center px-6">
+        <Stack.Screen options={{ headerShown: false, title: '正文' }} />
         <Ionicons
           name="compass-outline"
           size={48}
@@ -239,7 +251,7 @@ export default function ArticleDetail() {
   return (
     <View className="flex-1">
       {/* Hide native header */}
-      <Stack.Screen options={{ headerShown: false }} />
+      <Stack.Screen options={{ headerShown: false, title: '正文' }} />
 
       {/* Floating Header Bar */}
       <View
@@ -343,8 +355,8 @@ export default function ArticleDetail() {
                 onPress={goToProfile}
                 className="flex-row items-center flex-1 bg-transparent"
               >
-                <Image
-                  source={{ uri: data.author?.avatar_url }}
+                <StableAvatar
+                  uri={authorAvatarUrl}
                   className="w-11 h-11 rounded-full"
                 />
                 <View className="ml-3 flex-1 bg-transparent">
@@ -475,8 +487,17 @@ export default function ArticleDetail() {
       {/* Floating Footer Actions for Standard Articles */}
       {!isDaily && (
         <View
-          className="absolute left-5 right-5 z-[1000] shadow-black/10 shadow-[0_10px_20px] elevation-10"
-          style={{ bottom: insets.bottom + 10 }}
+          className="absolute left-5 right-5 z-[1000]"
+          style={[
+            !isDark && {
+              shadowColor: Colors.light.shadow,
+              shadowOffset: { width: 0, height: 10 },
+              shadowOpacity: 0.1,
+              shadowRadius: 20,
+              elevation: 10,
+            },
+            { bottom: insets.bottom + 10 },
+          ]}
         >
           <BlurView
             intensity={130}
@@ -494,7 +515,7 @@ export default function ArticleDetail() {
               <View className="flex-row items-center bg-transparent">
                 <LikeButton
                   id={id as string}
-                  count={data.voteup_count || 0}
+                  count={data.voteup_count ?? 0}
                   voted={data.relationship?.voting === 1 ? 1 : 0}
                   type="articles"
                   variant="minimal"
@@ -574,10 +595,12 @@ export default function ArticleDetail() {
           },
           {
             key: 'collection',
-            icon: isCollected ? 'star' : 'star-outline',
-            label: isCollected ? '取消收藏' : '移至收藏',
-            color: isCollected ? warningColor : undefined,
-            onPress: () => collectMutation.mutate(),
+            icon: activeCollected ? 'star' : 'star-outline',
+            label: activeCollected ? '取消收藏' : '移至收藏',
+            color: activeCollected ? warningColor : undefined,
+            disabled: collectionPending,
+            onPress: () =>
+              toggleCollect(id as string, 'article', activeCollected),
           },
           {
             key: 'share',

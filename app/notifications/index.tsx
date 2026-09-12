@@ -7,9 +7,11 @@ import {
 } from '@tanstack/react-query';
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
 import { getNotifications, markAllNotificationsRead } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
+import { QueryErrorView } from '@/components/QueryErrorView';
+import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -59,10 +61,11 @@ export default function NotificationScreen() {
     isFetchingNextPage,
     refetch,
     isRefetching,
+    isError,
   } = useInfiniteQuery({
     queryKey: ['notifications', selectedType],
-    queryFn: ({ pageParam = '' }) =>
-      getNotifications(pageParam as string, selectedType),
+    queryFn: ({ pageParam = '', signal }) =>
+      getNotifications(pageParam as string, selectedType, { signal }),
     initialPageParam: '',
     getNextPageParam: (lastPage) => {
       if (!lastPage || lastPage.paging?.is_end) return undefined;
@@ -181,8 +184,8 @@ export default function NotificationScreen() {
           <View className="flex-row items-center justify-between mb-1.5 bg-transparent">
             <View className="flex-row items-center bg-transparent">
               {actor.avatar_url && (
-                <Image
-                  source={{ uri: actor.avatar_url }}
+                <StableAvatar
+                  uri={actor.avatar_url}
                   className="w-5 h-5 rounded-full mr-1.5"
                 />
               )}
@@ -277,6 +280,12 @@ export default function NotificationScreen() {
           <View className="flex-1 p-[100px] items-center">
             {isLoading ? (
               <ActivityIndicator color={primaryColor} />
+            ) : isError ? (
+              <QueryErrorView
+                compact
+                message="通知加载失败"
+                onRetry={() => void refetch()}
+              />
             ) : (
               <Text type="secondary">暂无通知喵</Text>
             )}

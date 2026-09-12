@@ -1,22 +1,27 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createQuestion } from '@/api/zhihu';
+import type { UploadedImage } from '@/api/zhihu/image';
 import { BouncyButton } from '@/components/BouncyButton';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
+import {
+  PublishingEditor,
+  serializePublishingMarkdown,
+} from '@/features/publishing';
+import { getZhihuErrorMessage } from '@/utils/zhihuError';
 
 export default function PublishQuestionScreen() {
   const insets = useSafeAreaInsets();
@@ -30,18 +35,22 @@ export default function PublishQuestionScreen() {
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
+  const [editorBusy, setEditorBusy] = useState(false);
 
   const mutation = useMutation({
-    mutationFn: () => createQuestion(title.trim(), content.trim()),
+    mutationFn: () =>
+      createQuestion(
+        title.trim(),
+        serializePublishingMarkdown(content, uploadedImages),
+      ),
     onSuccess: () => {
       Alert.alert('发布成功', '您的问题已发布！');
       queryClient.invalidateQueries({ queryKey: ['feeds'] });
       router.back();
     },
-    onError: (err: any) => {
-      console.error(err);
-      Alert.alert('发布失败', err.response?.data?.error?.message || '未知错误');
-    },
+    onError: (error: unknown) =>
+      Alert.alert('发布失败', getZhihuErrorMessage(error)),
   });
 
   const handlePublish = () => {
@@ -49,13 +58,19 @@ export default function PublishQuestionScreen() {
       Alert.alert('提示', '请输入问题标题');
       return;
     }
+    if (editorBusy) {
+      Alert.alert('图片上传中', '请等待图片上传完成后再发布。');
+      return;
+    }
     mutation.mutate();
   };
 
-  const isPublishEnabled = title.trim().length > 5 && !mutation.isPending;
+  const isPublishEnabled =
+    title.trim().length > 5 && !editorBusy && !mutation.isPending;
 
   return (
     <View className="flex-1">
+      <Stack.Screen options={{ headerShown: false, title: '提问题' }} />
       <View
         className="flex-row items-center justify-between px-4 pb-3"
         style={{ paddingTop: insets.top + 10 }}
@@ -66,7 +81,7 @@ export default function PublishQuestionScreen() {
         >
           <Ionicons name="close" size={28} color={textColor} />
         </BouncyButton>
-        <Text className="text-lg font-bold">提问题(WIP)</Text>
+        <Text className="text-lg font-bold">提问题</Text>
         <BouncyButton
           disabled={!isPublishEnabled}
           onPress={handlePublish}
@@ -101,38 +116,17 @@ export default function PublishQuestionScreen() {
             onChangeText={setTitle}
             autoFocus
           />
-          <TextInput
-            className="text-lg py-4 min-h-[300px]"
-            style={{ color: textColor, textAlignVertical: 'top' }}
-            value={content}
+          <PublishingEditor
+            contentType="question"
+            disabled={mutation.isPending}
+            minHeight={300}
+            onBusyChange={setEditorBusy}
             onChangeText={setContent}
+            onImagesChange={setUploadedImages}
+            placeholder="补充问题背景和细节（可选）"
+            value={content}
           />
         </ScrollView>
-
-        <View
-          className="flex-row px-5 py-3"
-          style={{
-            paddingBottom: insets.bottom + 20,
-            borderTopWidth: 0.5,
-            borderTopColor: borderCol,
-          }}
-        >
-          {[
-            { icon: 'pricetag-outline', label: '话题' },
-            { icon: 'person-add-outline', label: '邀请' },
-            { icon: 'shield-checkmark-outline', label: '匿名' },
-          ].map((tool) => (
-            <Pressable key={tool.icon} className="flex-row items-center mr-6">
-              <Ionicons name={tool.icon as any} size={24} color={tintColor} />
-              <Text
-                className="text-sm ml-1 font-medium"
-                style={{ color: tintColor }}
-              >
-                {tool.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
       </KeyboardAvoidingView>
     </View>
   );

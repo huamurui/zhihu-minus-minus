@@ -14,7 +14,7 @@ import Reanimated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import client from '@/api/client';
 import { getAnswer } from '@/api/zhihu';
-import { addReadHistory } from '@/api/zhihu/history';
+import { recordReadHistory } from '@/api/zhihu/history';
 import { AnswerDetailView } from '@/components/AnswerDetailView';
 import { BouncyButton } from '@/components/BouncyButton';
 import { ShareMenu } from '@/components/ShareMenu';
@@ -58,7 +58,7 @@ export default function AnswerDetailScreen() {
 
   useEffect(() => {
     if (enableBrowseHistory && initialId) {
-      addReadHistory({ content_token: initialId, content_type: 'answer' });
+      recordReadHistory({ content_token: initialId, content_type: 'answer' });
       recordedIds.current.add(initialId);
     }
   }, [enableBrowseHistory, initialId]);
@@ -182,7 +182,7 @@ export default function AnswerDetailScreen() {
       currentId &&
       !recordedIds.current.has(currentId)
     ) {
-      addReadHistory({ content_token: currentId, content_type: 'answer' });
+      recordReadHistory({ content_token: currentId, content_type: 'answer' });
       recordedIds.current.add(currentId);
     }
   }, [enableBrowseHistory, currentId]);
@@ -212,6 +212,7 @@ export default function AnswerDetailScreen() {
   if (loadingInitial && !initialAnswer) {
     return (
       <View className="flex-1 justify-center items-center">
+        <Stack.Screen options={{ headerShown: false, title: '回答' }} />
         <ActivityIndicator color={primaryColor} />
       </View>
     );
@@ -219,7 +220,7 @@ export default function AnswerDetailScreen() {
 
   return (
     <View className="flex-1">
-      <Stack.Screen options={{ headerShown: false }} />
+      <Stack.Screen options={{ headerShown: false, title: '回答' }} />
 
       {/* Header Bar */}
       <View

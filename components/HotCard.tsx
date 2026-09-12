@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import React, { useMemo } from 'react';
 import Animated, { SharedTransition } from 'react-native-reanimated';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -28,7 +29,7 @@ export interface HotItem {
   } | null;
 }
 
-export const HotCard = ({ item }: { item: HotItem }) => {
+const HotCardComponent = ({ item }: { item: HotItem }) => {
   const router = useRouter();
   const { cookies } = useAuthStore();
   const colorScheme = useColorScheme();
@@ -55,6 +56,10 @@ export const HotCard = ({ item }: { item: HotItem }) => {
     colorScheme === 'dark'
       ? item.labelArea?.night_color || colors.light.hotLabel
       : item.labelArea?.normal_color || colors.light.hotLabel;
+  const imageSource = useMemo(
+    () => (item.image ? { uri: item.image } : undefined),
+    [item.image],
+  );
 
   return (
     <BouncyButton
@@ -81,11 +86,6 @@ export const HotCard = ({ item }: { item: HotItem }) => {
       style={{
         backgroundColor: Colors[colorScheme].backgroundSecondary,
         borderRadius: 14,
-        shadowColor: colors[colorScheme].cardShadow,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 1,
-        shadowRadius: 10,
-        elevation: 3,
       }}
       className="p-4 mb-3 mx-4 "
     >
@@ -118,7 +118,7 @@ export const HotCard = ({ item }: { item: HotItem }) => {
           {item.image && (
             <View className="justify-center bg-transparent ml-auto">
               <Animated.Image
-                source={{ uri: item.image }}
+                source={imageSource}
                 className="w-[100px] h-[90px] rounded-[10px]"
                 sharedTransitionTag={`image-${item.id}`}
                 style={{
@@ -185,3 +185,23 @@ export const HotCard = ({ item }: { item: HotItem }) => {
     </BouncyButton>
   );
 };
+
+export const HotCard = React.memo(
+  HotCardComponent,
+  (previous, next) =>
+    previous.item.id === next.item.id &&
+    previous.item.questionId === next.item.questionId &&
+    previous.item.title === next.item.title &&
+    previous.item.excerpt === next.item.excerpt &&
+    previous.item.image === next.item.image &&
+    previous.item.hotValue === next.item.hotValue &&
+    previous.item.rank === next.item.rank &&
+    previous.item.answerCount === next.item.answerCount &&
+    previous.item.labelArea?.type === next.item.labelArea?.type &&
+    previous.item.labelArea?.text === next.item.labelArea?.text &&
+    previous.item.labelArea?.trend === next.item.labelArea?.trend &&
+    previous.item.labelArea?.normal_color ===
+      next.item.labelArea?.normal_color &&
+    previous.item.labelArea?.night_color === next.item.labelArea?.night_color,
+);
+HotCard.displayName = 'HotCard';

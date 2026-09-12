@@ -11,7 +11,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Keyboard,
   Platform,
   StyleSheet,
@@ -41,6 +40,7 @@ import {
 } from '@/components/CommentComposer';
 import { CommentContent } from '@/components/CommentContent';
 import { LikeButton } from '@/components/LikeButton';
+import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -276,8 +276,8 @@ export default function ReplyDetailScreen() {
             }
             style={{ borderRadius: 16 }}
           >
-            <Image
-              source={{ uri: item.author.member.avatar_url }}
+            <StableAvatar
+              uri={item.author.member.avatar_url}
               className="w-8 h-8 rounded-full"
             />
           </BouncyButton>
@@ -399,8 +399,8 @@ export default function ReplyDetailScreen() {
             }
             style={{ borderRadius: 18 }}
           >
-            <Image
-              source={{ uri: parentComment.author.member.avatar_url }}
+            <StableAvatar
+              uri={parentComment.author.member.avatar_url}
               className="w-8 h-8 rounded-full"
             />
           </BouncyButton>
