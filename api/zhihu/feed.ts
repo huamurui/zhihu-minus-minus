@@ -1,7 +1,13 @@
+import axios, { type AxiosResponse } from 'axios';
 import type { ReactNode } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
-import apiClient from '../client';
+import apiClient, { type ApiRequestOptions } from '../client';
+import {
+  buildZhihuAppMomentsUrl,
+  buildZhihuAppRecommendUrl,
+  getZhihuAppEndpointHeaders,
+} from './appApi';
 
 export interface FeedAuthor {
   id: string;
@@ -338,6 +344,8 @@ export interface FeedItem {
   // —— 本地过滤所需的结构化信号（实测推荐流可用字段，见 utils/feedFilter.ts）——
   /** `answer_type === 'PAID'` 或 `paid_info != null` 即知乎盐选付费内容 */
   answerType?: string;
+  /** 推荐流正文是否被截断；被截断的正文不能作为详情缓存 */
+  contentNeedTruncated?: boolean;
   /** 推广/利益声明标记，话题流返回、推荐流通常不返回 */
   isLabeled?: boolean;
   /** author.is_org —— 机构号 */
@@ -561,18 +569,65 @@ export const FEED_URLS = {
   hot: 'https://www.zhihu.com/api/v3/feed/topstory/hot-lists/total?limit=50',
 } as const;
 
-export const getFeed = async (url: string): Promise<ZhihuFeedResponse> => {
+export interface RecommendRequestOptions {
+  includeDesktop: boolean;
+  includeAdInterval: boolean;
+  adInterval: number;
+}
+
+const RECOMMEND_FEED_PATH = '/api/v3/feed/topstory/recommend';
+
+/**
+ * Apply the optional recommendation query parameters to every recommendation
+ * page, including URLs returned by paging.next. Existing session_token values
+ * are intentionally preserved but are never generated or hardcoded here.
+ */
+export function buildRecommendRequestUrl(
+  url: string,
+  options: RecommendRequestOptions,
+): string {
+  if (!url.includes(RECOMMEND_FEED_PATH)) return url;
+
+  try {
+    const parsedUrl = new URL(url);
+    if (options.includeDesktop) {
+      parsedUrl.searchParams.set('desktop', 'true');
+    } else {
+      parsedUrl.searchParams.delete('desktop');
+    }
+    if (options.includeAdInterval) {
+      parsedUrl.searchParams.set('ad_interval', String(options.adInterval));
+    } else {
+      parsedUrl.searchParams.delete('ad_interval');
+    }
+    return parsedUrl.toString();
+  } catch {
+    return url;
+  }
+}
+
+export const getFeed = async (
+  url: string,
+  options: ApiRequestOptions = {},
+): Promise<ZhihuFeedResponse> => {
   let finalUrl = url;
   const { cookies } = useAuthStore.getState();
   const isRefreshRequest = url.includes('action=up') || url.includes('t=');
+  let appRecommendFallbackEligible = false;
 
-  // 如果未登录且请求的是推荐页初始接口，则切换为游客接口
-  if (!cookies && url.includes('feed/topstory/recommend')) {
-    finalUrl =
-      'https://www.zhihu.com/api/v3/explore/guest/feeds?limit=15&ws_qiangzhisafe=0';
-    if (isRefreshRequest) {
-      finalUrl += `&t=${Date.now()}`;
-    }
+  // 未登录时使用官方客户端的设备匿名态接口。翻页 URL 由接口返回，
+  // 因而这里只转换 Web 入口 URL，不覆盖服务端下发的 session_token 等状态。
+  if (!cookies && finalUrl.includes('/api/v3/feed/topstory/recommend')) {
+    appRecommendFallbackEligible = true;
+    finalUrl = buildZhihuAppRecommendUrl({
+      action: isRefreshRequest ? 'up' : 'down',
+      refresh_scene: isRefreshRequest ? 1 : 0,
+      is_feed_first_request: isRefreshRequest ? 0 : 1,
+    });
+  } else if (!cookies && finalUrl.includes('/api/v3/moments')) {
+    finalUrl = buildZhihuAppMomentsUrl('timeline', {
+      action: isRefreshRequest ? 'up' : 'down',
+    });
   }
 
   if (url === 'zhihu://local-feed') {
@@ -580,7 +635,9 @@ export const getFeed = async (url: string): Promise<ZhihuFeedResponse> => {
     try {
       const sectionsRes = await apiClient.get<{
         data?: Array<{ section_id?: string; section_name?: string }>;
-      }>('https://api.zhihu.com/feed-root/sections/query/v2');
+      }>('https://api.zhihu.com/feed-root/sections/query/v2', {
+        signal: options.signal,
+      });
       const sections = sectionsRes.data?.data || [];
       const localSection = sections.find(
         (section) =>
@@ -597,7 +654,8 @@ export const getFeed = async (url: string): Promise<ZhihuFeedResponse> => {
       } else {
         throw new Error('未找到同城版块');
       }
-    } catch {
+    } catch (error) {
+      if (axios.isCancel(error)) throw error;
       console.warn('获取同城版块失败，回退到推荐流');
       finalUrl = FEED_URLS.recommend;
     }
@@ -608,7 +666,38 @@ export const getFeed = async (url: string): Promise<ZhihuFeedResponse> => {
     );
   }
 
-  const res = await apiClient.get<ZhihuFeedResponse>(finalUrl);
+  if (cookies) {
+    const {
+      recommendRequestIncludeDesktop,
+      recommendRequestIncludeAdInterval,
+      recommendRequestAdInterval,
+    } = useSettingsStore.getState();
+    finalUrl = buildRecommendRequestUrl(finalUrl, {
+      includeDesktop: recommendRequestIncludeDesktop,
+      includeAdInterval: recommendRequestIncludeAdInterval,
+      adInterval: recommendRequestAdInterval,
+    });
+  }
+
+  let res: AxiosResponse<ZhihuFeedResponse>;
+  try {
+    res = await apiClient.get<ZhihuFeedResponse>(finalUrl, {
+      headers: getZhihuAppEndpointHeaders(finalUrl),
+      signal: options.signal,
+    });
+  } catch (error) {
+    if (axios.isCancel(error)) throw error;
+    // Some installs may not yet have all device credentials that the App
+    // endpoint expects. Keep the previous browser guest feed as a
+    // compatibility fallback instead of leaving a first-time user with no feed.
+    if (!appRecommendFallbackEligible) throw error;
+    let fallbackUrl =
+      'https://www.zhihu.com/api/v3/explore/guest/feeds?limit=15&ws_qiangzhisafe=0';
+    if (isRefreshRequest) fallbackUrl += `&t=${Date.now()}`;
+    res = await apiClient.get<ZhihuFeedResponse>(fallbackUrl, {
+      signal: options.signal,
+    });
+  }
 
   if (url.startsWith('zhihu://local-feed')) {
     // Override the next URL to use our custom scheme so we can intercept it again

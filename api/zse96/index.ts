@@ -1,5 +1,8 @@
 import { getSignaturePurity } from './zse_purity';
 
+export { hmacSha1Hex } from './hmac';
+export { encryptZseV4 } from './zse_purity';
+
 export const ZSE_VERSION = '101_3_3.0';
 
 /**

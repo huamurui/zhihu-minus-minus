@@ -14,6 +14,8 @@ import {
 import { getSearchSuggest, searchContent } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
 import { FeedCard } from '@/components/FeedCard';
+import { BottomSheet } from '@/components/overlays/BottomSheet';
+import { QueryErrorView } from '@/components/QueryErrorView';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { UserCard } from '@/components/UserCard';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -25,6 +27,29 @@ function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+const SEARCH_CONTENT_FILTERS = [
+  { label: '全部', value: undefined },
+  { label: '回答', value: 'answer' as const },
+  { label: '文章', value: 'article' as const },
+  { label: '视频', value: 'zvideo' as const },
+];
+
+const SEARCH_SORT_FILTERS = [
+  { label: '综合', value: undefined },
+  { label: '最新发布', value: 'created_time' as const },
+  { label: '最多赞同', value: 'upvoted_count' as const },
+];
+
+const SEARCH_TIME_FILTERS = [
+  { label: '不限时间', value: undefined },
+  { label: '一天内', value: 'a_day' as const },
+  { label: '一周内', value: 'a_week' as const },
+  { label: '一个月内', value: 'a_month' as const },
+  { label: '三个月内', value: 'three_months' as const },
+  { label: '半年内', value: 'half_a_year' as const },
+  { label: '一年内', value: 'a_year' as const },
+];
+
 export default function SearchScreen() {
   const colorScheme = useColorScheme();
   const router = useRouter();
@@ -33,7 +58,23 @@ export default function SearchScreen() {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [searchType, setSearchType] = useState('general');
+  const [contentFilter, setContentFilter] = useState<
+    'answer' | 'article' | 'zvideo' | undefined
+  >();
+  const [sortFilter, setSortFilter] = useState<
+    'created_time' | 'upvoted_count' | undefined
+  >();
+  const [timeFilter, setTimeFilter] = useState<
+    | 'a_day'
+    | 'a_week'
+    | 'a_month'
+    | 'three_months'
+    | 'half_a_year'
+    | 'a_year'
+    | undefined
+  >();
   const [isSearching, setIsSearching] = useState(false);
+  const [filterSheetVisible, setFilterSheetVisible] = useState(false);
 
   const { history, addHistory, clearHistory, removeHistory } = useSearchStore();
 
@@ -43,6 +84,31 @@ export default function SearchScreen() {
   const textColor = useThemeColor({}, 'text');
   const borderColor = useThemeColor({}, 'border');
 
+  const activeFilterCount =
+    Number(contentFilter !== undefined) +
+    Number(sortFilter !== undefined) +
+    Number(timeFilter !== undefined);
+
+  const activeFilterLabels = [
+    contentFilter
+      ? `类型：${SEARCH_CONTENT_FILTERS.find((item) => item.value === contentFilter)?.label}`
+      : null,
+    sortFilter
+      ? `排序：${SEARCH_SORT_FILTERS.find((item) => item.value === sortFilter)?.label}`
+      : null,
+    timeFilter
+      ? `时间：${SEARCH_TIME_FILTERS.find((item) => item.value === timeFilter)?.label}`
+      : null,
+  ].filter((label): label is string => Boolean(label));
+  const emptyStateIcon =
+    activeFilterCount > 0 ? 'options-outline' : 'search-outline';
+
+  const clearFilters = () => {
+    setContentFilter(undefined);
+    setSortFilter(undefined);
+    setTimeFilter(undefined);
+  };
+
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedQuery(query), 300);
     return () => clearTimeout(handler);
@@ -50,7 +116,7 @@ export default function SearchScreen() {
 
   const { data: suggestions } = useQuery({
     queryKey: ['search-suggest', debouncedQuery],
-    queryFn: () => getSearchSuggest(debouncedQuery),
+    queryFn: ({ signal }) => getSearchSuggest(debouncedQuery, { signal }),
     enabled: debouncedQuery.length > 0 && !isSearching,
   });
 
@@ -60,10 +126,24 @@ export default function SearchScreen() {
     hasNextPage,
     isFetchingNextPage,
     isLoading,
+    isError,
+    refetch,
   } = useInfiniteQuery({
-    queryKey: ['search-results', debouncedQuery, searchType],
-    queryFn: ({ pageParam = 0 }) =>
-      searchContent(debouncedQuery, pageParam as number, 20, searchType),
+    queryKey: [
+      'search-results',
+      debouncedQuery,
+      searchType,
+      contentFilter,
+      sortFilter,
+      timeFilter,
+    ],
+    queryFn: ({ pageParam = 0, signal }) =>
+      searchContent(debouncedQuery, pageParam as number, 20, searchType, {
+        vertical: searchType === 'general' ? contentFilter : undefined,
+        sort: searchType === 'general' ? sortFilter : undefined,
+        time_interval: searchType === 'general' ? timeFilter : undefined,
+        signal,
+      }),
     enabled: isSearching && debouncedQuery.length > 0,
     initialPageParam: 0,
     getNextPageParam: (lastPage) => {
@@ -244,9 +324,58 @@ export default function SearchScreen() {
     </View>
   );
 
+  const FilterRow = ({
+    title,
+    options,
+    selected,
+    onSelect,
+  }: {
+    title: string;
+    options: ReadonlyArray<{ label: string; value: string | undefined }>;
+    selected: string | undefined;
+    onSelect: (value: string | undefined) => void;
+  }) => (
+    <View className="flex-row items-center mb-2">
+      <Text type="secondary" className="w-[58px] text-xs">
+        {title}
+      </Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingRight: 15 }}
+      >
+        {options.map((option) => {
+          const active = option.value === selected;
+          return (
+            <BouncyButton
+              key={option.value ?? 'all'}
+              onPress={() => onSelect(option.value)}
+              className="mr-2 px-3 py-1 rounded-full"
+              style={{
+                backgroundColor: active
+                  ? Colors[colorScheme].primaryTransparent
+                  : surfaceColor,
+              }}
+            >
+              <Text
+                className="text-xs"
+                style={{
+                  color: active ? tintColor : textColor,
+                  fontWeight: active ? '600' : '400',
+                }}
+              >
+                {option.label}
+              </Text>
+            </BouncyButton>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+
   return (
     <View className="flex-1">
-      <Stack.Screen options={{ headerShown: false }} />
+      <Stack.Screen options={{ headerShown: false, title: '搜索' }} />
 
       {/* Header */}
       <View className="pt-[45px] pb-2.5 px-[5px]" style={{ backgroundColor }}>
@@ -317,6 +446,182 @@ export default function SearchScreen() {
 
       {isSearching && <SearchTabs />}
 
+      {isSearching && searchType === 'general' && (
+        <View
+          className="flex-row items-center px-[15px] py-2"
+          style={{
+            backgroundColor,
+            borderBottomWidth: StyleSheet.hairlineWidth,
+            borderBottomColor: borderColor,
+          }}
+        >
+          <BouncyButton
+            className="flex-row items-center px-3 py-1.5 rounded-full"
+            style={{ backgroundColor: surfaceColor }}
+            onPress={() => setFilterSheetVisible(true)}
+          >
+            <Ionicons
+              name="options-outline"
+              size={15}
+              color={activeFilterCount > 0 ? tintColor : textColor}
+            />
+            <Text
+              className="ml-1.5 text-xs"
+              style={{
+                color: activeFilterCount > 0 ? tintColor : textColor,
+                fontWeight: '600',
+              }}
+            >
+              筛选
+            </Text>
+            {activeFilterCount > 0 ? (
+              <View
+                className="ml-1.5 min-w-[17px] h-[17px] rounded-full items-center justify-center"
+                style={{ backgroundColor: tintColor }}
+              >
+                <Text className="text-[10px] text-white font-bold">
+                  {activeFilterCount}
+                </Text>
+              </View>
+            ) : null}
+          </BouncyButton>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            className="flex-1 ml-2"
+            contentContainerStyle={{ paddingRight: 4 }}
+          >
+            {activeFilterLabels.length > 0 ? (
+              activeFilterLabels.map((label) => (
+                <BouncyButton
+                  key={label}
+                  className="flex-row items-center px-2.5 py-1 rounded-full mr-1.5"
+                  style={{
+                    backgroundColor: Colors[colorScheme].primaryTransparent,
+                  }}
+                  onPress={() => setFilterSheetVisible(true)}
+                >
+                  <Text
+                    className="text-xs"
+                    style={{ color: tintColor }}
+                    numberOfLines={1}
+                  >
+                    {label}
+                  </Text>
+                  <Ionicons
+                    name="chevron-down"
+                    size={12}
+                    color={tintColor}
+                    style={{ marginLeft: 3 }}
+                  />
+                </BouncyButton>
+              ))
+            ) : (
+              <Text type="tertiary" className="text-xs ml-1 py-1">
+                综合结果
+              </Text>
+            )}
+          </ScrollView>
+
+          {activeFilterCount > 0 ? (
+            <BouncyButton className="ml-1 px-1" onPress={clearFilters}>
+              <Text type="secondary" className="text-xs">
+                重置
+              </Text>
+            </BouncyButton>
+          ) : null}
+        </View>
+      )}
+
+      <BottomSheet
+        visible={filterSheetVisible}
+        onClose={() => setFilterSheetVisible(false)}
+        title="筛选搜索结果"
+        subtitle={
+          activeFilterCount > 0
+            ? `已选择 ${activeFilterCount} 项`
+            : '按你的阅读目标调整结果'
+        }
+        height="58%"
+      >
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: 15, paddingVertical: 12 }}
+          showsVerticalScrollIndicator={false}
+        >
+          <FilterRow
+            title="类型"
+            options={SEARCH_CONTENT_FILTERS}
+            selected={contentFilter}
+            onSelect={(value) =>
+              setContentFilter(
+                value as 'answer' | 'article' | 'zvideo' | undefined,
+              )
+            }
+          />
+          <FilterRow
+            title="排序"
+            options={SEARCH_SORT_FILTERS}
+            selected={sortFilter}
+            onSelect={(value) =>
+              setSortFilter(
+                value as 'created_time' | 'upvoted_count' | undefined,
+              )
+            }
+          />
+          <FilterRow
+            title="时间"
+            options={SEARCH_TIME_FILTERS}
+            selected={timeFilter}
+            onSelect={(value) =>
+              setTimeFilter(
+                value as
+                  | 'a_day'
+                  | 'a_week'
+                  | 'a_month'
+                  | 'three_months'
+                  | 'half_a_year'
+                  | 'a_year'
+                  | undefined,
+              )
+            }
+          />
+          <View className="flex-row items-center mt-3">
+            <BouncyButton
+              className="flex-1 items-center py-2.5 rounded-xl mr-2"
+              style={{ backgroundColor: surfaceColor }}
+              onPress={clearFilters}
+            >
+              <Text type="secondary" className="text-sm font-semibold">
+                清除条件
+              </Text>
+            </BouncyButton>
+            <BouncyButton
+              className="flex-1 items-center py-2.5 rounded-xl"
+              style={{ backgroundColor: tintColor }}
+              onPress={() => setFilterSheetVisible(false)}
+            >
+              <Text className="text-sm font-semibold text-white">完成</Text>
+            </BouncyButton>
+          </View>
+        </ScrollView>
+      </BottomSheet>
+
+      {isSearching && flattenedResults.length > 0 ? (
+        <View
+          className="flex-row items-center px-[15px] py-2"
+          style={{ backgroundColor }}
+        >
+          <Text type="secondary" className="text-xs">
+            “{debouncedQuery}”的结果
+          </Text>
+          <View className="flex-1" />
+          <Text type="tertiary" className="text-xs">
+            已加载 {flattenedResults.length} 条
+          </Text>
+        </View>
+      ) : null}
+
       {!isSearching &&
       suggestions?.suggest &&
       suggestions.suggest.length > 0 ? (
@@ -356,15 +661,45 @@ export default function SearchScreen() {
           }}
           {...({
             estimatedItemSize: searchType === 'people' ? 80 : 150,
+            contentContainerStyle: { paddingTop: 4, paddingBottom: 18 },
             onEndReached: () =>
               hasNextPage && !isFetchingNextPage && fetchNextPage(),
             onEndReachedThreshold: 0.5,
             ListFooterComponent: isFetchingNextPage ? (
               <ActivityIndicator style={{ padding: 20 }} color={tintColor} />
             ) : null,
-            ListEmptyComponent: !isLoading ? (
-              <View className="flex-1 justify-center items-center">
-                <Text type="secondary">没有找到相关内容</Text>
+            ListEmptyComponent: isError ? (
+              <QueryErrorView
+                message="搜索失败"
+                onRetry={() => void refetch()}
+              />
+            ) : !isLoading ? (
+              <View className="flex-1 items-center justify-center px-10 py-24">
+                <Ionicons
+                  name={emptyStateIcon}
+                  size={38}
+                  color={Colors[colorScheme].textTertiary}
+                />
+                <Text className="mt-3 text-base font-semibold">
+                  没有找到相关内容
+                </Text>
+                <Text
+                  type="secondary"
+                  className="mt-1 text-center text-sm leading-5"
+                >
+                  {activeFilterCount > 0
+                    ? '可以放宽筛选条件，或者换一个关键词试试'
+                    : '可以换一个关键词，或者试试更具体的描述'}
+                </Text>
+                {activeFilterCount > 0 ? (
+                  <BouncyButton
+                    className="mt-4 px-4 py-2 rounded-full"
+                    style={{ backgroundColor: surfaceColor }}
+                    onPress={clearFilters}
+                  >
+                    <Text style={{ color: tintColor }}>清除筛选</Text>
+                  </BouncyButton>
+                ) : null}
               </View>
             ) : (
               <ActivityIndicator style={{ marginTop: 50 }} color={tintColor} />

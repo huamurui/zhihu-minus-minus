@@ -66,6 +66,11 @@ test('uses the same canonical cache keys as detail screens', () => {
   ]);
   assert.deepEqual(getRichContentQueryKey('pins', '3'), ['pin-detail', '3']);
   assert.deepEqual(getRichContentQueryKey('questions', '4'), ['question', '4']);
+  assert.deepEqual(getRichContentQueryKey('questions', '4', true), [
+    'question',
+    '4',
+    true,
+  ]);
 });
 
 test('prefetches at most the immediate pager neighbors', () => {

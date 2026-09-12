@@ -18,6 +18,7 @@ import {
   View as RNView,
   StyleSheet,
   useWindowDimensions,
+  type ViewStyle,
 } from 'react-native';
 import RenderHtml, {
   type CustomBlockRenderer,
@@ -267,11 +268,6 @@ export const LinkCard: React.FC<{
               backgroundColor: surfaceColor,
               borderWidth: StyleSheet.hairlineWidth,
               borderColor: cardBorderColor,
-              shadowColor: cardShadowColor,
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.05,
-              shadowRadius: 4,
-              elevation: 2,
             },
           ]}
         >
@@ -392,6 +388,7 @@ const P_Renderer: CustomBlockRenderer = ({ TDefaultRenderer, ...props }) => {
   const { tnode } = props;
   const rendererProps = useRendererProps('p');
   const textColor = useThemeColor({}, 'text');
+  const textSecondaryColor = useThemeColor({}, 'textSecondary');
   const lightPrimaryColor = useThemeColor({}, 'primary_60');
 
   if (!rendererProps) return <TDefaultRenderer {...props} />;
@@ -402,6 +399,17 @@ const P_Renderer: CustomBlockRenderer = ({ TDefaultRenderer, ...props }) => {
     fontSizeScale = 1.0,
     lineHeightScale = 1.5,
   } = rendererProps as any;
+  const isBlockquoteParagraph = tnode.parent?.tagName === 'blockquote';
+  const paragraphTextColor = isBlockquoteParagraph
+    ? textSecondaryColor
+    : textColor;
+  const blockquoteParagraphStyle = isBlockquoteParagraph
+    ? {
+        color: textSecondaryColor,
+        fontSize: 17 * fontSizeScale,
+        lineHeight: 17 * lineHeightScale,
+      }
+    : undefined;
 
   const pid = tnode.attributes['data-pid'];
   const segment = pid ? segmentMap.get(pid) : null;
@@ -410,7 +418,12 @@ const P_Renderer: CustomBlockRenderer = ({ TDefaultRenderer, ...props }) => {
   const hasAnyInteraction = slices.some((s) => s.interaction);
 
   if (!hasAnyInteraction) {
-    return <TDefaultRenderer {...props} />;
+    return (
+      <TDefaultRenderer
+        {...props}
+        style={[props.style, blockquoteParagraphStyle as unknown as ViewStyle]}
+      />
+    );
   }
 
   const textFontSize = typography.fontSize.subtitle * fontSizeScale;
@@ -421,7 +434,7 @@ const P_Renderer: CustomBlockRenderer = ({ TDefaultRenderer, ...props }) => {
       style={[
         props.style as any,
         {
-          color: textColor,
+          color: paragraphTextColor,
           fontSize: textFontSize,
           lineHeight: textLineHeight,
           marginBottom: 14,
@@ -437,7 +450,7 @@ const P_Renderer: CustomBlockRenderer = ({ TDefaultRenderer, ...props }) => {
               key={idx}
               onPress={() => onPress(pid, segment, slice.interaction)}
               style={{
-                color: textColor,
+                color: paragraphTextColor,
                 fontSize: textFontSize,
                 lineHeight: textLineHeight,
                 textDecorationLine: 'underline',
@@ -454,7 +467,7 @@ const P_Renderer: CustomBlockRenderer = ({ TDefaultRenderer, ...props }) => {
             // biome-ignore lint/suspicious/noArrayIndexKey: 同上,与相邻分支共用一次 slices.map。
             key={idx}
             style={{
-              color: textColor,
+              color: paragraphTextColor,
               fontSize: textFontSize,
               lineHeight: textLineHeight,
             }}
@@ -1027,12 +1040,12 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
           borderLeftColor: primaryColor,
           paddingLeft: 14,
           paddingRight: 10,
-          backgroundColor: `${surfaceColor}60`,
+          backgroundColor: 'transparent',
           paddingVertical: 10,
           marginVertical: 12,
-          borderRadius: 4,
-          color: textColor,
-          opacity: 0.85,
+          fontSize: 17 * fontSizeScale,
+          lineHeight: 17 * lineHeightScale,
+          color: textSecondaryColor,
         },
         h1: {
           color: textColor,
@@ -1096,7 +1109,6 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         textSecondaryColor,
         borderColor,
         contentBorderColor,
-        surfaceColor,
         fontSizeScale,
         lineHeightScale,
         primaryColor,
@@ -1173,6 +1185,9 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
       setViewerImage(src);
       setViewerVisible(true);
     }, []);
+    const onImageLongPressCallback = useCallback((src: string) => {
+      setActionSheetUrl(src);
+    }, []);
     const onSegmentPressCallback = useCallback(
       (pid: string) => {
         const segment = segmentMap.get(pid);
@@ -1222,6 +1237,10 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
       () => ({ backgroundColor: 'transparent', minHeight: 400 }),
       [],
     );
+    const nativeContentSource = useMemo(
+      () => ({ html: `<div>${content || ''}</div>` }),
+      [content],
+    );
 
     if (!shouldRender && !contentArray) {
       return (
@@ -1236,10 +1255,10 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         {contentArray ? (
           renderPinContent()
         ) : !useWebView || useNativeFallback || useNative ? (
-          <View className="px-1">
+          <View>
             <RenderHtml
               contentWidth={width - 40}
-              source={{ html: `<div>${content}</div>` }}
+              source={nativeContentSource}
               renderers={renderers as any}
               tagsStyles={tagsStyles as any}
               classesStyles={classesStyles as any}
@@ -1267,7 +1286,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
               colorScheme={colorScheme}
               onReady={onReadyCallback}
               onImagePress={onImagePressCallback}
-              onImageLongPress={(src) => setActionSheetUrl(src)}
+              onImageLongPress={onImageLongPressCallback}
               onLinkPress={handleInternalLink}
               onSegmentPress={onSegmentPressCallback}
               onTextSelected={
@@ -1281,6 +1300,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         <ActionSheet
           visible={modalVisible && Boolean(activeSegment)}
           onClose={() => setModalVisible(false)}
+          hapticFeedback={false}
           title="段落操作"
           subtitle={(() => {
             if (!activeSegment) return undefined;
@@ -1375,11 +1395,6 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
                 backgroundColor: surfaceColor,
                 borderWidth: StyleSheet.hairlineWidth,
                 borderColor: contentBorderColor,
-                shadowColor,
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.08,
-                shadowRadius: 8,
-                elevation: 4,
               },
             ]}
           >

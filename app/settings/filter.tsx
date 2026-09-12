@@ -1,13 +1,14 @@
 import type { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   View as RNView,
   ScrollView,
   StyleSheet,
   Switch,
+  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { FeedItem } from '@/api/zhihu';
@@ -58,8 +59,30 @@ export default function FilterSettings() {
     filterKeepUpvotedByFollowee,
     enableLocalFeedDedup,
     enableFeedCacheOnLaunch,
+    recommendRequestIncludeDesktop,
+    recommendRequestIncludeAdInterval,
+    recommendRequestAdInterval,
     updateSettings,
   } = useSettingsStore();
+  const [adIntervalText, setAdIntervalText] = useState(
+    String(recommendRequestAdInterval),
+  );
+
+  useEffect(() => {
+    setAdIntervalText(String(recommendRequestAdInterval));
+  }, [recommendRequestAdInterval]);
+
+  const commitAdInterval = () => {
+    const trimmed = adIntervalText.trim();
+    const value = Number(trimmed);
+    if (!trimmed || !Number.isSafeInteger(value)) {
+      setAdIntervalText(String(recommendRequestAdInterval));
+      showToast('ad_interval 需要填写整数');
+      return;
+    }
+    updateSettings({ recommendRequestAdInterval: value });
+    setAdIntervalText(String(value));
+  };
 
   // 实时效果条：读取已缓存的推荐流数据，本地跑一遍规则计算过滤率，
   // 不发请求。queryClient key 与 index.tsx 的 useInfiniteQuery 一致，
@@ -143,6 +166,18 @@ export default function FilterSettings() {
           paddingBottom: insets.bottom + 40,
         }}
       >
+        <RNView
+          style={[
+            styles.introCard,
+            { backgroundColor: Colors[colorScheme].backgroundSecondary },
+          ]}
+        >
+          <Text style={styles.introTitle}>推荐流设置分为两类</Text>
+          <Text type="secondary" style={styles.introText}>
+            服务端请求参数会影响知乎返回的推荐内容；本地后处理只在应用收到内容后执行，包含内容过滤、去重与启动缓存。
+          </Text>
+        </RNView>
+
         {/* 实时效果条 */}
         {enableLocalFeedFilter && stats != null && (
           <RNView
@@ -190,7 +225,7 @@ export default function FilterSettings() {
         )}
 
         {/* 启用总开关 */}
-        <Section title="内容过滤" colorScheme={colorScheme}>
+        <Section title="本地后处理 · 内容过滤" colorScheme={colorScheme}>
           <SettingItem
             label="启用内容过滤"
             icon="shield-checkmark-outline"
@@ -425,7 +460,7 @@ export default function FilterSettings() {
         )}
 
         {/* 推荐流（从「实验性功能」迁入） */}
-        <Section title="推荐流" colorScheme={colorScheme}>
+        <Section title="本地后处理 · 去重与缓存" colorScheme={colorScheme}>
           <Toggle
             label="本地 Feed 去重"
             icon="layers-outline"
@@ -478,6 +513,61 @@ export default function FilterSettings() {
             </BouncyButton>
           </SettingItem>
         </Section>
+
+        <Section title="服务端请求参数" colorScheme={colorScheme}>
+          <Toggle
+            label="发送 desktop=true"
+            icon="desktop-outline"
+            colorScheme={colorScheme}
+            value={recommendRequestIncludeDesktop}
+            onValueChange={(v) =>
+              updateSettings({ recommendRequestIncludeDesktop: v })
+            }
+            {...switchProps}
+          />
+          <Toggle
+            label="发送 ad_interval"
+            icon="options-outline"
+            colorScheme={colorScheme}
+            value={recommendRequestIncludeAdInterval}
+            onValueChange={(v) =>
+              updateSettings({ recommendRequestIncludeAdInterval: v })
+            }
+            {...switchProps}
+          />
+          {recommendRequestIncludeAdInterval && (
+            <SettingItem
+              label="ad_interval 值"
+              icon="create-outline"
+              colorScheme={colorScheme}
+            >
+              <TextInput
+                style={[
+                  styles.parameterInput,
+                  {
+                    color: Colors[colorScheme].text,
+                    borderColor: Colors[colorScheme].controlBorder,
+                    backgroundColor: Colors[colorScheme].backgroundTertiary,
+                  },
+                ]}
+                value={adIntervalText}
+                onChangeText={setAdIntervalText}
+                onBlur={commitAdInterval}
+                keyboardType="numbers-and-punctuation"
+                inputMode="numeric"
+                maxLength={12}
+                selectTextOnFocus
+                accessibilityLabel="ad_interval 值"
+              />
+            </SettingItem>
+          )}
+          <RNView style={styles.parameterNote}>
+            <Text type="secondary" style={styles.parameterNoteText}>
+              当前应用不会自动生成或硬编码
+              session_token；如果知乎的翻页地址返回该参数，会保留并继续使用。
+            </Text>
+          </RNView>
+        </Section>
       </ScrollView>
     </RNView>
   );
@@ -512,6 +602,37 @@ function Toggle({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  introCard: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 28,
+  },
+  introTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  introText: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  parameterInput: {
+    width: 92,
+    height: 38,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    textAlign: 'right',
+    fontSize: 15,
+  },
+  parameterNote: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  parameterNoteText: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
   statsCard: {
     padding: 16,
     borderRadius: 12,

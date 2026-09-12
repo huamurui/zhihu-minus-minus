@@ -18,9 +18,11 @@ import { BouncyButton } from '@/components/BouncyButton';
 import { CollectionEditorForm } from '@/components/CollectionEditorForm';
 import { ActionSheet } from '@/components/overlays/ActionSheet';
 import { BottomSheet } from '@/components/overlays/BottomSheet';
+import { QueryErrorView } from '@/components/QueryErrorView';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
+import { getZhihuErrorMessage } from '@/utils/zhihuError';
 
 interface CollectionItem {
   id: string | number;
@@ -54,6 +56,7 @@ export default function MyCollectionsScreen() {
     isFetchingNextPage,
     refetch,
     isRefetching,
+    isError,
   } = useInfiniteQuery({
     queryKey: ['my-collections'],
     queryFn: ({ pageParam = 0 }) => getMyCollections(20, pageParam as number),
@@ -72,6 +75,9 @@ export default function MyCollectionsScreen() {
       queryClient.invalidateQueries({ queryKey: ['my-collections'] });
       closeModal();
     },
+    onError: (error) => {
+      Alert.alert('创建失败', getZhihuErrorMessage(error));
+    },
   });
   const updateMutation = useMutation({
     mutationFn: (vars: {
@@ -82,11 +88,17 @@ export default function MyCollectionsScreen() {
       queryClient.invalidateQueries({ queryKey: ['my-collections'] });
       closeModal();
     },
+    onError: (error) => {
+      Alert.alert('保存失败', getZhihuErrorMessage(error));
+    },
   });
   const deleteMutation = useMutation({
     mutationFn: deleteCollection,
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ['my-collections'] }),
+    onError: (error) => {
+      Alert.alert('删除失败', getZhihuErrorMessage(error));
+    },
   });
 
   const openModal = useCallback((item?: CollectionItem) => {
@@ -233,6 +245,12 @@ export default function MyCollectionsScreen() {
           <View className="flex-1 p-[100px] items-center">
             {isLoading ? (
               <ActivityIndicator color={primaryColor} />
+            ) : isError ? (
+              <QueryErrorView
+                compact
+                message="收藏夹加载失败"
+                onRetry={() => void refetch()}
+              />
             ) : (
               <Text type="secondary">你还没有收藏夹喵</Text>
             )}

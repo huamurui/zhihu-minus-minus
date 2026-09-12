@@ -27,6 +27,8 @@ import PagerView, {
 import Animated, {
   Extrapolate,
   interpolate,
+  interpolateColor,
+  type SharedValue,
   useAnimatedStyle,
   useEvent,
   useSharedValue,
@@ -49,11 +51,13 @@ import { BouncyButton } from '@/components/BouncyButton';
 import { DailyList } from '@/components/DailyList';
 import { FeedCard } from '@/components/FeedCard';
 import { HotCard, type HotItem } from '@/components/HotCard';
+import { QueryErrorView } from '@/components/QueryErrorView';
 import { RecentMoments } from '@/components/RecentMoments';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { hasReusableAnswerDetail } from '@/features/rich-content';
+import { useCollapsibleChromeScroll } from '@/hooks/useCollapsibleChromeScroll';
 import {
   type FeedCacheContext,
   feedCacheRepository,
@@ -101,10 +105,16 @@ type FeedListItem = FeedItem | HotItem | CollapsedGroup;
 const AUTO_HIDE_NAV_TABS: readonly TabType[] = [
   'following',
   'recommend',
+  'local',
   'hot',
   'daily',
 ];
+const TOP_NAV_HEIGHT = 50;
+const BOTTOM_NAV_HEIGHT = 64;
 const AnimatedPagerView = Animated.createAnimatedComponent(PagerView);
+const AnimatedFlashList = Animated.createAnimatedComponent(
+  FlashList,
+) as typeof FlashList;
 
 function isTabType(value: string): value is TabType {
   return (TABS as readonly string[]).includes(value);
@@ -117,12 +127,6 @@ interface TabListHandle {
 
 interface FeedListHandle extends TabListHandle {
   refresh: () => void;
-}
-
-interface ScrollMotion {
-  direction: 'up' | 'down' | null;
-  directionStartOffset: number;
-  lastOffset: number;
 }
 
 // 隐藏模式下被过滤项不占行，一页内容可能所剩无几甚至为空——列表不足一屏时
@@ -178,13 +182,16 @@ export default function HomeScreen() {
 
   // 核心状态：共享滚动位置
   const scrollX = useSharedValue(initialPageIndex);
-  const chromeVisibility = useSharedValue(1);
+  const topNavOffset = useSharedValue(0);
+  const bottomNavOffset = useSharedValue(0);
   const pagerRef = useRef<PagerView>(null);
   const pageScrollHandler = useEvent<PagerViewOnPageScrollEvent>(
     (event) => {
       'worklet';
       if (event.eventName.endsWith('onPageScroll')) {
         scrollX.value = event.position + event.offset;
+        topNavOffset.value = 0;
+        bottomNavOffset.value = 0;
       }
     },
     ['onPageScroll'],
@@ -193,6 +200,7 @@ export default function HomeScreen() {
 
   const tintColor = useThemeColor({}, 'primary');
   const textColor = useThemeColor({}, 'text');
+  const secondaryTextColor = useThemeColor({}, 'textSecondary');
   const indicatorBgColor = useThemeColor({}, 'primary_26');
   const [currentPage, setCurrentPage] = useState(initialPageIndex);
   const [guestCookieReady, setGuestCookieReady] = useState(false);
@@ -238,90 +246,36 @@ export default function HomeScreen() {
     {},
   );
   const listRefs = useRef<Array<TabListHandle | null>>([]);
-  const scrollMotionRef = useRef<Record<number, ScrollMotion>>({});
-  const isChromeHiddenRef = useRef(false);
 
-  const setChromeHidden = useCallback(
-    (hidden: boolean) => {
-      if (isChromeHiddenRef.current === hidden) return;
-      isChromeHiddenRef.current = hidden;
-      chromeVisibility.value = withTiming(hidden ? 0 : 1, { duration: 180 });
-    },
-    [chromeVisibility],
-  );
+  const showChrome = useCallback(() => {
+    topNavOffset.value = 0;
+    bottomNavOffset.value = 0;
+  }, [bottomNavOffset, topNavOffset]);
 
   const handleRefreshStateChange = useCallback(
     (pageIndex: number, isRefreshing: boolean) => {
       if (isRefreshing && pageIndex === currentPage) {
-        setChromeHidden(false);
+        showChrome();
       }
       setRefreshingTabs((prev) => {
         if (prev[pageIndex] === isRefreshing) return prev;
         return { ...prev, [pageIndex]: isRefreshing };
       });
     },
-    [currentPage, setChromeHidden],
+    [currentPage, showChrome],
   );
 
   const isCurrentRefreshing = refreshingTabs[currentPage] || false;
 
-  const SCROLL_THRESHOLD_SHOW = 300;
-  const SCROLL_THRESHOLD_HIDE = 200;
-
-  const handleScrollUpdate = useCallback(
-    (pageIndex: number, offset: number) => {
+  const handleScrolledChange = useCallback(
+    (pageIndex: number, scrolled: boolean) => {
       setScrolledTabs((prev) => {
         const currentlyScrolled = prev[pageIndex] || false;
-        let nextScrolled = currentlyScrolled;
-
-        if (!currentlyScrolled && offset > SCROLL_THRESHOLD_SHOW) {
-          nextScrolled = true;
-        } else if (currentlyScrolled && offset < SCROLL_THRESHOLD_HIDE) {
-          nextScrolled = false;
-        }
-
-        if (currentlyScrolled === nextScrolled) return prev;
-        return { ...prev, [pageIndex]: nextScrolled };
+        if (currentlyScrolled === scrolled) return prev;
+        return { ...prev, [pageIndex]: scrolled };
       });
-
-      const previousMotion = scrollMotionRef.current[pageIndex] ?? {
-        direction: null,
-        directionStartOffset: offset,
-        lastOffset: offset,
-      };
-      const delta = offset - previousMotion.lastOffset;
-      const direction =
-        delta > 1 ? 'down' : delta < -1 ? 'up' : previousMotion.direction;
-
-      if (direction !== previousMotion.direction) {
-        previousMotion.direction = direction;
-        previousMotion.directionStartOffset = offset;
-      }
-      previousMotion.lastOffset = offset;
-      scrollMotionRef.current[pageIndex] = previousMotion;
-
-      if (pageIndex !== currentPage) return;
-      const currentTab = currentTabs[pageIndex];
-      if (!currentTab || !AUTO_HIDE_NAV_TABS.includes(currentTab)) {
-        setChromeHidden(false);
-        return;
-      }
-
-      if (offset <= 24) {
-        setChromeHidden(false);
-        return;
-      }
-
-      const directionDistance = Math.abs(
-        offset - previousMotion.directionStartOffset,
-      );
-      if (direction === 'down' && offset > 80 && directionDistance >= 24) {
-        setChromeHidden(true);
-      } else if (direction === 'up' && directionDistance >= 16) {
-        setChromeHidden(false);
-      }
     },
-    [currentPage, currentTabs, setChromeHidden],
+    [],
   );
 
   const handleHomeTabPress = () => {
@@ -376,33 +330,23 @@ export default function HomeScreen() {
       [0, -100],
       Extrapolate.CLAMP,
     );
-    const scrollTranslateY = interpolate(
-      chromeVisibility.value,
-      [0, 1],
-      [-80, 0],
-      Extrapolate.CLAMP,
-    );
+    const hideDistance = insets.top + TOP_NAV_HEIGHT;
+    const visibility = 1 - topNavOffset.value / hideDistance;
     return {
-      opacity: opacity * chromeVisibility.value,
-      transform: [{ translateY: translateY + scrollTranslateY }],
+      opacity: opacity * visibility,
+      transform: [{ translateY: translateY - topNavOffset.value }],
       pointerEvents:
-        scrollX.value > fadeStart + 0.5 || chromeVisibility.value < 0.5
-          ? 'none'
-          : 'auto',
+        scrollX.value > fadeStart + 0.5 || visibility <= 0 ? 'none' : 'auto',
     };
   });
 
   const bottomNavAnimStyle = useAnimatedStyle(() => {
-    const translateY = interpolate(
-      chromeVisibility.value,
-      [0, 1],
-      [96, 0],
-      Extrapolate.CLAMP,
-    );
+    const hideDistance = insets.bottom + BOTTOM_NAV_HEIGHT;
+    const visibility = 1 - bottomNavOffset.value / hideDistance;
     return {
-      opacity: chromeVisibility.value,
-      transform: [{ translateY }],
-      pointerEvents: chromeVisibility.value < 0.5 ? 'none' : 'auto',
+      opacity: visibility,
+      transform: [{ translateY: bottomNavOffset.value }],
+      pointerEvents: visibility <= 0 ? 'none' : 'auto',
     };
   });
 
@@ -477,7 +421,12 @@ export default function HomeScreen() {
     <View style={styles.container}>
       {/* 1. 顶部 Tab 导航 (Home 专属) */}
       <Animated.View
-        style={[styles.topNavContainer, { top: insets.top }, topNavAnimStyle]}
+        style={[
+          styles.topNavContainer,
+          colorScheme === 'light' && styles.lightTranslucentShadow,
+          { top: insets.top },
+          topNavAnimStyle,
+        ]}
       >
         <BlurView
           intensity={100}
@@ -528,17 +477,13 @@ export default function HomeScreen() {
                         { width: 54, paddingHorizontal: 0 },
                       ]}
                     >
-                      <Text
-                        style={[
-                          styles.navText,
-                          currentPage === index && {
-                            color: tintColor,
-                          },
-                        ]}
-                        type={currentPage === index ? 'default' : 'secondary'}
-                      >
-                        {labels[tab]}
-                      </Text>
+                      <TopTabLabel
+                        index={index}
+                        label={labels[tab]}
+                        scrollX={scrollX}
+                        activeColor={tintColor}
+                        inactiveColor={secondaryTextColor}
+                      />
                     </BouncyButton>
                   );
                 })}
@@ -561,7 +506,7 @@ export default function HomeScreen() {
         initialPage={initialPageIndex}
         onPageScroll={pageScrollHandler}
         onPageSelected={(e) => {
-          setChromeHidden(false);
+          showChrome();
           setCurrentPage(e.nativeEvent.position);
         }}
       >
@@ -575,7 +520,15 @@ export default function HomeScreen() {
                     listRefs.current[idx] = element;
                   }}
                   insets={insets}
-                  onScroll={(offset) => handleScrollUpdate(idx, offset)}
+                  chrome={{
+                    enabled: isFocused && currentPage === idx,
+                    topOffset: topNavOffset,
+                    bottomOffset: bottomNavOffset,
+                    topHideDistance: insets.top + TOP_NAV_HEIGHT,
+                    bottomHideDistance: insets.bottom + BOTTOM_NAV_HEIGHT,
+                    onScrolledChange: (scrolled) =>
+                      handleScrolledChange(idx, scrolled),
+                  }}
                   onRefreshStateChange={(isRefreshing) =>
                     handleRefreshStateChange(idx, isRefreshing)
                   }
@@ -584,18 +537,6 @@ export default function HomeScreen() {
                 <PublishScreen />
               ) : tab === 'profile' ? (
                 <ProfileScreen isActive={isFocused && currentPage === idx} />
-              ) : !cookies && tab === 'following' ? (
-                <View style={styles.loginPrompt}>
-                  <Text style={styles.loginText} type="secondary">
-                    登录后才能看此栏目哦
-                  </Text>
-                  <BouncyButton
-                    style={[styles.loginBtn, { backgroundColor: tintColor }]}
-                    onPress={() => router.push('/login')}
-                  >
-                    <Text style={styles.loginBtnText}>去登录</Text>
-                  </BouncyButton>
-                </View>
               ) : (
                 <FeedList
                   ref={(element) => {
@@ -605,7 +546,13 @@ export default function HomeScreen() {
                   isActive={isFocused && currentPage === idx}
                   insets={insets}
                   guestCookieReady={guestCookieReady}
-                  onScroll={(offset) => handleScrollUpdate(idx, offset)}
+                  topNavOffset={topNavOffset}
+                  bottomNavOffset={bottomNavOffset}
+                  topHideDistance={insets.top + TOP_NAV_HEIGHT}
+                  bottomHideDistance={insets.bottom + BOTTOM_NAV_HEIGHT}
+                  onScrolledChange={(scrolled) =>
+                    handleScrolledChange(idx, scrolled)
+                  }
                   onRefreshStateChange={(isRefreshing) =>
                     handleRefreshStateChange(idx, isRefreshing)
                   }
@@ -620,6 +567,7 @@ export default function HomeScreen() {
       <Animated.View
         style={[
           styles.bottomBarContainer,
+          colorScheme === 'light' && styles.lightTranslucentShadow,
           { bottom: insets.bottom, width: containerWidth },
           bottomNavAnimStyle,
         ]}
@@ -756,6 +704,37 @@ export default function HomeScreen() {
   );
 }
 
+function TopTabLabel({
+  index,
+  label,
+  scrollX,
+  activeColor,
+  inactiveColor,
+}: {
+  index: number;
+  label: string;
+  scrollX: SharedValue<number>;
+  activeColor: string;
+  inactiveColor: string;
+}) {
+  const animatedStyle = useAnimatedStyle(() => {
+    const distanceFromSelection = Math.min(1, Math.abs(scrollX.value - index));
+    return {
+      color: interpolateColor(
+        distanceFromSelection,
+        [0, 1],
+        [activeColor, inactiveColor],
+      ),
+    };
+  });
+
+  return (
+    <Animated.Text style={[styles.navText, animatedStyle]}>
+      {label}
+    </Animated.Text>
+  );
+}
+
 const _AnimatedIcon = Animated.createAnimatedComponent(Ionicons);
 
 function BottomTabIcon({
@@ -823,12 +802,27 @@ const FeedList = React.forwardRef<
     isActive: boolean;
     insets: EdgeInsets;
     guestCookieReady: boolean;
-    onScroll?: (offset: number) => void;
+    topNavOffset: SharedValue<number>;
+    bottomNavOffset: SharedValue<number>;
+    topHideDistance: number;
+    bottomHideDistance: number;
+    onScrolledChange?: (scrolled: boolean) => void;
     onRefreshStateChange?: (isRefreshing: boolean) => void;
   }
 >(
   (
-    { tab, isActive, insets, guestCookieReady, onScroll, onRefreshStateChange },
+    {
+      tab,
+      isActive,
+      insets,
+      guestCookieReady,
+      topNavOffset,
+      bottomNavOffset,
+      topHideDistance,
+      bottomHideDistance,
+      onScrolledChange,
+      onRefreshStateChange,
+    },
     ref,
   ) => {
     const queryClient = useQueryClient();
@@ -836,6 +830,9 @@ const FeedList = React.forwardRef<
     const {
       enableLocalFeedDedup,
       enableFeedCacheOnLaunch,
+      recommendRequestIncludeDesktop,
+      recommendRequestIncludeAdInterval,
+      recommendRequestAdInterval,
       enableLocalFeedFilter,
       filterMode,
       filterShowReason,
@@ -1030,67 +1027,83 @@ const FeedList = React.forwardRef<
         }
       },
     ).current;
+    const recommendationRequestKey = useMemo(
+      () =>
+        tab === 'recommend'
+          ? {
+              includeDesktop: recommendRequestIncludeDesktop,
+              includeAdInterval: recommendRequestIncludeAdInterval,
+              adInterval: recommendRequestAdInterval,
+            }
+          : null,
+      [
+        recommendRequestAdInterval,
+        recommendRequestIncludeAdInterval,
+        recommendRequestIncludeDesktop,
+        tab,
+      ],
+    );
+    const feedQueryKey = useMemo(
+      () =>
+        ['zhihu-feed', queryAccountKey, tab, recommendationRequestKey] as const,
+      [queryAccountKey, recommendationRequestKey, tab],
+    );
     const {
       data,
       fetchNextPage,
       hasNextPage,
       isFetchingNextPage,
       isLoading,
+      isError,
       isRefetching,
       refetch,
     } = useInfiniteQuery({
-      queryKey: ['zhihu-feed', queryAccountKey, tab],
-      queryFn: async ({ pageParam = FEED_URLS[tab] }) => {
-        if (!cookies && tab === 'following')
-          return { items: [], nextUrl: null };
-        try {
-          let requestUrl = pageParam as string;
-          const isInitialUrl =
-            (requestUrl === FEED_URLS[tab] ||
-              requestUrl === 'zhihu://local-feed' ||
-              requestUrl.includes('feed/topstory/recommend')) &&
-            !requestUrl.includes('action=down');
-          if (isRefreshing && isInitialUrl) {
-            const sep = requestUrl.includes('?') ? '&' : '?';
-            requestUrl = `${requestUrl}${sep}action=up&t=${Date.now()}`;
-          }
-
-          console.log(
-            `🌐 [queryFn] Requesting URL: ${requestUrl} (tab=${tab}, isRefreshing=${isRefreshing})`,
-          );
-          const data = await getFeed(requestUrl);
-          const rawItems = data.data || [];
-          seedAnswerDetailsFromFeed(queryClient, rawItems);
-          let items: Array<FeedItem | HotItem>;
-          if (tab === 'following')
-            items = rawItems
-              .map((item: RawFeedItem) => parseFollowingData(item))
-              .filter(Boolean) as FeedItem[];
-          else if (tab === 'recommend' || tab === 'local')
-            items = rawItems
-              .map((item: RawFeedItem) => parseRecommendData(item))
-              .filter(Boolean) as FeedItem[];
-          else
-            items = rawItems.map((item: RawFeedItem, index: number) =>
-              parseHotData(item, index),
-            );
-
-          const nextUrl =
-            data.paging?.next?.replace('http://', 'https://') ?? null;
-
-          if (launchCacheContext && isInitialUrl && items.length > 0) {
-            void feedCacheRepository
-              .saveFeedCache(launchCacheContext, items, nextUrl)
-              .catch((err) => console.warn('保存启动 Feed 缓存失败', err));
-          }
-
-          return {
-            items,
-            nextUrl,
-          };
-        } catch {
-          return { items: [], nextUrl: null };
+      queryKey: feedQueryKey,
+      queryFn: async ({ pageParam = FEED_URLS[tab], signal }) => {
+        let requestUrl = pageParam as string;
+        const isInitialUrl =
+          (requestUrl === FEED_URLS[tab] ||
+            requestUrl === 'zhihu://local-feed' ||
+            requestUrl.includes('feed/topstory/recommend')) &&
+          !requestUrl.includes('action=down');
+        if (isRefreshing && isInitialUrl) {
+          const sep = requestUrl.includes('?') ? '&' : '?';
+          requestUrl = `${requestUrl}${sep}action=up&t=${Date.now()}`;
         }
+
+        console.log(
+          `🌐 [queryFn] Requesting feed (tab=${tab}, isRefreshing=${isRefreshing})`,
+        );
+        const data = await getFeed(requestUrl, { signal });
+        const rawItems = data.data || [];
+        seedAnswerDetailsFromFeed(queryClient, rawItems);
+        let items: Array<FeedItem | HotItem>;
+        if (tab === 'following')
+          items = rawItems
+            .map((item: RawFeedItem) => parseFollowingData(item))
+            .filter(Boolean) as FeedItem[];
+        else if (tab === 'recommend' || tab === 'local')
+          items = rawItems
+            .map((item: RawFeedItem) => parseRecommendData(item))
+            .filter(Boolean) as FeedItem[];
+        else
+          items = rawItems.map((item: RawFeedItem, index: number) =>
+            parseHotData(item, index),
+          );
+
+        const nextUrl =
+          data.paging?.next?.replace('http://', 'https://') ?? null;
+
+        if (launchCacheContext && isInitialUrl && items.length > 0) {
+          void feedCacheRepository
+            .saveFeedCache(launchCacheContext, items, nextUrl)
+            .catch((err) => console.warn('保存启动 Feed 缓存失败', err));
+        }
+
+        return {
+          items,
+          nextUrl,
+        };
       },
       initialPageParam: FEED_URLS[tab],
       getNextPageParam: (lastPage) => lastPage.nextUrl,
@@ -1126,7 +1139,7 @@ const FeedList = React.forwardRef<
           tab === 'local' ? 'zhihu://local-feed' : FEED_URLS[tab];
         await refreshInfiniteQuery(
           queryClient,
-          ['zhihu-feed', queryAccountKey, tab],
+          feedQueryKey,
           refetch,
           initialParam,
         );
@@ -1140,7 +1153,7 @@ const FeedList = React.forwardRef<
       localDedupEnabled,
       onRefreshStateChange,
       queryClient,
-      queryAccountKey,
+      feedQueryKey,
       refetch,
       tab,
     ]);
@@ -1204,7 +1217,20 @@ const FeedList = React.forwardRef<
       expandedCollapsedKeys,
     ]);
 
+    const listExtraData = useMemo(
+      () => ({ expandedCollapsedKeys, filterMode, filterRules }),
+      [expandedCollapsedKeys, filterMode, filterRules],
+    );
+
     const flashListRef = useRef<FlashListRef<FeedListItem>>(null);
+    const scrollHandler = useCollapsibleChromeScroll({
+      enabled: isActive && AUTO_HIDE_NAV_TABS.includes(tab),
+      topOffset: topNavOffset,
+      bottomOffset: bottomNavOffset,
+      topHideDistance,
+      bottomHideDistance,
+      onScrolledChange,
+    });
 
     // 过滤开启下，列表可能因大量过滤/折叠短到无法滚动，onEndReached 就此失效。
     // 这里主动补页把可渲染行数补到 MIN_RENDERABLE_ITEMS，并以
@@ -1244,17 +1270,11 @@ const FeedList = React.forwardRef<
     }));
 
     return (
-      <FlashList
+      <AnimatedFlashList
         ref={flashListRef}
         showsVerticalScrollIndicator={false}
         data={flattenedData}
-        extraData={{
-          expandedCollapsedKeys,
-          filterMode,
-          filterRules,
-          isRefreshing,
-          isRefetching,
-        }}
+        extraData={listExtraData}
         keyExtractor={(item, index) => {
           if (isCollapsedGroup(item)) return `collapsed-${item.groupKey}`;
           const key = getInMemoryFeedKey(item);
@@ -1282,8 +1302,8 @@ const FeedList = React.forwardRef<
             style={{ opacity: 0 }}
           />
         }
-        onScroll={(e) => onScroll?.(e.nativeEvent.contentOffset.y)}
-        scrollEventThrottle={100}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
         contentContainerStyle={{
           paddingTop: insets.top + 70,
           paddingBottom: 120,
@@ -1322,7 +1342,9 @@ const FeedList = React.forwardRef<
             <FeedCard item={item as FeedItem} tab={tab} />
           );
         }}
-        ListHeaderComponent={tab === 'following' ? <RecentMoments /> : null}
+        ListHeaderComponent={
+          cookies && tab === 'following' ? <RecentMoments /> : null
+        }
         ListFooterComponent={
           isFetchingNextPage ? (
             <ActivityIndicator style={{ margin: 20 }} />
@@ -1348,6 +1370,11 @@ const FeedList = React.forwardRef<
             <View className="flex-1 items-center justify-center mt-[100px] bg-transparent">
               <ActivityIndicator size="large" color={tintColor} />
             </View>
+          ) : isError ? (
+            <QueryErrorView
+              message="Feed 加载失败"
+              onRetry={() => void refetch()}
+            />
           ) : (
             <View className="flex-1 items-center justify-center mt-[100px] bg-transparent">
               <Text type="secondary">暂无内容 喵~</Text>
@@ -1410,6 +1437,8 @@ function parseFollowingData(item: RawFeedItem): FeedItem | null {
       target.favorite_count || target.reaction?.statistics?.favorites || 0,
     voted: target.relationship?.voting || 0,
     type: appType,
+    answerType: normalizeAnswerType(target),
+    contentNeedTruncated: target.content_need_truncated,
     topics: target.topics?.map((topic) => ({
       id: topic.id,
       name: topic.name,
@@ -1509,6 +1538,7 @@ function parseRecommendData(item: RawFeedItem): FeedItem | null {
     // 大小写按接口而异——实测游客推荐流返回小写 `normal`，话题流返回大写
     // `NORMAL`/`PAID`，故统一大写后再比较，避免漏判。
     answerType: normalizeAnswerType(target),
+    contentNeedTruncated: target.content_need_truncated,
     isLabeled: Boolean(target.is_labeled),
     isOrgAuthor: Boolean(target.author?.is_org),
     isAdvertiser: Boolean(target.author?.is_advertiser),
@@ -1592,7 +1622,6 @@ const styles = StyleSheet.create({
   navText: {
     fontSize: 15,
     fontWeight: '600',
-    transitionProperty: 'color',
   },
   topPill: {
     position: 'absolute',
@@ -1614,6 +1643,13 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     zIndex: 1001,
   },
+  lightTranslucentShadow: {
+    shadowColor: Colors.light.shadow,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.14,
+    shadowRadius: 12,
+    elevation: 6,
+  },
   bottomBlur: { borderRadius: 32, overflow: 'hidden', height: 64 },
   bottomNavItems: {
     flexDirection: 'row',
@@ -1633,16 +1669,6 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     left: 10,
   },
-
-  loginPrompt: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingBottom: 100,
-  },
-  loginText: { fontSize: 16, marginTop: 20, marginBottom: 30 },
-  loginBtn: { paddingHorizontal: 40, paddingVertical: 12, borderRadius: 25 },
-  loginBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 });
 
 function TopLoadingBar({ color }: { color: string }) {

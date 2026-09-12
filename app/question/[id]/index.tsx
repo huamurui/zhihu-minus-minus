@@ -6,6 +6,7 @@ import {
 } from '@shopify/flash-list';
 import {
   type InfiniteData,
+  useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
@@ -25,7 +26,6 @@ import React, {
 import {
   ActivityIndicator,
   Alert,
-  Image,
   View as NativeView,
   Pressable,
   useWindowDimensions,
@@ -47,17 +47,18 @@ import Reanimated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import client from '@/api/client';
+import { hasAuthenticationCookie } from '@/api/client';
 import {
   type AnswerDetail,
   deleteAnswer,
   type QuestionAnswersResponse,
 } from '@/api/zhihu/answer';
-import { addReadHistory } from '@/api/zhihu/history';
+import { recordReadHistory } from '@/api/zhihu/history';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
 import {
   followQuestion,
   getQuestion,
+  getQuestionAnswers,
   unfollowQuestion,
   type ZhihuQuestionDetail,
 } from '@/api/zhihu/question';
@@ -65,10 +66,11 @@ import { BouncyButton } from '@/components/BouncyButton';
 import { LikeButton } from '@/components/LikeButton';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { ShareMenu } from '@/components/ShareMenu';
+import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
-import { ZhihuContent } from '@/features/rich-content';
+import { RICH_CONTENT_STALE_TIME, ZhihuContent } from '@/features/rich-content';
 import { useCollectionAction } from '@/hooks/useCollectionAction';
 import {
   type GestureScrollViewRef,
@@ -77,12 +79,13 @@ import {
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
 import { useScrollHeaderAnim } from '@/hooks/useScrollAnimation';
 import { useViewableItems } from '@/hooks/useViewableItems';
-import { useZhihuInfiniteQuery } from '@/hooks/useZhihuInfiniteQuery';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useCollectionStore } from '@/store/useCollectionStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ZhihuAuthor } from '@/types/zhihu';
 import { formatDate } from '@/utils/date';
 import { refreshInfiniteQuery } from '@/utils/query';
+import { getZhihuErrorMessage } from '@/utils/zhihuError';
 
 const AnimatedFlashList = Reanimated.createAnimatedComponent(
   FlashList,
@@ -104,6 +107,7 @@ interface AnswerItemProps {
   onShare?: (item: AnswerDetail) => void;
   questionId: string;
   sortBy: AnswerSort;
+  isAuthenticated: boolean;
   screenTranslateX: SharedValue<number>;
   scrollGestureRef: GestureScrollViewRef;
   onSwipeStart?: (author: ZhihuAuthor) => void;
@@ -120,6 +124,7 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
       onShare,
       questionId,
       sortBy,
+      isAuthenticated,
       screenTranslateX,
       scrollGestureRef,
       onSwipeStart,
@@ -290,8 +295,6 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
       item.content?.includes('<figure');
     const excerpt = isLongContent ? `${rawText.substring(0, 100)}...` : rawText;
 
-    const { fontSizeScale, lineHeightScale } = useSettingsStore();
-
     // Shared meta info component to avoid repetition
     const metaText = [
       item.created_time ? `发布于 ${formatDate(item.created_time)}` : null,
@@ -321,9 +324,9 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
     ) : null;
 
     const followMutation = useOptimisticToggle<
-      InfiniteData<QuestionAnswersResponse, number>
+      InfiniteData<QuestionAnswersResponse, number | string>
     >({
-      queryKey: ['question-answers', questionId, sortBy],
+      queryKey: ['question-answers', questionId, sortBy, isAuthenticated],
       mutationFn: async () => {
         const pid = item.author?.url_token || item.author?.id;
         if (!pid) return;
@@ -356,6 +359,9 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
       onSuccess: () => {
         Alert.alert('删除成功', '你的回答已删除喵！');
         queryClient.invalidateQueries({ queryKey: ['question-answers'] });
+      },
+      onError: (error) => {
+        Alert.alert('删除失败', getZhihuErrorMessage(error));
       },
     });
 
@@ -405,8 +411,8 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
               }
               className="flex-row flex-1 items-center bg-transparent"
             >
-              <Image
-                source={{ uri: item.author?.avatar_url }}
+              <StableAvatar
+                uri={item.author?.avatar_url}
                 className="w-[34px] h-[34px] rounded-[17px]"
               />
               <View className="flex-1 ml-2.5 bg-transparent">
@@ -475,8 +481,8 @@ const AnswerItem = forwardRef<AnswerItemHandle, AnswerItemProps>(
                   <View style={{ height: 180, overflow: 'hidden' }}>
                     <Text
                       style={{
-                        fontSize: 17 * fontSizeScale,
-                        lineHeight: 17 * lineHeightScale,
+                        fontSize: 17,
+                        lineHeight: 17 * 1.5,
                         color: Colors[colorScheme].text,
                         marginBottom: 14,
                       }}
@@ -730,6 +736,9 @@ export default function QuestionDetail() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
+  const isAuthenticated = useAuthStore((state) =>
+    hasAuthenticationCookie(state.cookies),
+  );
   const backgroundColor = Colors[colorScheme].background;
   const textColor = Colors[colorScheme].text;
   const queryClient = useQueryClient();
@@ -808,26 +817,33 @@ export default function QuestionDetail() {
     isRefetching,
     isPending: answersPending,
     isError: answersError,
-  } = useZhihuInfiniteQuery<QuestionAnswersResponse>({
-    queryKey: ['question-answers', id, sortBy],
+  } = useInfiniteQuery<
+    QuestionAnswersResponse,
+    Error,
+    InfiniteData<QuestionAnswersResponse, number | string>,
+    ['question-answers', string, AnswerSort, boolean],
+    number | string
+  >({
+    queryKey: ['question-answers', id, sortBy, isAuthenticated],
     queryFn: async ({ pageParam = 0 }) => {
       const include =
         'data[*].content,excerpt,voteup_count,comment_count,favlists_count,author.name,author.avatar_url,author.headline,author.is_following,relationship.voting,relationship.is_author,created_time,updated_time,ip_info,segment_infos';
-      const res = await client.get<QuestionAnswersResponse>(
-        `/questions/${id}/answers?include=${include}&limit=20&offset=${pageParam}&sort_by=${sortBy}`,
-      );
-      return res.data;
+      return getQuestionAnswers(id as string, pageParam, sortBy, include);
     },
     initialPageParam: 0,
+    getNextPageParam: (lastPage) => {
+      if (lastPage.paging?.is_end) return undefined;
+      return lastPage.paging?.next;
+    },
   });
 
   const handleRefresh = useCallback(() => {
     return refreshInfiniteQuery(
       queryClient,
-      ['question-answers', id, sortBy],
+      ['question-answers', id, sortBy, isAuthenticated],
       refetch,
     );
-  }, [queryClient, id, sortBy, refetch]);
+  }, [queryClient, id, sortBy, isAuthenticated, refetch]);
 
   const answers = useMemo(() => {
     const all = answersData?.pages.flatMap((page) => page.data) || [];
@@ -859,7 +875,7 @@ export default function QuestionDetail() {
         !recordedAnswerIds.current.has(id)
       ) {
         recordedAnswerIds.current.add(id);
-        addReadHistory({ content_token: id, content_type: 'answer' });
+        recordReadHistory({ content_token: id, content_type: 'answer' });
       }
 
       if (!expanded) {
@@ -985,12 +1001,13 @@ export default function QuestionDetail() {
     isError: questionError,
     refetch: refetchQuestion,
   } = useQuery({
-    queryKey: ['question', id],
+    queryKey: ['question', id, isAuthenticated],
     queryFn: async () => await getQuestion(id as string),
+    staleTime: RICH_CONTENT_STALE_TIME,
   });
 
   const followMutation = useOptimisticToggle<ZhihuQuestionDetail>({
-    queryKey: ['question', id],
+    queryKey: ['question', id, isAuthenticated],
     isActive: question?.relationship?.is_following,
     mutationFn: async () => {
       if (question?.relationship?.is_following)
@@ -1033,7 +1050,7 @@ export default function QuestionDetail() {
 
   React.useEffect(() => {
     if (enableBrowseHistory && question?.id) {
-      addReadHistory({
+      recordReadHistory({
         content_token: String(question.id),
         content_type: 'question',
       });
@@ -1056,7 +1073,7 @@ export default function QuestionDetail() {
             {question?.title || initialTitle || '加载中...'}
           </Text>
         </Reanimated.View>
-        {qLoading ? (
+        {qLoading && !question ? (
           <View className="h-[100px] justify-center bg-transparent">
             <ActivityIndicator size="small" color={primaryColor} />
           </View>
@@ -1263,7 +1280,7 @@ export default function QuestionDetail() {
 
   return (
     <View type="default" className="flex-1">
-      <Stack.Screen options={{ headerShown: false }} />
+      <Stack.Screen options={{ headerShown: false, title: '问题' }} />
 
       <ShareMenu
         visible={isSharing}
@@ -1350,6 +1367,7 @@ export default function QuestionDetail() {
               }}
               questionId={id}
               sortBy={sortBy}
+              isAuthenticated={isAuthenticated}
               screenTranslateX={screenTranslateX}
               scrollGestureRef={scrollGestureRef}
               onSwipeStart={setSwipedAuthor}
@@ -1402,10 +1420,17 @@ export default function QuestionDetail() {
         />
 
         <Reanimated.View
-          className="absolute left-5 right-5 h-[54px] rounded-[27px] overflow-hidden z-[1000] shadow-black/20 shadow-lg elevation-10"
+          className="absolute left-5 right-5 h-[54px] rounded-[27px] overflow-hidden z-[1000]"
           style={[
             {
               bottom: insets.bottom,
+            },
+            colorScheme === 'light' && {
+              shadowColor: Colors.light.shadow,
+              shadowOffset: { width: 0, height: 10 },
+              shadowOpacity: 0.2,
+              shadowRadius: 15,
+              elevation: 10,
             },
             footerAnimatedStyle,
           ]}
@@ -1553,8 +1578,8 @@ export default function QuestionDetail() {
           ]}
         >
           <View className="items-center bg-transparent mt-10">
-            <Image
-              source={{ uri: swipedAuthor.avatar_url }}
+            <StableAvatar
+              uri={swipedAuthor.avatar_url}
               style={{ width: 90, height: 90, borderRadius: 45 }}
             />
             <Text

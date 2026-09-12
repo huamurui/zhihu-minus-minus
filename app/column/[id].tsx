@@ -11,8 +11,10 @@ import {
   getColumnItems,
   unfollowColumn,
 } from '@/api/zhihu/column';
-import { addReadHistory } from '@/api/zhihu/history';
+import { recordReadHistory } from '@/api/zhihu/history';
 import { BouncyButton } from '@/components/BouncyButton';
+import { QueryErrorView } from '@/components/QueryErrorView';
+import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -32,7 +34,12 @@ export default function ColumnDetail() {
   const borderColor = useThemeColor({}, 'border');
 
   // 1. 获取专栏基本信息
-  const { data: column, isLoading: columnLoading } = useQuery({
+  const {
+    data: column,
+    isLoading: columnLoading,
+    isError: columnError,
+    refetch: refetchColumn,
+  } = useQuery({
     queryKey: ['column-detail', id],
     queryFn: () => getColumn(id),
   });
@@ -41,7 +48,7 @@ export default function ColumnDetail() {
 
   useEffect(() => {
     if (enableBrowseHistory && column?.id) {
-      addReadHistory({
+      recordReadHistory({
         content_token: String(column.id),
         content_type: 'column',
       });
@@ -72,6 +79,7 @@ export default function ColumnDetail() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    isError: itemsError,
     refetch,
     isRefetching,
   } = useInfiniteQuery({
@@ -91,6 +99,15 @@ export default function ColumnDetail() {
   const renderHeader = () => {
     if (!column && columnLoading) {
       return <ActivityIndicator style={{ marginTop: 50 }} />;
+    }
+    if (!column && columnError) {
+      return (
+        <QueryErrorView
+          compact
+          message="专栏加载失败"
+          onRetry={() => void refetchColumn()}
+        />
+      );
     }
     if (!column) return null;
 
@@ -154,8 +171,8 @@ export default function ColumnDetail() {
               )
             }
           >
-            <Image
-              source={{ uri: column.author.avatar_url }}
+            <StableAvatar
+              uri={column.author.avatar_url}
               className="w-6 h-6 rounded-full"
             />
             <Text type="secondary" className="text-xs ml-2">
@@ -263,7 +280,17 @@ export default function ColumnDetail() {
         refreshing={isRefetching}
         ListEmptyComponent={() => (
           <View className="p-10 items-center bg-transparent">
-            {!itemsLoading && <Text type="secondary">专栏里还没有文章喵</Text>}
+            {itemsLoading ? (
+              <ActivityIndicator color={tintColor} />
+            ) : itemsError ? (
+              <QueryErrorView
+                compact
+                message="文章列表加载失败"
+                onRetry={() => void refetch()}
+              />
+            ) : (
+              <Text type="secondary">专栏里还没有文章喵</Text>
+            )}
           </View>
         )}
         ListFooterComponent={() =>

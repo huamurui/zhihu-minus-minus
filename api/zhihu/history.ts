@@ -1,4 +1,8 @@
-import apiClient from '../client';
+import { useAuthStore } from '@/store/useAuthStore';
+import apiClient, {
+  type ApiRequestOptions,
+  hasAuthenticationCookie,
+} from '../client';
 
 export const CONTENT_TYPES = [
   'answer',
@@ -61,9 +65,17 @@ export interface ReadHistoryResponse {
 }
 
 export const addReadHistory = async (payload: AddReadHistoryPayload) => {
+  if (!hasAuthenticationCookie(useAuthStore.getState().cookies)) return null;
   const res = await apiClient.post('/read_history/add', payload);
   return res.data;
 };
+
+/** Best-effort background recording; reading content must not create an unhandled rejection. */
+export function recordReadHistory(payload: AddReadHistoryPayload): void {
+  void addReadHistory(payload).catch(() => {
+    console.warn('记录浏览历史失败');
+  });
+}
 
 export interface BatchDelReadHistoryPayload {
   pairs?: AddReadHistoryPayload[];
@@ -80,9 +92,11 @@ export const batchDelReadHistory = async (
 export const getReadHistory = async (
   limit = 20,
   offset = 0,
+  options: ApiRequestOptions = {},
 ): Promise<ReadHistoryResponse> => {
   const res = await apiClient.get<ReadHistoryResponse>(
     `/unify-consumption/read_history?limit=${limit}&offset=${offset}`,
+    { signal: options.signal },
   );
   return res.data;
 };

@@ -19,6 +19,7 @@ import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { useCollectionStore } from '@/store/useCollectionStore';
+import { updateContentInteractionCaches } from '@/utils/contentCache';
 import { showToast } from '@/utils/toast';
 
 interface CollectionStatusItem {
@@ -115,6 +116,11 @@ export function CollectionSelectorModal() {
             .updateCollectedCountOffset(id, hasCollections ? 1 : -1);
         }
         setCollectedStatus(id, hasCollections);
+        updateContentInteractionCaches(queryClient, {
+          type: selectorContentType === 'answer' ? 'answers' : 'articles',
+          id,
+          isCollected: hasCollections,
+        });
         void queryClient.invalidateQueries({
           queryKey: ['answer-collection-status', id],
         });

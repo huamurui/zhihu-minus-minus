@@ -1,3 +1,6 @@
+> [!WARNING]
+> 本文件是早期开发记录，仅供历史参考，不代表当前版本规划。当前进展请以 README、GitHub Issues 和各版本发布说明为准。
+
 获取 WebView 的 HttpOnly Cookie 要用 `@preeternal/react-native-cookie-manager` 这类原生库，因此不能使用 Expo Go 预览，需要通过开发构建连接真机或模拟器。
 
 todo:

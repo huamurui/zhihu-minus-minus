@@ -109,6 +109,11 @@ export interface ZhihuQuestion {
     is_anonymous?: boolean;
     is_thanked?: boolean;
     is_nothelp?: boolean;
+    my_answer?: {
+      id?: string | number;
+      answer_id?: string | number;
+      is_deleted?: boolean;
+    } | null;
   };
 }
 
@@ -180,6 +185,31 @@ export interface ZhihuPin {
   relationship?: {
     voting?: number;
   };
+  bottom_poll?: {
+    voting?: ZhihuPinPoll;
+    pk?: ZhihuPinPoll;
+  };
+}
+
+export interface ZhihuPinPoll {
+  id: string;
+  title?: string;
+  max_selections?: number;
+  type?: string;
+  begin_at?: number;
+  end_at?: number;
+  voting_count?: number;
+  member_count?: number;
+  is_voted?: boolean;
+  is_reviewing?: boolean;
+  options: ZhihuPinPollOption[];
+}
+
+export interface ZhihuPinPollOption {
+  id: string;
+  title: string;
+  voting_count?: number;
+  is_selected?: boolean;
 }
 
 export interface ZhihuVideo {

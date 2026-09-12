@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import { ActivityIndicator } from 'react-native';
 import Animated, {
@@ -11,6 +12,7 @@ import Animated, {
 import { voteContent } from '@/api/zhihu';
 import Colors from '@/constants/Colors';
 import { colors } from '@/constants/designTokens';
+import { updateContentInteractionCaches } from '@/utils/contentCache';
 import { showToast } from '@/utils/toast';
 import { getZhihuErrorMessage } from '@/utils/zhihuError';
 import { BouncyButton } from './BouncyButton';
@@ -35,6 +37,7 @@ export const LikeButton = ({
   const [voted, setVoted] = useState(initialVoted);
   const [count, setCount] = useState(initialCount);
   const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
   const scale = useSharedValue(1);
   const colorScheme = useColorScheme();
 
@@ -81,9 +84,24 @@ export const LikeButton = ({
       setVoted(nextVoted);
       // count 可能是占位符（如 '-'），仅在数字时增减并通知外部
       if (typeof count === 'number') {
-        const newCount = isUpvoted ? count - 1 : count + 1;
+        const newCount = Math.max(0, isUpvoted ? count - 1 : count + 1);
         setCount(newCount);
         onVoteChange?.(nextVoted, newCount);
+
+        if (type !== 'comments') {
+          updateContentInteractionCaches(queryClient, {
+            type,
+            id,
+            voted: nextVoted,
+            voteCount: newCount,
+          });
+        }
+      } else if (type !== 'comments') {
+        updateContentInteractionCaches(queryClient, {
+          type,
+          id,
+          voted: nextVoted,
+        });
       }
       showToast(isUpvoted ? '已取消赞同' : '已赞同');
     } catch (error: unknown) {

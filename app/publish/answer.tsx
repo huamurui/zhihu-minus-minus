@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -105,6 +105,7 @@ export default function PublishAnswerScreen() {
 
   return (
     <View className="flex-1">
+      <Stack.Screen options={{ headerShown: false, title: '写回答' }} />
       {/* Header */}
       <View
         className="flex-row items-center justify-between px-4 pb-3"

@@ -75,6 +75,7 @@ export function normalizeUserFeedType(
       return 'questions';
     case 'pin':
     case 'pins':
+    case 'moments_pin':
       return 'pins';
     case 'video':
     case 'videos':
@@ -97,4 +98,67 @@ export function getNextPageOffset(nextUrl: string | null | undefined) {
   } catch {
     return undefined;
   }
+}
+
+export interface RecentActivityCursor {
+  offset: number;
+  pageNum: number;
+}
+
+interface RecentActivityTargetIdentity {
+  id?: string | number;
+  type?: string;
+  url?: string;
+}
+
+/** Recover exact pin ids from URLs because their JSON numbers exceed 2^53 - 1. */
+export function getRecentActivityTargetId(
+  target: RecentActivityTargetIdentity,
+) {
+  if (
+    !target.url ||
+    (target.type !== 'moments_pin' &&
+      target.type !== 'pin' &&
+      target.type !== 'pins')
+  ) {
+    return target.id;
+  }
+  try {
+    const pathname = new URL(target.url, 'https://www.zhihu.com').pathname;
+    return pathname.match(/^\/pins?\/([^/]+)$/)?.[1] || target.id;
+  } catch {
+    return target.id;
+  }
+}
+
+/** Parse the timestamp cursor used by the Android recent-person activity API. */
+export function getNextRecentActivityCursor(
+  nextUrl: string | null | undefined,
+): RecentActivityCursor | undefined {
+  if (!nextUrl) return undefined;
+  try {
+    const url = new URL(nextUrl, 'https://api.zhihu.com');
+    const offset = Number.parseInt(url.searchParams.get('offset') || '', 10);
+    const pageNum = Number.parseInt(url.searchParams.get('page_num') || '', 10);
+    if (!Number.isFinite(offset) || !Number.isFinite(pageNum)) return undefined;
+    return { offset, pageNum };
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Return the raw activity index after which the entry-time unread marker goes.
+ * Keep waiting for more pages unless the server says the stream has ended.
+ */
+export function getRecentActivityReadBoundary(
+  unreadCount: number,
+  loadedCount: number,
+  isEnd: boolean,
+) {
+  if (!Number.isInteger(unreadCount) || unreadCount <= 0 || loadedCount <= 0) {
+    return undefined;
+  }
+  if (loadedCount >= unreadCount) return unreadCount;
+  return isEnd ? loadedCount : undefined;
 }

@@ -1,4 +1,4 @@
-import client from '../client';
+import client, { type ApiRequestOptions } from '../client';
 
 export interface ChatParticipant {
   type: string;
@@ -57,17 +57,26 @@ export interface ChatMessagesResponse {
   };
 }
 
-export const getInbox = async (nextUrl?: string) => {
+export const getInbox = async (
+  nextUrl?: string,
+  options: ApiRequestOptions = {},
+) => {
   const url = nextUrl || 'https://www.zhihu.com/api/v4/inbox';
-  const { data } = await client.get<InboxResponse>(url);
+  const { data } = await client.get<InboxResponse>(url, {
+    signal: options.signal,
+  });
   return data;
 };
 
-export const getMessages = async (senderId: string, nextUrl?: string) => {
+export const getMessages = async (
+  senderId: string,
+  nextUrl?: string,
+  options: ApiRequestOptions = {},
+) => {
   const url =
     nextUrl ||
     `https://www.zhihu.com/api/v4/chat?sender_id=${senderId}&limit=20`;
-  const { data } = await client.get<any>(url);
+  const { data } = await client.get<any>(url, { signal: options.signal });
 
   // 转换数据结构，使其与 POST 返回的单条消息结构一致，方便统一渲染
   const messages = data?.data?.messages || [];

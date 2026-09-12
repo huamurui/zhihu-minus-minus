@@ -5,6 +5,12 @@ import type {
   ZhihuSegmentInfo,
 } from '@/types/zhihu';
 import apiClient from '../client';
+import {
+  createPublishingTraceId,
+  getPublishingTextLength,
+  type PublishedContentResult,
+  parsePublishedContentResult,
+} from './publishing';
 
 export interface AnswerQuestion extends Omit<ZhihuQuestion, 'relationship'> {
   relationship?: ZhihuQuestion['relationship'] | null;
@@ -17,6 +23,7 @@ export interface AnswerDetail {
   question?: AnswerQuestion;
   author: ZhihuAuthor;
   content: string;
+  editable_content?: string;
   excerpt: string;
   created_time: number;
   created_time_name?: string;
@@ -67,12 +74,116 @@ export interface QuestionAnswersResponse {
   read_count?: number;
 }
 
+export interface AnswerPublishOptions {
+  answerId?: string | number;
+  deltaTime?: number;
+  tableOfContentsEnabled?: boolean;
+}
+
+export interface AnswerDraftSettings {
+  can_reward: boolean;
+  commercial_report_info: {
+    is_report: boolean;
+  };
+  comment_permission: string;
+  disclaimer_status: string;
+  disclaimer_type: string;
+  is_copyable: boolean;
+  reshipment_settings: string;
+  table_of_contents: {
+    enabled: boolean;
+  };
+  table_of_contents_enabled: boolean;
+  thank_inviter: string;
+  thank_inviter_status: string;
+}
+
+/** Response returned by `POST /questions/{id}/draft`. */
+export interface AnswerDraft {
+  answer_type: string;
+  attachment: Record<string, unknown> | null;
+  content: string;
+  created_time: number;
+  draft_type: string;
+  editable_content: string;
+  excerpt: string;
+  settings: AnswerDraftSettings;
+  title: {
+    enabled: boolean;
+  };
+  type: 'draft';
+  updated_time: number;
+  url: string;
+}
+
+interface AnswerDraftRequestSettings {
+  can_reward: boolean;
+  commercial_report_info: {
+    is_report: boolean;
+  };
+  comment_permission: 'all';
+  disclaimer_status: 'close';
+  disclaimer_type: 'none';
+  reshipment_settings: 'allowed';
+  table_of_contents_enabled: boolean;
+  tagline: string;
+  thank_inviter: string;
+  thank_inviter_status: 'close';
+}
+
+interface AnswerDraftRequest {
+  content: string;
+  delta_time: number;
+  draft_type: 'normal';
+  settings: AnswerDraftRequestSettings;
+}
+
+interface AnswerPublishRequest {
+  action: 'answer';
+  data: {
+    appreciate: { can_reward: false; tagline: string };
+    commentsPermission: Record<string, never>;
+    commercialReportInfo: { isReport: 0 };
+    contentsTables: { table_of_contents_enabled: boolean };
+    creationStatement: {
+      disclaimer_status: 'close';
+      disclaimer_type: 'none';
+    };
+    draft:
+      | { disabled: 1; isPublished: false }
+      | {
+          contentId: string;
+          disabled: 1;
+          isPublished: true;
+        };
+    extra_info: {
+      include: string;
+      pc_business_params: string;
+      publisher: 'pc';
+      question_id?: string;
+    };
+    hybrid: { html: string; textLength: number };
+    hybridInfo: Record<string, never>;
+    publish: { traceId: string };
+    publishSwitch: { draft_type: 'normal' };
+    reprint: Record<string, never>;
+    thanksInvitation: {
+      thank_inviter: string;
+      thank_inviter_status: 'close';
+    };
+    toFollower: Record<string, never>;
+  };
+}
+
+const ANSWER_PUBLISH_INCLUDE =
+  'is_contain_ai_content,is_visible,paid_info,paid_info_content,has_column,admin_closed_comment,reward_info,annotation_action,annotation_detail,collapse_reason,is_normal,is_sticky,collapsed_by,suggest_edit,comment_count,thanks_count,favlists_count,can_comment,content,editable_content,voteup_count,reshipment_settings,comment_permission,created_time,updated_time,review_info,relevant_info,question,excerpt,attachment,content_source,is_labeled,endorsements,reaction_instruction,reaction,ip_info,relationship.is_authorized,voting,is_thanked,is_author,is_nothelp,is_favorited;author.vip_info,kvip_info,badge[*].topics;settings.table_of_content.enabled';
+
 export const getAnswer = async (
   id: string | number,
   include?: string,
 ): Promise<AnswerDetail> => {
   const defaultInclude =
-    'content,paid_info,can_comment,excerpt,thanks_count,voteup_count,comment_count,visited_count,reaction,ip_info,question.topics,author.is_following,reaction.relation.voting,segment_infos,favlists_count';
+    'content,editable_content,paid_info,can_comment,excerpt,thanks_count,voteup_count,comment_count,visited_count,reaction,ip_info,question.topics,author.is_following,reaction.relation.voting,segment_infos,favlists_count';
   const res = await apiClient.get(
     `/answers/${id}?include=${include || defaultInclude}`,
   );
@@ -87,37 +198,89 @@ export const voteAnswer = async (
   return res.data;
 };
 
-export const createAnswer = async (
+export async function saveAnswerDraft(
   questionId: string | number,
-  text: string,
-) => {
-  // 转化成知乎喜欢的 HTML 格式
-  const htmlContent = `<p>${text}</p>`;
-  // 模拟 traceId (timestamp + uuid)
-  const timestamp = Date.now();
-  const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-  const traceId = `${timestamp},${uuid}`;
+  html: string,
+  options: AnswerPublishOptions = {},
+): Promise<AnswerDraft> {
+  const tableOfContentsEnabled = options.tableOfContentsEnabled ?? false;
+  const payload: AnswerDraftRequest = {
+    content: html,
+    draft_type: 'normal',
+    delta_time: options.deltaTime ?? 0,
+    settings: {
+      reshipment_settings: 'allowed',
+      comment_permission: 'all',
+      can_reward: false,
+      tagline: '',
+      disclaimer_status: 'close',
+      disclaimer_type: 'none',
+      commercial_report_info: { is_report: false },
+      table_of_contents_enabled: tableOfContentsEnabled,
+      thank_inviter_status: 'close',
+      thank_inviter: '',
+    },
+  };
+  const response = await apiClient.post<AnswerDraft>(
+    `/questions/${encodeURIComponent(String(questionId))}/draft`,
+    payload,
+    {
+      headers: {
+        Origin: 'https://www.zhihu.com',
+        Referer: options.answerId
+          ? `https://www.zhihu.com/question/${questionId}/answer/${options.answerId}`
+          : `https://www.zhihu.com/question/${questionId}/answer`,
+      },
+    },
+  );
+  return response.data;
+}
 
-  const payload = {
+export async function publishAnswer(
+  questionId: string | number,
+  html: string,
+  options: AnswerPublishOptions = {},
+): Promise<PublishedContentResult> {
+  const tableOfContentsEnabled = options.tableOfContentsEnabled ?? false;
+  const isPublished = options.answerId !== undefined;
+  const questionIdString = String(questionId);
+  const businessParams = JSON.stringify({
+    is_paid_column: false,
+    reward_setting: { can_reward: false, tagline: '' },
+    disclaimer_status: 'close',
+    disclaimer_type: 'none',
+    commercial_report_info: { is_report: false },
+    commercial_zhitask_bind_info: null,
+    is_report: false,
+    push_activity: true,
+    table_of_contents_enabled: tableOfContentsEnabled,
+    thank_inviter_status: 'close',
+    thank_inviter: '',
+  });
+  const payload: AnswerPublishRequest = {
     action: 'answer',
     data: {
-      publish: { traceId },
+      publish: { traceId: createPublishingTraceId() },
       hybridInfo: {},
-      draft: { isPublished: false, disabled: 1 },
+      draft: isPublished
+        ? {
+            contentId: String(options.answerId),
+            isPublished: true,
+            disabled: 1,
+          }
+        : { isPublished: false, disabled: 1 },
       extra_info: {
-        question_id: String(questionId),
+        question_id: questionIdString,
         publisher: 'pc',
+        include: ANSWER_PUBLISH_INCLUDE,
+        pc_business_params: businessParams,
       },
       hybrid: {
-        html: htmlContent,
-        textLength: text.length,
+        html,
+        textLength: getPublishingTextLength(html),
       },
-      reprint: { reshipment_settings: 'allowed' },
-      commentsPermission: { comment_permission: 'all' },
+      reprint: {},
+      commentsPermission: {},
       appreciate: { can_reward: false, tagline: '' },
       publishSwitch: { draft_type: 'normal' },
       creationStatement: {
@@ -126,15 +289,32 @@ export const createAnswer = async (
       },
       commercialReportInfo: { isReport: 0 },
       toFollower: {},
-      contentsTables: { table_of_contents_enabled: false },
+      contentsTables: {
+        table_of_contents_enabled: tableOfContentsEnabled,
+      },
       thanksInvitation: { thank_inviter_status: 'close', thank_inviter: '' },
     },
   };
-
-  // 使用 /content/publish 接口
   const res = await apiClient.post('/content/publish', payload);
-  return res.data;
+  return parsePublishedContentResult(res.data);
+}
+
+export const createAnswer = async (
+  questionId: string | number,
+  html: string,
+  options: AnswerPublishOptions = {},
+): Promise<PublishedContentResult> => {
+  await saveAnswerDraft(questionId, html, options);
+  return publishAnswer(questionId, html, options);
 };
+
+export const updateAnswer = async (
+  questionId: string | number,
+  answerId: string | number,
+  html: string,
+  options: Omit<AnswerPublishOptions, 'answerId'> = {},
+): Promise<PublishedContentResult> =>
+  createAnswer(questionId, html, { ...options, answerId });
 
 export const deleteAnswer = async (id: string | number) => {
   const res = await apiClient.delete(`/answers/${id}`);

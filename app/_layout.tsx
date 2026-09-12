@@ -32,6 +32,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { resolveThemeColors } from '@/constants/theme';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { consumeAppClipboardText } from '@/utils/clipboard';
+import { shouldRetryQuery } from '@/utils/query';
 
 Sentry.init({
   dsn: 'https://93a6099dd49b040d9c516485eb3c72f6@o4511051860672512.ingest.de.sentry.io/4511051866112080',
@@ -62,14 +63,7 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: (failureCount, error: any) => {
-        // 如果是人机验证错误（40352），停止自动重试，等待弹窗加载
-        if (error?.response?.data?.error?.code === 40352) {
-          return false;
-        }
-        // 其他错误默认重试 2 次 (共三次尝试)
-        return failureCount < 2;
-      },
+      retry: shouldRetryQuery,
       // 这里的配置确保不会因为网络瞬间闪烁在验证期间反复弹窗
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     },
@@ -239,21 +233,16 @@ function RootLayout() {
                   },
                   headerTintColor: currentTint,
                   headerShadowVisible: false,
+                  headerBackButtonDisplayMode: 'minimal',
                 }}
               >
-                {/* 底部 Tab 主框架 */}
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-
                 {/* 开发工具自带嵌套导航；生产环境会由 dev layout 重定向 */}
                 <Stack.Screen name="dev" options={{ headerShown: false }} />
 
                 {/* 文章详情页：从右侧推入 */}
                 <Stack.Screen
-                  name="article/[id]"
-                  options={{
-                    headerTitle: '正文',
-                    headerBackTitle: '返回',
-                  }}
+                  name="(tabs)"
+                  options={{ headerShown: false, title: '知乎' }}
                 />
 
                 {/* 登录页：建议做成从底部弹出的 Modal */}
@@ -261,7 +250,6 @@ function RootLayout() {
                   name="login/index"
                   options={{
                     presentation: 'modal',
-                    headerTitle: '登录知乎',
                     headerLeft: () => null,
                   }}
                 />

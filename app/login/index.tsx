@@ -1,6 +1,6 @@
 import CookieManager from '@preeternal/react-native-cookie-manager';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
@@ -110,6 +110,7 @@ export default function LoginScreen() {
 
   return (
     <View className="flex-1">
+      <Stack.Screen options={{ title: '登录知乎' }} />
       {/* 顶部标题栏 */}
       <View
         type="surface"
@@ -144,7 +145,14 @@ export default function LoginScreen() {
         }}
         onNavigationStateChange={(navState) => {
           const { url } = navState;
-          console.log('🌐 导航至:', url);
+          let safeUrl = url.split('?')[0];
+          try {
+            const parsedUrl = new URL(url);
+            safeUrl = `${parsedUrl.origin}${parsedUrl.pathname}`;
+          } catch {
+            // Keep only the URL path when navigation reports a non-standard URL.
+          }
+          console.log('🌐 导航至:', safeUrl);
           if (
             url === 'https://www.zhihu.com/' ||
             url === 'https://www.zhihu.com'

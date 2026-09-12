@@ -3,6 +3,7 @@ import type {
   ZhihuMemberRelation,
   ZhihuPaging,
 } from '@/types/zhihu';
+import { getRecentActivityTargetId } from '@/utils/userProfile';
 import apiClient from '../client';
 
 export const MEMBER_INCLUDE =
@@ -40,9 +41,73 @@ export interface ZhihuListResponse<T> {
 
 export interface ZhihuMemberActivity {
   id?: string | number;
-  target?: ZhihuMemberRelation;
+  source?: {
+    action_text?: string;
+    action_time?: number;
+    action_type?: string;
+  };
+  target?: ZhihuMemberActivityTarget;
   type?: string;
   url?: string;
+}
+
+export interface ZhihuMemberActivityTarget {
+  id?: string | number;
+  type?: string;
+  url?: string;
+  title?: string;
+  excerpt?: string;
+  excerpt_title?: string;
+  content?: string | ZhihuMemberActivityContentSegment[];
+  image_url?: string;
+  thumbnail?: string;
+  voteup_count?: number;
+  reaction_count?: number;
+  comment_count?: number;
+  favlists_count?: number;
+  created?: number;
+  created_time?: number;
+  relationship?: { voting?: number };
+  author?: Partial<ZhihuAuthor>;
+  question?: {
+    id?: string | number;
+    title?: string;
+  };
+  [key: string]: unknown;
+}
+
+export interface ZhihuMemberActivityContentSegment {
+  type: string;
+  content?: string;
+  own_text?: string;
+  url?: string;
+  data_draft_cover?: string;
+}
+
+export interface ZhihuRecentActivityCursor {
+  offset: number;
+  pageNum: number;
+}
+
+interface RawZhihuMemberActivity extends Omit<ZhihuMemberActivity, 'target'> {
+  source?: {
+    action_text?: string;
+    action_time?: number;
+    action_type?: string;
+  };
+  target?: {
+    id?: string | number;
+    type?: string;
+    url?: string;
+    created?: number;
+    created_time?: number;
+    reaction_relation?: { vote?: number | string };
+    relationship?: {
+      voting?: number | string;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  };
 }
 
 export interface ZhihuFollowResponse {
@@ -93,6 +158,64 @@ export const getMemberActivities = async (
     },
   });
   return res.data;
+};
+
+/** 获取「最近更新」入口对应用户的纯发布流。 */
+export const getRecentMemberActivities = async (
+  memberId: string | number,
+  cursor: ZhihuRecentActivityCursor,
+): Promise<ZhihuListResponse<ZhihuMemberActivity>> => {
+  const url = `https://api.zhihu.com/moments/recent/people/${memberId}/activities`;
+  const res = await apiClient.get<ZhihuListResponse<RawZhihuMemberActivity>>(
+    url,
+    {
+      params: {
+        action: 'down',
+        offset: cursor.offset,
+        page_num: cursor.pageNum,
+      },
+      headers: {
+        'x-api-version': '3.0.93',
+        'x-page-id': '10103',
+      },
+    },
+  );
+
+  return {
+    ...res.data,
+    data: res.data.data.map((activity) => {
+      const { source, target } = activity;
+      if (!target) {
+        return {
+          id: activity.id,
+          source,
+          type: activity.type,
+          url: activity.url,
+        };
+      }
+
+      const voting =
+        target.relationship?.voting ?? target.reaction_relation?.vote;
+      const normalizedVoting =
+        voting === undefined ? undefined : Number(voting);
+
+      return {
+        ...activity,
+        target: {
+          ...target,
+          // Pin ids exceed Number.MAX_SAFE_INTEGER. The URL retains the exact
+          // decimal string after JSON parsing, while the numeric id does not.
+          id: getRecentActivityTargetId(target),
+          type: target.type === 'moments_pin' ? 'pin' : target.type,
+          created: target.created ?? target.created_time ?? source?.action_time,
+          relationship:
+            normalizedVoting !== undefined && Number.isFinite(normalizedVoting)
+              ? { ...target.relationship, voting: normalizedVoting }
+              : undefined,
+        },
+      };
+    }),
+  };
 };
 
 export const getMemberRelations = async (
