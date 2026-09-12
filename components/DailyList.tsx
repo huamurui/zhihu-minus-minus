@@ -22,10 +22,12 @@ import {
 } from '@/hooks/useCollapsibleChromeScroll';
 import { refreshInfiniteQuery } from '@/utils/query';
 import { BouncyButton } from './BouncyButton';
+import { PullToRefresh } from './PullToRefresh';
 
 const AnimatedFlashList = Animated.createAnimatedComponent(
   FlashList,
 ) as typeof FlashList;
+const MIN_REFRESH_INDICATOR_MS = 500;
 
 // --- 类型定义 ---
 type Story = {
@@ -115,7 +117,10 @@ export const DailyList = React.forwardRef<
   const router = useRouter();
   const colorScheme = useColorScheme();
   const primaryColor = useThemeColor({}, 'primary');
+  const backgroundColor = useThemeColor({}, 'background');
+  const indicatorTrackColor = useThemeColor({}, 'border');
   const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const refreshInFlightRef = React.useRef(false);
 
   const {
     data,
@@ -123,7 +128,6 @@ export const DailyList = React.forwardRef<
     hasNextPage,
     isFetchingNextPage,
     isLoading,
-    isRefetching,
     refetch,
   } = useInfiniteQuery({
     queryKey: ['zhihu-daily'],
@@ -138,14 +142,23 @@ export const DailyList = React.forwardRef<
   });
 
   const handleRefresh = useCallback(async () => {
+    if (refreshInFlightRef.current) return;
+
+    refreshInFlightRef.current = true;
+    const startedAt = Date.now();
     setIsRefreshing(true);
     onRefreshStateChange?.(true);
     try {
       await refreshInfiniteQuery(queryClient, ['zhihu-daily'], refetch);
     } catch (_e) {
     } finally {
+      const remaining = MIN_REFRESH_INDICATOR_MS - (Date.now() - startedAt);
+      if (remaining > 0) {
+        await new Promise<void>((resolve) => setTimeout(resolve, remaining));
+      }
       setIsRefreshing(false);
       onRefreshStateChange?.(false);
+      refreshInFlightRef.current = false;
     }
   }, [queryClient, refetch, onRefreshStateChange]);
 
@@ -173,7 +186,7 @@ export const DailyList = React.forwardRef<
     refresh: handleRefresh,
   }));
 
-  if (isLoading) {
+  if (isLoading && !isRefreshing) {
     return (
       <View className="flex-1">
         {[1, 2, 3, 4, 5].map((i) => (
@@ -183,7 +196,7 @@ export const DailyList = React.forwardRef<
     );
   }
 
-  if (!isLoading && flattenedData.length === 0) {
+  if (!isLoading && !isRefreshing && flattenedData.length === 0) {
     return (
       <View className="flex-1 justify-center items-center p-10">
         <Ionicons
@@ -205,13 +218,22 @@ export const DailyList = React.forwardRef<
     );
   }
 
-  const showRefreshing = isRefreshing || isRefetching;
-
   return (
-    <View className="flex-1">
+    <PullToRefresh
+      enabled={chrome.enabled}
+      indicatorTop={insets.top + 60}
+      onRefresh={handleRefresh}
+      refreshing={isRefreshing}
+      backgroundColor={backgroundColor}
+      indicatorColor={primaryColor}
+      indicatorTrackColor={indicatorTrackColor}
+    >
       <AnimatedFlashList
         ref={flashListRef}
         showsVerticalScrollIndicator={false}
+        bounces
+        alwaysBounceVertical
+        overScrollMode="never"
         data={flattenedData}
         keyExtractor={(item: ListItem, index: number) =>
           item.type === 'date' ? item.date : item.data.id.toString() + index
@@ -221,8 +243,6 @@ export const DailyList = React.forwardRef<
           hasNextPage && !isFetchingNextPage && fetchNextPage()
         }
         onEndReachedThreshold={0.5}
-        onRefresh={handleRefresh}
-        refreshing={showRefreshing}
         onScroll={scrollHandler}
         scrollEventThrottle={16}
         contentContainerStyle={{
@@ -278,6 +298,6 @@ export const DailyList = React.forwardRef<
           ) : null
         }
       />
-    </View>
+    </PullToRefresh>
   );
 });
