@@ -178,7 +178,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   defaultTab: 'recommend',
   localCityName: null,
   borderRadius: 12,
-  useWebView: false,
+  useWebView: true,
   enablePrivateMessaging: false,
   pressOpacity: 0.82,
   pressScale: 0.98,
