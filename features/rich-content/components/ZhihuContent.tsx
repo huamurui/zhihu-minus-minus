@@ -60,8 +60,6 @@ export interface ZhihuContentProps {
   type: 'answer' | 'article' | 'pin' | 'question';
   onRefresh?: () => void;
   useNative?: boolean;
-  /** Daily-article bodies open with the author's small avatar; forwarded to the WebView renderer. */
-  isDaily?: boolean;
 }
 
 interface LinkCardDisplay {
@@ -763,7 +761,6 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
     type,
     onRefresh,
     useNative,
-    isDaily,
   }) => {
     const colorScheme = useColorScheme();
     const { width } = useWindowDimensions();
@@ -1308,7 +1305,6 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
                   : undefined
               }
               style={domStyle}
-              isDaily={isDaily}
             />
           </View>
         )}
