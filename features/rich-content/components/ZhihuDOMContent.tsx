@@ -24,6 +24,8 @@ export interface ZhihuDOMContentProps {
   onTextSelected?: (info: TextSelectionInfo | null) => void;
   onReady?: () => void;
   style?: object;
+  /** Daily-article bodies lead with the author's small avatar image; tag it so it renders as a round thumbnail instead of a full-width block. */
+  isDaily?: boolean;
 }
 
 export default React.memo(function ZhihuDOMContent({
@@ -38,6 +40,7 @@ export default React.memo(function ZhihuDOMContent({
   onTextSelected,
   onReady,
   style,
+  isDaily,
 }: ZhihuDOMContentProps) {
   const [height, setHeight] = useState(400);
   const [_loading, _setLoading] = useState(true);
@@ -101,6 +104,17 @@ export default React.memo(function ZhihuDOMContent({
           border-radius: 12px;
           margin: 10px 0;
           cursor: pointer;
+        }
+        /* Daily articles open with the author's small round avatar (first <img class="avatar">); keep it tiny and circular, inline with the author name. */
+        .zhihu-content img.daily-avatar {
+          width: 36px !important;
+          height: 36px !important;
+          border-radius: 50% !important;
+          margin: 0 8px 0 0 !important;
+          object-fit: cover;
+          display: inline-block;
+          vertical-align: middle;
+          cursor: default;
         }
         .zhihu-content figure {
           margin: 15px 0;
@@ -201,6 +215,7 @@ export default React.memo(function ZhihuDOMContent({
         const htmlContent = ${JSON.stringify(htmlContent)};
         const segmentInfosStr = ${JSON.stringify(segmentInfosStr || '[]')};
         const linkCardInfoStr = ${JSON.stringify(linkCardInfoStr || '{}')};
+        const isDaily = ${isDaily ? 'true' : 'false'};
 
         const container = document.getElementById('content');
         container.innerHTML = htmlContent;
@@ -282,6 +297,14 @@ export default React.memo(function ZhihuDOMContent({
           }
           anchor.replaceWith(card);
         });
+
+        // Daily articles lead with the author's small avatar (the first
+        // <img class="avatar">). Tag it so CSS renders it as a round thumbnail
+        // instead of a full-width block image.
+        if (isDaily) {
+          const avatarImg = container.querySelector('img.avatar') || container.querySelector('img');
+          if (avatarImg) avatarImg.classList.add('daily-avatar');
+        }
 
         // Process images
         const images = container.querySelectorAll('img');
