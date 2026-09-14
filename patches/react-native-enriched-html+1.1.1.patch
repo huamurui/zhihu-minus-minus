@@ -2,112 +2,80 @@ diff --git a/node_modules/react-native-enriched-html/ReactNativeEnrichedHtml.pod
 index 0af0fb0..fb6a8ab 100644
 --- a/node_modules/react-native-enriched-html/ReactNativeEnrichedHtml.podspec
 +++ b/node_modules/react-native-enriched-html/ReactNativeEnrichedHtml.podspec
-@@ -28,4 +28,6 @@ else
-   s.dependency "React-Core"
- end
- 
+@@ -30,0 +31,2 @@ end
 +s.dependency "SDWebImageSVGCoder", "~> 1.7.0"
 +
- end
 diff --git a/node_modules/react-native-enriched-html/android/build.gradle b/node_modules/react-native-enriched-html/android/build.gradle
 index cd36195..bfc1e5b 100644
 --- a/node_modules/react-native-enriched-html/android/build.gradle
 +++ b/node_modules/react-native-enriched-html/android/build.gradle
-@@ -95,6 +95,7 @@ def kotlin_version = getExtOrDefault("kotlinVersion")
- 
- dependencies {
- 	implementation "com.facebook.react:react-android"
+@@ -97,0 +98 @@ dependencies {
 +	implementation "com.caverock:androidsvg-aar:1.4"
- 	implementation 'org.ccil.cowan.tagsoup:tagsoup:1.2.1'
- 	implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
- }
+diff --git a/node_modules/react-native-enriched-html/android/generated/java/com/facebook/react/viewmanagers/EnrichedTextViewManagerDelegate.java b/node_modules/react-native-enriched-html/android/generated/java/com/facebook/react/viewmanagers/EnrichedTextViewManagerDelegate.java
+index acfd319..573e7a7 100644
+--- a/node_modules/react-native-enriched-html/android/generated/java/com/facebook/react/viewmanagers/EnrichedTextViewManagerDelegate.java
++++ b/node_modules/react-native-enriched-html/android/generated/java/com/facebook/react/viewmanagers/EnrichedTextViewManagerDelegate.java
+@@ -57,0 +58,3 @@ public class EnrichedTextViewManagerDelegate<T extends View, U extends BaseViewM
++      case "lineHeight":
++        mViewManager.setLineHeight(view, value == null ? 0f : ((Double) value).floatValue());
++        break;
+diff --git a/node_modules/react-native-enriched-html/android/generated/java/com/facebook/react/viewmanagers/EnrichedTextViewManagerInterface.java b/node_modules/react-native-enriched-html/android/generated/java/com/facebook/react/viewmanagers/EnrichedTextViewManagerInterface.java
+index 7dedc37..d6f4be0 100644
+--- a/node_modules/react-native-enriched-html/android/generated/java/com/facebook/react/viewmanagers/EnrichedTextViewManagerInterface.java
++++ b/node_modules/react-native-enriched-html/android/generated/java/com/facebook/react/viewmanagers/EnrichedTextViewManagerInterface.java
+@@ -27,0 +28 @@ public interface EnrichedTextViewManagerInterface<T extends View> extends ViewMa
++  void setLineHeight(T view, float value);
+diff --git a/node_modules/react-native-enriched-html/android/generated/jni/react/renderer/components/ReactNativeEnrichedSpec/Props.cpp b/node_modules/react-native-enriched-html/android/generated/jni/react/renderer/components/ReactNativeEnrichedSpec/Props.cpp
+index 9569683..ecc544f 100644
+--- a/node_modules/react-native-enriched-html/android/generated/jni/react/renderer/components/ReactNativeEnrichedSpec/Props.cpp
++++ b/node_modules/react-native-enriched-html/android/generated/jni/react/renderer/components/ReactNativeEnrichedSpec/Props.cpp
+@@ -196,0 +197 @@ EnrichedTextViewProps::EnrichedTextViewProps(
++    lineHeight(convertRawProp(context, rawProps, "lineHeight", sourceProps.lineHeight, {0.0})),
+@@ -256,0 +258,3 @@ folly::dynamic EnrichedTextViewProps::getDiffProps(
++  if ((lineHeight != oldProps->lineHeight) && !(std::isnan(lineHeight) && std::isnan(oldProps->lineHeight))) {
++    result["lineHeight"] = lineHeight;
++  }
+diff --git a/node_modules/react-native-enriched-html/android/generated/jni/react/renderer/components/ReactNativeEnrichedSpec/Props.h b/node_modules/react-native-enriched-html/android/generated/jni/react/renderer/components/ReactNativeEnrichedSpec/Props.h
+index b8da319..0f37923 100644
+--- a/node_modules/react-native-enriched-html/android/generated/jni/react/renderer/components/ReactNativeEnrichedSpec/Props.h
++++ b/node_modules/react-native-enriched-html/android/generated/jni/react/renderer/components/ReactNativeEnrichedSpec/Props.h
+@@ -1617,0 +1618 @@ class EnrichedTextViewProps final : public ViewProps {
++  Float lineHeight{0.0};
 diff --git a/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/common/AsyncDrawable.kt b/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/common/AsyncDrawable.kt
 index 6198ead..770b0ae 100644
 --- a/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/common/AsyncDrawable.kt
 +++ b/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/common/AsyncDrawable.kt
-@@ -1,12 +1,14 @@
- package com.swmansion.enriched.common
- 
- import android.content.res.Resources
+@@ -3,0 +4 @@ import android.content.res.Resources
 +import android.graphics.Bitmap
- import android.graphics.BitmapFactory
- import android.graphics.Canvas
- import android.graphics.Color
- import android.graphics.ColorFilter
- import android.graphics.ImageDecoder
- import android.graphics.PixelFormat
+@@ -9,0 +11 @@ import android.graphics.PixelFormat
 +import android.graphics.RectF
- import android.graphics.drawable.AnimatedImageDrawable
- import android.graphics.drawable.Drawable
- import android.os.Build
-@@ -14,18 +16,26 @@ import android.os.Handler
- import android.os.Looper
- import android.util.Log
- import androidx.core.graphics.drawable.toDrawable
+@@ -16,0 +19 @@ import androidx.core.graphics.drawable.toDrawable
 +import com.caverock.androidsvg.SVG
- import com.swmansion.enriched.R
+@@ -17,0 +21 @@ import com.swmansion.enriched.R
 +import java.io.ByteArrayInputStream
- import java.net.URL
- import java.nio.ByteBuffer
- import java.util.concurrent.Executors
- 
- class AsyncDrawable(
-   private val url: String,
+@@ -23,0 +28,2 @@ class AsyncDrawable(
 +  width: Int,
 +  height: Int,
- ) : Drawable() {
+@@ -24,0 +31,2 @@ class AsyncDrawable(
 +  private val targetWidth = (width * Resources.getSystem().displayMetrics.density).toInt().coerceAtLeast(1)
 +  private val targetHeight = (height * Resources.getSystem().displayMetrics.density).toInt().coerceAtLeast(1)
-   private var internalDrawable: Drawable = Color.TRANSPARENT.toDrawable()
-   private val mainHandler = Handler(Looper.getMainLooper())
-   private val executor = Executors.newSingleThreadExecutor()
-   var isLoaded = false
+@@ -28,0 +37,2 @@ class AsyncDrawable(
 +  var isFormulaSvg = false
 +    private set
- 
-   init {
-     internalDrawable.bounds = bounds
-@@ -37,8 +47,7 @@ class AsyncDrawable(
-     executor.execute {
-       try {
-         isLoaded = false
+@@ -40,2 +50 @@ class AsyncDrawable(
 -        val inputStream = URL(url).openStream()
 -        val bytes = inputStream.readBytes()
 +        val bytes = URL(url).openStream().use { it.readBytes() }
-         val d = prepareDrawable(bytes)
- 
-         // Switch to Main Thread to update UI
-@@ -51,7 +60,7 @@ class AsyncDrawable(
-           }
-         }
-       } catch (e: Exception) {
+@@ -54 +63 @@ class AsyncDrawable(
 -        Log.e("AsyncDrawable", "Failed to load: $url", e)
 +        Log.e("AsyncDrawable", "Failed to load remote image", e)
- 
-         loadPlaceholderImage()
-       } finally {
-@@ -62,6 +71,8 @@ class AsyncDrawable(
-   }
- 
-   private fun prepareDrawable(bytes: ByteArray): Drawable? {
+@@ -64,0 +74,2 @@ class AsyncDrawable(
 +    prepareSvgDrawable(bytes)?.let { return it }
 +
-     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-       try {
-         val buffer = ByteBuffer.wrap(bytes)
-@@ -69,7 +80,7 @@ class AsyncDrawable(
- 
-         val drawable =
-           ImageDecoder.decodeDrawable(source) { decoder, _, _ ->
+@@ -72 +83 @@ class AsyncDrawable(
 -            decoder.setTargetSize(bounds.width(), bounds.height())
 +            decoder.setTargetSize(targetWidth, targetHeight)
-           }
- 
-         if (drawable is AnimatedImageDrawable) {
-@@ -93,6 +104,28 @@ class AsyncDrawable(
-     }
-   }
- 
+@@ -95,0 +107,22 @@ class AsyncDrawable(
 +  private fun prepareSvgDrawable(bytes: ByteArray): Drawable? {
 +    val prefix = bytes.decodeToString(0, minOf(bytes.size, 512)).trimStart('\uFEFF', ' ', '\t', '\r', '\n')
 +    if (!prefix.startsWith("<svg", ignoreCase = true) &&
@@ -130,47 +98,153 @@ index 6198ead..770b0ae 100644
 +    }
 +  }
 +
-   private fun loadPlaceholderImage() {
-     internalDrawable = ResourceManager.getDrawableResource(R.drawable.broken_image)
-   }
 diff --git a/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/common/spans/EnrichedImageSpan.kt b/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/common/spans/EnrichedImageSpan.kt
 index ba09436..795bd82 100644
 --- a/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/common/spans/EnrichedImageSpan.kt
 +++ b/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/common/spans/EnrichedImageSpan.kt
-@@ -43,6 +43,9 @@ open class EnrichedImageSpan :
-     paint: Paint,
-   ) {
-     val drawable = drawable
+@@ -45,0 +46,3 @@ open class EnrichedImageSpan :
 +    if (drawable is AsyncDrawable && drawable.isFormulaSvg) {
 +      drawable.setTint(paint.color)
 +    }
-     canvas.withSave {
-       val transY = bottom - drawable.bounds.bottom - paint.fontMetricsInt.descent
-       translate(x, transY.toFloat())
-@@ -138,7 +141,7 @@ open class EnrichedImageSpan :
-       var cleanPath = src
- 
-       if (cleanPath.startsWith("http://") || cleanPath.startsWith("https://")) {
+@@ -141 +144 @@ open class EnrichedImageSpan :
 -        return AsyncDrawable(cleanPath)
 +        return AsyncDrawable(cleanPath, width, height)
-       }
- 
-       if (cleanPath.startsWith("file://")) {
+diff --git a/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/text/EnrichedTextView.kt b/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/text/EnrichedTextView.kt
+index 53a0a50..3aaff50 100644
+--- a/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/text/EnrichedTextView.kt
++++ b/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/text/EnrichedTextView.kt
+@@ -32,0 +33 @@ import com.swmansion.enriched.text.spans.interfaces.EnrichedTextSpan
++import com.swmansion.enriched.textinput.spans.EnrichedLineHeightSpan
+@@ -43,0 +45 @@ class EnrichedTextView : AppCompatTextView {
++  private var lineHeightRaw: Float? = null
+@@ -50,0 +53 @@ class EnrichedTextView : AppCompatTextView {
++      valueDirty = true
+@@ -181,2 +184,2 @@ class EnrichedTextView : AppCompatTextView {
+-      parsedText = parsed
+-      setText(parsed, BufferType.NORMAL)
++      parsedText = applyLineHeight(parsed)
++      setText(parsedText, BufferType.NORMAL)
+@@ -185,2 +188,18 @@ class EnrichedTextView : AppCompatTextView {
+-      parsedText = null
+-      this.text = text
++      parsedText = applyLineHeight(text)
++      this.text = parsedText
++    }
++  }
++
++  private fun applyLineHeight(text: CharSequence): CharSequence {
++    val lineHeight = lineHeightRaw ?: return text
++    if (text.isEmpty()) return text
++
++    return SpannableString(text).apply {
++      setSpan(
++        EnrichedLineHeightSpan(lineHeight, allowFontScaling),
++        0,
++        length,
++        Spannable.SPAN_INCLUSIVE_INCLUSIVE,
++      )
++    }
++  }
+@@ -307,0 +325,8 @@ class EnrichedTextView : AppCompatTextView {
++  fun setLineHeight(height: Float) {
++    val nextLineHeight = height.takeIf { it > 0f }
++    if (lineHeightRaw == nextLineHeight) return
++
++    lineHeightRaw = nextLineHeight
++    valueDirty = true
++  }
++
+diff --git a/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/text/EnrichedTextViewManager.kt b/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/text/EnrichedTextViewManager.kt
+index 62f9125..cfce40f 100644
+--- a/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/text/EnrichedTextViewManager.kt
++++ b/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/text/EnrichedTextViewManager.kt
+@@ -55,0 +56,7 @@ class EnrichedTextViewManager :
++  override fun setLineHeight(
++    view: EnrichedTextView?,
++    value: Float,
++  ) {
++    view?.setLineHeight(value)
++  }
++
+diff --git a/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/text/MeasurementStore.kt b/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/text/MeasurementStore.kt
+index b82c752..4cf5630 100644
+--- a/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/text/MeasurementStore.kt
++++ b/node_modules/react-native-enriched-html/android/src/main/java/com/swmansion/enriched/text/MeasurementStore.kt
+@@ -7,0 +8,2 @@ import android.text.StaticLayout
++import android.text.Spannable
++import android.text.SpannableString
+@@ -23,0 +26 @@ import com.swmansion.enriched.common.pixelFromSpOrDp
++import com.swmansion.enriched.textinput.spans.EnrichedLineHeightSpan
+@@ -112 +115 @@ object MeasurementStore {
+-      return text
++      return applyLineHeight(text, props)
+@@ -123 +126 @@ object MeasurementStore {
+-      return parsed.trimEnd('\n')
++      return applyLineHeight(parsed.trimEnd('\n'), props)
+@@ -126 +129,28 @@ object MeasurementStore {
+-      return text
++      return applyLineHeight(text, props)
++    }
++  }
++
++  private fun applyLineHeight(
++    text: CharSequence,
++    props: ReadableMap?,
++  ): CharSequence {
++    val lineHeight =
++      if (props?.hasKey("lineHeight") == true && !props.isNull("lineHeight")) {
++        props.getDouble("lineHeight").toFloat()
++      } else {
++        0f
++      }
++    if (lineHeight <= 0f || text.isEmpty()) return text
++
++    return SpannableString(text).apply {
++      setSpan(
++        EnrichedLineHeightSpan(
++          lineHeight,
++          allowFontScalingFromProps(props),
++        ),
++        0,
++        length,
++        Spannable.SPAN_INCLUSIVE_INCLUSIVE,
++      )
++    }
++  }
+diff --git a/node_modules/react-native-enriched-html/ios/EnrichedTextView.mm b/node_modules/react-native-enriched-html/ios/EnrichedTextView.mm
+index 16ef470..2396367 100644
+--- a/node_modules/react-native-enriched-html/ios/EnrichedTextView.mm
++++ b/node_modules/react-native-enriched-html/ios/EnrichedTextView.mm
+@@ -156,0 +157,6 @@ - (void)updateProps:(Props::Shared const &)props
++  // lineHeight
++  if (newViewProps.lineHeight != oldViewProps.lineHeight) {
++    [newConfig setPrimaryLineHeight:newViewProps.lineHeight];
++    stylePropChanged = YES;
++  }
++
+diff --git a/node_modules/react-native-enriched-html/ios/generated/ReactCodegen/ReactNativeEnrichedSpec/Props.cpp b/node_modules/react-native-enriched-html/ios/generated/ReactCodegen/ReactNativeEnrichedSpec/Props.cpp
+index 9569683..ecc544f 100644
+--- a/node_modules/react-native-enriched-html/ios/generated/ReactCodegen/ReactNativeEnrichedSpec/Props.cpp
++++ b/node_modules/react-native-enriched-html/ios/generated/ReactCodegen/ReactNativeEnrichedSpec/Props.cpp
+@@ -196,0 +197 @@ EnrichedTextViewProps::EnrichedTextViewProps(
++    lineHeight(convertRawProp(context, rawProps, "lineHeight", sourceProps.lineHeight, {0.0})),
+@@ -256,0 +258,3 @@ folly::dynamic EnrichedTextViewProps::getDiffProps(
++  if ((lineHeight != oldProps->lineHeight) && !(std::isnan(lineHeight) && std::isnan(oldProps->lineHeight))) {
++    result["lineHeight"] = lineHeight;
++  }
+diff --git a/node_modules/react-native-enriched-html/ios/generated/ReactCodegen/ReactNativeEnrichedSpec/Props.h b/node_modules/react-native-enriched-html/ios/generated/ReactCodegen/ReactNativeEnrichedSpec/Props.h
+index b8da319..0f37923 100644
+--- a/node_modules/react-native-enriched-html/ios/generated/ReactCodegen/ReactNativeEnrichedSpec/Props.h
++++ b/node_modules/react-native-enriched-html/ios/generated/ReactCodegen/ReactNativeEnrichedSpec/Props.h
+@@ -1617,0 +1618 @@ class EnrichedTextViewProps final : public ViewProps {
++  Float lineHeight{0.0};
 diff --git a/node_modules/react-native-enriched-html/ios/interfaces/ImageAttachment.mm b/node_modules/react-native-enriched-html/ios/interfaces/ImageAttachment.mm
 index c852966..177fb43 100644
 --- a/node_modules/react-native-enriched-html/ios/interfaces/ImageAttachment.mm
 +++ b/node_modules/react-native-enriched-html/ios/interfaces/ImageAttachment.mm
-@@ -1,5 +1,6 @@
- #import "ImageAttachment.h"
- #import "ImageExtension.h"
+@@ -2,0 +3 @@
 +#import <SDWebImageSVGCoder/SDImageSVGCoder.h>
- 
- // NSTextStorage frequently recreates NSTextAttachment objects during attribute
- // invalidation (e.g. on every keystroke). Without this cache each recreation
-@@ -82,12 +83,27 @@ - (void)loadAsync {
-   dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-     NSData *bytes = [NSData dataWithContentsOfURL:url];
- 
+@@ -85,6 +86,21 @@ - (void)loadAsync {
 -    // We pass all image data (including static formats like PNG or JPEG)
 -    // through the animated image parser. It safely acts as a universal parser,
 -    // returning a single-frame UIImage for static formats and an animated
@@ -198,6 +272,21 @@ index c852966..177fb43 100644
 +    if (img == nil) {
 +      img = [UIImage systemImageNamed:@"photo"];
 +    }
- 
-     dispatch_async(dispatch_get_main_queue(), ^{
-       if (bytes != nil && img != nil && self.uri.length > 0) {
+diff --git a/node_modules/react-native-enriched-html/lib/module/spec/EnrichedTextNativeComponent.ts b/node_modules/react-native-enriched-html/lib/module/spec/EnrichedTextNativeComponent.ts
+index fec62bd..f25ff8a 100644
+--- a/node_modules/react-native-enriched-html/lib/module/spec/EnrichedTextNativeComponent.ts
++++ b/node_modules/react-native-enriched-html/lib/module/spec/EnrichedTextNativeComponent.ts
+@@ -102,0 +103 @@ export interface NativeProps extends ViewProps {
++  lineHeight?: Float;
+diff --git a/node_modules/react-native-enriched-html/lib/typescript/src/spec/EnrichedTextNativeComponent.d.ts b/node_modules/react-native-enriched-html/lib/typescript/src/spec/EnrichedTextNativeComponent.d.ts
+index cb5dffd..ff53965 100644
+--- a/node_modules/react-native-enriched-html/lib/typescript/src/spec/EnrichedTextNativeComponent.d.ts
++++ b/node_modules/react-native-enriched-html/lib/typescript/src/spec/EnrichedTextNativeComponent.d.ts
+@@ -81,0 +82 @@ export interface NativeProps extends ViewProps {
++    lineHeight?: Float;
+diff --git a/node_modules/react-native-enriched-html/src/spec/EnrichedTextNativeComponent.ts b/node_modules/react-native-enriched-html/src/spec/EnrichedTextNativeComponent.ts
+index fec62bd..f25ff8a 100644
+--- a/node_modules/react-native-enriched-html/src/spec/EnrichedTextNativeComponent.ts
++++ b/node_modules/react-native-enriched-html/src/spec/EnrichedTextNativeComponent.ts
+@@ -102,0 +103 @@ export interface NativeProps extends ViewProps {
++  lineHeight?: Float;

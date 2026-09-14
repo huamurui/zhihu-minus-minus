@@ -1,0 +1,343 @@
+{
+  "type": "question_feed_card",
+  "target_type": "answer",
+  "target": {
+    "admin_closed_comment": false,
+    "allow_segment_interaction": 1,
+    "annotation_action": null,
+    "answer_type": "normal",
+    "attached_info": "",
+    "author": {
+      "avatar_url": "",
+      "avatar_url_template": "",
+      "badge": [
+        {
+          "description": "武汉科技大学 工学硕士",
+          "topics": [],
+          "type": "identity"
+        },
+        {
+          "description": "优秀答主",
+          "topics": [
+            {
+              "avatar_url": "https://picx.zhimg.com/f5b4524ab48273ed913a113d84ba009e_qhd.jpg?source=57bbeac9",
+              "id": "19562906",
+              "name": "化学",
+              "topic_type": "NORMAL",
+              "type": "topic",
+              "url": "https://www.zhihu.com/api/v4/topics/19562906"
+            }
+          ],
+          "type": "best_answerer"
+        }
+      ],
+      "badge_v2": {
+        "detail_badges": [
+          {
+            "description": "新知答主",
+            "detail_type": "zhihu_yearly_answerer",
+            "icon": "https://picx.zhimg.com/v2-4a07bc69c4bb04444721f35b32125c75_l.png?source=32738c0c",
+            "night_icon": "https://picx.zhimg.com/v2-4a07bc69c4bb04444721f35b32125c75_l.png?source=32738c0c",
+            "sources": [
+              {
+                "avatar_path": "",
+                "avatar_url": "",
+                "description": "",
+                "id": "2025",
+                "name": "",
+                "priority": 2025,
+                "token": "",
+                "type": "year",
+                "url": ""
+              }
+            ],
+            "title": "年度新知答主",
+            "type": "reward",
+            "url": "https://www.zhihu.com/question/510340037"
+          },
+          {
+            "description": "化学话题下的优秀答主",
+            "detail_type": "best_answerer",
+            "icon": "https://picx.zhimg.com/v2-4a07bc69c4bb04444721f35b32125c75_l.png?source=32738c0c",
+            "night_icon": "https://picx.zhimg.com/v2-4a07bc69c4bb04444721f35b32125c75_l.png?source=32738c0c",
+            "sources": [
+              {
+                "avatar_path": "f5b4524ab48273ed913a113d84ba009e.png",
+                "avatar_url": "https://picx.zhimg.com/f5b4524ab48273ed913a113d84ba009e_720w.jpg?source=32738c0c",
+                "description": "",
+                "id": "19562906",
+                "name": "化学",
+                "priority": 0,
+                "token": "19562906",
+                "type": "topic",
+                "url": "https://www.zhihu.com/topic/19562906"
+              }
+            ],
+            "title": "优秀答主",
+            "type": "best",
+            "url": "https://www.zhihu.com/question/48509984"
+          },
+          {
+            "description": "武汉科技大学 工学硕士",
+            "detail_type": "identity_people",
+            "icon": "https://pica.zhimg.com/v2-2ddc5cc683982648f6f123616fb4ec09_l.png?source=32738c0c",
+            "night_icon": "https://picx.zhimg.com/v2-2ddc5cc683982648f6f123616fb4ec09_l.png?source=32738c0c",
+            "sources": [],
+            "title": "已认证的个人",
+            "type": "identity",
+            "url": "https://zhuanlan.zhihu.com/p/96956163"
+          }
+        ],
+        "icon": "https://picx.zhimg.com/v2-27bfcba90e66db79ce8768ab807e017e_l.png?source=32738c0c",
+        "merged_badges": [
+          {
+            "description": "新知答主",
+            "detail_type": "best",
+            "icon": "",
+            "night_icon": "",
+            "sources": [],
+            "title": "年度新知答主",
+            "type": "best",
+            "url": "https://www.zhihu.com/question/510340037"
+          },
+          {
+            "description": "武汉科技大学 工学硕士",
+            "detail_type": "identity_people",
+            "icon": "",
+            "night_icon": "",
+            "sources": [],
+            "title": "认证",
+            "type": "identity",
+            "url": "https://zhuanlan.zhihu.com/p/96956163"
+          }
+        ],
+        "night_icon": "https://picx.zhimg.com/v2-27bfcba90e66db79ce8768ab807e017e_l.png?source=32738c0c",
+        "title": "新知答主"
+      },
+      "exposed_medal": {
+        "avatar_url": "https://picx.zhimg.com/v2-a45847d6047d4063e424b93fd17366c7_l.png?source=1def8aca",
+        "description": "2025 年度新知答主获得者",
+        "medal_avatar_frame": "",
+        "medal_id": "2025249373995418572",
+        "medal_name": "2025 年度新知答主",
+        "mini_avatar_url": "https://pic1.zhimg.com/v2-a45847d6047d4063e424b93fd17366c7_r.png?source=1def8aca"
+      },
+      "follower_count": 0,
+      "gender": 1,
+      "headline": "已脱敏",
+      "id": "fixture-author-formula-table-001",
+      "is_advertiser": false,
+      "is_followed": false,
+      "is_following": false,
+      "is_org": false,
+      "is_privacy": false,
+      "name": "脱敏用户",
+      "type": "people",
+      "url": "",
+      "url_token": "fixture-author-formula-table-001",
+      "user_type": "people"
+    },
+    "business_type": "normal",
+    "can_comment": {
+      "reason": "",
+      "status": true
+    },
+    "collapse_reason": "",
+    "collapsed_by": "nobody",
+    "comment_count": 76,
+    "comment_permission": "all",
+    "content": "<p data-pid=\"zgbgH1eR\">写个回答，来提升我作品的含💩量吧，这个题目看似是物理学和数学，实际上涉及到物理化学、流体力学、胶粘学，粑粑就是一种天然的胶粘剂，一个东西能不能粘得住，和表面材质关系很大，主要考虑到表面能。</p><figure data-size=\"normal\"><noscript><img src=\"https://picx.zhimg.com/50/v2-e929963f075091e2b21df2bf0034c0f8_720w.gif?source=1def8aca\" data-caption=\"\" data-size=\"normal\" data-rawwidth=\"324\" data-rawheight=\"324\" data-original-token=\"v2-e929963f075091e2b21df2bf0034c0f8\" data-thumbnail=\"https://picx.zhimg.com/50/v2-e929963f075091e2b21df2bf0034c0f8_720w.jpg?source=1def8aca\" class=\"content_image\" width=\"324\"/></noscript><img src=\"data:image/svg+xml;utf8,&lt;svg xmlns=&#39;http://www.w3.org/2000/svg&#39; width=&#39;324&#39; height=&#39;324&#39;&gt;&lt;/svg&gt;\" data-caption=\"\" data-size=\"normal\" data-rawwidth=\"324\" data-rawheight=\"324\" data-original-token=\"v2-e929963f075091e2b21df2bf0034c0f8\" data-thumbnail=\"https://picx.zhimg.com/50/v2-e929963f075091e2b21df2bf0034c0f8_720w.jpg?source=1def8aca\" class=\"content_image lazy\" width=\"324\" data-actualsrc=\"https://picx.zhimg.com/50/v2-e929963f075091e2b21df2bf0034c0f8_720w.gif?source=1def8aca\"/></figure><p data-pid=\"pIkUAtfD\"><b>先说说结论，尿流与马桶壁法线夹角大约 60°～80°的时候，对便便的冲击的效果较优的。</b></p><p data-pid=\"wDCps_2k\">既不能完全打直球（90°），直接正对着便便冲，也不能完全打插边球（20°~40°），就是人要站的远一点儿，让尿去冲击便便，让尿流看着明显有拍打的感觉，又能在便便表面刮着横流过去。</p><p data-pid=\"al107apB\">具体怎么做，请自行脑补我上面那段话，我这里就不亲自演示了。（哈哈哈）</p><p data-pid=\"gAdOntTJ\">因为便便的多样性，我按照胶粘剂的三种状态，大致分为三类便便，这三类便便的操作方法还可以针对性微调一下，可以求得更好的尿冲击效果。</p><figure data-size=\"normal\"><noscript><img src=\"https://picx.zhimg.com/50/v2-8e45505391d293166c90b6254b9c502d_720w.jpg?source=1def8aca\" data-size=\"normal\" data-rawwidth=\"537\" data-rawheight=\"342\" data-original-token=\"v2-c4c61df3d057ba5fdcee927b6b5f9753\" class=\"origin_image zh-lightbox-thumb\" width=\"537\" data-original=\"https://pic1.zhimg.com/v2-8e45505391d293166c90b6254b9c502d_r.jpg?source=1def8aca\"/></noscript><img src=\"data:image/svg+xml;utf8,&lt;svg xmlns=&#39;http://www.w3.org/2000/svg&#39; width=&#39;537&#39; height=&#39;342&#39;&gt;&lt;/svg&gt;\" data-size=\"normal\" data-rawwidth=\"537\" data-rawheight=\"342\" data-original-token=\"v2-c4c61df3d057ba5fdcee927b6b5f9753\" class=\"origin_image zh-lightbox-thumb lazy\" width=\"537\" data-original=\"https://pic1.zhimg.com/v2-8e45505391d293166c90b6254b9c502d_r.jpg?source=1def8aca\" data-actualsrc=\"https://picx.zhimg.com/50/v2-8e45505391d293166c90b6254b9c502d_720w.jpg?source=1def8aca\"/><figcaption>粑粑变干，类似胶水固化中的凝胶状态</figcaption></figure><p data-pid=\"gcTmniv7\">1、刚拉完、还很湿的便便。</p><p data-pid=\"QdJ-Mn1G\">可以尝试更接近垂直的角度（70°～85°）<b>​</b>，增加法向冲击，把它直接打散成小块再带走。</p><p data-pid=\"Qp1rjrC9\">2、已经半干、黏着很牢的便便。</p><p data-pid=\"oKmp4P2E\">这时候，更依赖沿壁流动产生的切向剪切力，角度可以略斜些（60°～75°），让尿流冲上去后沿着壁面往下刮。</p><p data-pid=\"-U3-SGvh\">3、完全干透，像糊上去的树脂那种的便便，</p><p data-pid=\"IX09vCuI\">这时候完全靠尿去冲击，作用都比较小了，干掉的便便，就类似固化的胶粘剂（共价作用吸附），只不过是通过范德华力、氢键、静电力来吸附。</p><p data-pid=\"ggHJfnyz\">无论怎么去微调角度，也只能部分软化，对局部去削边，尿液已经不中了，用纯机械的刮擦效果才能更好。</p><p data-pid=\"cti_sW_r\">如果你膀胱存了足够多的货，倒是可以多尿几次，多次让干透的便便湿润，等几分钟软化，再自行调高尿速，用 60°～80°的角度冲冲看。</p><hr/><h2><b>以下是严肃的科学内容，请谨慎观看。（睡前观看，效果更佳）</b></h2><figure data-size=\"normal\"><noscript><img src=\"https://pic1.zhimg.com/50/v2-85f7f1967788021304f02312052001a9_720w.jpg?source=1def8aca\" data-caption=\"\" data-size=\"normal\" data-rawwidth=\"1316\" data-rawheight=\"822\" data-original-token=\"v2-cf422055a26238cc90bbd0f1ffebebba\" class=\"origin_image zh-lightbox-thumb\" width=\"1316\" data-original=\"https://picx.zhimg.com/v2-85f7f1967788021304f02312052001a9_r.jpg?source=1def8aca\"/></noscript><img src=\"data:image/svg+xml;utf8,&lt;svg xmlns=&#39;http://www.w3.org/2000/svg&#39; width=&#39;1316&#39; height=&#39;822&#39;&gt;&lt;/svg&gt;\" data-caption=\"\" data-size=\"normal\" data-rawwidth=\"1316\" data-rawheight=\"822\" data-original-token=\"v2-cf422055a26238cc90bbd0f1ffebebba\" class=\"origin_image zh-lightbox-thumb lazy\" width=\"1316\" data-original=\"https://picx.zhimg.com/v2-85f7f1967788021304f02312052001a9_r.jpg?source=1def8aca\" data-actualsrc=\"https://pic1.zhimg.com/50/v2-85f7f1967788021304f02312052001a9_720w.jpg?source=1def8aca\"/></figure><h2><b>一、表面</b>能：<b>为啥便便会粘在马桶壁上？</b></h2><p data-pid=\"Nb7rRkMM\">从化学成分的角度看，人便便中干物质差不多是20%~30%，剩下大头都是水，干物质中有：</p><ul><li data-pid=\"zOgEPs4E\">不溶性纤维、未完全消化的多糖颗粒</li><li data-pid=\"6a1eCWM7\">脂类、胆盐</li><li data-pid=\"FQjyz1vD\">蛋白质、多糖构成的<b>黏液网络</b>（肠道分泌的 mucin 等高分子）</li><li data-pid=\"eNVPD9CG\">细菌及其胞外多糖（EPS）</li></ul><p data-pid=\"bMG0_dww\">这玩意的状态就很类似胶粘剂的组成思路：<b>含水的高分子凝胶 + 颗粒填料的复合物</b>。具有屈服应力，这类流体需要一定的剪切应力才开始流动的。（没有剪切应力，它就动不了），另外还有黏弹性，怎么说呢？就是短时间看像固体，而长时间像高粘度流体。这点在污泥和粪渣流变研究里有详细测量（沥青也是类似的状态）</p><p data-pid=\"EThBcXyP\"><br/>陶瓷马桶釉面大体上是高表面能，并且相对亲水的无机玻璃相表面，这玩意就和粪便天生相吸了。。。所以高端点的马桶都会从材质上研究怎么降低表面能，使得不粘便便这类的东西。（随便插一嘴，无广）</p><figure data-size=\"normal\"><noscript><img src=\"https://picx.zhimg.com/50/v2-458eb6045a2e0a616ac77d6759c65a2d_720w.jpg?source=1def8aca\" data-size=\"normal\" data-rawwidth=\"560\" data-rawheight=\"300\" data-original-token=\"v2-448174fe2e7307f3b6f6687839bcd069\" class=\"origin_image zh-lightbox-thumb\" width=\"560\" data-original=\"https://picx.zhimg.com/v2-458eb6045a2e0a616ac77d6759c65a2d_r.jpg?source=1def8aca\"/></noscript><img src=\"data:image/svg+xml;utf8,&lt;svg xmlns=&#39;http://www.w3.org/2000/svg&#39; width=&#39;560&#39; height=&#39;300&#39;&gt;&lt;/svg&gt;\" data-size=\"normal\" data-rawwidth=\"560\" data-rawheight=\"300\" data-original-token=\"v2-448174fe2e7307f3b6f6687839bcd069\" class=\"origin_image zh-lightbox-thumb lazy\" width=\"560\" data-original=\"https://picx.zhimg.com/v2-458eb6045a2e0a616ac77d6759c65a2d_r.jpg?source=1def8aca\" data-actualsrc=\"https://picx.zhimg.com/50/v2-458eb6045a2e0a616ac77d6759c65a2d_720w.jpg?source=1def8aca\"/><figcaption>陶瓷马桶往往是亲水的高表面能，就天然容易粘便便。</figcaption></figure><p data-pid=\"be0pcLxq\">粪便表面的蛋白质、多糖（mucin、细菌胶团），这些东西典型会<b>强烈吸附到高能表面，</b>跟蛋白质吸附到玻璃器壁是同一类现象<sup data-text=\"Effects of surface wettability and contact time on protein adhesion to surfaces.\" data-url=\"https://pmc.ncbi.nlm.nih.gov/articles/PMC3671914/\" data-draft-node=\"inline\" data-draft-type=\"reference\" data-numero=\"1\">[1]</sup>。另外，脂类、胆盐，能形成类似黏胶脂肪膜，也能把便便本身粘在一起。</p><figure data-size=\"normal\"><noscript><img src=\"https://pic1.zhimg.com/50/v2-3a62cd7d017c7cd156fe9656a10ecaf0_720w.jpg?source=1def8aca\" data-size=\"normal\" data-rawwidth=\"591\" data-rawheight=\"443\" data-original-token=\"v2-bf4f65b908999c1dbc75154856a2cf7d\" class=\"origin_image zh-lightbox-thumb\" width=\"591\" data-original=\"https://pica.zhimg.com/v2-3a62cd7d017c7cd156fe9656a10ecaf0_r.jpg?source=1def8aca\"/></noscript><img src=\"data:image/svg+xml;utf8,&lt;svg xmlns=&#39;http://www.w3.org/2000/svg&#39; width=&#39;591&#39; height=&#39;443&#39;&gt;&lt;/svg&gt;\" data-size=\"normal\" data-rawwidth=\"591\" data-rawheight=\"443\" data-original-token=\"v2-bf4f65b908999c1dbc75154856a2cf7d\" class=\"origin_image zh-lightbox-thumb lazy\" width=\"591\" data-original=\"https://pica.zhimg.com/v2-3a62cd7d017c7cd156fe9656a10ecaf0_r.jpg?source=1def8aca\" data-actualsrc=\"https://pic1.zhimg.com/50/v2-3a62cd7d017c7cd156fe9656a10ecaf0_720w.jpg?source=1def8aca\"/><figcaption>玻璃杯中的牛奶挂壁现象也是这个原理。</figcaption></figure><p data-pid=\"5jQAxBzj\">在表面科学里，我们可以用Young–Dupré 方程描述液滴在固体表面的粘附功，近似把粘在马桶壁上的一小块湿便便看成带点固含量的液滴压在陶瓷上。</p><p data-pid=\"DWSj26xU\">就有Young 方程： <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Cgamma_%7BS+V%7D%3D%5Cgamma_%7BS+L%7D%2B%5Cgamma_%7BL+V%7D+%5Coperatorname%7Bcos%7D+%5Ctheta\" alt=\"\\gamma_{S V}=\\gamma_{S L}+\\gamma_{L V} \\operatorname{cos} \\theta\"/> </p><p data-pid=\"5uh01QEN\">其中，</p><ul><li data-pid=\"1msR9FQc\"><img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Cgamma_%7BS+V%7D\" alt=\"\\gamma_{S V}\"/> ​：固体–气体界面张力（陶瓷–空气），本质上就是陶瓷表面能。</li><li data-pid=\"3Q4RumSl\"><img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Cgamma_%7BSL%7D\" alt=\"\\gamma_{SL}\"/> ​：固体–液体界面张力（陶瓷–便便外层那层“胶泥”）</li><li data-pid=\"Z0nFQe7c\"><img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Cgamma_%7BLV%7D+\" alt=\"\\gamma_{LV} \"/> ：液体–气体界面张力（便便表面的“液相”表面张力）</li><li data-pid=\"Iz_wTgCu\"><img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctheta\" alt=\"\\theta\"/> ：粑粑这一小团在陶瓷表面的平衡接触角。</li></ul><figure data-size=\"normal\"><noscript><img src=\"https://pica.zhimg.com/50/v2-1d362043250527f9993e82d297e7bd87_720w.jpg?source=1def8aca\" data-size=\"normal\" data-rawwidth=\"480\" data-rawheight=\"279\" data-original-token=\"v2-3902a77d230b7e1c3e8ff64b14c6f0e0\" class=\"origin_image zh-lightbox-thumb\" width=\"480\" data-original=\"https://picx.zhimg.com/v2-1d362043250527f9993e82d297e7bd87_r.jpg?source=1def8aca\"/></noscript><img src=\"data:image/svg+xml;utf8,&lt;svg xmlns=&#39;http://www.w3.org/2000/svg&#39; width=&#39;480&#39; height=&#39;279&#39;&gt;&lt;/svg&gt;\" data-size=\"normal\" data-rawwidth=\"480\" data-rawheight=\"279\" data-original-token=\"v2-3902a77d230b7e1c3e8ff64b14c6f0e0\" class=\"origin_image zh-lightbox-thumb lazy\" width=\"480\" data-original=\"https://picx.zhimg.com/v2-1d362043250527f9993e82d297e7bd87_r.jpg?source=1def8aca\" data-actualsrc=\"https://pica.zhimg.com/50/v2-1d362043250527f9993e82d297e7bd87_720w.jpg?source=1def8aca\"/><figcaption>Young 方程示意图，学过物理化学的小伙伴，肯定不陌生吧。</figcaption></figure><p data-pid=\"NnzDtBHD\">普通未做“超疏水”涂层的陶瓷釉面，对水是亲水的，水接触角往往低于90°；对含蛋白/多糖的生物流体（如粘液、血清）接触角常更低， <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctheta\" alt=\"\\theta\"/> 会在10°~60°这一类区间。</p><p data-pid=\"mzytzn3P\">接触角越小，意味着铺得越开、越贴地、越亲近呗。</p><p data-pid=\"PG09wSLf\">如果要把便便–陶瓷这对界面硬生生撕开，那么就需要克服单位面积的黏附功 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=W_%7B%5Ctext%7Badh%7D%7D%E2%80%8B\" alt=\"W_{\\text{adh}}​\"/> 。对于液体/凝胶贴在固体表面，用 Young–Dupré 方程写为： <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=W_%7B%5Cmathrm%7Ba+d+h%7D%7D%3D%5Cgamma_%7BL+V%7D+%28+1%2B%5Coperatorname%7Bcos%7D+%5Ctheta%29\" alt=\"W_{\\mathrm{a d h}}=\\gamma_{L V} ( 1+\\operatorname{cos} \\theta)\"/> </p><p data-pid=\"7yFI7l54\">这里就可以分析下两种极端情况：</p><ul><li data-pid=\"2QDKJ-mm\">若<i>θ</i>→0°（完全铺展），则 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=W_%7B%5Ctext%7Badh%7D%7D+%5Cto+2%5Cgamma_%7BLV%7D\" alt=\"W_{\\text{adh}} \\to 2\\gamma_{LV}\"/> ，是最大值。</li><li data-pid=\"YhlYUTh0\">若 <i>θ</i>→180°，那么cos<i>θ</i>=−1，则 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=W_%7B%5Ctext%7Badh%7D%7D+%5Cto+0\" alt=\"W_{\\text{adh}} \\to 0\"/> ，几乎不粘。</li></ul><p data-pid=\"Fo1qmFp4\">假设粑粑表面的液相层（富含黏液蛋白和脂类）表面张力取一个跟高浓度有机溶胶类似的数值，比如： <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Cgamma_%7BL+V%7D+%5Capprox4+0+~+%5Cmathrm%7Bm+N+%2F+m%7D\" alt=\"\\gamma_{L V} \\approx4 0 ~ \\mathrm{m N / m}\"/> ，如果它在陶瓷上的接触角只有30°， <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Coperatorname%7Bcos%7D+3+0%5E%7B%5Ccirc%7D%3D%5Ccfrac%7B%5Csqrt%7B3%7D%7D+%7B2%7D+%5Capprox0+.+8+6+6\" alt=\"\\operatorname{cos} 3 0^{\\circ}=\\cfrac{\\sqrt{3}} {2} \\approx0 . 8 6 6\"/> ，那么可以估算一下。</p><p data-pid=\"DkQ4kr8S\"><img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=W_%7B%5Cmathrm%7Ba+d+h%7D%7D+%5Capprox4+0+%5Ctimes1+0%5E%7B-3%7D+%5C%2C+%5Cmathrm%7BN+%2F+m%7D+%5Ctimes%28+1%2B0+.+8+6+6+%29+%5Capprox7+4+.+6+%5Ctimes1+0%5E%7B-3%7D+%5C%2C+%5Cmathrm%7BJ+%2F+m%7D%5E%7B2%7D\" alt=\"W_{\\mathrm{a d h}} \\approx4 0 \\times1 0^{-3} \\, \\mathrm{N / m} \\times( 1+0 . 8 6 6 ) \\approx7 4 . 6 \\times1 0^{-3} \\, \\mathrm{J / m}^{2}\"/> </p><p data-pid=\"qXq6MJIf\">1 平方米粪便–陶瓷界面，要用大约0.075焦的能量才能完全剥离，实际粘附面积只是几平方厘米，我这里是估算量级用的。当然用 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=W_%7BS+L%7D%3D%5Cgamma_%7BS+V%7D%2B%5Cgamma_%7BL+V%7D-%5Cgamma_%7BS+L%7D\" alt=\"W_{S L}=\\gamma_{S V}+\\gamma_{L V}-\\gamma_{S L}\"/> 这个Dupré的一般形式也可以推算出来。</p><p data-pid=\"qXWD0mIT\">便便里那层富含 mucin 高分子、细菌胞外多糖（EPS）、脂类 的网络，会在陶瓷高能表面上吸附（主要是范德华力、氢键、静电作用），通过降低 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Cgamma_%7BSL%7D\" alt=\"\\gamma_{SL}\"/> ，增加 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Cgamma_%7BSV%7D+-+%5Cgamma_%7BSL%7D\" alt=\"\\gamma_{SV} - \\gamma_{SL}\"/> 的差，提高 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=+W_%7BSL%7D\" alt=\" W_{SL}\"/> 的值，就可以粘得牢了，这和唾液蛋白、细菌在瓷牙表面形成菌膜的机理一样的<sup data-text=\" INFLUENCE OF SURFACE PROPERTIES ON ADHESION FORCES AND ATTACHMENT.\" data-url=\"https://pmc.ncbi.nlm.nih.gov/articles/PMC5126402/\" data-draft-node=\"inline\" data-draft-type=\"reference\" data-numero=\"2\">[2]</sup>。</p><p data-pid=\"7jgwgKZy\">从铺展系数的角度来看： <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=S%3D%5Cgamma_%7BS+V%7D-%5Cgamma_%7BS+L%7D-%5Cgamma_%7BL+V%7D\" alt=\"S=\\gamma_{S V}-\\gamma_{S L}-\\gamma_{L V}\"/> </p><ul><li data-pid=\"FlIDOmld\"><i>S</i>&gt;0：液体在固体表面会自发铺展（超亲）</li><li data-pid=\"Lie-Z_NQ\"><i>S</i>&lt;0：只能形成有限接触角（部分润湿）</li></ul><p data-pid=\"KJ4dYRlV\">粑粑含有大量表面活性的大分子（mucin、脂肪酸、胆盐小分子等），往往能显著降低 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Cgamma_%7BSL%7D\" alt=\"\\gamma_{SL}\"/> ；</p><p data-pid=\"dJ5LSTqn\">对于高表面能的陶瓷，通常满足： <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Cgamma_%7BS+V%7D-%5Cgamma_%7BS+L%7D+%5Cunderset%7B%5Csim%7D+%7B%5Cgeq%7D+%5Cgamma_%7BL+V%7D+%5CRightarrow+S+%5Cunderset%7B%5Csim%7D+%7B%5Cgeq%7D+0\" alt=\"\\gamma_{S V}-\\gamma_{S L} \\underset{\\sim} {\\geq} \\gamma_{L V} \\Rightarrow S \\underset{\\sim} {\\geq} 0\"/> </p><p data-pid=\"TG6b8kPh\">所以从热力学上讲，便便有动力尽可能铺开并贴在壁上，这就是你看到大面积糊在壁上一层的根源。。。（不放图了，请自行脑补）</p><h2>二、尿液：不是纯水，而是低表面张力、带电解质的弱清洗液</h2><p data-pid=\"kznwb-zI\">我们都知道用洗洁精可以洗掉污垢，这是因为洗洁精里面有添加很多表面活性剂，大大降低溶液的表面张力，同理尿也是一样的，尿里面也有表面活性成分，对便便也有软化作用，但是这种软化只是辅助作用，真正的主导便便从马桶下来的因素还是流体力学主导。</p><figure data-size=\"normal\"><noscript><img src=\"https://picx.zhimg.com/50/v2-155d40ff849f0eb8bf03d00ca6a9c467_720w.jpg?source=1def8aca\" data-size=\"normal\" data-rawwidth=\"500\" data-rawheight=\"376\" data-original-token=\"v2-5fb42204da2e430b961d01849469f682\" class=\"origin_image zh-lightbox-thumb\" width=\"500\" data-original=\"https://picx.zhimg.com/v2-155d40ff849f0eb8bf03d00ca6a9c467_r.jpg?source=1def8aca\"/></noscript><img src=\"data:image/svg+xml;utf8,&lt;svg xmlns=&#39;http://www.w3.org/2000/svg&#39; width=&#39;500&#39; height=&#39;376&#39;&gt;&lt;/svg&gt;\" data-size=\"normal\" data-rawwidth=\"500\" data-rawheight=\"376\" data-original-token=\"v2-5fb42204da2e430b961d01849469f682\" class=\"origin_image zh-lightbox-thumb lazy\" width=\"500\" data-original=\"https://picx.zhimg.com/v2-155d40ff849f0eb8bf03d00ca6a9c467_r.jpg?source=1def8aca\" data-actualsrc=\"https://picx.zhimg.com/50/v2-155d40ff849f0eb8bf03d00ca6a9c467_720w.jpg?source=1def8aca\"/><figcaption>表面活性剂在溶液中会形成胶束，尿的表面张力要比水低，里面也有很多表面活性成分，能类似清洗剂一样去瓦解便便。</figcaption></figure><p data-pid=\"KSe0fGP3\">标准纯水在室温下的表面张力约72mN/m，文献中对人尿的测量值范围大致69-70mN/m<sup data-text=\"ISO 9073-8:1995 NOTE 4（URINE SURFACE TENSION 69–70 mN/m）\" data-url=\"https://cdn.standards.iteh.ai/samples/16658/27cac8e2fad7449e9ed5378a52304df3/ISO-9073-8-1995.pdf\" data-draft-node=\"inline\" data-draft-type=\"reference\" data-numero=\"3\">[3]</sup>，某些样本（高胆盐）表面张力可降到小于50mN/m<sup data-text=\"SURFACE TENSION PROPERTIES OF HUMAN URINE: RELATIONSHIP WITH BILE SALT CONCENTRATION.\" data-url=\"https://pubmed.ncbi.nlm.nih.gov/3404085/\" data-draft-node=\"inline\" data-draft-type=\"reference\" data-numero=\"4\">[4]</sup>，尿液中存在一定量的表面活性成分（胆盐、脂肪酸、尿蛋白片段等），能稍微增强润湿和清洗效果。</p><p data-pid=\"UiB1PzET\">我们就估算尿的表面张力取这个数值吧： <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Cgamma_%7B%5Cmathrm%7Bu+r+i+n+e%7D%7D+%5Capprox5+0+%5Csim7+0+~+%5Cmathrm%7Bm+N+%2F+m%7D\" alt=\"\\gamma_{\\mathrm{u r i n e}} \\approx5 0 \\sim7 0 ~ \\mathrm{m N / m}\"/> </p><p data-pid=\"hJQZ1HnX\">尿液中主要溶质之一是尿素，典型浓度可以估在： <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=c_%7B%5Cmathrm%7Bu+r+e+a%7D%7D+%5Csim0+.+2+%7B%5Cmathrm%7B-%7D+0+.+4%7D+%5C+%5Cmathrm%7Bm+o+l+%2F+L%7D\" alt=\"c_{\\mathrm{u r e a}} \\sim0 . 2 {\\mathrm{-} 0 . 4} \\ \\mathrm{m o l / L}\"/> </p><p data-pid=\"XigVVXK5\">《物理化学》中理想溶液近似下，对凝胶（粪便外壳）的<b>渗透压：</b> <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Cpi%5Capprox+R+T+c_%7B%5Cmathrm%7Bu+r+e+a%7D%7D\" alt=\"\\pi\\approx R T c_{\\mathrm{u r e a}}\"/> ，</p><p data-pid=\"TPj5LbmF\">取取 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=c_%7B%5Ctext%7Burea%7D%7D+%3D+0.3~%5Cmathrm%7Bmol%2FL%7D\" alt=\"c_{\\text{urea}} = 0.3~\\mathrm{mol/L}\"/> ， <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=T+%5Capprox+310~%5Cmathrm%7BK%7D\" alt=\"T \\approx 310~\\mathrm{K}\"/> ，那么得到尿的渗透压大小为：</p><p data-pid=\"0GnbzTxW\"><img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Cpi%5Capprox0+.+3+%5Ctimes8+.+3+1+4+%5Ctimes3+1+0+%5Capprox7+7+4+%5C%3B+%5Cmathrm%7BP+a%7D\" alt=\"\\pi\\approx0 . 3 \\times8 . 3 1 4 \\times3 1 0 \\approx7 7 4 \\; \\mathrm{P a}\"/> </p><p data-pid=\"eNHVm8zs\">看看这个数值就知道：这个 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Csim+10%5E3\" alt=\"\\sim 10^3\"/> 的量级远小于稍后要讨论的射流动压 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Csim+10%5E3%5Ctext%7B%E2%80%93%7D10%5E4\" alt=\"\\sim 10^3\\text{–}10^4\"/> ，尿素的软化作用（渗透压），比尿液的流体力学的冲击和剪切作用要弱的多。</p><p data-pid=\"NVdgZ0gw\">尿液能够软化便便，但是真正把便便从马桶上干下来的还是流体的冲击作用。</p><p data-pid=\"9rkUJp_5\">再提一下，尿素和无机盐，还能改变蛋白、黏液的构象（有轻微变性、溶胀作用），提高水在粪便胶层中的渗透速度（扩散系数增加），但是这些往往是发生在秒到分钟的时间尺度，不是一冲就掉的主因。</p><h2>三、便便：一个高分子胶泥（流变学模型），为啥干了更难冲？</h2><p data-pid=\"8Ge5tX5i\">新鲜人类粪便在较低剪切率下表现出明显的屈服应力和高黏度，可用 Bingham 塑性流体近似<sup data-text=\"SHEAR RHEOLOGICAL PROPERTIES OF FRESH HUMAN FAECES. \" data-url=\"https://scielo.org.za/scielo.php?script=sci_arttext&amp;pid=S1816-79502014000200016\" data-draft-node=\"inline\" data-draft-type=\"reference\" data-numero=\"5\">[5]</sup>：</p><p data-pid=\"YT-6qYiR\"><img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctau%3D%5Ctau_%7By%7D%2B%5Cmu_%7Bp%7D+%5Cdot%7B%5Cgamma%7D\" alt=\"\\tau=\\tau_{y}+\\mu_{p} \\dot{\\gamma}\"/> </p><p data-pid=\"wN5oBF83\">其中，</p><ul><li data-pid=\"tnKKAekV\"><i>τ</i>：剪切应力</li><li data-pid=\"aS0L1Aiq\"><img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctau_y\" alt=\"\\tau_y\"/> ​：屈服应力（不到这个应力不流动）</li><li data-pid=\"_o65ssuq\"><img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Cmu_p\" alt=\"\\mu_p\"/>：塑性黏度</li><li data-pid=\"cGq1CnPi\"><img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Cdot%7B%5Cgamma%7D\" alt=\"\\dot{\\gamma}\"/> ：剪切率</li></ul><p data-pid=\"QAs2MOih\">粪便样品测得的表观黏度在剪切率： <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ceta_%7B%5Cmathrm%7Ba+p+p%7D%7D+%5Csim2+7+%5Cmathrm%7B-%7D+2+0+0+0+%5C+%5Cmathrm%7BP+a+%5Ccdot+s%7D\" alt=\"\\eta_{\\mathrm{a p p}} \\sim2 7 \\mathrm{-} 2 0 0 0 \\ \\mathrm{P a \\cdot s}\"/> ，随着剪切率增加黏度下降（剪切变稀）<sup data-text=\"SHEAR RHEOLOGICAL PROPERTIES OF FRESH HUMAN FAECES. \" data-url=\"https://scielo.org.za/scielo.php?script=sci_arttext&amp;pid=S1816-79502014000200016\" data-draft-node=\"inline\" data-draft-type=\"reference\" data-numero=\"5\">[5]</sup>。高含水量样品屈服应力 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctau_y\" alt=\"\\tau_y\"/> ​较低（类似软泥），含固量高时 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctau_y\" alt=\"\\tau_y\"/> ​可升到几十到几千Pa级别<sup data-text=\"RHEOLOGY OF HUMAN FAECES AND PATHOPHYSIOLOGY OF DEFAECATION. \" data-url=\"https://hal.science/hal-02502923v1/document\" data-draft-node=\"inline\" data-draft-type=\"reference\" data-numero=\"6\">[6]</sup>。</p><p data-pid=\"hkUplQUp\">问题就来了，究竟需要多大的剪切力，下能把便便刮走呢？</p><p data-pid=\"iQvxBFL5\">这里就需要估算一个量级了。</p><p data-pid=\"VcvAVnwD\">若某块半干粑粑在马桶壁上形成厚度 (h) 的薄层，假设要流动/脱离需要的<b>临界剪切应力</b>为 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctau_c\" alt=\"\\tau_c\"/> ，当你的尿液沿着它表面流过，那么，壁面剪切应力 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctau_w\" alt=\"\\tau_w\"/>需要满足： <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctau_%7Bw%7D+%5Cgeq%5Ctau_%7Bc%7D\" alt=\"\\tau_{w} \\geq\\tau_{c}\"/> 。</p><ul><li data-pid=\"qMZEjSzS\">对高含水、较软的粪便， <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctau_c\" alt=\"\\tau_c\"/> 可能只要几 Pa～几十 Pa；</li><li data-pid=\"ezRZvWNt\">对干固层， <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctau_c\" alt=\"\\tau_c\"/> 则可达上百 Pa甚至更高的上千Pa，所以这就是干了就几乎洗不掉的根本原因。</li></ul><p data-pid=\"aadJBwiZ\">所以，用厕所后，请及时冲洗厕所！在它还没干的时候，更容易冲下去。</p><figure data-size=\"normal\"><noscript><img src=\"https://picx.zhimg.com/50/v2-a50cddd2419bec35c4630fa2bfcd8d97_720w.jpg?source=1def8aca\" data-caption=\"\" data-size=\"normal\" data-rawwidth=\"800\" data-rawheight=\"800\" data-original-token=\"v2-a387443f0a9d3017c8ebed626f4a7d3c\" class=\"origin_image zh-lightbox-thumb\" width=\"800\" data-original=\"https://pic1.zhimg.com/v2-a50cddd2419bec35c4630fa2bfcd8d97_r.jpg?source=1def8aca\"/></noscript><img src=\"data:image/svg+xml;utf8,&lt;svg xmlns=&#39;http://www.w3.org/2000/svg&#39; width=&#39;800&#39; height=&#39;800&#39;&gt;&lt;/svg&gt;\" data-caption=\"\" data-size=\"normal\" data-rawwidth=\"800\" data-rawheight=\"800\" data-original-token=\"v2-a387443f0a9d3017c8ebed626f4a7d3c\" class=\"origin_image zh-lightbox-thumb lazy\" width=\"800\" data-original=\"https://pic1.zhimg.com/v2-a50cddd2419bec35c4630fa2bfcd8d97_r.jpg?source=1def8aca\" data-actualsrc=\"https://picx.zhimg.com/50/v2-a50cddd2419bec35c4630fa2bfcd8d97_720w.jpg?source=1def8aca\"/></figure><h2>四、尿流冲击：流体力学的奥妙，来找找角度？</h2><p data-pid=\"HdXPQhS6\">我们可以简单把尿流对便便的冲击正交分解成两个方向的作用，一个是垂直的法向压力，一个是水平的剪切力。（请自行脑补）</p><figure data-size=\"normal\"><noscript><img src=\"https://picx.zhimg.com/50/v2-75bd599e3f4570d430e342773bd2eb43_720w.jpg?source=1def8aca\" data-caption=\"\" data-size=\"normal\" data-rawwidth=\"627\" data-rawheight=\"528\" data-original-token=\"v2-8fd338281d57b76b6f42cebc8e76e883\" class=\"origin_image zh-lightbox-thumb\" width=\"627\" data-original=\"https://pica.zhimg.com/v2-75bd599e3f4570d430e342773bd2eb43_r.jpg?source=1def8aca\"/></noscript><img src=\"data:image/svg+xml;utf8,&lt;svg xmlns=&#39;http://www.w3.org/2000/svg&#39; width=&#39;627&#39; height=&#39;528&#39;&gt;&lt;/svg&gt;\" data-caption=\"\" data-size=\"normal\" data-rawwidth=\"627\" data-rawheight=\"528\" data-original-token=\"v2-8fd338281d57b76b6f42cebc8e76e883\" class=\"origin_image zh-lightbox-thumb lazy\" width=\"627\" data-original=\"https://pica.zhimg.com/v2-75bd599e3f4570d430e342773bd2eb43_r.jpg?source=1def8aca\" data-actualsrc=\"https://picx.zhimg.com/50/v2-75bd599e3f4570d430e342773bd2eb43_720w.jpg?source=1def8aca\"/></figure><p data-pid=\"3ouw-3m2\">把尿流看成从尿道/喷嘴喷出的水射流，速度 (V)，密度近似水 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Crho+%5Capprox+1000~%5Cmathrm%7Bkg%2Fm%5E3%7D\" alt=\"\\rho \\approx 1000~\\mathrm{kg/m^3}\"/> ，那么，沿着流线用 Bernoulli 方程，到停滞点（流速降为0）时：</p><p data-pid=\"vk5fCAEy\"><img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=p_%7B%5Cmathrm%7Bs+t+a+g%7D%7D%3Dp_%7B0%7D%2B%5Ccfrac%7B1%7D+%7B2%7D+%5Crho+V%5E%7B2%7D\" alt=\"p_{\\mathrm{s t a g}}=p_{0}+\\cfrac{1} {2} \\rho V^{2}\"/> </p><p data-pid=\"VbNCV2yL\">这里 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=p_0\" alt=\"p_0\"/>可以近似认为是周围的静压（大气压）。当尿速为： <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=V+%5Csim+2~%5Cmathrm%7Bm%2Fs%7D\" alt=\"V \\sim 2~\\mathrm{m/s}\"/> ，我们算算压强：</p><p data-pid=\"00qeZTMX\"><img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5CDelta+p%3D%5Ccfrac%7B1%7D+%7B2%7D+%5Crho+V%5E%7B2%7D%3D0+.+5+%5Ctimes1+0+0+0+%5Ctimes2%5E%7B2%7D%3D2+0+0+0+%5Cmathrm%7B~+P+a%7D\" alt=\"\\Delta p=\\cfrac{1} {2} \\rho V^{2}=0 . 5 \\times1 0 0 0 \\times2^{2}=2 0 0 0 \\mathrm{~ P a}\"/> </p><p data-pid=\"OJckK-mc\">这个压强已经有了两千帕了，落在新鲜的糊状便便上面，是可以把它拍扁、打碎的。（除非你拉的是黄金巨蟒，当我没说）</p><p data-pid=\"DIZkQjKu\"><b>再看看题主最关心的什么的角度去尿尿？</b></p><p data-pid=\"BDGGEN7_\">设尿流与马桶壁<b>法线</b>之间夹角为 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctheta\" alt=\"\\theta\"/> ，那么：</p><ul><li data-pid=\"SDodYDrZ\"><img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctheta+%3D+90%5E%5Ccirc\" alt=\"\\theta = 90^\\circ\"/>：正对着壁，垂直打。</li><li data-pid=\"2YYRnG8r\"><img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctheta+%3D+0%5E%5Ccirc\" alt=\"\\theta = 0^\\circ\"/>：几乎平行擦边掠过，水平切。</li></ul><p data-pid=\"YlvGSO2y\">尿流速度分量：</p><p data-pid=\"eWS_Onnz\"><img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=V_%7Bn%7D%3DV+%5Coperatorname%7Bcos%7D+%5Ctheta%5C%2C+%28%E6%B3%95%E5%90%91%29%EF%BC%9BV_%7Bt%7D%3DV+%5Coperatorname%7Bsin%7D+%5Ctheta%EF%BC%88%E5%88%87%E5%90%91%EF%BC%89\" alt=\"V_{n}=V \\operatorname{cos} \\theta\\, (法向)；V_{t}=V \\operatorname{sin} \\theta（切向）\"/> </p><p data-pid=\"U3NCAXE9\">法向动压（粗略看作局部法向冲击压）: <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=p_%7Bn%7D+%5Capprox%5Cfrac%7B1%7D+%7B2%7D+%5Crho+V_%7Bn%7D%5E%7B2%7D%3D%5Cfrac%7B1%7D+%7B2%7D+%5Crho+V%5E%7B2%7D+%5Coperatorname%7Bc+o+s%7D%5E%7B2%7D+%5Ctheta\" alt=\"p_{n} \\approx\\frac{1} {2} \\rho V_{n}^{2}=\\frac{1} {2} \\rho V^{2} \\operatorname{c o s}^{2} \\theta\"/> ;</p><p data-pid=\"5mWjs02X\">切向“动压”可以理解为给壁面液膜提供的动量通量，对应一个典型剪切应力尺度：</p><p data-pid=\"3-C9AH9m\"><img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctau_%7Bw%7D+%5Csim%5Cfrac%7B1%7D+%7B2%7D+%5Crho+V_%7Bt%7D%5E%7B2%7D%3D%5Cfrac%7B1%7D+%7B2%7D+%5Crho+V%5E%7B2%7D+%5Coperatorname%7Bs+i+n%7D%5E%7B2%7D+%5Ctheta\" alt=\"\\tau_{w} \\sim\\frac{1} {2} \\rho V_{t}^{2}=\\frac{1} {2} \\rho V^{2} \\operatorname{s i n}^{2} \\theta\"/> ;</p><p data-pid=\"ir5hXu6_\">于是：</p><ul><li data-pid=\"uk98bfGv\">正冲（ <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctheta+%5Cto+90%5E%5Ccirc\" alt=\"\\theta \\to 90^\\circ\"/>）： <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ccos%5Ctheta+%5Cto+0\" alt=\"\\cos\\theta \\to 0\"/> ; <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Csin%5Ctheta+%5Cto+1\" alt=\"\\sin\\theta \\to 1\"/> ; <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=+p_n+%5Cto+0\" alt=\" p_n \\to 0\"/> ; <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctau_w+%5Csim+0.5%5Crho+V%5E2\" alt=\"\\tau_w \\sim 0.5\\rho V^2\"/> ,意味着切向很强，但如果你尿的真的是完全水平掠过壁（那是 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=+%5Ctheta+%5Cto+0%5E%5Ccirc\" alt=\" \\theta \\to 0^\\circ\"/> 的情况），又几乎没有有效停滞点。</li><li data-pid=\"FIUeyT-5\">完全垂直撞（<img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctheta+%5Cto+0%5E%5Ccirc\" alt=\"\\theta \\to 0^\\circ\"/> 此处要注意定义：是相对法线还是相对壁面）​，在我们定义中 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctheta\" alt=\"\\theta\"/> <i>θ</i>相对法线，当 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctheta+%5Cto+0%5E%5Ccirc\" alt=\"\\theta \\to 0^\\circ\"/> 时： <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=p_n+%5Csim+0.5+%5Crho+V%5E2\" alt=\"p_n \\sim 0.5 \\rho V^2\"/> 最大 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctau_w+%5Cto+0\" alt=\"\\tau_w \\to 0\"/> ：只会锤子式拍上去，而沿面的扫掠有限。</li></ul><p data-pid=\"BPmIbygz\">根据便便的状态，我就设置两个参数a和b，代表不同固化程度的便便喜欢吃哪一套（是更喜欢法向的，还是更喜欢切向的）。</p><p data-pid=\"AQ5nx5X5\">定义综合指标： <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5CPhi%28+%5Ctheta%29%3Da+%5C%2C+p_%7Bn%7D%2Bb+%5C%2C+%5Ctau_%7Bw%7D%3D%5Cfrac%7B1%7D+%7B2%7D+%5Crho+V%5E%7B2%7D+%5Cleft%28+a+%5Coperatorname%7Bcos%7D%5E%7B2%7D+%5Ctheta%2Bb+%5Coperatorname%7Bsin%7D%5E%7B2%7D+%5Ctheta%5Cright%29\" alt=\"\\Phi( \\theta)=a \\, p_{n}+b \\, \\tau_{w}=\\frac{1} {2} \\rho V^{2} \\left( a \\operatorname{cos}^{2} \\theta+b \\operatorname{sin}^{2} \\theta\\right)\"/> </p><ul><li data-pid=\"2jCqP8Sj\">粘得很湿 → 更吃法向破碎：a&gt;b</li><li data-pid=\"XZ2zOJLC\">半干 → 更吃切向刮削：b&gt;a</li></ul><p data-pid=\"qv3aAYXu\">在合理的 (a,b) 比值下， Φ(<i>θ</i>)通常会在 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctheta%3D60%5E%5Ccirc%5Csim+80%5E%5Ccirc\" alt=\"\\theta=60^\\circ\\sim 80^\\circ\"/> 这一带取得较高值，这就是本回答最开始我给的结论。</p><figure data-size=\"normal\"><noscript><img src=\"https://picx.zhimg.com/50/v2-32333e638678311c92051de4f8a0aa08_720w.jpg?source=1def8aca\" data-size=\"normal\" data-rawwidth=\"1395\" data-rawheight=\"891\" data-original-token=\"v2-5ac00d204e1fdaf07563b7583fb34e35\" class=\"origin_image zh-lightbox-thumb\" width=\"1395\" data-original=\"https://pica.zhimg.com/v2-32333e638678311c92051de4f8a0aa08_r.jpg?source=1def8aca\"/></noscript><img src=\"data:image/svg+xml;utf8,&lt;svg xmlns=&#39;http://www.w3.org/2000/svg&#39; width=&#39;1395&#39; height=&#39;891&#39;&gt;&lt;/svg&gt;\" data-size=\"normal\" data-rawwidth=\"1395\" data-rawheight=\"891\" data-original-token=\"v2-5ac00d204e1fdaf07563b7583fb34e35\" class=\"origin_image zh-lightbox-thumb lazy\" width=\"1395\" data-original=\"https://pica.zhimg.com/v2-32333e638678311c92051de4f8a0aa08_r.jpg?source=1def8aca\" data-actualsrc=\"https://picx.zhimg.com/50/v2-32333e638678311c92051de4f8a0aa08_720w.jpg?source=1def8aca\"/><figcaption>我用python建模，得到合理的尿的射流角度。</figcaption></figure><p data-pid=\"AFSzC-jm\">这里我取a=2，b=1，得到的最大值是63°，当然不同的便便，(a,b)的参数不一样，推荐合理的尿流角度就是60°~80°</p><p data-pid=\"CRcdsM09\">感兴趣的朋友，也可以用python建模，去算算理论的最大值，这是一个数学建模的问题，我这里就不过多展开了。</p><p data-pid=\"fyz4BK0Q\">若只看剪切强度相对最大值的比值： <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Cfrac%7B%5Ctau_%7Bw%7D+%28+%5Ctheta%29%7D+%7B%5Ctau_%7Bw%7D+%28+9+0%5E%7B%5Ccirc%7D+%29%7D%3D%5Cfrac%7B%5Coperatorname%7Bsin%7D%5E%7B2%7D+%5Ctheta%7D+%7B%5Coperatorname%7Bsin%7D%5E%7B2%7D+9+0%5E%7B%5Ccirc%7D%7D%3D%5Coperatorname%7Bsin%7D%5E%7B2%7D+%5Ctheta\" alt=\"\\frac{\\tau_{w} ( \\theta)} {\\tau_{w} ( 9 0^{\\circ} )}=\\frac{\\operatorname{sin}^{2} \\theta} {\\operatorname{sin}^{2} 9 0^{\\circ}}=\\operatorname{sin}^{2} \\theta\"/> </p><p data-pid=\"6GP7W7v7\">大致算一下啊。</p><table data-draft-node=\"block\" data-draft-type=\"table\" data-size=\"normal\" data-row-style=\"normal\"><tbody><tr><th>θ（相对法线）</th><th>(sinθ)^2（剪切相对 90°）</th></tr><tr><td>90°</td><td>1.00</td></tr><tr><td>80°</td><td>0.97</td></tr><tr><td>70°</td><td>0.88</td></tr><tr><td>60°</td><td>0.75</td></tr><tr><td>50°</td><td>0.59</td></tr></tbody></table><figure data-size=\"normal\"><noscript><img src=\"https://picx.zhimg.com/50/v2-75a9cce1513a16efcfc250b7ebe8ee1c_720w.jpg?source=1def8aca\" data-size=\"normal\" data-rawwidth=\"1614\" data-rawheight=\"972\" data-original-token=\"v2-4f5cf1179e610b34e71299bb4d79556d\" class=\"origin_image zh-lightbox-thumb\" width=\"1614\" data-original=\"https://picx.zhimg.com/v2-75a9cce1513a16efcfc250b7ebe8ee1c_r.jpg?source=1def8aca\"/></noscript><img src=\"data:image/svg+xml;utf8,&lt;svg xmlns=&#39;http://www.w3.org/2000/svg&#39; width=&#39;1614&#39; height=&#39;972&#39;&gt;&lt;/svg&gt;\" data-size=\"normal\" data-rawwidth=\"1614\" data-rawheight=\"972\" data-original-token=\"v2-4f5cf1179e610b34e71299bb4d79556d\" class=\"origin_image zh-lightbox-thumb lazy\" width=\"1614\" data-original=\"https://picx.zhimg.com/v2-75a9cce1513a16efcfc250b7ebe8ee1c_r.jpg?source=1def8aca\" data-actualsrc=\"https://picx.zhimg.com/50/v2-75a9cce1513a16efcfc250b7ebe8ee1c_720w.jpg?source=1def8aca\"/><figcaption>65°、70° 这些角度已经接近几乎最大剪切，同时仍保留一定法向分量，有利于既刮又砸。</figcaption></figure><p data-pid=\"XGpFCsny\">也就是说，从 90° 退到 60°，剪切牺牲掉了约 25%，但你获得了更贴着壁扫过一大片的轨迹，更有利于连根拔起边缘处的粘附。</p><h2>五、给个会不会被冲下去的判据</h2><p data-pid=\"UU-DEsSt\">类似化学反应能不能发生一样，考虑焓判据和熵判据，便便能不能冲下去，我这里就粗糙个弄个<b>便便退散</b>判据。</p><figure data-size=\"normal\"><noscript><img src=\"https://pica.zhimg.com/50/v2-6c9cc5b7f8637da67a71d8409f563b02_720w.jpg?source=1def8aca\" data-caption=\"\" data-size=\"normal\" data-rawwidth=\"749\" data-rawheight=\"734\" data-original-token=\"v2-9d4a97a0a1b87f1461a3a70631bab8be\" class=\"origin_image zh-lightbox-thumb\" width=\"749\" data-original=\"https://picx.zhimg.com/v2-6c9cc5b7f8637da67a71d8409f563b02_r.jpg?source=1def8aca\"/></noscript><img src=\"data:image/svg+xml;utf8,&lt;svg xmlns=&#39;http://www.w3.org/2000/svg&#39; width=&#39;749&#39; height=&#39;734&#39;&gt;&lt;/svg&gt;\" data-caption=\"\" data-size=\"normal\" data-rawwidth=\"749\" data-rawheight=\"734\" data-original-token=\"v2-9d4a97a0a1b87f1461a3a70631bab8be\" class=\"origin_image zh-lightbox-thumb lazy\" width=\"749\" data-original=\"https://picx.zhimg.com/v2-6c9cc5b7f8637da67a71d8409f563b02_r.jpg?source=1def8aca\" data-actualsrc=\"https://pica.zhimg.com/50/v2-6c9cc5b7f8637da67a71d8409f563b02_720w.jpg?source=1def8aca\"/></figure><p data-pid=\"aCR5FId4\"><b>便便退散判据=（湿、半干、干）便便界面能判据+尿的射流判据。</b></p><p data-pid=\"DU7Gq3fb\">1、要把面积 (A) 的粑粑–陶瓷界面撕开，最少需要的能量大约是： <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=E_%7B%5Cmathrm%7Ba+d+h%7D%7D+%5Capprox+W_%7B%5Cmathrm%7Ba+d+h%7D%7D+%5C%2C+A\" alt=\"E_{\\mathrm{a d h}} \\approx W_{\\mathrm{a d h}} \\, A\"/> </p><p data-pid=\"hDn3UZmb\">2、尿流在时间Δ<i>t</i> 内冲击在这块区域上<b>的做功上限，</b>可以用冲击功率 × 时间估个数量级，尿流单位时间的动能流率（功率）： <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=P_%7B%5Cmathrm%7Bj+e+t%7D%7D+%5Capprox%5Cfrac%7B1%7D+%7B2%7D+%5Crho+A_%7B%5Cmathrm%7Bn+o+z+z+l+e%7D%7D+V%5E%7B3%7D\" alt=\"P_{\\mathrm{j e t}} \\approx\\frac{1} {2} \\rho A_{\\mathrm{n o z z l e}} V^{3}\"/> ，若其中有一小部分<i>η</i>用来克服粘附（其余被耗散成湍流、热、飞溅），则： <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=E_%7B%5Cmathrm%7Bu+s+e+f+u+l%7D%7D+%5Capprox%5Ceta%5C%2C+P_%7B%5Cmathrm%7Bj+e+t%7D%7D+%5C%2C+%5CDelta+t\" alt=\"E_{\\mathrm{u s e f u l}} \\approx\\eta\\, P_{\\mathrm{j e t}} \\, \\Delta t\"/> </p><p data-pid=\"IRSQLZ7a\">粗略判据就是： <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=E_%7B%5Cmathrm%7Bu+s+e+f+u+l%7D%7D+%5Cgtrsim+E_%7B%5Cmathrm%7Ba+d+h%7D%7D+%5CRightarrow%5Ceta%5C%2C+%5Cfrac%7B1%7D+%7B2%7D+%5Crho+A_%7B%5Cmathrm%7Bn+o+z+z+l+e%7D%7D+V%5E%7B3%7D+%5CDelta+t+%5Cgtrsim+W_%7B%5Cmathrm%7Ba+d+h%7D%7D+A+%E3%80%90%E4%BE%BF%E4%BE%BF%E9%80%80%E6%95%A3%E5%88%A4%E6%8D%AE%E3%80%91\" alt=\"E_{\\mathrm{u s e f u l}} \\gtrsim E_{\\mathrm{a d h}} \\Rightarrow\\eta\\, \\frac{1} {2} \\rho A_{\\mathrm{n o z z l e}} V^{3} \\Delta t \\gtrsim W_{\\mathrm{a d h}} A 【便便退散判据】\"/> </p><p class=\"ztext-empty-paragraph\"><br/></p><p data-pid=\"HbDrFlBP\">用法如下：</p><ul><li data-pid=\"jL0-qCkz\">对刚拉出来、很湿的便便： <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=W_%7B%5Ctext%7Badh%7D%7D\" alt=\"W_{\\text{adh}}\"/> 较低， <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctau_c\" alt=\"\\tau_c\"/> 较低，很容易满足，稍微冲几秒就掉。</li><li data-pid=\"umhhlKZC\">对<b>半干</b>的： <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=W_%7B%5Ctext%7Badh%7D%7D\" alt=\"W_{\\text{adh}}\"/> 、 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctau_c\" alt=\"\\tau_c\"/> 都上去了，需要：</li><ul><li data-pid=\"ed5RVX7C\">更高 (V)（更大的尿速，可能要站的更高）</li><li data-pid=\"6kfPC31K\">更合适的 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=%5Ctheta\" alt=\"\\theta\"/> （兼顾法向与切向）</li><li data-pid=\"7p6d8Msk\">更长 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=+%5CDelta+t\" alt=\" \\Delta t\"/> （多冲几秒）</li></ul><li data-pid=\"yZsnRLgz\"><b>干透的薄膜层便便</b>： <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=W_%7B%5Ctext%7Badh%7D%7D\" alt=\"W_{\\text{adh}}\"/> 等效上到干胶层级别，一般冲几秒的 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=E_%7B%5Ctext%7Buseful%7D%7D\" alt=\"E_{\\text{useful}}\"/> 很难达到要求，就进入老老实实必须机械刷洗的区间。</li></ul><figure data-size=\"normal\"><noscript><img src=\"https://pica.zhimg.com/50/v2-0485a4b1a4b63fc165b60cb72990b9cf_720w.gif?source=1def8aca\" data-caption=\"\" data-size=\"normal\" data-rawwidth=\"490\" data-rawheight=\"233\" data-original-token=\"v2-0485a4b1a4b63fc165b60cb72990b9cf\" data-thumbnail=\"https://picx.zhimg.com/50/v2-0485a4b1a4b63fc165b60cb72990b9cf_720w.jpg?source=1def8aca\" class=\"origin_image zh-lightbox-thumb\" width=\"490\" data-original=\"https://picx.zhimg.com/v2-0485a4b1a4b63fc165b60cb72990b9cf_r.jpg?source=1def8aca\"/></noscript><img src=\"data:image/svg+xml;utf8,&lt;svg xmlns=&#39;http://www.w3.org/2000/svg&#39; width=&#39;490&#39; height=&#39;233&#39;&gt;&lt;/svg&gt;\" data-caption=\"\" data-size=\"normal\" data-rawwidth=\"490\" data-rawheight=\"233\" data-original-token=\"v2-0485a4b1a4b63fc165b60cb72990b9cf\" data-thumbnail=\"https://picx.zhimg.com/50/v2-0485a4b1a4b63fc165b60cb72990b9cf_720w.jpg?source=1def8aca\" class=\"origin_image zh-lightbox-thumb lazy\" width=\"490\" data-original=\"https://picx.zhimg.com/v2-0485a4b1a4b63fc165b60cb72990b9cf_r.jpg?source=1def8aca\" data-actualsrc=\"https://pica.zhimg.com/50/v2-0485a4b1a4b63fc165b60cb72990b9cf_720w.gif?source=1def8aca\"/></figure><h2>六、两个脑洞问题</h2><p data-pid=\"wtZYyNhY\"> 1、是否可以通过微调尿液化学组成来增强清洗？</p><p data-pid=\"OClPbxne\">理论上可以，但现实操作很鸡肋，比如增加表面活性剂（例如大量脂肪酸、胆盐）会降低尿液表面张力、增强润湿和乳化能力，但这些东西来自饮食和代谢，你很难马上吃就马上尿出来，即便做到了，跟射流动能 + 马桶釉面自身疏污性相比，贡献仍然很有限。。。</p><p data-pid=\"kVWFdFl6\">2、升级马桶釉面材料能不能有效改善便便粘附难题？</p><p data-pid=\"BnNdHS6B\">超滑马桶涂层本质上就是通过构造超疏水、超疏液表面，把水接触角推到 140°~150° 甚至更高<sup data-text=\"New, Slippery Toilet Coating Provides Cleaner Flushing, Saves Water.\" data-url=\"https://www.mri.psu.edu/mri/newsmedia/news/new-slippery-toilet-coating-provides-cleaner-flushing-saves-water\" data-draft-node=\"inline\" data-draft-type=\"reference\" data-numero=\"7\">[7]</sup><sup data-text=\"Scientists develop slippery toilet coating to stop poo sticking.\" data-url=\"https://www.theguardian.com/science/2019/nov/18/scientists-develop-slippery-toilet-coating-stop-poo-sticking\" data-draft-node=\"inline\" data-draft-type=\"reference\" data-numero=\"8\">[8]</sup><sup data-text=\"Scientists Invented a Super-Slippery Toilet That Nothing Sticks\" data-url=\"https://www.sciencealert.com/scientists-invented-a-super-slippery-toilet-that-nothing-sticks-to\" data-draft-node=\"inline\" data-draft-type=\"reference\" data-numero=\"9\">[9]</sup>，对大多数水基污物（包括粪便模拟物）的粘附功 <img eeimg=\"1\" src=\"https://www.zhihu.com/equation?tex=+W_%7B%5Ctext%7Badh%7D%7D\" alt=\" W_{\\text{adh}}\"/> ​ 大幅下降，使得很小的射流剪切就足以掀掉大块污物。</p><p data-pid=\"har8OiLV\">如果你家是这种高端马桶的话，你就不需要费劲心思找角度了。</p><figure data-size=\"normal\"><noscript><img src=\"https://picx.zhimg.com/50/v2-c14af74ed458a901451dcc7fb536a371_720w.jpg?source=1def8aca\" data-caption=\"\" data-size=\"normal\" data-rawwidth=\"690\" data-rawheight=\"690\" data-original-token=\"v2-445b7b05b3faca64aef457477d4360d0\" class=\"origin_image zh-lightbox-thumb\" width=\"690\" data-original=\"https://picx.zhimg.com/v2-c14af74ed458a901451dcc7fb536a371_r.jpg?source=1def8aca\"/></noscript><img src=\"data:image/svg+xml;utf8,&lt;svg xmlns=&#39;http://www.w3.org/2000/svg&#39; width=&#39;690&#39; height=&#39;690&#39;&gt;&lt;/svg&gt;\" data-caption=\"\" data-size=\"normal\" data-rawwidth=\"690\" data-rawheight=\"690\" data-original-token=\"v2-445b7b05b3faca64aef457477d4360d0\" class=\"origin_image zh-lightbox-thumb lazy\" width=\"690\" data-original=\"https://picx.zhimg.com/v2-c14af74ed458a901451dcc7fb536a371_r.jpg?source=1def8aca\" data-actualsrc=\"https://picx.zhimg.com/50/v2-c14af74ed458a901451dcc7fb536a371_720w.jpg?source=1def8aca\"/></figure><p></p>",
+    "content_mark": {},
+    "content_need_truncated": false,
+    "created_time": 1773132138,
+    "decorative_labels": [],
+    "editable_content": "",
+    "endorsements": [
+      {
+        "action_url": "https://www.zhihu.com/column/c_2020540043559716281",
+        "background_color": {
+          "alpha": 0.08,
+          "group": "GBL01A"
+        },
+        "elements": [
+          {
+            "height": 16,
+            "image_color": {
+              "alpha": 1,
+              "group": "GBL01A"
+            },
+            "image_key": "zhicon_icon_24_column_fill",
+            "type": "IMAGE",
+            "width": 16
+          },
+          {
+            "content": "收录于 · 化学肛程",
+            "font_color": {
+              "alpha": 1,
+              "group": "GBL01A"
+            },
+            "font_size": 13,
+            "is_bold": false,
+            "max_line": 1,
+            "type": "TEXT"
+          },
+          {
+            "height": 12,
+            "image_color": {
+              "alpha": 1,
+              "group": "GBL01A"
+            },
+            "image_key": "zhicon_icon_16_arrow_right",
+            "type": "IMAGE",
+            "width": 12
+          }
+        ],
+        "sub_elements": [],
+        "sub_elements_type": "DESCRIPTION",
+        "za": {
+          "block_text": "Column",
+          "text": "收录于 · 化学肛程",
+          "type": "text"
+        }
+      }
+    ],
+    "excerpt": "写个回答，来提升我作品的含💩量吧，这个题目看似是物理学和数学，实际上涉及到物理化学、流体力学、胶粘学，粑粑就是一种天然的胶粘剂，一个东西能不能粘得住，和表面材质关系很大，主要考虑到表面能。 [图片] 先说说结论，尿流与马桶壁法线夹角大约 60°～80°的时候，对便便的冲击的效果较优的。既不能完全打直球（90°），直接正对着便便冲，也不能完全打插边球（20°~40°），就是人要站的远一点儿，让尿去冲击便便，让尿流看着…",
+    "extras": "",
+    "favlists_count": 218,
+    "force_login_when_click_read_more": false,
+    "has_publishing_draft": false,
+    "id": "fixture-answer-formula-table-001",
+    "is_collapsed": false,
+    "is_copyable": false,
+    "is_jump_native": false,
+    "is_mine": false,
+    "is_navigator": false,
+    "is_normal": true,
+    "is_sticky": false,
+    "is_visible": true,
+    "matrix_tips": "391 赞同 · 218 收藏 · 76 评论",
+    "navigator_vote": false,
+    "question": {
+      "created": 1691574829,
+      "id": "616439290",
+      "question_type": "normal",
+      "relationship": null,
+      "title": "在不使用马桶刷的情况下，用什么角度尿尿冲击才能最有效率地把粘在马桶壁上的㞎㞎冲掉？",
+      "type": "question",
+      "updated_time": 1774023384,
+      "url": "https://www.zhihu.com/api/v4/questions/616439290"
+    },
+    "reaction": {
+      "relation": {
+        "faved": false,
+        "liked": false
+      },
+      "statistics": {
+        "down_vote_count": 6,
+        "favorites": 218,
+        "like_count": 23
+      }
+    },
+    "reaction_instruction": {},
+    "relationship": {
+      "is_author": false,
+      "is_authorized": false,
+      "is_favorited": false,
+      "is_nothelp": false,
+      "is_thanked": false,
+      "upvoted_followees": [],
+      "voting": 0
+    },
+    "relevant_info": {
+      "is_relevant": false,
+      "relevant_text": "",
+      "relevant_type": ""
+    },
+    "reshipment_settings": "disallowed",
+    "reward_info": {
+      "can_open_reward": false,
+      "is_rewardable": true,
+      "reward_member_count": 0,
+      "reward_total_money": 0,
+      "tagline": "真诚赞赏，手留余香"
+    },
+    "segment_infos": [
+      {
+        "marks": [
+          {
+            "end_index": 30,
+            "seg_info": {
+              "comment_count": 2,
+              "is_like": false,
+              "is_span": false,
+              "like_count": 2,
+              "my_comment_count": 0,
+              "seg_ids": ["2017848416588289007"]
+            },
+            "start_index": 6
+          }
+        ],
+        "pid": "pIkUAtfD",
+        "text": "先说说结论，尿流与马桶壁法线夹角大约 60°～80°的时候，对便便的冲击的效果较优的。"
+      }
+    ],
+    "settings": {
+      "table_of_contents": {
+        "enabled": true
+      }
+    },
+    "sticky_info": "",
+    "suggest_edit": {
+      "reason": "",
+      "status": false,
+      "tip": "",
+      "title": "",
+      "unnormal_details": {
+        "description": "",
+        "note": "",
+        "reason": "",
+        "reason_id": 0,
+        "status": ""
+      },
+      "url": ""
+    },
+    "thanks_count": 23,
+    "thumbnail_info": {
+      "count": 3,
+      "thumbnails": [
+        {
+          "height": 324,
+          "token": "v2-e929963f075091e2b21df2bf0034c0f8",
+          "type": "image",
+          "url": "https://pic1.zhimg.com/80/v2-e929963f075091e2b21df2bf0034c0f8_720w.jpg?source=1def8aca",
+          "width": 324
+        },
+        {
+          "height": 342,
+          "token": "v2-c4c61df3d057ba5fdcee927b6b5f9753",
+          "type": "image",
+          "url": "https://picx.zhimg.com/80/v2-c4c61df3d057ba5fdcee927b6b5f9753_720w.jpg?source=1def8aca",
+          "width": 537
+        },
+        {
+          "height": 822,
+          "token": "v2-cf422055a26238cc90bbd0f1ffebebba",
+          "type": "image",
+          "url": "https://pica.zhimg.com/80/v2-cf422055a26238cc90bbd0f1ffebebba_720w.jpg?source=1def8aca",
+          "width": 1316
+        }
+      ],
+      "type": "thumbnail_info"
+    },
+    "type": "answer",
+    "updated_time": 1773134409,
+    "url": "",
+    "visible_only_to_author": false,
+    "vote_next_step": "vote",
+    "voteup_count": 391
+  },
+  "skip_count": false,
+  "position": 0,
+  "cursor": "fixture-cursor-formula-table-001",
+  "is_jump_native": false
+}

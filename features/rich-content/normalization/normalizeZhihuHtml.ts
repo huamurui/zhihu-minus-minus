@@ -1,5 +1,10 @@
 import { type Element, isTag, isText, type Node } from 'domhandler';
 import { parseDocument } from 'htmlparser2';
+import {
+  RICH_CONTENT_BLOCK_FORMULA_HEIGHT,
+  RICH_CONTENT_INLINE_FORMULA_HEIGHT,
+  RICH_CONTENT_UNKNOWN_IMAGE_HEIGHT,
+} from '../presentation.ts';
 
 export type EnrichedFallbackKind =
   | 'block-image'
@@ -34,6 +39,9 @@ interface NormalizationState {
   blockImageCount: number;
   maxImageWidth: number;
 }
+
+const ORIGINAL_IMAGE_TOKEN_PATTERN = /v2-[a-f\d]{32}/i;
+const ENRICHED_IMAGE_LINK_PREFIX = 'zhihu-enriched-image:';
 
 const BLOCK_TAGS = new Set([
   'p',
@@ -147,14 +155,26 @@ function getImageDimensions(
     parseDimension(element.attribs.height);
 
   const formulaText = element.attribs.alt?.trim() ?? '';
+  if (!isFormula) {
+    return {
+      width: maxWidth,
+      height:
+        rawWidth && rawHeight
+          ? Math.max(1, Math.round((maxWidth * rawHeight) / rawWidth))
+          : RICH_CONTENT_UNKNOWN_IMAGE_HEIGHT,
+    };
+  }
+
   let width =
     rawWidth ??
-    (isFormula
-      ? isBlock
-        ? maxWidth
-        : Math.min(maxWidth, Math.max(40, formulaText.length * 8))
-      : maxWidth);
-  let height = rawHeight ?? (isFormula ? (isBlock ? 60 : 22) : width * 0.5625);
+    (isBlock
+      ? maxWidth
+      : Math.min(maxWidth, Math.max(40, formulaText.length * 8)));
+  let height =
+    rawHeight ??
+    (isBlock
+      ? RICH_CONTENT_BLOCK_FORMULA_HEIGHT
+      : RICH_CONTENT_INLINE_FORMULA_HEIGHT);
 
   if (width > maxWidth) {
     height *= maxWidth / width;
@@ -165,6 +185,31 @@ function getImageDimensions(
     width: Math.max(1, Math.round(width)),
     height: Math.max(1, Math.round(height)),
   };
+}
+
+function resolveImageSource(element: Element): string | undefined {
+  const originalToken = element.attribs['data-original-token']?.trim();
+  let source = (
+    element.attribs['data-actualsrc'] ||
+    element.attribs['data-original'] ||
+    element.attribs.src ||
+    ''
+  ).trim();
+
+  if (source && originalToken && ORIGINAL_IMAGE_TOKEN_PATTERN.test(source)) {
+    source = source.replace(ORIGINAL_IMAGE_TOKEN_PATTERN, originalToken);
+  }
+
+  return source || undefined;
+}
+
+export function getEnrichedImageLinkSource(url: string): string | null {
+  if (!url.startsWith(ENRICHED_IMAGE_LINK_PREFIX)) return null;
+  try {
+    return decodeURIComponent(url.slice(ENRICHED_IMAGE_LINK_PREFIX.length));
+  } catch {
+    return null;
+  }
 }
 
 function serializeChildren(
@@ -199,10 +244,7 @@ function serializeImage(
   state: NormalizationState,
   context: SerializeContext,
 ): string {
-  const sourceCandidate =
-    element.attribs['data-actualsrc'] ||
-    element.attribs['data-original'] ||
-    element.attribs.src;
+  const sourceCandidate = resolveImageSource(element);
   const source = normalizeUrl(sourceCandidate, 'image');
   if (!source) {
     state.diagnostics.push({ kind: 'unsafe-url', source: 'img' });
@@ -217,7 +259,14 @@ function serializeImage(
     eeimg === '2' ||
     source.includes('/equation') ||
     source.includes('equation?');
-  const isBlock = eeimg === '2' || (!isFormula && context.parentTag !== 'p');
+  const formulaText = element.attribs.alt?.trim() ?? '';
+  const isBlockFormula =
+    eeimg === '2' ||
+    (!eeimg &&
+      (formulaText.includes('\\begin') || formulaText.includes('\\\\')));
+  const isBlock = isFormula
+    ? isBlockFormula
+    : context.parentTag !== 'p' && context.parentTag !== 'a';
   const { width, height } = getImageDimensions(
     element,
     isFormula,
@@ -229,7 +278,8 @@ function serializeImage(
   if (isBlock) {
     state.blockImageCount += 1;
     state.diagnostics.push({ kind: 'block-image', source: 'img' });
-    return `<p>${image}</p>`;
+    const imageLink = `${ENRICHED_IMAGE_LINK_PREFIX}${encodeURIComponent(source)}`;
+    return `<p><a href="${escapeAttribute(imageLink)}">${image}</a></p>`;
   }
 
   state.inlineImageCount += 1;

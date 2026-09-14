@@ -48,7 +48,20 @@ import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ZhihuSegmentInfo } from '@/types/zhihu';
 import { showToast } from '@/utils/toast';
 import { extractZhihuRedirectTarget, parseZhihuUrl } from '@/utils/url';
+import type { EnrichedNormalizationResult } from '../normalization/normalizeZhihuHtml';
+import {
+  createRichContentMetrics,
+  RICH_CONTENT_BLOCK_FORMULA_HEIGHT,
+  RICH_CONTENT_INLINE_FORMULA_HEIGHT,
+  RICH_CONTENT_LIST_INDENT,
+  RICH_CONTENT_LIST_ITEM_SPACING,
+  RICH_CONTENT_PARAGRAPH_SPACING,
+  RICH_CONTENT_UNKNOWN_IMAGE_HEIGHT,
+} from '../presentation';
 import ZhihuDOMContent, { type TextSelectionInfo } from './ZhihuDOMContent';
+import { ZhihuEnrichedContent } from './ZhihuEnrichedContent';
+
+export type RichContentRenderer = 'rnrh' | 'webview' | 'enriched';
 
 export interface ZhihuContentProps {
   content?: string;
@@ -58,6 +71,9 @@ export interface ZhihuContentProps {
   objectId: string;
   type: 'answer' | 'article' | 'pin' | 'question';
   onRefresh?: () => void;
+  onEnrichedNormalized?: (result: EnrichedNormalizationResult) => void;
+  renderer?: RichContentRenderer;
+  /** @deprecated Prefer `renderer="rnrh"` for explicit backend selection. */
   useNative?: boolean;
 }
 
@@ -396,8 +412,8 @@ const P_Renderer: CustomBlockRenderer = ({ TDefaultRenderer, ...props }) => {
   const {
     segmentMap,
     onPress,
-    fontSizeScale = 1.0,
-    lineHeightScale = 1.5,
+    fontSize = typography.fontSize.subtitle,
+    lineHeight = typography.fontSize.subtitle * 1.5,
   } = rendererProps as any;
   const isBlockquoteParagraph = tnode.parent?.tagName === 'blockquote';
   const paragraphTextColor = isBlockquoteParagraph
@@ -406,8 +422,8 @@ const P_Renderer: CustomBlockRenderer = ({ TDefaultRenderer, ...props }) => {
   const blockquoteParagraphStyle = isBlockquoteParagraph
     ? {
         color: textSecondaryColor,
-        fontSize: 17 * fontSizeScale,
-        lineHeight: 17 * lineHeightScale,
+        fontSize,
+        lineHeight,
       }
     : undefined;
 
@@ -426,8 +442,8 @@ const P_Renderer: CustomBlockRenderer = ({ TDefaultRenderer, ...props }) => {
     );
   }
 
-  const textFontSize = typography.fontSize.subtitle * fontSizeScale;
-  const textLineHeight = typography.fontSize.subtitle * lineHeightScale;
+  const textFontSize = fontSize;
+  const textLineHeight = lineHeight;
 
   return (
     <Text
@@ -574,7 +590,7 @@ const IMG_Renderer: CustomBlockRenderer = ({ tnode }) => {
     eeimg === '2' ||
     (!eeimg && (alt.includes('\\begin') || alt.includes('\\\\')));
 
-  let displayHeight = 200;
+  let displayHeight = RICH_CONTENT_UNKNOWN_IMAGE_HEIGHT;
   let displayWidth: number | string = contentWidth;
 
   if (originalWidth > 0 && originalHeight > 0) {
@@ -587,7 +603,9 @@ const IMG_Renderer: CustomBlockRenderer = ({ tnode }) => {
     }
   } else if (isFormula) {
     // 默认高度估计
-    displayHeight = isBlockFormula ? 60 : 22;
+    displayHeight = isBlockFormula
+      ? RICH_CONTENT_BLOCK_FORMULA_HEIGHT
+      : RICH_CONTENT_INLINE_FORMULA_HEIGHT;
     displayWidth = isBlockFormula
       ? contentWidth
       : Math.min(contentWidth, Math.max(40, alt.length * 8));
@@ -759,11 +777,19 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
     objectId,
     type,
     onRefresh,
+    onEnrichedNormalized,
+    renderer,
     useNative,
   }) => {
     const colorScheme = useColorScheme();
     const { width } = useWindowDimensions();
     const { useWebView, fontSizeScale, lineHeightScale } = useSettingsStore();
+    const metrics = useMemo(
+      () => createRichContentMetrics(fontSizeScale, lineHeightScale),
+      [fontSizeScale, lineHeightScale],
+    );
+    const selectedRenderer: RichContentRenderer =
+      renderer ?? (useNative || !useWebView ? 'rnrh' : 'webview');
     const textColor = useThemeColor({}, 'text');
     const textSecondaryColor = useThemeColor({}, 'textSecondary');
     const borderColor = useThemeColor({}, 'border');
@@ -798,7 +824,12 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
 
     // 备选方案：如果 DOM 组件加载太慢或失败，回退到原生渲染
     React.useEffect(() => {
-      if (useWebView && !useNative && !contentArray && content && !domReady) {
+      if (
+        selectedRenderer === 'webview' &&
+        !contentArray &&
+        content &&
+        !domReady
+      ) {
         const timer = setTimeout(() => {
           if (!domReady) {
             console.log(
@@ -809,7 +840,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         }, 3500);
         return () => clearTimeout(timer);
       }
-    }, [content, domReady, contentArray, useWebView, useNative]);
+    }, [content, domReady, contentArray, selectedRenderer]);
 
     const handleInternalLink = useCallback(
       (url: string) => {
@@ -967,8 +998,8 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         p: {
           segmentMap,
           onPress: handlePress,
-          fontSizeScale,
-          lineHeightScale,
+          fontSize: metrics.body.fontSize,
+          lineHeight: metrics.body.lineHeight,
         },
         a: {
           onPress: (_event: any, href: string) => handleInternalLink(href),
@@ -999,8 +1030,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         handleInternalLink,
         surfaceColor,
         width,
-        fontSizeScale,
-        lineHeightScale,
+        metrics,
       ],
     );
 
@@ -1027,9 +1057,9 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
       () => ({
         p: {
           color: textColor,
-          fontSize: 17 * fontSizeScale,
-          lineHeight: 17 * lineHeightScale,
-          marginBottom: 14,
+          fontSize: metrics.body.fontSize,
+          lineHeight: metrics.body.lineHeight,
+          marginBottom: RICH_CONTENT_PARAGRAPH_SPACING,
           marginTop: 0,
         },
         b: { color: textColor, fontWeight: 'bold' },
@@ -1038,46 +1068,78 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         blockquote: {
           borderLeftWidth: 3,
           borderLeftColor: primaryColor,
-          paddingLeft: 14,
+          paddingLeft: RICH_CONTENT_PARAGRAPH_SPACING,
           paddingRight: 10,
           backgroundColor: 'transparent',
           paddingVertical: 10,
           marginVertical: 12,
-          fontSize: 17 * fontSizeScale,
-          lineHeight: 17 * lineHeightScale,
+          fontSize: metrics.body.fontSize,
+          lineHeight: metrics.body.lineHeight,
           color: textSecondaryColor,
         },
         h1: {
           color: textColor,
-          fontSize: 21 * fontSizeScale,
+          fontSize: metrics.headings.h1.fontSize,
           fontWeight: 'bold',
-          marginTop: 24,
-          marginBottom: 10,
-          lineHeight: 21 * lineHeightScale,
+          marginTop: metrics.headings.h1.marginTop,
+          marginBottom: metrics.headings.h1.marginBottom,
+          lineHeight: metrics.headings.h1.lineHeight,
         },
         h2: {
           color: textColor,
-          fontSize: 19 * fontSizeScale,
+          fontSize: metrics.headings.h2.fontSize,
           fontWeight: 'bold',
-          marginTop: 20,
-          marginBottom: 8,
-          lineHeight: 19 * lineHeightScale,
+          marginTop: metrics.headings.h2.marginTop,
+          marginBottom: metrics.headings.h2.marginBottom,
+          lineHeight: metrics.headings.h2.lineHeight,
         },
         h3: {
           color: textColor,
-          fontSize: 17 * fontSizeScale,
+          fontSize: metrics.headings.h3.fontSize,
           fontWeight: 'bold',
-          marginTop: 16,
-          marginBottom: 6,
-          lineHeight: 17 * lineHeightScale,
+          marginTop: metrics.headings.h3.marginTop,
+          marginBottom: metrics.headings.h3.marginBottom,
+          lineHeight: metrics.headings.h3.lineHeight,
         },
-        ul: { paddingLeft: 20, color: textColor, marginVertical: 8 },
-        ol: { paddingLeft: 20, color: textColor, marginVertical: 8 },
-        li: {
-          marginBottom: 6,
+        h4: {
           color: textColor,
-          fontSize: 17 * fontSizeScale,
-          lineHeight: 17 * lineHeightScale,
+          fontSize: metrics.headings.h4.fontSize,
+          fontWeight: 'bold',
+          marginTop: metrics.headings.h4.marginTop,
+          marginBottom: metrics.headings.h4.marginBottom,
+          lineHeight: metrics.headings.h4.lineHeight,
+        },
+        h5: {
+          color: textColor,
+          fontSize: metrics.headings.h5.fontSize,
+          fontWeight: 'bold',
+          marginTop: metrics.headings.h5.marginTop,
+          marginBottom: metrics.headings.h5.marginBottom,
+          lineHeight: metrics.headings.h5.lineHeight,
+        },
+        h6: {
+          color: textColor,
+          fontSize: metrics.headings.h6.fontSize,
+          fontWeight: 'bold',
+          marginTop: metrics.headings.h6.marginTop,
+          marginBottom: metrics.headings.h6.marginBottom,
+          lineHeight: metrics.headings.h6.lineHeight,
+        },
+        ul: {
+          paddingLeft: RICH_CONTENT_LIST_INDENT,
+          color: textColor,
+          marginVertical: 8,
+        },
+        ol: {
+          paddingLeft: RICH_CONTENT_LIST_INDENT,
+          color: textColor,
+          marginVertical: 8,
+        },
+        li: {
+          marginBottom: RICH_CONTENT_LIST_ITEM_SPACING,
+          color: textColor,
+          fontSize: metrics.body.fontSize,
+          lineHeight: metrics.body.lineHeight,
         },
         hr: {
           height: 1,
@@ -1087,7 +1149,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         figure: { marginVertical: 12, alignItems: 'center' },
         figcaption: {
           color: textSecondaryColor,
-          fontSize: 13 * fontSizeScale,
+          fontSize: metrics.captionFontSize,
           marginTop: 6,
           textAlign: 'center',
           opacity: 0.7,
@@ -1101,7 +1163,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
           paddingHorizontal: 5,
           paddingVertical: 2,
           fontFamily: 'monospace',
-          fontSize: 14 * fontSizeScale,
+          fontSize: metrics.codeFontSize,
         },
       }),
       [
@@ -1109,8 +1171,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         textSecondaryColor,
         borderColor,
         contentBorderColor,
-        fontSizeScale,
-        lineHeightScale,
+        metrics,
         primaryColor,
       ],
     );
@@ -1254,7 +1315,15 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
       <View className="bg-transparent">
         {contentArray ? (
           renderPinContent()
-        ) : !useWebView || useNativeFallback || useNative ? (
+        ) : selectedRenderer === 'enriched' ? (
+          <ZhihuEnrichedContent
+            htmlContent={content || ''}
+            contentWidth={width - 40}
+            onLinkPress={handleInternalLink}
+            onImagePress={onImagePressCallback}
+            onNormalized={onEnrichedNormalized}
+          />
+        ) : selectedRenderer === 'rnrh' || useNativeFallback ? (
           <View>
             <RenderHtml
               contentWidth={width - 40}

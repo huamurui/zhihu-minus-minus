@@ -37,7 +37,7 @@ npm run test:rich-content
 
 开发构建可从“我的 → 富文本测试案例（开发）”打开案例列表。列表读取 `fixtures/manifest.json`，支持按 ID、来源类型和 trait 搜索；进入案例后可以在 RNRH、现有 WebView 和 EnrichedText 实验后端之间切换，并可重新挂载正文以观察冷渲染。正文交互默认关闭，也可用页面开关临时打开，以测试图片、链接、选择和段落操作；打开后需注意案例可能保留真实对象 ID。
 
-EnrichedText 后端目前只用于 PoC，不读取或改写生产渲染设置，也不会被业务页选择。它会显示规范化诊断数量；`eeimg=1` 作为行内 attachment 保留，块图和暂不支持的媒体会显式降级。公式 SVG 已通过 `patch-package` 补齐 Android/iOS 解码并适配正文颜色；当前尺寸 fallback 与旧渲染器一致，精确 intrinsic metrics / baseline offset 仍待 native extension。该原生库不能在 Expo Go 中运行，安装依赖后需要重新生成并编译 development build。
+EnrichedText 后端目前只用于 PoC，不读取或改写生产渲染设置，也不会被业务页选择。三个后端现在统一经过 `ZhihuContent` 的交互外壳：Enriched 使用与 RNRH 相同的站内/站外链接分流、内容宽度和图片预览层；普通块图的源地址修复、等比尺寸和未知尺寸 fallback，以及公式 block/inline 判定也与 RNRH 对齐。正文、h1-h6、代码和图注的字号来自同一份指标，`patch-package` 同时补齐了只读 EnrichedText 的 Android/iOS `lineHeight` 和公式 SVG 解码。它仍会显示规范化诊断数量，暂不支持的媒体会显式降级。精确公式 intrinsic metrics / baseline offset 和图片长按仍待 native extension。该原生库不能在 Expo Go 中运行，安装依赖后需要重新生成并编译 development build。
 
 案例页只展示已经登记到 `fixtures/cases/` 与 manifest 的稳定样本，`inbox/` 不会直接进入 UI。新增并登记 JSON case 后，Metro 的 fixture context 会自动发现文件，不需要再修改页面注册表。生产构建不显示入口，直接访问 `/dev/*` 也会被重定向到首页。
 

@@ -1,13 +1,13 @@
 经过进一步调研，当前不准备立即完整重写 RNRH，也暂不把 WebView / FlashList / 自研 Native Rich Text 作为唯一既定路线。
 
-## 实施状态（2026-09-08）
+## 实施状态（2026-09-14）
 
 第一批 JS / Fabric 接入已经完成，但尚未宣称实验通过：
 
 * 安装 `react-native-enriched-html@1.1.1`，该版本支持项目当前的 React Native 0.83 / Fabric；
 * 增加 `normalizeZhihuHtmlForEnriched`，将知乎 HTML 收窄为库支持的 canonical dialect；
 * 只保留允许的 URL scheme，移除 script/form 等节点，并对 unsupported node 产生可观测诊断；
-* `eeimg=1` 保持 inline `<img>`，`eeimg=2` 和普通 block image 显式记录降级；
+* `eeimg=1` 保持 inline `<img>`，`eeimg=2` 和普通 block image 显式记录诊断；
 * 开发案例页已增加 `Enriched` 第三后端，可与 RNRH / WebView 渲染同一份稳定 fixture；
 * 新增 normalization、危险 URL、link card、inline / block attachment 回归测试。
 
@@ -20,9 +20,18 @@
 * 代码背景使用现有 renderer 的 `border` token，并绕开 Enriched 对不透明背景自动降 alpha 后在浅色主题几乎不可见的问题；normalization 同时移除了 block 之间仅用于格式化源码的空白，避免它们变成额外文本行；
 * Android app debug 构建与 iOS `ReactNativeEnrichedHtml` Simulator target 均已编译通过。
 
+第三批将实验后端接回了与 RNRH 相同的展示与交互边界：
+
+* `ZhihuContent` 提供显式的 `rnrh` / `webview` / `enriched` 后端选择；开发案例页不再绕过生产组件单独挂载 Enriched；
+* 三个后端复用同一套站内路由、外链打开和图片预览层。Enriched 的块图通过内部 attachment link 回调打开预览，不把内部地址交给系统；
+* Enriched 的图片源选择补齐 `data-actualsrc` / `data-original` / `src` 与 `data-original-token` 修复，普通块图的等比尺寸和未知尺寸高度与 RNRH 一致；
+* 公式 block 判定补齐无 `eeimg` 时的 `\\begin` / 双反斜线启发式；公式与普通图片 fallback 常量由两个后端共享；
+* 正文、h1-h6、code、figcaption 的字号与正文行高收敛到一个 renderer-independent metrics 模块；引用文字也统一使用 secondary text token；
+* 上游只读 `EnrichedText` 原先虽然接收 React Native `style.lineHeight`，但 native component 没有消费它。本项目 patch 已将该 prop 接入 Android 展示与 Yoga 测量，以及 iOS attributed-string paragraph style。
+
 这仍不是公式排版的最终形态。知乎公式端点返回的 SVG 在自身 `width` / `height`（`ex`）和 `vertical-align` 中携带精确 metrics，但 Enriched 当前 `<img>` 模型只接收固定整数尺寸，不接收 baseline offset。第一阶段先消除裂图并取得可比较结果；精确 intrinsic metrics 和 baseline 仍属于下文的 Attachment metrics 扩展，需要真机对照后再做。
 
-基础排版也仍有一组明确的库边界：`htmlStyle` 暂不开放普通段落与标题的上下间距、引用背景与内边距、inline code 内边距、图片圆角、分隔线及图注样式。因此本轮只对齐公开配置能够稳定表达的部分，没有通过插入空行伪造 margin（那会污染复制文本和连续 selection）。这些差异应在真机对照后，再决定是否值得增加通用的 paragraph / attachment style native extension。
+基础排版也仍有一组明确的库边界：`htmlStyle` 暂不开放普通段落与标题的上下间距、引用背景与内边距、inline code 内边距、图片圆角、分隔线及图注样式。因此本轮只对齐公开配置能够稳定表达的部分，没有通过插入空行伪造 margin（那会污染复制文本和连续 selection）。图片单击已经复用预览层，但上游只读组件没有独立的 attachment press / long-press 事件，长按菜单仍不能与 RNRH 对齐。这些差异应在真机对照后，再决定是否值得增加通用的 paragraph / attachment interaction native extension。
 
 当前上游只读 `EnrichedText` 已有 `selectable`，但没有 `onSelectionChange`；`htmlStyle` 的 underline 也只有开关和颜色，没有 thickness / offset / line style。因此这两项仍明确属于下一批 native extension，不在本批伪造 JS 事件或视觉模拟。
 

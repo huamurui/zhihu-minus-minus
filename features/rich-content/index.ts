@@ -1,5 +1,6 @@
 export {
   LinkCard,
+  type RichContentRenderer,
   ZhihuContent,
   type ZhihuContentProps,
 } from './components/ZhihuContent';
@@ -16,6 +17,7 @@ export {
   type EnrichedNormalizationDiagnostic,
   type EnrichedNormalizationOptions,
   type EnrichedNormalizationResult,
+  getEnrichedImageLinkSource,
   normalizeZhihuHtmlForEnriched,
 } from './normalization/normalizeZhihuHtml';
 export {

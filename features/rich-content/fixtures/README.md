@@ -77,6 +77,8 @@ HTML 统计还包括 `memberMentions`（`a.member_mention`）和 `topicTags`（`
 
 `cases/question-feed-card-heavy.json` 是 `question_feed_card` envelope，正文位于 `target.content`，用于覆盖 feed card 包装、超长图文、link card、segment 信息和 answer 关系元数据。
 
+`cases/question-feed-card-formula-table-001.json` 是脱敏后的 `question_feed_card` envelope，用于覆盖公式密集正文、表格、嵌套列表、引用、GIF/普通图片和段落交互数据。
+
 `cases/pin-link-card-001.json` 的 pin 正文位于 `content_html`，但知乎问题卡片位于 `content.1`；这类案例必须同时保留两个字段，不能只保存 HTML。
 
 `cases/pin-member-mention-muted.json` 和 `cases/pin-topic-tag-001.json` 分别覆盖 `member_mention` 与 `hash_tag` anchor，并保留 pin 的状态和内容数组。

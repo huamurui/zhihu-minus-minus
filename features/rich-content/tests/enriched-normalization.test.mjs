@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { normalizeZhihuHtmlForEnriched } from '../normalization/normalizeZhihuHtml.ts';
+import {
+  getEnrichedImageLinkSource,
+  normalizeZhihuHtmlForEnriched,
+} from '../normalization/normalizeZhihuHtml.ts';
+import { createRichContentMetrics } from '../presentation.ts';
 
 test('lowers common Zhihu markup to one canonical enriched HTML document', () => {
   const result = normalizeZhihuHtmlForEnriched(`
@@ -64,6 +68,46 @@ test('uses the existing renderer formula size fallback when dimensions are absen
 
   assert.match(result.html, /tex=Ax" width="40" height="22"/);
   assert.match(result.html, /tex=matrix" width="300" height="60"/);
+});
+
+test('matches RNRH block image sizing, source repair, and preview links', () => {
+  const result = normalizeZhihuHtmlForEnriched(
+    '<figure><img data-actualsrc="//pic.zhimg.com/v2-00000000000000000000000000000000_720w.jpg" data-original-token="v2-11111111111111111111111111111111" data-rawwidth="200" data-rawheight="100"></figure>',
+    { maxImageWidth: 320 },
+  );
+
+  assert.match(result.html, /width="320" height="160"/);
+  assert.match(result.html, /v2-11111111111111111111111111111111/);
+  assert.doesNotMatch(result.html, /v2-00000000000000000000000000000000/);
+
+  const href = result.html.match(/<a href="([^"]+)">/)?.[1];
+  assert.ok(href);
+  assert.equal(
+    getEnrichedImageLinkSource(href),
+    'https://pic.zhimg.com/v2-11111111111111111111111111111111_720w.jpg',
+  );
+});
+
+test('uses the RNRH block-formula heuristic when eeimg is absent', () => {
+  const result = normalizeZhihuHtmlForEnriched(
+    '<img src="https://www.zhihu.com/equation?tex=matrix" alt="\\begin{matrix}1\\\\2\\end{matrix}">',
+    { maxImageWidth: 280 },
+  );
+
+  assert.match(result.html, /width="280" height="60"/);
+  assert.equal(result.blockImageCount, 1);
+});
+
+test('keeps RNRH and Enriched typography on one metrics source', () => {
+  const metrics = createRichContentMetrics(1.2, 1.7);
+
+  assert.equal(metrics.body.fontSize, 20.4);
+  assert.equal(metrics.body.lineHeight, 28.9);
+  assert.equal(metrics.headings.h1.fontSize, 25.2);
+  assert.ok(
+    Math.abs(metrics.headings.h1.lineHeight - 35.7) < Number.EPSILON * 100,
+  );
+  assert.equal(metrics.codeFontSize, 16.8);
 });
 
 test('strips executable markup and rejects dangerous URLs', () => {
