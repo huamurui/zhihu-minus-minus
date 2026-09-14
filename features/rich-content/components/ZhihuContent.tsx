@@ -46,6 +46,7 @@ import Colors from '@/constants/Colors';
 import { typography } from '@/constants/designTokens';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ZhihuSegmentInfo } from '@/types/zhihu';
+import { copyToClipboard } from '@/utils/clipboard';
 import { showToast } from '@/utils/toast';
 import { extractZhihuRedirectTarget, parseZhihuUrl } from '@/utils/url';
 import ZhihuDOMContent, { type TextSelectionInfo } from './ZhihuDOMContent';
@@ -1233,6 +1234,15 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         showToast('操作失败，请重试');
       },
     });
+
+    // Copy the currently selected span so continuous selection is actually useful.
+    const copySelection = useCallback(async () => {
+      if (!textSelection) return;
+      const ok = await copyToClipboard(textSelection.text);
+      showToast(ok ? '已复制' : '复制失败');
+      setTextSelection(null);
+    }, [textSelection]);
+
     const domStyle = useMemo(
       () => ({ backgroundColor: 'transparent', minHeight: 400 }),
       [],
@@ -1290,7 +1300,9 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
               onLinkPress={handleInternalLink}
               onSegmentPress={onSegmentPressCallback}
               onTextSelected={
-                type === 'answer' ? onTextSelectedCallback : undefined
+                type === 'answer' || type === 'article'
+                  ? onTextSelectedCallback
+                  : undefined
               }
               style={domStyle}
             />
@@ -1387,7 +1399,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
           onClose={() => setActionSheetUrl(null)}
         />
 
-        {textSelection && type === 'answer' && (
+        {textSelection && (type === 'answer' || type === 'article') && (
           <View
             className="mt-3 rounded-2xl overflow-hidden"
             style={[
@@ -1430,28 +1442,52 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
                   取消
                 </Text>
               </BouncyButton>
-              <BouncyButton
-                className="flex-row items-center rounded-full px-4 py-1.5"
-                style={{
-                  backgroundColor: primaryColor,
-                }}
-                onPress={() => createReactionMutation.mutate()}
-                disabled={createReactionMutation.isPending}
-              >
-                {createReactionMutation.isPending ? (
-                  <ActivityIndicator size="small" color={inverseTextColor} />
-                ) : (
-                  <>
-                    <Ionicons name="heart" size={16} color={inverseTextColor} />
-                    <Text
-                      className="text-sm font-bold ml-1"
-                      style={{ color: inverseTextColor }}
-                    >
-                      赞同
-                    </Text>
-                  </>
+              <View className="flex-row items-center">
+                <BouncyButton
+                  className="flex-row items-center p-2 rounded-full bg-transparent"
+                  onPress={() => copySelection()}
+                >
+                  <Ionicons
+                    name="copy-outline"
+                    size={18}
+                    color={textSecondaryColor}
+                  />
+                  <Text type="secondary" className="text-sm ml-1">
+                    复制
+                  </Text>
+                </BouncyButton>
+                {type === 'answer' && (
+                  <BouncyButton
+                    className="flex-row items-center rounded-full px-4 py-1.5 ml-1"
+                    style={{
+                      backgroundColor: primaryColor,
+                    }}
+                    onPress={() => createReactionMutation.mutate()}
+                    disabled={createReactionMutation.isPending}
+                  >
+                    {createReactionMutation.isPending ? (
+                      <ActivityIndicator
+                        size="small"
+                        color={inverseTextColor}
+                      />
+                    ) : (
+                      <>
+                        <Ionicons
+                          name="heart"
+                          size={16}
+                          color={inverseTextColor}
+                        />
+                        <Text
+                          className="text-sm font-bold ml-1"
+                          style={{ color: inverseTextColor }}
+                        >
+                          赞同
+                        </Text>
+                      </>
+                    )}
+                  </BouncyButton>
                 )}
-              </BouncyButton>
+              </View>
             </View>
           </View>
         )}

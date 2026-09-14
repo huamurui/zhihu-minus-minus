@@ -672,7 +672,7 @@ export default function AppearanceSettings() {
         {/* 7. 实验性功能 */}
         <Section title="实验性功能 (默认关闭)" colorScheme={colorScheme}>
           <SettingItem
-            label="启用 WebView 渲染"
+            label="WebView 渲染（支持连续选词）"
             icon="globe-outline"
             colorScheme={colorScheme}
           >
