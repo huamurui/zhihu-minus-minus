@@ -492,7 +492,7 @@ const FeedCardComponent = ({ item, tab }: FeedCardProps) => {
               style={{ borderRadius: 99 }}
             >
               <Ionicons
-                name="ellipsis-horizontal"
+                name="share-outline"
                 size={18}
                 color={secondaryColor}
               />

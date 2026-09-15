@@ -23,6 +23,7 @@ import { CollectButton } from '@/components/CollectButton';
 import { DownvoteButton } from '@/components/DownvoteButton';
 import { LikeButton } from '@/components/LikeButton';
 import { LikeHeartButton } from '@/components/LikeHeartButton';
+import { ShareMenu } from '@/components/ShareMenu';
 import { StableAvatar } from '@/components/StableAvatar';
 import { Text, ThemedIcon, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -89,6 +90,7 @@ export const AnswerDetailView = ({
   }));
 
   const [votersVisible, setVotersVisible] = React.useState(false);
+  const [isSharing, setIsSharing] = React.useState(false);
   const [hasBeenFocused, setHasBeenFocused] = React.useState(isFocused);
 
   React.useEffect(() => {
@@ -243,7 +245,12 @@ export const AnswerDetailView = ({
               </Text>
             </BouncyButton>
           </View>
-          <View className="w-10 bg-transparent" />
+          <BouncyButton
+            onPress={() => setIsSharing(true)}
+            className="w-10 h-10 justify-center items-center rounded-full bg-transparent"
+          >
+            <Ionicons name="share-outline" size={24} color={secondaryColor} />
+          </BouncyButton>
         </View>
       </Reanimated.View>
 
@@ -472,6 +479,19 @@ export const AnswerDetailView = ({
         contentType="answer"
         contentId={id}
         count={answer?.voteup_count}
+      />
+
+      <ShareMenu
+        visible={isSharing}
+        onClose={() => setIsSharing(false)}
+        type="answer"
+        data={{
+          id,
+          title: answer?.question?.title,
+          author: answer?.author?.name,
+          authorHeadline: answer?.author?.headline,
+          url: `https://www.zhihu.com/answer/${id}`,
+        }}
       />
     </View>
   );
