@@ -7,6 +7,9 @@
     "icon": "./assets/images/icon.png",
     "scheme": "zhihu--",
     "userInterfaceStyle": "automatic",
+    "androidStatusBar": {
+      "hidden": true
+    },
     "splash": {
       "image": "./assets/images/android-icon-monochrome.png",
       "resizeMode": "contain",
@@ -16,7 +19,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.huamu013.ZhihuMinusMinus",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIStatusBarHidden": true,
+        "UIViewControllerBasedStatusBarAppearance": false
       },
       "splash": {
         "backgroundColor": "#ffffff",

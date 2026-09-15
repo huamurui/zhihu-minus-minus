@@ -1,11 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import React, { useRef } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   type ScrollView as NativeScrollView,
   StyleSheet,
 } from 'react-native';
@@ -16,13 +15,14 @@ import Reanimated, {
   useAnimatedStyle,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { type AnswerDetail, deleteAnswer, getAnswer } from '@/api/zhihu';
+import { type AnswerDetail, getAnswer } from '@/api/zhihu';
 import { getAnswerCollectionStatus } from '@/api/zhihu/collection';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
 import { BouncyButton } from '@/components/BouncyButton';
+import { CollectButton } from '@/components/CollectButton';
 import { DownvoteButton } from '@/components/DownvoteButton';
 import { LikeButton } from '@/components/LikeButton';
-import { ActionSheet } from '@/components/overlays/ActionSheet';
+import { LikeHeartButton } from '@/components/LikeHeartButton';
 import { ShareMenu } from '@/components/ShareMenu';
 import { StableAvatar } from '@/components/StableAvatar';
 import { Text, ThemedIcon, useThemeColor, View } from '@/components/Themed';
@@ -30,9 +30,11 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { VoterListModal } from '@/components/VoterListModal';
 import Colors from '@/constants/Colors';
 import { RICH_CONTENT_STALE_TIME, ZhihuContent } from '@/features/rich-content';
-import { useCollectionAction } from '@/hooks/useCollectionAction';
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
-import { useScrollHeaderAnim } from '@/hooks/useScrollAnimation';
+import {
+  FOOTER_HIDE_DISTANCE,
+  useScrollHeaderAnim,
+} from '@/hooks/useScrollAnimation';
 import { useCollectionStore } from '@/store/useCollectionStore';
 import { formatDate } from '@/utils/date';
 
@@ -62,7 +64,7 @@ export const AnswerDetailView = ({
   const _textColor = Colors[colorScheme].text;
 
   const scrollViewRef = useRef<NativeScrollView>(null);
-  const { headerVisible, handleScroll } = useScrollHeaderAnim(
+  const { headerVisible, footerOffset, handleScroll } = useScrollHeaderAnim(
     300,
     onScroll,
     100,
@@ -82,10 +84,13 @@ export const AnswerDetailView = ({
     ],
   }));
 
-  const [isLiked, setIsLiked] = React.useState(false);
-  const [menuVisible, setMenuVisible] = React.useState(false);
-  const [isSharing, setIsSharing] = React.useState(false);
+  const footerAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: 1 - footerOffset.value / FOOTER_HIDE_DISTANCE,
+    transform: [{ translateY: footerOffset.value }],
+  }));
+
   const [votersVisible, setVotersVisible] = React.useState(false);
+  const [isSharing, setIsSharing] = React.useState(false);
   const [hasBeenFocused, setHasBeenFocused] = React.useState(isFocused);
 
   React.useEffect(() => {
@@ -129,30 +134,6 @@ export const AnswerDetailView = ({
     successMessage: (isActive) => (isActive ? '已取消关注' : '已关注'),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: () => deleteAnswer(id),
-    onSuccess: () => {
-      Alert.alert('删除成功', '你的回答已删除喵！');
-      router.back();
-    },
-    onError: (err: any) =>
-      Alert.alert(
-        '删除失败',
-        err.response?.data?.error?.message || '无法删除回答',
-      ),
-  });
-
-  const handleDelete = () => {
-    Alert.alert('确认删除', '确定要删除这个回答吗？此操作不可撤销喵！', [
-      { text: '取消', style: 'cancel' },
-      {
-        text: '确认删除',
-        style: 'destructive',
-        onPress: () => deleteMutation.mutate(),
-      },
-    ]);
-  };
-
   const { data: collectionStatus, isFetchedAfterMount } = useQuery({
     queryKey: ['answer-collection-status', id],
     queryFn: () => getAnswerCollectionStatus(id),
@@ -182,7 +163,6 @@ export const AnswerDetailView = ({
         ? statusCollected
         : rawIsFaved;
   const storeCollectedRef = useRef(storeCollected);
-  const { toggleCollect, isPending: collectionPending } = useCollectionAction();
   const authorAvatarUrl = answer?.author?.avatar_url;
 
   React.useEffect(() => {
@@ -205,15 +185,9 @@ export const AnswerDetailView = ({
     if (token) router.push(`/user/${token}`);
   };
 
-  const getShareLink = () => {
-    const actualQid = answer?.question?.id || questionId;
-    return `https://www.zhihu.com/question/${actualQid}/answer/${id}`;
-  };
-
   const primaryColor = useThemeColor({}, 'primary');
   const primaryTransparent = useThemeColor({}, 'primaryTransparent');
   const secondaryColor = useThemeColor({}, 'textSecondary');
-  const warningColor = useThemeColor({}, 'warning');
 
   if (!hasBeenFocused) {
     return <View className="flex-1" />;
@@ -271,7 +245,12 @@ export const AnswerDetailView = ({
               </Text>
             </BouncyButton>
           </View>
-          <View className="w-10 bg-transparent" />
+          <BouncyButton
+            onPress={() => setIsSharing(true)}
+            className="w-10 h-10 justify-center items-center rounded-full bg-transparent"
+          >
+            <Ionicons name="ellipsis-vertical" size={24} color={secondaryColor} />
+          </BouncyButton>
         </View>
       </Reanimated.View>
 
@@ -414,7 +393,7 @@ export const AnswerDetailView = ({
       </Reanimated.ScrollView>
 
       {/* Footer Actions */}
-      <View
+      <Reanimated.View
         className="absolute left-5 right-5 z-[1000]"
         style={[
           colorScheme === 'light' && {
@@ -425,6 +404,7 @@ export const AnswerDetailView = ({
             elevation: 10,
           },
           { bottom: insets.bottom },
+          footerAnimatedStyle,
         ]}
       >
         <BlurView
@@ -459,6 +439,16 @@ export const AnswerDetailView = ({
               />
             </View>
             <View className="flex-1 flex-row justify-end items-center bg-transparent">
+              <LikeHeartButton
+                id={id}
+                type="answer"
+                liked={answer?.reaction?.relation?.liked}
+              />
+              <CollectButton
+                id={id}
+                type="answer"
+                collected={activeCollected}
+              />
               <BouncyButton
                 className="items-center justify-center ml-3 p-2 flex-row bg-transparent"
                 style={{ borderRadius: 99 }}
@@ -478,38 +468,10 @@ export const AnswerDetailView = ({
                   </Text>
                 )}
               </BouncyButton>
-              <BouncyButton
-                className="items-center justify-center ml-3 p-2 flex-row bg-transparent"
-                style={{ borderRadius: 99 }}
-                onPress={() => setMenuVisible(true)}
-              >
-                <ThemedIcon
-                  name="ellipsis-horizontal"
-                  size={24}
-                  colorType="secondary"
-                />
-              </BouncyButton>
             </View>
           </View>
         </BlurView>
-      </View>
-
-      <ShareMenu
-        visible={isSharing}
-        onClose={() => setIsSharing(false)}
-        type="answer"
-        data={
-          answer
-            ? {
-                id: answer.id,
-                title: answer.question?.title,
-                author: answer.author?.name,
-                authorHeadline: answer.author?.headline,
-                url: getShareLink(),
-              }
-            : null
-        }
-      />
+      </Reanimated.View>
 
       <VoterListModal
         visible={votersVisible}
@@ -519,59 +481,17 @@ export const AnswerDetailView = ({
         count={answer?.voteup_count}
       />
 
-      <ActionSheet
-        visible={menuVisible && !isSharing}
-        onClose={() => setMenuVisible(false)}
-        title="回答操作"
-        options={[
-          {
-            key: 'like',
-            icon: isLiked ? 'heart' : 'heart-outline',
-            label: isLiked ? '取消喜欢' : '加入喜欢',
-            color: isLiked ? Colors[colorScheme].danger : undefined,
-            onPress: () => setIsLiked(!isLiked),
-          },
-          {
-            key: 'collection',
-            icon: activeCollected ? 'star' : 'star-outline',
-            label: activeCollected ? '取消收藏' : '移至收藏',
-            color: activeCollected ? warningColor : undefined,
-            disabled: collectionPending,
-            onPress: () => toggleCollect(id, 'answer', activeCollected),
-          },
-          {
-            key: 'share',
-            icon: 'share-social-outline',
-            label: '分享回答',
-            onPress: () => setIsSharing(true),
-          },
-          ...(answer?.relationship?.is_author
-            ? [
-                {
-                  key: 'edit',
-                  icon: 'create-outline' as const,
-                  label: '编辑回答',
-                  onPress: () => {
-                    const targetQuestionId = answer.question?.id || questionId;
-                    if (targetQuestionId) {
-                      router.push(`/question/write/${targetQuestionId}`);
-                    }
-                  },
-                },
-              ]
-            : []),
-          ...(answer?.relationship?.is_author
-            ? [
-                {
-                  key: 'delete',
-                  icon: 'trash-outline' as const,
-                  label: '删除回答',
-                  destructive: true,
-                  onPress: handleDelete,
-                },
-              ]
-            : []),
-        ]}
+      <ShareMenu
+        visible={isSharing}
+        onClose={() => setIsSharing(false)}
+        type="answer"
+        data={{
+          id,
+          title: answer?.question?.title,
+          author: answer?.author?.name,
+          authorHeadline: answer?.author?.headline,
+          url: `https://www.zhihu.com/answer/${id}`,
+        }}
       />
     </View>
   );

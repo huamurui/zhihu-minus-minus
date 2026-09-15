@@ -5,6 +5,7 @@ import type {
   ZhihuSegmentInfo,
 } from '@/types/zhihu';
 import apiClient from '../client';
+import type { ZhihuCommentResponse } from './comment';
 import {
   createPublishingTraceId,
   getPublishingTextLength,
@@ -404,7 +405,7 @@ export const getSegmentComments = async (
   segmentId: string,
   limit = 20,
   offset = '',
-): Promise<SegmentCommentsResponse> => {
+): Promise<ZhihuCommentResponse> => {
   const res = await apiClient.get<SegmentCommentsResponse>(
     `/comment_v5/answers/${answerId}/segment/root_comment?segment_id=${segmentId}&order_by=score&limit=${limit}&offset=${offset}`,
   );
@@ -426,5 +427,5 @@ export const getSegmentComments = async (
       return comment;
     });
   }
-  return res.data;
+  return res.data as unknown as ZhihuCommentResponse;
 };

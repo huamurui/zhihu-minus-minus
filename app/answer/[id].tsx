@@ -249,20 +249,20 @@ export default function AnswerDetailScreen() {
           pointerEvents="none"
         />
 
-        {/* 返回按钮 (Always Visible) */}
-        <BouncyButton
-          onPress={() => router.back()}
-          className="w-10 h-10 justify-center items-center z-50 rounded-full"
-        >
-          <Ionicons name="chevron-back" size={28} color={textColor} />
-        </BouncyButton>
-
-        {/* 可折叠/淡出的内容区域 (标题和分享按钮) */}
+        {/* 可折叠/淡出的内容区域 (返回按钮、标题和分享按钮) */}
         <Reanimated.View
           className="flex-1 flex-row items-start"
           style={headerContentStyle}
           pointerEvents={isHeaderCollapsed ? 'none' : 'auto'}
         >
+          {/* 返回按钮 */}
+          <BouncyButton
+            onPress={() => router.back()}
+            className="w-10 h-10 justify-center items-center z-50 rounded-full"
+          >
+            <Ionicons name="chevron-back" size={28} color={textColor} />
+          </BouncyButton>
+
           {/* 标题区域 */}
           <BouncyButton
             className="flex-1 mx-2"
@@ -294,7 +294,7 @@ export default function AnswerDetailScreen() {
             onPress={handleShareClick}
             className="w-10 h-10 justify-center items-center rounded-full"
           >
-            <Ionicons name="share-outline" size={24} color={textColor} />
+            <Ionicons name="ellipsis-vertical" size={24} color={textColor} />
           </BouncyButton>
         </Reanimated.View>
       </View>

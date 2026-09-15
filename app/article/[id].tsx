@@ -3,7 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import { BlurView } from 'expo-blur';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Image, StyleSheet } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet } from 'react-native';
+import Reanimated, {
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getArticle, getDailyDetail } from '@/api/zhihu';
 import { getArticleCollectionStatus } from '@/api/zhihu/collection';
@@ -15,9 +20,10 @@ import {
 import { recordReadHistory } from '@/api/zhihu/history';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
 import { BouncyButton } from '@/components/BouncyButton';
+import { CollectButton } from '@/components/CollectButton';
 import { DownvoteButton } from '@/components/DownvoteButton';
 import { LikeButton } from '@/components/LikeButton';
-import { ActionSheet } from '@/components/overlays/ActionSheet';
+import { LikeHeartButton } from '@/components/LikeHeartButton';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { ShareMenu } from '@/components/ShareMenu';
 import { StableAvatar } from '@/components/StableAvatar';
@@ -25,8 +31,11 @@ import { Text, ThemedIcon, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { RICH_CONTENT_STALE_TIME, ZhihuContent } from '@/features/rich-content';
-import { useCollectionAction } from '@/hooks/useCollectionAction';
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
+import {
+  FOOTER_HIDE_DISTANCE,
+  useScrollHeaderAnim,
+} from '@/hooks/useScrollAnimation';
 import { useCollectionStore } from '@/store/useCollectionStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ZhihuArticle } from '@/types/zhihu';
@@ -35,7 +44,6 @@ import { formatDate } from '@/utils/date';
 export default function ArticleDetail() {
   const colorScheme = useColorScheme();
   const primaryColor = useThemeColor({}, 'primary');
-  const warningColor = useThemeColor({}, 'warning');
   const { id, source } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -45,10 +53,14 @@ export default function ArticleDetail() {
   const isDark = colorScheme === 'dark';
 
   const [isSharing, setIsSharing] = useState(false);
-  const [menuVisible, setMenuVisible] = useState(false);
-  const [isLiked, setIsLiked] = useState(false); // Local liked menu state (optional)
 
-  const scrollY = useRef(new Animated.Value(0)).current;
+  const scrollY = useSharedValue(0);
+  const { footerOffset, handleScroll } = useScrollHeaderAnim(
+    300,
+    undefined,
+    0,
+    scrollY,
+  );
 
   // 1. 获取日报详情
   const {
@@ -116,7 +128,6 @@ export default function ArticleDetail() {
   );
   const activeCollected = storeCollected ?? statusCollected ?? false;
   const storeCollectedRef = useRef(storeCollected);
-  const { toggleCollect, isPending: collectionPending } = useCollectionAction();
 
   useEffect(() => {
     storeCollectedRef.current = storeCollected;
@@ -187,17 +198,19 @@ export default function ArticleDetail() {
   };
 
   // Header Animation values
-  const headerBgOpacity = scrollY.interpolate({
-    inputRange: [0, 80],
-    outputRange: [0, 1],
-    extrapolate: 'clamp',
-  });
+  const headerBgStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [0, 80], [0, 1], 'clamp'),
+  }));
 
-  const headerTitleOpacity = scrollY.interpolate({
-    inputRange: [80, 140],
-    outputRange: [0, 1],
-    extrapolate: 'clamp',
-  });
+  const headerTitleStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [80, 140], [0, 1], 'clamp'),
+  }));
+
+  // 底部交互栏随滚动折叠/展开，与回答页一致。
+  const footerAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: 1 - footerOffset.value / FOOTER_HIDE_DISTANCE,
+    transform: [{ translateY: footerOffset.value }],
+  }));
 
   if (isLoading && !data) {
     return (
@@ -264,17 +277,17 @@ export default function ArticleDetail() {
         }}
         pointerEvents="box-none"
       >
-        <Animated.View
+        <Reanimated.View
           style={[
             StyleSheet.absoluteFillObject,
             {
               backgroundColor: Colors[colorScheme].backgroundSecondary,
-              opacity: headerBgOpacity,
               borderBottomWidth: StyleSheet.hairlineWidth,
               borderBottomColor: isDark
                 ? 'rgba(255,255,255,0.1)'
                 : 'rgba(0,0,0,0.1)',
             },
+            headerBgStyle,
           ]}
           pointerEvents="none"
         />
@@ -286,9 +299,9 @@ export default function ArticleDetail() {
           <Ionicons name="chevron-back" size={28} color={textColor} />
         </BouncyButton>
 
-        <Animated.View
+        <Reanimated.View
           className="flex-1 mx-4"
-          style={{ opacity: headerTitleOpacity }}
+          style={headerTitleStyle}
           pointerEvents="none"
         >
           <Text
@@ -298,17 +311,17 @@ export default function ArticleDetail() {
           >
             {data.title}
           </Text>
-        </Animated.View>
+        </Reanimated.View>
 
         <BouncyButton
           onPress={() => setIsSharing(true)}
           className="w-10 h-10 justify-center items-center z-50 rounded-full"
         >
-          <Ionicons name="share-outline" size={24} color={textColor} />
+          <Ionicons name="ellipsis-vertical" size={24} color={textColor} />
         </BouncyButton>
       </View>
 
-      <Animated.ScrollView
+      <Reanimated.ScrollView
         className="flex-1"
         style={{
           backgroundColor: isDark
@@ -316,10 +329,7 @@ export default function ArticleDetail() {
             : 'rgba(255, 255, 255, 0.9)',
         }}
         scrollEventThrottle={16}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true },
-        )}
+        onScroll={handleScroll}
         contentContainerStyle={{
           paddingTop: isDaily ? 0 : insets.top + 60,
           paddingBottom: isDaily ? 100 + insets.bottom : 120 + insets.bottom,
@@ -482,11 +492,11 @@ export default function ArticleDetail() {
             </Text>
           </View>
         )}
-      </Animated.ScrollView>
+      </Reanimated.ScrollView>
 
       {/* Floating Footer Actions for Standard Articles */}
       {!isDaily && (
-        <View
+        <Reanimated.View
           className="absolute left-5 right-5 z-[1000]"
           style={[
             !isDark && {
@@ -497,6 +507,7 @@ export default function ArticleDetail() {
               elevation: 10,
             },
             { bottom: insets.bottom + 10 },
+            footerAnimatedStyle,
           ]}
         >
           <BlurView
@@ -529,6 +540,12 @@ export default function ArticleDetail() {
                 />
               </View>
               <View className="flex-1 flex-row justify-end items-center bg-transparent">
+                <LikeHeartButton id={id as string} type="article" />
+                <CollectButton
+                  id={id as string}
+                  type="article"
+                  collected={activeCollected}
+                />
                 <BouncyButton
                   className="items-center justify-center ml-3 p-2 flex-row rounded-full bg-transparent"
                   onPress={() => router.push(`/comments/${id}?type=article`)}
@@ -547,20 +564,10 @@ export default function ArticleDetail() {
                     </Text>
                   )}
                 </BouncyButton>
-                <BouncyButton
-                  className="items-center justify-center ml-3 p-2 flex-row rounded-full bg-transparent"
-                  onPress={() => setMenuVisible(true)}
-                >
-                  <ThemedIcon
-                    name="ellipsis-horizontal"
-                    size={24}
-                    colorType="secondary"
-                  />
-                </BouncyButton>
               </View>
             </View>
           </BlurView>
-        </View>
+        </Reanimated.View>
       )}
 
       {/* Share Menu */}
@@ -579,36 +586,6 @@ export default function ArticleDetail() {
               }
             : null
         }
-      />
-
-      <ActionSheet
-        visible={menuVisible && !isSharing}
-        onClose={() => setMenuVisible(false)}
-        title="文章操作"
-        options={[
-          {
-            key: 'like',
-            icon: isLiked ? 'heart' : 'heart-outline',
-            label: isLiked ? '取消喜欢' : '加入喜欢',
-            color: isLiked ? Colors[colorScheme].danger : undefined,
-            onPress: () => setIsLiked(!isLiked),
-          },
-          {
-            key: 'collection',
-            icon: activeCollected ? 'star' : 'star-outline',
-            label: activeCollected ? '取消收藏' : '移至收藏',
-            color: activeCollected ? warningColor : undefined,
-            disabled: collectionPending,
-            onPress: () =>
-              toggleCollect(id as string, 'article', activeCollected),
-          },
-          {
-            key: 'share',
-            icon: 'share-social-outline',
-            label: '分享文章',
-            onPress: () => setIsSharing(true),
-          },
-        ]}
       />
     </View>
   );

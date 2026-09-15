@@ -6,7 +6,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { type ComponentProps, useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
 import { getNotifications, markAllNotificationsRead } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
@@ -15,6 +15,11 @@ import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
+import type {
+  ZhihuNotificationActor,
+  ZhihuNotificationItem,
+  ZhihuNotificationTarget,
+} from '@/types/zhihu';
 import { formatDateTime } from '@/utils/date';
 import { refreshInfiniteQuery } from '@/utils/query';
 
@@ -25,6 +30,8 @@ const NOTIFICATION_TYPES = [
   { label: '关注', value: 'follow' },
   { label: '邀请', value: 'invite' },
 ];
+
+type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 export default function NotificationScreen() {
   const colorScheme = useColorScheme();
@@ -83,9 +90,16 @@ export default function NotificationScreen() {
 
   const notifications = data?.pages.flatMap((page) => page.data) || [];
 
-  const getIconConfig = (item: any) => {
-    const type = item.type;
-    const verb = item.content?.verb || '';
+  const getIconConfig = (
+    item: ZhihuNotificationItem,
+  ): {
+    name: IoniconName;
+    color: string;
+    bg: string;
+  } => {
+    const type = item.type ?? '';
+    const content = typeof item.content === 'string' ? undefined : item.content;
+    const verb = content?.verb || '';
     if (
       verb.includes('赞同') ||
       verb.includes('喜欢') ||
@@ -133,10 +147,14 @@ export default function NotificationScreen() {
     };
   };
 
-  const renderItem = ({ item }: { item: any }) => {
-    const actor = item.content?.actors?.[0] || item.actors?.[0] || {};
-    const target = item.content?.target || item.target || {};
-    const time = formatDateTime(item.create_time);
+  const renderItem = ({ item }: { item: ZhihuNotificationItem }) => {
+    const content = typeof item.content === 'string' ? undefined : item.content;
+    const actor: ZhihuNotificationActor =
+      content?.actors?.[0] ?? item.actors?.[0] ?? {};
+    const target: ZhihuNotificationTarget =
+      content?.target ?? item.target ?? {};
+    const targetText = content?.target?.text;
+    const time = item.create_time ? formatDateTime(item.create_time) : '';
     const iconConfig = getIconConfig(item);
 
     return (
@@ -147,7 +165,7 @@ export default function NotificationScreen() {
           borderBottomColor: borderColor,
         }}
         onPress={() => {
-          const link = item.content?.target?.link;
+          const link = content?.target?.link;
           if (link) {
             if (link.includes('/answer/')) {
               const id = link.split('/answer/')[1];
@@ -173,11 +191,7 @@ export default function NotificationScreen() {
           className="w-[52px] h-[52px] rounded-full justify-center items-center"
           style={{ backgroundColor: iconConfig.bg }}
         >
-          <Ionicons
-            name={iconConfig.name as any}
-            size={28}
-            color={iconConfig.color}
-          />
+          <Ionicons name={iconConfig.name} size={28} color={iconConfig.color} />
         </View>
 
         <View className="ml-[15px] flex-1 bg-transparent">
@@ -198,23 +212,23 @@ export default function NotificationScreen() {
             </Text>
           </View>
           <Text className="text-sm leading-5" numberOfLines={3}>
-            {item.content?.verb ? (
+            {content?.verb ? (
               <Text style={{ color: iconConfig.color, fontWeight: 'bold' }}>
-                {item.content.verb}{' '}
+                {content.verb}{' '}
               </Text>
             ) : null}
-            {item.content?.text ||
-              item.content?.title ||
-              item.content?.sub_text ||
+            {content?.text ||
+              content?.title ||
+              content?.sub_text ||
               (typeof item.content === 'string' ? item.content : '新的动态')}
           </Text>
-          {item.content?.target?.text && (
+          {targetText && (
             <View
               className="mt-2 p-2 rounded"
               style={{ backgroundColor: `${borderColor}20` }}
             >
               <Text numberOfLines={1} type="secondary" className="text-xs">
-                {item.content.target.text}
+                {targetText}
               </Text>
             </View>
           )}

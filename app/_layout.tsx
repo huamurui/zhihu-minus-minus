@@ -321,7 +321,7 @@ function RootLayout() {
               <GradientMaskOverlay isDark={isDark} />
 
               {/* 全局状态栏控制 */}
-              <StatusBar style={isDark ? 'light' : 'dark'} />
+              <StatusBar hidden style={isDark ? 'light' : 'dark'} />
 
               {/* 人机验证弹窗 */}
               <VerificationModal />
