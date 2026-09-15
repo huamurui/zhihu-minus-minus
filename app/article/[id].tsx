@@ -15,9 +15,10 @@ import {
 import { recordReadHistory } from '@/api/zhihu/history';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
 import { BouncyButton } from '@/components/BouncyButton';
+import { CollectButton } from '@/components/CollectButton';
 import { DownvoteButton } from '@/components/DownvoteButton';
 import { LikeButton } from '@/components/LikeButton';
-import { ActionSheet } from '@/components/overlays/ActionSheet';
+import { LikeHeartButton } from '@/components/LikeHeartButton';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { ShareMenu } from '@/components/ShareMenu';
 import { StableAvatar } from '@/components/StableAvatar';
@@ -25,7 +26,6 @@ import { Text, ThemedIcon, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { RICH_CONTENT_STALE_TIME, ZhihuContent } from '@/features/rich-content';
-import { useCollectionAction } from '@/hooks/useCollectionAction';
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
 import { useCollectionStore } from '@/store/useCollectionStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
@@ -35,7 +35,6 @@ import { formatDate } from '@/utils/date';
 export default function ArticleDetail() {
   const colorScheme = useColorScheme();
   const primaryColor = useThemeColor({}, 'primary');
-  const warningColor = useThemeColor({}, 'warning');
   const { id, source } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -45,8 +44,6 @@ export default function ArticleDetail() {
   const isDark = colorScheme === 'dark';
 
   const [isSharing, setIsSharing] = useState(false);
-  const [menuVisible, setMenuVisible] = useState(false);
-  const [isLiked, setIsLiked] = useState(false); // Local liked menu state (optional)
 
   const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -116,7 +113,6 @@ export default function ArticleDetail() {
   );
   const activeCollected = storeCollected ?? statusCollected ?? false;
   const storeCollectedRef = useRef(storeCollected);
-  const { toggleCollect, isPending: collectionPending } = useCollectionAction();
 
   useEffect(() => {
     storeCollectedRef.current = storeCollected;
@@ -529,6 +525,12 @@ export default function ArticleDetail() {
                 />
               </View>
               <View className="flex-1 flex-row justify-end items-center bg-transparent">
+                <LikeHeartButton id={id as string} type="article" />
+                <CollectButton
+                  id={id as string}
+                  type="article"
+                  collected={activeCollected}
+                />
                 <BouncyButton
                   className="items-center justify-center ml-3 p-2 flex-row rounded-full bg-transparent"
                   onPress={() => router.push(`/comments/${id}?type=article`)}
@@ -546,16 +548,6 @@ export default function ArticleDetail() {
                       {data.comment_count}
                     </Text>
                   )}
-                </BouncyButton>
-                <BouncyButton
-                  className="items-center justify-center ml-3 p-2 flex-row rounded-full bg-transparent"
-                  onPress={() => setMenuVisible(true)}
-                >
-                  <ThemedIcon
-                    name="ellipsis-horizontal"
-                    size={24}
-                    colorType="secondary"
-                  />
                 </BouncyButton>
               </View>
             </View>
@@ -579,36 +571,6 @@ export default function ArticleDetail() {
               }
             : null
         }
-      />
-
-      <ActionSheet
-        visible={menuVisible && !isSharing}
-        onClose={() => setMenuVisible(false)}
-        title="文章操作"
-        options={[
-          {
-            key: 'like',
-            icon: isLiked ? 'heart' : 'heart-outline',
-            label: isLiked ? '取消喜欢' : '加入喜欢',
-            color: isLiked ? Colors[colorScheme].danger : undefined,
-            onPress: () => setIsLiked(!isLiked),
-          },
-          {
-            key: 'collection',
-            icon: activeCollected ? 'star' : 'star-outline',
-            label: activeCollected ? '取消收藏' : '移至收藏',
-            color: activeCollected ? warningColor : undefined,
-            disabled: collectionPending,
-            onPress: () =>
-              toggleCollect(id as string, 'article', activeCollected),
-          },
-          {
-            key: 'share',
-            icon: 'share-social-outline',
-            label: '分享文章',
-            onPress: () => setIsSharing(true),
-          },
-        ]}
       />
     </View>
   );
