@@ -123,7 +123,6 @@ export default function MyCollectionsScreen() {
         <BouncyButton
           className="p-2 rounded-full"
           onPress={() => openModal()}
-          style={{ marginRight: 15 }}
         >
           <Ionicons name="add" size={28} color={primaryColor} />
         </BouncyButton>
