@@ -17,7 +17,6 @@ import { BottomSheet } from '@/components/overlays/BottomSheet';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
-import { ThemeModeSelector } from '@/components/ThemeModeSelector';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -383,8 +382,6 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
 
       {/* 通用设置 */}
       <View type="surface" className="rounded-2xl mx-3 mt-3 overflow-hidden">
-        <ThemeModeSelector />
-
         <MenuItem
           icon="color-palette-outline"
           title="外观与定制"

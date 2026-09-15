@@ -1,6 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type ComponentProps,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   LayoutAnimation,
   Platform,
@@ -30,6 +37,7 @@ import {
   TEXT_CONTRAST_OPTIONS,
 } from '@/constants/theme';
 import { type TabKey, useSettingsStore } from '@/store/useSettingsStore';
+import { type ThemeMode, useThemeStore } from '@/store/useThemeStore';
 
 // 开启 Android 下的 LayoutAnimation
 if (
@@ -45,6 +53,16 @@ export interface ColorPreset {
 }
 
 const PRESET_COLORS: ColorPreset[] = designTokens.primaryPresets;
+
+const THEME_MODE_OPTIONS: ReadonlyArray<{
+  mode: ThemeMode;
+  label: string;
+  icon: ComponentProps<typeof Ionicons>['name'];
+}> = [
+  { mode: 'system', label: '系统', icon: 'phone-portrait-outline' },
+  { mode: 'light', label: '浅色', icon: 'sunny-outline' },
+  { mode: 'dark', label: '深色', icon: 'moon-outline' },
+];
 
 export default function AppearanceSettings() {
   const insets = useSafeAreaInsets();
@@ -86,6 +104,8 @@ export default function AppearanceSettings() {
   const tintColor = useThemeColor({}, 'primary');
   const canvasColor = useThemeColor({}, 'background');
   const isDark = colorScheme === 'dark';
+  const themeMode = useThemeStore((s) => s.themeMode);
+  const setThemeMode = useThemeStore((s) => s.setThemeMode);
 
   const toggleTab = (tab: TabKey) => {
     if (visibleTabs.includes(tab)) {
@@ -217,7 +237,7 @@ export default function AppearanceSettings() {
         </Section>
 
         {/* 2. 主题颜色 */}
-        <Section title="主题颜色" colorScheme={colorScheme}>
+        <Section title="主题" colorScheme={colorScheme}>
           <RNView style={styles.colorGrid}>
             {PRESET_COLORS.map((preset) => {
               const isSelected = primaryColor === preset.value;
@@ -299,6 +319,53 @@ export default function AppearanceSettings() {
               }
             />
           )}
+
+          <SettingItem
+            label="主题模式"
+            icon="contrast-outline"
+            colorScheme={colorScheme}
+          >
+            <RNView style={styles.optionRow}>
+              {THEME_MODE_OPTIONS.map((option) => {
+                const isSelected = themeMode === option.mode;
+                return (
+                  <BouncyButton
+                    key={option.mode}
+                    onPress={() => setThemeMode(option.mode)}
+                    style={[
+                      styles.optionChip,
+                      styles.themeModeChip,
+                      {
+                        backgroundColor: Colors[colorScheme].backgroundTertiary,
+                      },
+                      isSelected && { backgroundColor: tintColor },
+                    ]}
+                  >
+                    <Ionicons
+                      name={option.icon}
+                      size={14}
+                      color={
+                        isSelected
+                          ? Colors[colorScheme].textInverse
+                          : Colors[colorScheme].textSecondary
+                      }
+                    />
+                    <Text
+                      style={[
+                        styles.optionChipText,
+                        isSelected && {
+                          color: Colors[colorScheme].textInverse,
+                          fontWeight: 'bold',
+                        },
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </BouncyButton>
+                );
+              })}
+            </RNView>
+          </SettingItem>
         </Section>
 
         {/* 3. 阅读体验 */}
@@ -1147,6 +1214,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 16,
+  },
+  themeModeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   optionChipText: {
     fontSize: 13,
