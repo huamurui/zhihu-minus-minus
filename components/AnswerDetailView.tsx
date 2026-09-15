@@ -249,7 +249,7 @@ export const AnswerDetailView = ({
             onPress={() => setIsSharing(true)}
             className="w-10 h-10 justify-center items-center rounded-full bg-transparent"
           >
-            <Ionicons name="share-outline" size={24} color={secondaryColor} />
+            <Ionicons name="ellipsis-vertical" size={24} color={secondaryColor} />
           </BouncyButton>
         </View>
       </Reanimated.View>

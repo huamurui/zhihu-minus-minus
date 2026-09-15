@@ -294,7 +294,7 @@ export default function AnswerDetailScreen() {
             onPress={handleShareClick}
             className="w-10 h-10 justify-center items-center rounded-full"
           >
-            <Ionicons name="share-outline" size={24} color={textColor} />
+            <Ionicons name="ellipsis-vertical" size={24} color={textColor} />
           </BouncyButton>
         </Reanimated.View>
       </View>
