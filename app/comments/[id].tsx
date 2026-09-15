@@ -37,6 +37,7 @@ import {
   getArticleCommentsV5 as getArticleComments,
   getPinCommentsV5 as getPinComments,
   getQuestionCommentsV5 as getQuestionComments,
+  type ZhihuCommentResponse,
 } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
 import { CommentActionSheet } from '@/components/CommentActionSheet';
@@ -151,7 +152,7 @@ export default function CommentScreen() {
         return getPinComments(id as string, 20, pageParam, orderBy);
       return getAnswerComments(id as string);
     },
-    getNextPageParam: (lastPage: any) => {
+    getNextPageParam: (lastPage: ZhihuCommentResponse) => {
       if (!lastPage?.paging?.is_end && lastPage?.paging?.next) {
         const match = lastPage.paging.next.match(/offset=([^&]*)/);
         return match ? match[1] : undefined;
@@ -161,7 +162,8 @@ export default function CommentScreen() {
     initialPageParam: '',
   });
 
-  const comments = data?.pages.flatMap((page: any) => page.data || []) || [];
+  const comments =
+    data?.pages.flatMap((page: ZhihuCommentResponse) => page.data || []) || [];
 
   const mutation = useMutation({
     mutationFn: async ({ text: commentText, images }: CommentDraft) => {
