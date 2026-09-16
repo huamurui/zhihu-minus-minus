@@ -631,7 +631,7 @@ export default function SearchScreen() {
           {...({
             estimatedItemSize: 50,
             keyboardShouldPersistTaps: 'handled',
-          } as any)}
+          } as object)}
         />
       ) : isSearching ? (
         <FlashList
@@ -704,7 +704,7 @@ export default function SearchScreen() {
             ) : (
               <ActivityIndicator style={{ marginTop: 50 }} color={tintColor} />
             ),
-          } as any)}
+          } as object)}
         />
       ) : (
         <ScrollView

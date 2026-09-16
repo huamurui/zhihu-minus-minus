@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import { Modal, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { WebView } from 'react-native-webview';
+import { WebView, type WebViewNavigation } from 'react-native-webview';
 import Colors from '@/constants/Colors';
 import { useVerificationStore } from '@/store/useVerificationStore';
 import { BouncyButton } from './BouncyButton';
@@ -13,7 +13,7 @@ export const VerificationModal = () => {
   const queryClient = useQueryClient();
   const { isVisible, verificationUrl, hide } = useVerificationStore();
 
-  const handleNavigationStateChange = (navState: any) => {
+  const handleNavigationStateChange = (navState: WebViewNavigation) => {
     // 知乎验证成功后通常会自动跳转回之前的页面或者知乎首页
     // 如果 URL 中不再包含 'unhuman' 且不是验证码相关的 URL，可以认为验证成功
     if (

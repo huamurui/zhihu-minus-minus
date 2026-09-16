@@ -424,7 +424,7 @@ export default function CommentScreen() {
           data={comments}
           renderItem={renderComment}
           keyExtractor={(item: CommentItem) => item.id.toString()}
-          {...({ estimatedItemSize: 120 } as any)}
+          {...({ estimatedItemSize: 120 } as object)}
           onRefresh={refetch}
           refreshing={isFetching && !isLoading}
           onEndReached={() =>

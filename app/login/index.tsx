@@ -2,7 +2,7 @@ import CookieManager from '@preeternal/react-native-cookie-manager';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { getMe } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
@@ -10,6 +10,7 @@ import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useSettingsStore } from '@/store/useSettingsStore';
 import { useVerificationStore } from '@/store/useVerificationStore';
 import { syncNativeSessionCookies } from '@/utils/authSession';
 
@@ -94,11 +95,18 @@ export default function LoginScreen() {
         if (router.canGoBack()) {
           router.back();
         } else {
-          // 使用参数跳转，确保回到主容器 index.tsx 从而保留自定义 TabBar
-          router.replace({
-            pathname: '/(tabs)',
-            params: { tab: 'profile' },
-          });
+          const useNativeIOSBottomTabs =
+            Platform.OS === 'ios' &&
+            useSettingsStore.getState().useNativeIOSBottomTabs;
+          if (useNativeIOSBottomTabs) {
+            router.replace('/(tabs)/profile');
+          } else {
+            // 使用参数跳转，确保回到主容器 index.tsx 从而保留自定义 TabBar
+            router.replace({
+              pathname: '/(tabs)',
+              params: { tab: 'profile' },
+            });
+          }
         }
       } else if (hasZc0 && !hasZseCk) {
         console.log('⚠️ 捕获到 z_c0 但缺失 __zse_ck，请在验证页面稍候...');

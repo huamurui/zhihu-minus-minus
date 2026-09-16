@@ -186,7 +186,6 @@ export const LinkCard: React.FC<{
     const isInternal = internalPath !== null;
     const primaryColor = useThemeColor({}, 'primary');
     const cardBorderColor = useThemeColor({}, 'contentBorderStrong');
-    const cardShadowColor = useThemeColor({}, 'shadow');
 
     const parsedId = useMemo(() => {
       if (!internalPath) return null;
@@ -769,7 +768,6 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
     const textSecondaryColor = useThemeColor({}, 'textSecondary');
     const borderColor = useThemeColor({}, 'border');
     const contentBorderColor = useThemeColor({}, 'contentBorder');
-    const shadowColor = useThemeColor({}, 'shadow');
     const inverseTextColor = useThemeColor({}, 'textInverse');
     const surfaceColor = useThemeColor({}, 'surface');
     const router = useRouter();

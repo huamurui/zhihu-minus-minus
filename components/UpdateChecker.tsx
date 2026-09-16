@@ -11,7 +11,14 @@ import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
 import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Linking, Platform, StyleSheet, View } from 'react-native';
+import {
+  Alert,
+  type AlertButton,
+  Linking,
+  Platform,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { AppDialog } from '@/components/overlays/AppDialog';
 import { Text, useThemeColor } from '@/components/Themed';
 import { showToast } from '@/utils/toast';
@@ -19,6 +26,18 @@ import { showToast } from '@/utils/toast';
 const GITHUB_RELEASE_API =
   'https://api.github.com/repos/huamurui/zhihu-minus-minus/releases/latest';
 const IGNORED_VERSION_KEY = 'ignored_version_tag';
+
+interface GithubReleaseAsset {
+  name: string;
+  browser_download_url: string;
+}
+
+interface GithubRelease {
+  tag_name?: string;
+  assets?: GithubReleaseAsset[];
+  html_url: string;
+  body?: string;
+}
 
 export const useCheckUpdate = (
   onUpdate?: (url: string, version: string) => void,
@@ -35,7 +54,7 @@ export const useCheckUpdate = (
       await new Promise((resolve) => setTimeout(resolve, 2000));
       try {
         const response = await fetch(GITHUB_RELEASE_API);
-        const data = await response.json();
+        const data = (await response.json()) as GithubRelease;
 
         if (data?.tag_name) {
           const latestVersionTag = data.tag_name;
@@ -52,11 +71,11 @@ export const useCheckUpdate = (
 
           if (isVersionNewer(latestVersion, currentVersion)) {
             // 查找 APK 文件
-            const apkAsset = data.assets?.find((asset: any) =>
+            const apkAsset = data.assets?.find((asset) =>
               asset.name.endsWith('.apk'),
             );
 
-            const buttons: any[] = [
+            const buttons: AlertButton[] = [
               { text: '稍后', style: 'cancel' },
               {
                 text: '忽略此版本',
@@ -150,10 +169,10 @@ async function downloadAndInstallApk(
     // Modern API v55: Delete if exists to avoid "Destination already exists"
     try {
       const targetFile = new File(fileUri);
-      if (typeof (targetFile as any).delete === 'function') {
-        await (targetFile as any).delete();
+      if (typeof targetFile.delete === 'function') {
+        await targetFile.delete();
       } else {
-        await (FileSystem as any).deleteAsync(fileUri, { idempotent: true });
+        await FileSystem.deleteAsync(fileUri, { idempotent: true });
       }
     } catch (_e) {}
 
@@ -216,10 +235,10 @@ async function downloadAndInstallApk(
     } else {
       onStatusChange?.(false);
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     onStatusChange?.(false);
     console.error('[Update] Error details:', e);
-    showToast(`更新失败: ${e.message || '未知错误'}`);
+    showToast(`更新失败: ${e instanceof Error ? e.message : '未知错误'}`);
   }
 }
 

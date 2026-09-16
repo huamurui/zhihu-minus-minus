@@ -62,6 +62,7 @@ export default function AppearanceSettings() {
     enablePrivateMessaging,
     enableBrowseHistory,
     enableHapticFeedback,
+    useNativeIOSBottomTabs,
     pressOpacity,
     pressScale,
     androidFeedbackType,
@@ -638,6 +639,21 @@ export default function AppearanceSettings() {
               />
             </SettingItem>
           ))}
+          {Platform.OS === 'ios' && (
+            <SettingItem
+              label="iOS 26+ 液态玻璃"
+              icon="phone-portrait-outline"
+              colorScheme={colorScheme}
+            >
+              <Switch
+                value={useNativeIOSBottomTabs}
+                onValueChange={(val) =>
+                  updateSettings({ useNativeIOSBottomTabs: val })
+                }
+                trackColor={{ true: tintColor }}
+              />
+            </SettingItem>
+          )}
         </Section>
 
         {/* 6. 默认落地页 */}

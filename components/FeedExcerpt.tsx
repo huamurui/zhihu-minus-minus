@@ -48,7 +48,7 @@ function parsePinContent(contentArray: PinContentItem[]): {
   return { text: textBlocks.join(' ').trim(), links };
 }
 
-function isString(v: any): v is string {
+function isString(v: unknown): v is string {
   return typeof v === 'string';
 }
 

@@ -269,7 +269,7 @@ export default function NotificationScreen() {
       <FlashList
         data={notifications}
         renderItem={renderItem}
-        {...({ estimatedItemSize: 120 } as any)}
+        {...({ estimatedItemSize: 120 } as object)}
         onEndReached={() => {
           if (hasNextPage && !isFetchingNextPage) fetchNextPage();
         }}

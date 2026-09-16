@@ -115,6 +115,8 @@ export interface AppSettings {
   androidFeedbackType: 'ripple' | 'scale-opacity';
   /** 是否开启应用内震动反馈 */
   enableHapticFeedback: boolean;
+  /** iOS 是否使用系统原生底部 Tab（iOS 26+ 显示 Liquid Glass） */
+  useNativeIOSBottomTabs: boolean;
   /** 是否开启浏览历史记录 */
   enableBrowseHistory: boolean;
   /** 是否在本地记录并过滤近期看过的推荐内容 */
@@ -184,6 +186,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   pressScale: 0.98,
   androidFeedbackType: 'ripple',
   enableHapticFeedback: true,
+  useNativeIOSBottomTabs: false,
   enableBrowseHistory: true,
   enableLocalFeedDedup: false,
   enableFeedCacheOnLaunch: false,
@@ -266,7 +269,7 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'zhihu-settings-storage',
       storage: createJSONStorage(() => settingsStorage),
-      version: 11,
+      version: 12,
       migrate: (rawPersistedState: unknown, version: number) => {
         const persistedState =
           normalizePersistedSettingsState(rawPersistedState);
@@ -352,6 +355,11 @@ export const useSettingsStore = create<SettingsState>()(
         if (version < 9) {
           persistedState.enableHapticFeedback =
             persistedState.enableHapticFeedback ?? true;
+        }
+
+        if (version < 12) {
+          persistedState.useNativeIOSBottomTabs =
+            persistedState.useNativeIOSBottomTabs ?? false;
         }
 
         persistedState.readingBackground = isValidReadingBackground(

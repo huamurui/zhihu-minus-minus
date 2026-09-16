@@ -508,7 +508,7 @@ export default function ReplyDetailScreen() {
           renderItem={renderReply}
           keyExtractor={(item: CommentItem) => item.id.toString()}
           ListHeaderComponent={renderHeader}
-          {...({ estimatedItemSize: 100 } as any)}
+          {...({ estimatedItemSize: 100 } as object)}
           contentContainerStyle={{
             paddingBottom: INPUT_BAR_HEIGHT + insets.bottom + 20,
           }}

@@ -93,7 +93,7 @@ export default function CollectionDetailScreen() {
           else if (content.type === 'pin') type = 'pin';
           return <CreationCard item={content} type={type} />;
         }}
-        {...({ estimatedItemSize: 150 } as any)}
+        {...({ estimatedItemSize: 150 } as object)}
         onEndReached={() => {
           if (hasNextPage && !isFetchingNextPage) fetchNextPage();
         }}

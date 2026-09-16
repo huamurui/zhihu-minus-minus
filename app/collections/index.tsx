@@ -234,7 +234,7 @@ export default function MyCollectionsScreen() {
       <FlashList
         data={collections}
         renderItem={renderItem}
-        {...({ estimatedItemSize: 90 } as any)}
+        {...({ estimatedItemSize: 90 } as object)}
         onEndReached={() => {
           if (hasNextPage && !isFetchingNextPage) fetchNextPage();
         }}

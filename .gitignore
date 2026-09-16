@@ -40,3 +40,5 @@ yarn-error.*
 /ios
 /android
 /build
+/modules/*/android/.gradle/
+/modules/*/android/build/
