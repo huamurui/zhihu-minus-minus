@@ -62,6 +62,7 @@ export default React.memo(function ZhihuDOMContent({
           max-width: 100%;
           overflow-x: hidden;
           -webkit-user-select: text;
+          -webkit-touch-callout: default;
           user-select: text;
         }
         .zhihu-content {
@@ -548,6 +549,7 @@ export default React.memo(function ZhihuDOMContent({
         });
 
         // Text selection detection
+        // Prefer a paragraph that carries a data-pid (segmented answer).
         function findParagraph(node) {
           while (node && node !== container) {
             if (node.nodeType === 1 && node.getAttribute && node.getAttribute('data-pid')) {
@@ -558,6 +560,36 @@ export default React.memo(function ZhihuDOMContent({
           return null;
         }
 
+        // Fallback: nearest selectable block so a selection that lives outside a
+        // data-pid paragraph still reports a stable id and the in-app bar shows up.
+        var BLOCK_TAGS = ['p', 'li', 'blockquote', 'h1', 'h2', 'h3', 'div'];
+        function findBlockFallback(node) {
+          while (node && node !== container) {
+            if (node.nodeType === 1 && node.getAttribute) {
+              var tag = node.tagName ? node.tagName.toLowerCase() : '';
+              if (BLOCK_TAGS.indexOf(tag) !== -1) {
+                return node;
+              }
+            }
+            node = node.parentElement || node.parentNode;
+          }
+          return container;
+        }
+
+        // Stable id: real data-pid when present, otherwise a deterministic
+        // block:<index> derived from the block's position in the content tree.
+        function blockId(blockNode) {
+          if (!blockNode) return 'content';
+          var pid = blockNode.getAttribute && blockNode.getAttribute('data-pid');
+          if (pid) return pid;
+          if (blockNode === container) return 'content';
+          var blocks = Array.prototype.slice.call(
+            container.querySelectorAll('p,li,blockquote,h1,h2,h3,div')
+          );
+          var idx = blocks.indexOf(blockNode);
+          return idx >= 0 ? 'block:' + idx : 'content';
+        }
+
         function getTextOffset(paragraph, targetNode, targetOffset) {
           var walker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT, null, false);
           var offset = 0;
@@ -566,7 +598,7 @@ export default React.memo(function ZhihuDOMContent({
             if (node === targetNode) {
               return offset + targetOffset;
             }
-            offset += node.textContent.length;
+            offset += node.textContent ? node.textContent.length : 0;
           }
           return offset;
         }
@@ -582,24 +614,22 @@ export default React.memo(function ZhihuDOMContent({
             }
             var text = selection.toString();
             var range = selection.getRangeAt(0);
-            var startP = findParagraph(range.startContainer);
-            var endP = findParagraph(range.endContainer);
-            if (startP) {
-              var startPid = startP.getAttribute('data-pid');
-              var endPid = endP ? endP.getAttribute('data-pid') : startPid;
-              var sOff = getTextOffset(startP, range.startContainer, range.startOffset);
-              var eOff = endP ? getTextOffset(endP, range.endContainer, range.endOffset) : sOff + text.length;
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'selection',
-                info: {
-                  text: text,
-                  startParagraphId: startPid,
-                  endParagraphId: endPid,
-                  startOffset: sOff,
-                  endOffset: eOff
-                }
-              }));
-            }
+            var startP = findParagraph(range.startContainer) || findBlockFallback(range.startContainer);
+            var endP = findParagraph(range.endContainer) || findBlockFallback(range.endContainer);
+            var startPid = blockId(startP);
+            var endPid = blockId(endP);
+            var sOff = getTextOffset(startP, range.startContainer, range.startOffset);
+            var eOff = getTextOffset(endP, range.endContainer, range.endOffset);
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'selection',
+              info: {
+                text: text,
+                startParagraphId: startPid,
+                endParagraphId: endPid,
+                startOffset: sOff,
+                endOffset: eOff
+              }
+            }));
           }, 300);
         });
 
