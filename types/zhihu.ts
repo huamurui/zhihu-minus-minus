@@ -289,3 +289,34 @@ export interface ZhihuPaging {
   previous?: string;
   totals?: number;
 }
+
+export interface ZhihuNotificationTarget {
+  type?: string;
+  id?: string;
+  link?: string;
+  text?: string;
+}
+
+export interface ZhihuNotificationActor {
+  id?: string;
+  name?: string;
+  avatar_url?: string;
+}
+
+export interface ZhihuNotificationContent {
+  verb?: string;
+  text?: string;
+  title?: string;
+  sub_text?: string;
+  actors?: ZhihuNotificationActor[];
+  target?: ZhihuNotificationTarget;
+}
+
+export interface ZhihuNotificationItem {
+  id?: string;
+  type?: string;
+  create_time?: number;
+  actors?: ZhihuNotificationActor[];
+  target?: ZhihuNotificationTarget;
+  content?: string | ZhihuNotificationContent;
+}

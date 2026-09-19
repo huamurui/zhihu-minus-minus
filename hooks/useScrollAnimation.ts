@@ -6,6 +6,8 @@ import {
   withTiming,
 } from 'react-native-reanimated';
 
+export const FOOTER_HIDE_DISTANCE = 100;
+
 export function useScrollHeaderAnim(
   threshold = 300,
   onScroll?: (currentY: number) => void,
@@ -16,6 +18,7 @@ export function useScrollHeaderAnim(
   const isHeaderShown = useSharedValue(false);
   const lastScrollY = useSharedValue(0);
   const lastCallbackTime = useSharedValue(0);
+  const footerOffset = useSharedValue(0);
 
   const handleScroll = useAnimatedScrollHandler(
     {
@@ -39,6 +42,17 @@ export function useScrollHeaderAnim(
           headerVisible.value = withTiming(0, { duration: 200 });
         }
 
+        // 底部交互栏随滚动折叠/展开，与首页底部导航一致：
+        // 向下滚动累加偏移直到完全隐藏，向上滚动累减直到完全显示。
+        if (currentY <= 0) {
+          footerOffset.value = 0;
+        } else {
+          footerOffset.value = Math.min(
+            FOOTER_HIDE_DISTANCE,
+            Math.max(0, footerOffset.value + diff),
+          );
+        }
+
         lastScrollY.value = currentY;
 
         const now = Date.now();
@@ -55,5 +69,5 @@ export function useScrollHeaderAnim(
     [onScroll, onScrollThrottleMs, sharedScrollY, threshold],
   );
 
-  return { headerVisible, handleScroll };
+  return { headerVisible, footerOffset, handleScroll };
 }

@@ -36,6 +36,7 @@ import {
   RefreshControl,
 } from 'react-native-gesture-handler';
 import Reanimated, {
+  Extrapolate,
   interpolate,
   runOnJS,
   SharedTransition,
@@ -970,10 +971,13 @@ export default function QuestionDetail() {
     ],
   );
 
+  const scrollY = useSharedValue(0);
+
   const { headerVisible, handleScroll } = useScrollHeaderAnim(
     400,
     handleScrollEffects,
     100,
+    scrollY,
   );
 
   const headerAnimatedStyle = useAnimatedStyle(() => ({
@@ -984,6 +988,26 @@ export default function QuestionDetail() {
           headerVisible.value,
           [0, 1],
           [-insets.top - 120, 0],
+        ),
+      },
+    ],
+  }));
+
+  // 返回按钮随滚动隐藏，与阅读页一致：opacity 1→0、translateY 0→-120（滚动 0→80px）。
+  const backButtonStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      scrollY.value,
+      [0, 80],
+      [1, 0],
+      Extrapolate.CLAMP,
+    ),
+    transform: [
+      {
+        translateY: interpolate(
+          scrollY.value,
+          [0, 80],
+          [0, -120],
+          Extrapolate.CLAMP,
         ),
       },
     ],
@@ -1340,13 +1364,17 @@ export default function QuestionDetail() {
         </Reanimated.View>
 
         {/* 返回按钮 */}
-        <BouncyButton
-          onPress={() => router.back()}
-          className="absolute left-2.5 z-[100] w-10 h-10 justify-center items-center rounded-full"
-          style={{ top: insets.top + 8 }}
+        <Reanimated.View
+          className="absolute left-2.5 z-[100]"
+          style={[{ top: insets.top + 8 }, backButtonStyle]}
         >
-          <Ionicons name="chevron-back" size={28} color={textColor} />
-        </BouncyButton>
+          <BouncyButton
+            onPress={() => router.back()}
+            className="w-10 h-10 justify-center items-center rounded-full"
+          >
+            <Ionicons name="chevron-back" size={28} color={textColor} />
+          </BouncyButton>
+        </Reanimated.View>
 
         <AnimatedFlashList<AnswerDetail>
           ref={flashListRef}
