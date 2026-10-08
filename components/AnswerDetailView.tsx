@@ -3,7 +3,6 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useRef } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   type ScrollView as NativeScrollView,
   type View as NativeView,
@@ -20,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type AnswerDetail, deleteAnswer, getAnswer } from '@/api/zhihu';
 import { getAllContentCollectionStatus } from '@/api/zhihu/collection';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
+import { AnswerLoadingPlaceholder } from '@/components/AnswerLoadingPlaceholder';
 import { BouncyButton } from '@/components/BouncyButton';
 import {
   CONTENT_ACTION_BAR_HEIGHT,
@@ -43,6 +43,7 @@ import Colors from '@/constants/Colors';
 import {
   isRichTextNativeAvailable,
   RICH_CONTENT_STALE_TIME,
+  type RichContentLoadingPhase,
   ZhihuContent,
 } from '@/features/rich-content';
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
@@ -55,6 +56,10 @@ import { calculateDetailHeaderAppearance } from '@/utils/detailHeaderAppearance'
 import { getZhihuErrorMessage, getZhihuErrorStatus } from '@/utils/zhihuError';
 
 const slowTransition = SharedTransition.duration(600);
+
+function renderContentPlaceholder(phase: RichContentLoadingPhase) {
+  return <AnswerLoadingPlaceholder phase={phase} />;
+}
 
 interface AnswerDetailViewProps {
   id: string;
@@ -394,22 +399,9 @@ export const AnswerDetailView = ({
     if (token) router.push(`/user/${token}`);
   };
 
-  const primaryColor = useThemeColor({}, 'primary');
   const linkColor = useThemeColor({}, 'link');
   const primaryTransparent = useThemeColor({}, 'primaryTransparent');
   const secondaryColor = useThemeColor({}, 'textSecondary');
-  const renderContentPlaceholder = React.useCallback(
-    () => (
-      <View className="h-[200px] justify-center items-center bg-transparent">
-        <ActivityIndicator size="small" color={primaryColor} />
-        <Text type="secondary" className="mt-[15px]">
-          正在斟酌文字...喵
-        </Text>
-      </View>
-    ),
-    [primaryColor],
-  );
-
   if (!shouldRenderBody) {
     return <View className="flex-1" />;
   }
@@ -541,7 +533,7 @@ export const AnswerDetailView = ({
         </View>
 
         {queryLoading && !answer ? (
-          renderContentPlaceholder()
+          <AnswerLoadingPlaceholder phase="fetching-answer" />
         ) : isError && !answer && getZhihuErrorStatus(error) !== 404 ? (
           <QueryErrorView
             message="回答加载失败"

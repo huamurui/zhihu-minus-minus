@@ -565,6 +565,35 @@
       "expectedMetadata": {
         "data.3.structured_content.segments.1.list_node.type": "ordered"
       }
+    },
+    {
+      "id": "segment-slicing-boundaries-001",
+      "file": "./cases/segment-slicing-boundaries-001.json",
+      "contentPath": "content",
+      "sourceType": "answer",
+      "collectedAt": "2026-10-08",
+      "traits": [
+        "synthetic",
+        "segment",
+        "nested-formats",
+        "utf16",
+        "inline-formula",
+        "inline-image",
+        "line-break"
+      ],
+      "expected": {
+        "paragraphs": 1,
+        "headings": 0,
+        "totalImages": 2,
+        "activeImages": 2,
+        "formulaImages": 1,
+        "segmentInfos": 1
+      },
+      "expectedMetadata": {
+        "type": "answer",
+        "id": "synthetic-segment-slicing-boundaries",
+        "segment_infos.0.marks.length": 3
+      }
     }
   ]
 }

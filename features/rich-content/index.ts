@@ -110,6 +110,7 @@ export {
 } from './structuredContent';
 export type {
   LinkCardProps,
+  RichContentLoadingPhase,
   RichContentObjectType,
   RichContentRenderer,
   RichContentTypographyOptions,

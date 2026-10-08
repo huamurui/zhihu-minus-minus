@@ -1,9 +1,13 @@
 import { compileZhihuDocument, mapRichTextSelection } from '../compileRichText';
+import type { ZhihuInlineRun } from '../document';
 import { walkZhihuDocument } from '../documentTraversal';
+import slicingFixture from '../fixtures/cases/segment-slicing-boundaries-001.json';
+import { createInlineRunSlicer } from '../normalization/inlineRunSlicer';
 import {
   normalizeZhihuContentSegments,
   normalizeZhihuDocument,
 } from '../normalization/normalizeZhihuDocument';
+import { legacyInlineText, legacySliceRuns } from './inline-slicing-reference';
 
 const normalize = (html: string) =>
   normalizeZhihuDocument(html, { documentId: 'test' });
@@ -612,6 +616,167 @@ describe('prototype HTML to ZhihuDocument normalization', () => {
       run?.type === 'segmentHighlight' && run.highlight?.location,
     ).toBeUndefined();
     expect(diagnostics[0]).toMatchObject({ kind: 'invalid-range' });
+  });
+
+  it('preserves exact sliced IDs, source maps and zero-length nodes in the boundary fixture', () => {
+    const options = { documentId: 'test' };
+    const original = normalizeZhihuDocument(
+      slicingFixture.content,
+      options,
+    ).document;
+    const paragraph = original.blocks[0];
+    if (paragraph.type !== 'paragraph') throw new Error('Expected paragraph');
+    const { document, diagnostics } = normalizeZhihuDocument(
+      slicingFixture.content,
+      {
+        ...options,
+        segmentInfos: slicingFixture.segment_infos,
+      },
+    );
+    expect(diagnostics).toEqual([]);
+    const annotated = document.blocks[0];
+    if (annotated.type !== 'paragraph') throw new Error('Expected paragraph');
+    expect(
+      annotated.children
+        .filter((run) => run.type === 'segment')
+        .map((run) => run.range),
+    ).toEqual(
+      slicingFixture.segment_infos[0].marks.map((mark) => ({
+        start: mark.start_index,
+        end: mark.end_index,
+      })),
+    );
+    const total = slicingFixture.segment_infos[0].text.length;
+    let previousEnd = 0;
+    const expected: ZhihuInlineRun[] = [];
+    for (const run of annotated.children) {
+      if (run.type !== 'segment') continue;
+      expected.push(
+        ...legacySliceRuns(
+          paragraph.children,
+          previousEnd,
+          run.range.start,
+          total,
+        ),
+      );
+      expected.push({
+        ...run,
+        children: legacySliceRuns(
+          paragraph.children,
+          run.range.start,
+          run.range.end,
+          total,
+        ),
+      });
+      previousEnd = run.range.end;
+    }
+    expected.push(
+      ...legacySliceRuns(paragraph.children, previousEnd, total, total),
+    );
+    expect(annotated.children).toEqual(expected);
+    const compileOptions = { fontSize: 17, lineHeight: 25.5 };
+    const compiled = compileZhihuDocument(document, compileOptions);
+    expect(compiled).toEqual(
+      compileZhihuDocument(
+        { ...document, blocks: [{ ...annotated, children: expected }] },
+        compileOptions,
+      ),
+    );
+    const nodes = [...walkZhihuDocument(document)];
+    expect(nodes.filter((node) => node.type === 'inlineFormula')).toHaveLength(
+      1,
+    );
+    expect(nodes.filter((node) => node.type === 'inlineImage')).toHaveLength(1);
+    expect(nodes.filter((node) => node.type === 'lineBreak')).toHaveLength(2);
+  });
+
+  it('matches the previous slicer across deterministic nested partitions', () => {
+    let seed = 42;
+    const random = (maximum: number) => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed % maximum;
+    };
+    let serial = 0;
+    const runs = (depth: number): ZhihuInlineRun[] =>
+      Array.from({ length: random(7) + 1 }, (): ZhihuInlineRun => {
+        const id = `node:${serial++}`;
+        const choice = random(depth < 3 ? 9 : 7);
+        if (choice === 0) return { id, type: 'lineBreak' };
+        if (choice === 1)
+          return { id, type: 'inlineFormula', formula: { latex: 'x' } };
+        if (choice === 2)
+          return {
+            id,
+            type: 'unsupported',
+            sourceType: 'test',
+            fallbackText: '替代',
+          };
+        if (choice === 3)
+          return {
+            id,
+            type: 'footnoteReference',
+            definitionId: 'footnote',
+            label: '[1]',
+          };
+        if (choice === 4) return { id, type: 'inlineCode', text: 'code  ' };
+        if (choice === 5) return { id, type: 'text', text: '' };
+        if (choice === 6) return { id, type: 'text', text: '甲😀乙' };
+        return {
+          id,
+          type: choice === 7 ? 'strong' : 'emphasis',
+          children: runs(depth + 1),
+        };
+      });
+    for (let sample = 0; sample < 200; sample += 1) {
+      const input = runs(0);
+      const text = legacyInlineText(input);
+      const boundaries = [0];
+      for (const character of text)
+        boundaries.push(boundaries[boundaries.length - 1] + character.length);
+      const slice = createInlineRunSlicer(input);
+      let index = 0;
+      while (index < boundaries.length - 1) {
+        const next = Math.min(boundaries.length - 1, index + random(6) + 1);
+        const start = boundaries[index];
+        const end = boundaries[next];
+        expect(slice(start, start)).toEqual([]);
+        expect(slice(start, end)).toEqual(
+          legacySliceRuns(input, start, end, text.length),
+        );
+        index = next;
+      }
+      expect(slice(text.length, text.length)).toEqual([]);
+    }
+  });
+
+  it('reads dense paragraph text a linear number of times while preserving every slice', () => {
+    let textReads = 0;
+    const count = 2000;
+    const children: ZhihuInlineRun[] = Array.from(
+      { length: count },
+      (_, index) => ({
+        id: `strong:${index}`,
+        type: 'strong',
+        children: [
+          {
+            id: `text:${index}`,
+            type: 'text',
+            get text() {
+              textReads += 1;
+              return '甲乙';
+            },
+          },
+        ],
+      }),
+    );
+    const slice = createInlineRunSlicer(children);
+    const output: ZhihuInlineRun[] = [];
+    for (let offset = 0; offset < count * 2; offset += 1)
+      output.push(...slice(offset, offset + 1));
+    // Bound work independently of wall-clock speed; rescanning every source
+    // child for each knowledge boundary would exceed this by orders of magnitude.
+    expect(textReads).toBeLessThan(count * 6);
+    expect(legacyInlineText(output)).toBe('甲乙'.repeat(count));
   });
 
   it('accepts only native image data URL media types for self-contained demos', () => {

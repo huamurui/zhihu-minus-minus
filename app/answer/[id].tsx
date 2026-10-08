@@ -1,15 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import { getAnswer } from '@/api/zhihu';
 import { recordReadHistory } from '@/api/zhihu/history';
 import { AnswerDetailView } from '@/components/AnswerDetailView';
+import { AnswerLoadingPlaceholder } from '@/components/AnswerLoadingPlaceholder';
 import { AnswerPreviewList } from '@/components/AnswerPreviewList';
 import { DetailNavigationHeader } from '@/components/DetailNavigationHeader';
 import { ShareMenu } from '@/components/ShareMenu';
-import { useThemeColor, View } from '@/components/Themed';
+import { View } from '@/components/Themed';
 import { RICH_CONTENT_STALE_TIME } from '@/features/rich-content';
 import { useAnswerHeaderState } from '@/hooks/useAnswerHeaderState';
 import { useAnswerPagerSource } from '@/hooks/useAnswerPagerSource';
@@ -58,7 +58,6 @@ function AnswerDetailScreen() {
   const { id, questionId: propQuestionId, sortBy = 'default' } = params;
   const answerContext = getAnswerReadingContext(params);
   const router = useRouter();
-  const primaryColor = useThemeColor({}, 'primary');
 
   // 锁定初始 ID，避免滑动时 URL 参数改变导致重新触发 top-level loading
   const [initialEntry] = useState({
@@ -288,7 +287,7 @@ function AnswerDetailScreen() {
     return (
       <View className="flex-1 justify-center items-center">
         <Stack.Screen options={{ headerShown: false, title: '回答' }} />
-        <ActivityIndicator color={primaryColor} />
+        <AnswerLoadingPlaceholder phase="fetching-answer" />
       </View>
     );
   }

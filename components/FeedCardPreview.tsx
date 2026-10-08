@@ -26,6 +26,9 @@ interface FeedCardPreviewProps {
   item: FeedItem;
 }
 
+const PREVIEW_WIDTH = 320;
+const PREVIEW_PADDING = 16;
+
 function getResponseStatus(error: unknown) {
   if (!error || typeof error !== 'object' || !('response' in error)) {
     return undefined;
@@ -179,6 +182,7 @@ export function FeedCardPreview({ item }: FeedCardPreviewProps) {
               objectId={item.id}
               type={typeKey}
               useNative={true}
+              initialContentWidth={PREVIEW_WIDTH - PREVIEW_PADDING * 2}
               renderPlaceholder={renderPlaceholder}
             />
           </View>
@@ -190,9 +194,9 @@ export function FeedCardPreview({ item }: FeedCardPreviewProps) {
 
 const styles = StyleSheet.create({
   container: {
-    width: 320,
+    width: PREVIEW_WIDTH,
     maxHeight: 450,
-    padding: 16,
+    padding: PREVIEW_PADDING,
     borderRadius: 16,
   },
   scrollContainer: {

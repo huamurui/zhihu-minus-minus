@@ -1,8 +1,10 @@
 import type { QueryClient } from '@tanstack/react-query';
 import type { FeedItem } from '@/api/zhihu';
+import type { AnswerDetail } from '@/api/zhihu/answer';
 import {
   getRichContentQueryKey,
   hasInlineRichContent,
+  hasReusableAnswerDetail,
 } from '@/features/rich-content';
 
 export type CachedContentType = 'answers' | 'articles' | 'pins' | 'questions';
@@ -283,6 +285,21 @@ export function seedRichContentFromFeedItem(
   // detail screen can refresh it in the background without losing the fast
   // first paint.
   queryClient.setQueryData(key, seed, { updatedAt: 0 });
+}
+
+/** Reuse a list answer for first paint while fetching missing detail metadata. */
+export function seedAnswerDetailFromList(
+  queryClient: QueryClient,
+  answer: AnswerDetail,
+): void {
+  const id = String(answer.id).trim();
+  const detail: AnswerDetail = { ...answer, type: 'answer' };
+  if (!id || !hasReusableAnswerDetail(detail)) return;
+
+  const key = getRichContentQueryKey('answers', id);
+  // A detail response or optimistic interaction may be newer than this list.
+  if (queryClient.getQueryData(key) !== undefined) return;
+  queryClient.setQueryData(key, detail, { updatedAt: 0 });
 }
 
 export function updateContentInteractionCaches(

@@ -1,8 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, waitFor } from '@testing-library/react-native';
+import type { ReactNode } from 'react';
 import { type AnswerDetail, getAnswer } from '../api/zhihu';
 import { getAllContentCollectionStatus } from '../api/zhihu/collection';
 import { AnswerDetailView } from '../components/AnswerDetailView';
+import type { RichContentLoadingPhase } from '../features/rich-content';
 
 interface ReadingOptions {
   enabled: boolean;
@@ -43,6 +45,7 @@ const mockReadingMeasurement = jest.fn(
 const mockBodyMount = jest.fn();
 const mockBodyUnmount = jest.fn();
 let mockLayoutReady: () => void;
+let mockContentLoadingPhase: RichContentLoadingPhase | null = null;
 
 jest.mock('../api/zhihu', () => ({
   getAnswer: jest.fn(),
@@ -155,15 +158,19 @@ jest.mock('../features/rich-content', () => {
     ZhihuContent: ({
       content,
       onLayoutReady,
+      renderPlaceholder,
     }: {
       content: string;
       onLayoutReady: () => void;
+      renderPlaceholder?: (phase: RichContentLoadingPhase) => ReactNode;
     }) => {
       mockLayoutReady = onLayoutReady;
       react.useEffect(() => {
         mockBodyMount();
         return () => mockBodyUnmount();
       }, []);
+      if (mockContentLoadingPhase)
+        return renderPlaceholder?.(mockContentLoadingPhase) ?? null;
       return react.createElement(
         native.Text,
         { testID: 'answer-body' },
@@ -238,6 +245,7 @@ function expectInactiveReading() {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockContentLoadingPhase = null;
   jest.mocked(getAnswer).mockResolvedValue(answer);
   jest
     .mocked(getAllContentCollectionStatus)
@@ -257,6 +265,91 @@ test('mounts a cached neighboring body before focus without starting detail, col
   expect(getAnswer).not.toHaveBeenCalled();
   expect(getAllContentCollectionStatus).not.toHaveBeenCalled();
   expectInactiveReading();
+});
+
+test.each<readonly [RichContentLoadingPhase, string]>([
+  ['container-layout', '正在确认正文宽度…'],
+  ['text-layout', '正在排版文字…'],
+  ['content-layout', '正在布局正文内容…'],
+])('reports %s for a cached answer without claiming to fetch its body', async (phase, message) => {
+  mockContentLoadingPhase = phase;
+  const host = await renderAnswer({ isFocused: true });
+
+  expect(host.queryByText(message)).toBeNull();
+  await waitFor(() => expect(host.getByText(message)).toBeTruthy());
+  expect(host.queryByText('正在获取回答…')).toBeNull();
+  expect(getAnswer).not.toHaveBeenCalled();
+  expect(host.queryByTestId('answer-body')).toBeNull();
+
+  mockContentLoadingPhase = null;
+  await host.rerender(host.page(true, true));
+
+  expect(host.getByTestId('answer-body')).toHaveTextContent(answer.content);
+  expect(host.queryByText(message)).toBeNull();
+  expect(host.queryByText('正在获取回答…')).toBeNull();
+});
+
+test('keeps a cached answer in its layout phase during a background refresh', async () => {
+  let finishRequest!: (value: AnswerDetail) => void;
+  jest.mocked(getAnswer).mockReturnValue(
+    new Promise<AnswerDetail>((resolve) => {
+      finishRequest = resolve;
+    }),
+  );
+  mockContentLoadingPhase = 'text-layout';
+  const host = await renderAnswer({ isFocused: true });
+  expect(getAnswer).not.toHaveBeenCalled();
+  await waitFor(() => expect(host.getByText('正在排版文字…')).toBeTruthy());
+
+  await act(() => {
+    void host.queryClient.invalidateQueries({
+      queryKey: ['answer-detail', answer.id],
+      exact: true,
+    });
+  });
+  await waitFor(() => expect(getAnswer).toHaveBeenCalledTimes(1));
+  expect(
+    host.queryClient.getQueryState(['answer-detail', answer.id])?.fetchStatus,
+  ).toBe('fetching');
+  expect(host.getByText('正在排版文字…')).toBeTruthy();
+  expect(host.queryByText('正在获取回答…')).toBeNull();
+
+  await act(() => finishRequest(answer));
+  await waitFor(() =>
+    expect(
+      host.queryClient.getQueryState(['answer-detail', answer.id])?.fetchStatus,
+    ).toBe('idle'),
+  );
+  expect(host.getByText('正在排版文字…')).toBeTruthy();
+  expect(host.queryByText('正在获取回答…')).toBeNull();
+});
+
+test('changes an uncached focused answer from fetching to its actual native layout phase', async () => {
+  let finishRequest!: (value: AnswerDetail) => void;
+  jest.mocked(getAnswer).mockReturnValue(
+    new Promise<AnswerDetail>((resolve) => {
+      finishRequest = resolve;
+    }),
+  );
+  mockContentLoadingPhase = 'container-layout';
+  const host = await renderAnswer({ cached: false, isFocused: true });
+
+  expect(host.getByText('正在获取回答…')).toBeTruthy();
+  expect(host.queryByText('正在确认正文宽度…')).toBeNull();
+  expect(mockBodyMount).not.toHaveBeenCalled();
+  expect(getAnswer).toHaveBeenCalledTimes(1);
+
+  await act(() => finishRequest(answer));
+  await waitFor(() => expect(host.getByText('正在确认正文宽度…')).toBeTruthy());
+  expect(host.queryByText('正在获取回答…')).toBeNull();
+  expect(mockBodyMount).toHaveBeenCalledTimes(1);
+
+  mockContentLoadingPhase = 'text-layout';
+  await host.rerender(host.page(true, true));
+  expect(host.getByText('正在排版文字…')).toBeTruthy();
+  expect(host.queryByText('正在确认正文宽度…')).toBeNull();
+  expect(host.queryByText('正在获取回答…')).toBeNull();
+  expect(getAnswer).toHaveBeenCalledTimes(1);
 });
 
 test('keeps an uncached neighbor blank and mounts its body when prefetch populates the disabled query', async () => {

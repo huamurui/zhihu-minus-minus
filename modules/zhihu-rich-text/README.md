@@ -5,6 +5,7 @@
 ## Android 实现
 
 - 一个 flow 对应一个 Android `TextView` 和一份 UTF-16 `Spannable`，段落分隔符、附件占位符均保留原始 offset。系统长按选择可以跨越这个 flow 内的段落。
+- Expo 的属性 setter 先暂存输入，`OnViewDidUpdateProps` 在同一事务中统一提交，正文、配置和宽度只触发一次全文构建。仅 `layoutKey` 或 `selectable` 变化不重建 span；高度任务同时校验提交版本，拒绝旧属性批次的测量。
 - 粗体、斜体、下划线、删除线、背景高亮、上下标、等宽代码、链接，以及标题、引用线、列表缩进和段距。
 - 根据 Android `Layout` 的实际视觉行绘制实线、虚线、点线和波浪线；软换行不会复用下一行的首个 caret 作为上一行终点。
 - `ReplacementSpan` 表示 `U+FFFC` 附件。异步读取图片、HTTP(S) SVG 和 `data:image/…`，解析 SVG 根节点的 `ex`/`em` 尺寸与 `vertical-align`；同一动画帧完成的资源统一回填、保留选区并重新测量。
@@ -16,7 +17,7 @@
 - 解码资源按kind、URL、尺寸、字号/系统缩放及容器宽度保留在进程LRU中，以bitmap.byteCount计数，缓存上限24MB。缓存保留未染主题色的glyph/mask，主题切换在绘制时着色；kind防止普通图复用公式mask。重新挂载的文字流可直接使用已缓存几何；资源失败不阻塞正文首测，也不输出资源URL。
 - 附件加载由全进程共享的两个worker执行，空闲30秒后回收线程；相同资源key的进行中请求共享一次下载和解码。缓存检查与请求登记使用同一把锁，避免刚完成的资源再次下载。每个view只取消自己的订阅，最后一个订阅退出才取消底层任务；旧请求的迟到结果不能覆盖同key的新请求，generation 与 viewport revision 保护按帧回填，低内存/trim 回调清理进程缓存。
 
-附件并发、去重、取消和重试，以及引用末行边界与竖线裁剪的纯JVM回归位于 `android/src/test/`，生成工程后在项目 `android/` 目录运行 `./gradlew :zhihu-rich-text:testDebugUnitTest`。这些测试不请求真实图源，不替代Android布局与附件的视觉验收。
+属性批量提交、附件并发、去重、取消和重试，以及引用末行边界与竖线裁剪的纯JVM回归位于 `android/src/test/`，生成工程后在项目 `android/` 目录运行 `./gradlew :zhihu-rich-text:testDebugUnitTest`。这些测试不请求真实图源，不替代Android布局与附件的视觉验收。
 
 ## iOS 初步实现
 

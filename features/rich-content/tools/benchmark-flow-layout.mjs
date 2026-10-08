@@ -1,20 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
+import { createTypeScriptRequire } from './load-typescript.mjs';
 
-const require = createRequire(import.meta.url);
-const ts = require('typescript');
-require.extensions['.ts'] = (module, filename) => {
-  const { outputText } = ts.transpileModule(readFileSync(filename, 'utf8'), {
-    compilerOptions: {
-      module: ts.ModuleKind.CommonJS,
-      target: ts.ScriptTarget.ES2022,
-    },
-  });
-  module._compile(outputText, filename);
-};
+const require = createTypeScriptRequire(import.meta.url);
 const { compileZhihuDocument } = require('../compileRichText.ts');
 const {
   normalizeZhihuDocument,

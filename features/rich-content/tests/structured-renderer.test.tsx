@@ -178,12 +178,23 @@ function displayedImages() {
   return screen.root?.queryAll((node) => node.type === 'Image') ?? [];
 }
 
-async function measureCurrentDocument(): Promise<void> {
+async function layoutCurrentDocument(): Promise<void> {
   const container = screen
     .getAllByTestId('native-content-layout', { includeHiddenElements: true })
     .at(-1);
   if (!container) throw new Error('Missing native document');
   await fireEvent(container, 'layout', {
+    nativeEvent: { layout: { x: 0, y: 0, width: 320, height: 120 } },
+  });
+}
+
+async function measureCurrentDocument(): Promise<void> {
+  await layoutCurrentDocument();
+  const body = screen
+    .getAllByTestId('native-content-body', { includeHiddenElements: true })
+    .at(-1);
+  if (!body) throw new Error('Missing mounted native body');
+  await fireEvent(body, 'layout', {
     nativeEvent: { layout: { x: 0, y: 0, width: 320, height: 120 } },
   });
   await act(() => {
@@ -533,6 +544,7 @@ describe('isolated structured-content renderer', () => {
         resources={resources}
       />,
     );
+    await measureCurrentDocument();
     const attachments = [...mockNativeViews.values()].flatMap(
       (view) => (JSON.parse(view.flowJson) as RichTextFlow).attachments,
     );
@@ -576,6 +588,7 @@ describe('isolated structured-content renderer', () => {
         resources={mapped}
       />,
     );
+    await measureCurrentDocument();
     const attachments = [...mockNativeViews.values()].flatMap(
       (view) => (JSON.parse(view.flowJson) as RichTextFlow).attachments,
     );
@@ -635,6 +648,7 @@ describe('isolated structured-content renderer', () => {
         renderer="native-v2"
       />,
     );
+    await measureCurrentDocument();
     const attachments = [...mockNativeViews.values()].flatMap(
       (view) => (JSON.parse(view.flowJson) as RichTextFlow).attachments,
     );
@@ -665,6 +679,7 @@ describe('isolated structured-content renderer', () => {
         resources={resources}
       />,
     );
+    await layoutCurrentDocument();
     const after = [...mockNativeViews.values()][0];
     expect(after.layoutKey).not.toBe(before.layoutKey);
     expect(
@@ -807,6 +822,7 @@ describe('isolated structured-content renderer', () => {
         resources={resources}
       />,
     );
+    if (renderer === 'native-v2') await measureCurrentDocument();
     const imagesOnScreen = displayedImages();
     expect(imagesOnScreen).toHaveLength(2);
     const normal = StyleSheet.flatten(imagesOnScreen[0].props.style);

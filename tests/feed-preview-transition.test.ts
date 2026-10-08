@@ -38,7 +38,7 @@ jest.mock('../features/rich-content', () => ({
   RICH_CONTENT_STALE_TIME: 60_000,
   ZhihuContent: (props: ZhihuContentProps) => {
     mockContentProps.push(props);
-    return props.renderPlaceholder?.() ?? null;
+    return props.renderPlaceholder?.('container-layout') ?? null;
   },
 }));
 jest.mock('../components/StableAvatar', () => ({ StableAvatar: () => null }));

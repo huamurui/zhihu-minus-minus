@@ -60,7 +60,7 @@ import type {
   RichTextFlow,
   RichTextSelectionMapping,
 } from '../richText';
-import type { RichContentObjectType } from '../types';
+import type { RichContentLoadingPhase, RichContentObjectType } from '../types';
 import { NativeTable } from './NativeTable';
 
 export { isRichTextNativeAvailable } from '@/modules/zhihu-rich-text';
@@ -120,8 +120,10 @@ export interface ZhihuNativeContentProps {
   /** The host supplies a complete adapter on unsupported clients. */
   renderFallback: () => React.ReactNode;
   /** Keep the host's preview visible until the native layout is measured. */
-  renderPlaceholder?: () => React.ReactNode;
+  renderPlaceholder?: (phase: RichContentLoadingPhase) => React.ReactNode;
   onLayoutReady?: () => void;
+  /** Exact inner width already known by the host, before the first onLayout. */
+  initialContentWidth?: number;
 }
 
 interface FlowEvent {
@@ -805,6 +807,11 @@ interface ReadyNativeDocument {
 export const ZhihuNativeContent = React.memo(function ZhihuNativeContent(
   props: ZhihuNativeContentProps,
 ) {
+  const { width: windowWidth } = useWindowDimensions();
+  const measuredHostWidth = useRef<{
+    windowWidth: number;
+    width: number;
+  } | null>(null);
   const identity = JSON.stringify([
     props.type,
     props.objectId,
@@ -894,7 +901,14 @@ export const ZhihuNativeContent = React.memo(function ZhihuNativeContent(
   const requested = { identity, revision, input };
   const layers = replacing ? [displayed, requested] : [requested];
   return (
-    <View style={styles.content}>
+    <View
+      testID="native-content-host"
+      style={styles.content}
+      onLayout={({ nativeEvent: { layout } }) => {
+        if (Number.isFinite(layout.width) && layout.width > 0)
+          measuredHostWidth.current = { windowWidth, width: layout.width };
+      }}
+    >
       {layers.map((layer) => {
         const latest = layer.revision === revision;
         const visible = !replacing || !latest;
@@ -919,6 +933,11 @@ export const ZhihuNativeContent = React.memo(function ZhihuNativeContent(
             <NativeDocumentContent
               {...props}
               {...layer.input}
+              initialContentWidth={
+                measuredHostWidth.current?.windowWidth === windowWidth
+                  ? measuredHostWidth.current.width
+                  : props.initialContentWidth
+              }
               interactive={interactive}
               selectable={interactive && props.selectable !== false}
               onLayoutReady={latest ? onReady : undefined}
@@ -982,6 +1001,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
   renderFallback,
   renderPlaceholder,
   onLayoutReady,
+  initialContentWidth,
   interactive = true,
 }: ZhihuNativeContentProps & { interactive?: boolean }) {
   const dimensions = useWindowDimensions();
@@ -992,7 +1012,15 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
   const linkColor = themeColors.link;
   const surfaceColor = themeColors.backgroundSecondary;
   const borderColor = themeColors.border;
-  const [availableWidth, setAvailableWidth] = useState(dimensions.width - 32);
+  // Prepare the document immediately, but defer native layout until its actual
+  // container width is available. A fixed-width host can avoid this first wait.
+  const [availableWidth, setAvailableWidth] = useState(() =>
+    initialContentWidth !== undefined &&
+    Number.isFinite(initialContentWidth) &&
+    initialContentWidth > 0
+      ? initialContentWidth
+      : 0,
+  );
   const [measuredContainerWidth, setMeasuredContainerWidth] = useState<
     number | null
   >(null);
@@ -1016,9 +1044,10 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
   );
   const { fontSize, lineHeight } = metrics.body;
   const scaledEm = fontSize * dimensions.fontScale;
-  const width = options.integerMeasure
-    ? Math.max(scaledEm, Math.floor(availableWidth / scaledEm) * scaledEm)
-    : availableWidth;
+  const width =
+    options.integerMeasure && availableWidth > 0
+      ? Math.max(scaledEm, Math.floor(availableWidth / scaledEm) * scaledEm)
+      : availableWidth;
   const normalized = useMemo(() => {
     if (document) return { document, diagnostics: [] };
     const normalizationOptions = {
@@ -1119,6 +1148,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
     [onImagePress, previewImages],
   );
   const measuredFlowsRef = useRef(new Map<string, string>());
+  const measuredBodyKeyRef = useRef<string | null>(null);
   const [revealedLayout, setRevealedLayout] = useState<{ key: string } | null>(
     null,
   );
@@ -1169,6 +1199,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
     geometrySourceRef.current = documentGeometryKey;
     revealedGeometryRef.current = null;
     measuredFlowsRef.current = new Map();
+    measuredBodyKeyRef.current = null;
     notifiedLayoutRef.current = null;
   }
   const currentLayout = useRef({ compiled, key: documentLayoutKey });
@@ -1176,8 +1207,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
   const notifyLayoutReady = useCallback(
     (key: string) => {
       if (currentCompilation.current !== compiled) return;
-      // A block-only document can reveal from onLayout before the state update
-      // commits its first actual width. Keep that measured geometry eligible.
+      // Keep the body and host-width confirmation on the same geometry.
       geometrySourceRef.current = key;
       if (revealedGeometryRef.current !== key) {
         revealedGeometryRef.current = key;
@@ -1228,6 +1258,14 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
     measuredContainerWidth === availableWidth &&
     revealedGeometryRef.current === documentGeometryKey &&
     revealedLayout?.key === documentGeometryKey;
+  // A known width hint can start native layout, but still needs confirmation
+  // from this container. Content-only layouts don't wait for media downloads.
+  const loadingPhase: RichContentLoadingPhase =
+    availableWidth <= 0 || measuredContainerWidth !== availableWidth
+      ? 'container-layout'
+      : compiled.parts.some((part) => part.type === 'flow')
+        ? 'text-layout'
+        : 'content-layout';
   const handleLink = useCallback(
     (url: string) => {
       if (url.startsWith('zhihu-rich-footnote:')) {
@@ -1368,12 +1406,14 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
         setMeasuredContainerWidth(available);
         const measured = measuredFlowsRef.current;
         if (
-          compiled.parts.every(
-            (part) =>
-              part.type !== 'flow' ||
-              measured.get(part.flow.id) ===
-                flowMeasureKey(part.flow, nextWidth, configJson),
-          )
+          compiled.parts.some((part) => part.type === 'flow')
+            ? compiled.parts.every(
+                (part) =>
+                  part.type !== 'flow' ||
+                  measured.get(part.flow.id) ===
+                    flowMeasureKey(part.flow, nextWidth, configJson),
+              )
+            : measuredBodyKeyRef.current === nextGeometryKey
         )
           notifyLayoutReady(nextGeometryKey);
       }}
@@ -1381,7 +1421,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
     >
       {!initialLayoutReady ? (
         renderPlaceholder ? (
-          renderPlaceholder()
+          renderPlaceholder(loadingPhase)
         ) : (
           <View
             testID="native-content-placeholder"
@@ -1404,59 +1444,77 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
           </View>
         )
       ) : null}
-      <View
-        pointerEvents={initialLayoutReady ? 'auto' : 'none'}
-        style={[
-          styles.content,
-          !initialLayoutReady && {
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            opacity: 0,
-          },
-        ]}
-      >
-        {compiled.parts.map((part) =>
-          part.type === 'flow' ? (
-            <NativeFlow
-              key={part.flow.id}
-              flow={part.flow}
-              contentWidth={width}
-              configJson={configJson}
-              fontSize={fontSize}
-              lineHeight={lineHeight}
-              selectable={selectable}
-              options={options}
-              linkColor={linkColor}
-              onSelection={handleSelection}
-              onAction={handleAction}
-              onMeasured={onFlowMeasured}
-            />
-          ) : (
-            <NativeBlock
-              key={part.block.id}
-              block={part.block}
-              width={availableWidth}
-              fontSize={fontSize}
-              lineHeight={lineHeight}
-              textColor={textColor}
-              secondaryColor={secondaryColor}
-              linkColor={linkColor}
-              surfaceColor={surfaceColor}
-              borderColor={borderColor}
-              onLink={handleLink}
-              onImage={handleImage}
-              onImageLongPress={onImageLongPress}
-              configJson={configJson}
-              selectable={selectable}
-              options={options}
-              onFlowAction={handleAction}
-              onFlowSelection={handleSelection}
-              renderLinkCard={renderLinkCard}
-            />
-          ),
-        )}
-      </View>
+      {availableWidth > 0 ? (
+        <View
+          testID="native-content-body"
+          onLayout={(event) => {
+            if (
+              event.nativeEvent.layout.width !== availableWidth ||
+              currentLayout.current.compiled !== compiled ||
+              currentLayout.current.key !== documentLayoutKey
+            )
+              return;
+            measuredBodyKeyRef.current = documentGeometryKey;
+            if (
+              !compiled.parts.some((part) => part.type === 'flow') &&
+              measuredContainerWidthRef.current === availableWidth
+            )
+              notifyLayoutReady(documentGeometryKey);
+          }}
+          pointerEvents={initialLayoutReady ? 'auto' : 'none'}
+          style={[
+            styles.content,
+            { width: availableWidth },
+            !initialLayoutReady && {
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              opacity: 0,
+            },
+          ]}
+        >
+          {compiled.parts.map((part) =>
+            part.type === 'flow' ? (
+              <NativeFlow
+                key={part.flow.id}
+                flow={part.flow}
+                contentWidth={width}
+                configJson={configJson}
+                fontSize={fontSize}
+                lineHeight={lineHeight}
+                selectable={selectable}
+                options={options}
+                linkColor={linkColor}
+                onSelection={handleSelection}
+                onAction={handleAction}
+                onMeasured={onFlowMeasured}
+              />
+            ) : (
+              <NativeBlock
+                key={part.block.id}
+                block={part.block}
+                width={availableWidth}
+                fontSize={fontSize}
+                lineHeight={lineHeight}
+                textColor={textColor}
+                secondaryColor={secondaryColor}
+                linkColor={linkColor}
+                surfaceColor={surfaceColor}
+                borderColor={borderColor}
+                onLink={handleLink}
+                onImage={handleImage}
+                onImageLongPress={onImageLongPress}
+                configJson={configJson}
+                selectable={selectable}
+                options={options}
+                onFlowAction={handleAction}
+                onFlowSelection={handleSelection}
+                renderLinkCard={renderLinkCard}
+              />
+            ),
+          )}
+        </View>
+      ) : null}
       <Modal
         visible={interactive && Boolean(footnote)}
         transparent

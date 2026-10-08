@@ -9,6 +9,12 @@ export type RichContentObjectType = 'answer' | 'article' | 'pin' | 'question';
 /** 用户可选择的正文后端；单个正文可通过 renderer 显式覆盖设置。 */
 export type RichContentRenderer = 'webview' | 'native-v2';
 
+/** Observable native layout waits; parsing/compilation run synchronously. */
+export type RichContentLoadingPhase =
+  | 'container-layout'
+  | 'text-layout'
+  | 'content-layout';
+
 /** Layout-only experiments; source text and persistent settings stay intact. */
 export interface RichContentTypographyOptions {
   justify?: boolean;
@@ -32,10 +38,12 @@ export interface ZhihuContentProps {
   type: RichContentObjectType;
   onRefresh?: () => void;
   renderer?: RichContentRenderer;
-  /** Keep an existing preview visible while the native text completes its first layout. */
-  renderPlaceholder?: () => ReactNode;
+  /** Keep a preview visible or describe the current native layout wait. */
+  renderPlaceholder?: (phase: RichContentLoadingPhase) => ReactNode;
   /** Native V2 has measured its current text layout and can reveal the body. */
   onLayoutReady?: () => void;
+  /** Exact inner width already known by the host; native layout still verifies it. */
+  initialContentWidth?: number;
   /** Per-surface overrides used by the development comparison page. */
   fontSizeScale?: number;
   lineHeightScale?: number;

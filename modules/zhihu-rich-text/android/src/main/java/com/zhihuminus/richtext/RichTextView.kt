@@ -91,8 +91,7 @@ class RichTextView(context: Context, appContext: AppContext) : ExpoView(context,
   private val attachmentFrame = Runnable { applyAttachmentUpdates() }
   private var flow: FlowData? = null
   private var config = TextConfig()
-  private var previousFlowJson = ""
-  private var previousConfigJson = ""
+  private val propBatch = RichTextPropBatch()
   private var layoutKey = ""
   private var contentWidthPx = 0
   private var generation = 0
@@ -116,40 +115,53 @@ class RichTextView(context: Context, appContext: AppContext) : ExpoView(context,
   }
 
   fun setFlowJson(value: String) {
-    if (previousFlowJson == value) return
-    previousFlowJson = value
-    flow = FlowData.parse(value)
-    lastHeightKey = ""
-    lastSelectionKey = ""
-    rebuild()
+    propBatch.update { it.copy(flowJson = value) }
   }
 
   fun setConfigJson(value: String) {
-    if (previousConfigJson == value) return
-    previousConfigJson = value
-    config = TextConfig.parse(value)
-    rebuild()
+    propBatch.update { it.copy(configJson = value) }
   }
 
   fun setContentWidth(value: Float) {
     val pixels = if (value.isFinite()) ceil(value.coerceAtLeast(0f) * density).toInt() else 0
-    if (contentWidthPx == pixels) return
-    contentWidthPx = pixels
-    rebuild()
+    propBatch.update { it.copy(contentWidthPx = pixels) }
   }
 
   fun setLayoutKey(value: String) {
-    if (layoutKey == value) return
-    layoutKey = value
-    lastHeightKey = ""
-    requestLayout()
-    post { if (!disposed && layoutKey == value) measureText() }
+    propBatch.update { it.copy(layoutKey = value) }
   }
 
   fun setSelectable(value: Boolean) {
-    if (textView.isTextSelectable == value) return
-    textView.setTextIsSelectable(value)
-    textView.isClickable = true
+    propBatch.update { it.copy(selectable = value) }
+  }
+
+  fun commitProps() {
+    if (disposed) return
+    val change = propBatch.commit() ?: return
+    val props = change.current
+    if (change.flowChanged) {
+      flow = FlowData.parse(props.flowJson)
+      lastSelectionKey = ""
+    }
+    if (change.configChanged) config = TextConfig.parse(props.configJson)
+    contentWidthPx = props.contentWidthPx
+    layoutKey = props.layoutKey
+    // A new commit invalidates pending height events, including a key that
+    // changes away and back. Reissue its measurement even if geometry is equal.
+    lastHeightKey = ""
+    suppressSelection = true
+    if (textView.isTextSelectable != props.selectable) {
+      textView.setTextIsSelectable(props.selectable)
+      textView.isClickable = true
+    }
+    if (change.requiresRebuild) {
+      rebuild()
+    } else {
+      suppressSelection = false
+      emitSelection(textView.selectionStart, textView.selectionEnd)
+      requestLayout()
+      scheduleMeasurement()
+    }
   }
 
   override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -293,7 +305,7 @@ class RichTextView(context: Context, appContext: AppContext) : ExpoView(context,
     suppressSelection = false
     emitSelection(textView.selectionStart, textView.selectionEnd)
     requestLayout()
-    post { if (!disposed && generation == currentGeneration) measureText() }
+    scheduleMeasurement()
     post { if (!disposed && generation == currentGeneration) synchronizeAttachments() }
   }
 
@@ -400,21 +412,30 @@ class RichTextView(context: Context, appContext: AppContext) : ExpoView(context,
   }
 
   private fun measureText() {
-    if (disposed) return
+    if (disposed || propBatch.hasPending) return
     val desiredWidth = if (contentWidthPx > 0) contentWidthPx else max(1, measuredWidth)
     textView.measure(View.MeasureSpec.makeMeasureSpec(desiredWidth, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
     measuredTextHeight = textView.measuredHeight
     val activeFlow = flow ?: return
     val currentLayoutKey = layoutKey
     val currentGeneration = generation
+    val currentRevision = propBatch.revision
     val key = "${activeFlow.id}:${activeFlow.textVersion}:$currentLayoutKey:$measuredTextHeight"
     if (key == lastHeightKey) return
     lastHeightKey = key
     val event = HeightEvent(activeFlow.id, activeFlow.textVersion, currentLayoutKey, measuredTextHeight / density.toDouble())
     post {
-      if (!disposed && generation == currentGeneration && layoutKey == currentLayoutKey && lastHeightKey == key) {
+      if (!disposed && generation == currentGeneration && propBatch.accepts(currentRevision) && layoutKey == currentLayoutKey && lastHeightKey == key) {
         onHeightChange(event)
       }
+    }
+  }
+
+  private fun scheduleMeasurement() {
+    val currentGeneration = generation
+    val currentRevision = propBatch.revision
+    post {
+      if (!disposed && generation == currentGeneration && propBatch.accepts(currentRevision)) measureText()
     }
   }
 
