@@ -2,7 +2,7 @@
   "expo": {
     "name": "知乎--",
     "slug": "ZhihuMinusMinus",
-    "version": "0.8.0",
+    "version": "0.8.1",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "zhihu--",
@@ -27,7 +27,7 @@
       }
     },
     "android": {
-      "versionCode": 800,
+      "versionCode": 801,
       "splash": {
         "backgroundColor": "#ffffff",
         "image": "./assets/images/android-icon-monochrome.png",
@@ -362,8 +362,8 @@
           "基础稳定性优化: 修复了若干 UI 细节与已知的小概率崩溃问题。"
         ]
       },
-      "status": "🚀 v0.8.0 - tiqian-super-mini 正文排版",
-      "lastUpdated": "2026-10-05",
+      "status": "🚀 v0.8.1 - tiqian-super-mini 正文排版",
+      "lastUpdated": "2026-10-09",
       "eas": {
         "projectId": "faa0f061-50e6-4ec4-bb6f-accda0dbd24f"
       }
