@@ -27,6 +27,7 @@ import {
   getContentActionBarBottom,
 } from '@/components/ContentActionBar';
 import { ContentActionButton } from '@/components/ContentActionButton';
+import { ContentRelationshipNotice } from '@/components/ContentRelationshipNotice';
 import { useDetailNavigationHeight } from '@/components/DetailNavigationHeader';
 import { FollowButton } from '@/components/FollowButton';
 import { MoreActionsButton } from '@/components/MoreActionsButton';
@@ -38,7 +39,6 @@ import { ShareMenu } from '@/components/ShareMenu';
 import { StableAvatar } from '@/components/StableAvatar';
 import { Text, ThemedIcon, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
-import { VoterListModal } from '@/components/VoterListModal';
 import Colors from '@/constants/Colors';
 import {
   isRichTextNativeAvailable,
@@ -129,7 +129,6 @@ export const AnswerDetailView = ({
   const lastCallbackTime = useSharedValue(0);
 
   const [menuVisible, setMenuVisible] = React.useState(false);
-  const [votersVisible, setVotersVisible] = React.useState(false);
   const [hasBeenFocused, setHasBeenFocused] = React.useState(isFocused);
 
   React.useEffect(() => {
@@ -560,6 +559,12 @@ export const AnswerDetailView = ({
           </View>
         ) : (
           <View className="px-5 pb-2 bg-transparent">
+            <ContentRelationshipNotice
+              contentType="answer"
+              contentId={id}
+              enabled={isFocused && Boolean(answer)}
+              voteCount={answer?.voteup_count}
+            />
             <ZhihuContent
               content={answer?.content || ''}
               segmentInfos={answer?.segment_infos}
@@ -716,13 +721,6 @@ export const AnswerDetailView = ({
               ]
             : []),
         ]}
-      />
-      <VoterListModal
-        visible={votersVisible}
-        onClose={() => setVotersVisible(false)}
-        contentType="answer"
-        contentId={id}
-        count={answer?.voteup_count}
       />
     </View>
   );

@@ -15,6 +15,7 @@ import {
   getContentActionBarBottom,
 } from '@/components/ContentActionBar';
 import { ContentActionButton } from '@/components/ContentActionButton';
+import { ContentRelationshipNotice } from '@/components/ContentRelationshipNotice';
 import { FollowButton } from '@/components/FollowButton';
 import { MoreActionsButton } from '@/components/MoreActionsButton';
 import { PinPollCard } from '@/components/PinPollCard';
@@ -25,7 +26,6 @@ import { ShareMenu } from '@/components/ShareMenu';
 import { StableAvatar } from '@/components/StableAvatar';
 import { Text, ThemedIcon, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
-import { VoterListModal } from '@/components/VoterListModal';
 import Colors from '@/constants/Colors';
 import { RICH_CONTENT_STALE_TIME, ZhihuContent } from '@/features/rich-content';
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
@@ -58,7 +58,6 @@ export default function PinDetailScreen() {
       opened === contentIdentity ? opened : null,
     );
   }, [contentIdentity]);
-  const [votersVisible, setVotersVisible] = React.useState(false);
   const scrollViewRef = React.useRef<ScrollView>(null);
 
   const {
@@ -240,6 +239,11 @@ export default function PinDetailScreen() {
 
         {/* 想法内容 */}
         <View className="px-5 bg-transparent">
+          <ContentRelationshipNotice
+            contentType="pin"
+            contentId={String(id)}
+            voteCount={pinVoteCount}
+          />
           <ZhihuContent
             contentArray={pin?.content}
             objectId={id as string}
@@ -311,14 +315,6 @@ export default function PinDetailScreen() {
             />
           </View>
         }
-      />
-
-      <VoterListModal
-        visible={votersVisible}
-        onClose={() => setVotersVisible(false)}
-        contentType="pin"
-        contentId={String(id)}
-        count={pinVoteCount}
       />
     </View>
   );

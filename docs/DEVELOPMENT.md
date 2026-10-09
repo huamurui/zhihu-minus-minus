@@ -222,6 +222,8 @@ xcrun simctl openurl booted 'zhihu--:///dev/rich-content/prototype?caseId=attach
 
 回答入口 `/answer/[id]` 按 `answerReadingMode` 选择详情或预览卡片列表，默认 `detail`；settings version 16 给旧设置补齐该值。`readingMode=detail` 用于主动切换到详情。问题页、收藏夹与点赞页先显示普通摘要卡片，不在列表中加载完整正文。长按 FeedCard 的临时预览菜单保持原有行为。
 
+回答和想法详情通过 `ContentRelationshipNotice` 在作者信息之后、正文之前显示 `/answers/{id}/relationship?desktop=true` 或 `/pins/{id}/relationship?desktop=true` 返回的互动关系文案。正文首次展示时立即用当前赞同数显示默认文案，缺少计数时显示“赞同信息”；提示始终占用一行，服务端文案较长时省略显示，无障碍标签保留全文，加载、空响应、失败及回答焦点切换不会插入或移除这一行。回答只在当前页聚焦且已有详情时请求，缓存包含内容类型、ID 和账号会话；赞同数变化后重新获取文案。默认赞同文案以及 `reaction_endorse` 且跳转目标为当前内容的知乎赞同者页面时，点击提示打开应用内的 `VoterListModal`；未知跳转保留文字并禁用点击，未聚焦回答禁用点击。文字颜色使用运行时主题 token，服务端颜色代码不直接作为样式。
+
 问题来源的预览列表将同一问题的标题、描述及问题操作集中在列表头；其他来源可能跨问题，每张卡片保留各自的问题标题。卡片显示回答作者、正文和回答操作，首卡固定展开，后续卡片使用右下角紧凑的展开/收起按钮。正常渲染没有详情跳转按钮，请求失败时仍提供详情入口。展开长正文并滚过 300px、所有可见卡片操作栏均离开视口时显示悬浮回答操作栏；滚动结束强制重测，回收卡片或换会话后拒绝旧测量。预览与问题页共用 `useDetailHeaderState`、`DetailNavigationHeader` 和渐显计算：初始透明，标题离开顶部时渐显标题与背景，按实测标题及字号更新阈值。回答 Pager 保留独立的身份、位置与焦点管理。
 
 回答、文章、想法与预览浮栏共用 `ContentActionBar` 的胶囊浮面、模糊背景和主题色。底部定位统一传入安全区 `bottomInset`，可用 `bottomOffset` 保留文章页额外的 10dp 间距；`getContentActionBarBottom` 将实际底距限制为至少 12dp，较大的原有底距不变。浮栏胶囊高度统一为 48dp。正文底部留白、阅读恢复提示与回答滚动指示器使用同一底距计算结果及公共浮栏高度，随胶囊高度同步调整。普通 Feed 卡片与预览卡片底部共用 `FeedCardActionRow`，统一赞同和评论的图标尺寸及靠左紧凑布局，更多按钮靠右，预览卡片额外在赞同旁提供同为 16dp 的反对按钮；预览首卡的悬浮栏不提供收起按钮，后续卡片保留收起。评论、展开/收起等按钮复用 `ContentActionButton` 的胶囊点击反馈，更多操作继续用 `MoreActionsButton`。全局 `BouncyButton` 的默认圆角保持原有规则，普通卡片与正文交互不受操作栏样式影响。

@@ -23,6 +23,7 @@ export * from './pin';
 export * from './publishing';
 export * from './question';
 export * from './questionFeed';
+export * from './relationship';
 export * from './search';
 export * from './topic';
 export * from './video';

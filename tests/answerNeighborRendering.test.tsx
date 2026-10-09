@@ -29,6 +29,13 @@ interface Collections {
   collectedStatusMap: Record<string, boolean>;
 }
 
+interface RelationshipNoticeProps {
+  contentType: 'answer' | 'pin';
+  contentId: string | number;
+  voteCount?: number;
+  enabled?: boolean;
+}
+
 const mockReadingProgress = jest.fn((_options: ReadingOptions) => ({
   beginContentMeasurement: jest.fn(),
   onContentSizeChange: jest.fn(),
@@ -44,6 +51,7 @@ const mockReadingMeasurement = jest.fn(
 );
 const mockBodyMount = jest.fn();
 const mockBodyUnmount = jest.fn();
+const mockRelationshipNotice = jest.fn((_props: RelationshipNoticeProps) => {});
 let mockLayoutReady: () => void;
 let mockContentLoadingPhase: RichContentLoadingPhase | null = null;
 
@@ -91,6 +99,21 @@ jest.mock('../components/BouncyButton', () => ({
   BouncyButton:
     jest.requireActual<typeof import('react-native')>('react-native').Pressable,
 }));
+jest.mock('../components/ContentRelationshipNotice', () => {
+  const react = jest.requireActual<typeof import('react')>('react');
+  const native =
+    jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    ContentRelationshipNotice: (props: RelationshipNoticeProps) => {
+      mockRelationshipNotice(props);
+      return react.createElement(
+        native.Text,
+        { testID: 'content-relationship-notice' },
+        '合成互动关系提示',
+      );
+    },
+  };
+});
 jest.mock('../components/DetailNavigationHeader', () => ({
   useDetailNavigationHeight: () => 44,
 }));
@@ -257,13 +280,24 @@ afterEach(() => {
   clients.length = 0;
 });
 
-test('mounts a cached neighboring body before focus without starting detail, collection, or reading work', async () => {
+test('mounts a cached neighboring body before focus without starting detail, collection, relationship, or reading work', async () => {
   const host = await renderAnswer();
 
   expect(host.getByTestId('answer-body')).toHaveTextContent(answer.content);
   expect(mockBodyMount).toHaveBeenCalledTimes(1);
   expect(getAnswer).not.toHaveBeenCalled();
   expect(getAllContentCollectionStatus).not.toHaveBeenCalled();
+  expect(mockRelationshipNotice).toHaveBeenLastCalledWith({
+    contentType: 'answer',
+    contentId: answer.id,
+    voteCount: answer.voteup_count,
+    enabled: false,
+  });
+  expect(
+    host
+      .getAllByTestId(/^(content-relationship-notice|answer-body)$/)
+      .map((node) => node.props.testID),
+  ).toEqual(['content-relationship-notice', 'answer-body']);
   expectInactiveReading();
 });
 
@@ -337,12 +371,16 @@ test('changes an uncached focused answer from fetching to its actual native layo
   expect(host.getByText('正在获取回答…')).toBeTruthy();
   expect(host.queryByText('正在确认正文宽度…')).toBeNull();
   expect(mockBodyMount).not.toHaveBeenCalled();
+  expect(mockRelationshipNotice).not.toHaveBeenCalled();
   expect(getAnswer).toHaveBeenCalledTimes(1);
 
   await act(() => finishRequest(answer));
   await waitFor(() => expect(host.getByText('正在确认正文宽度…')).toBeTruthy());
   expect(host.queryByText('正在获取回答…')).toBeNull();
   expect(mockBodyMount).toHaveBeenCalledTimes(1);
+  expect(mockRelationshipNotice).toHaveBeenLastCalledWith(
+    expect.objectContaining({ contentId: answer.id, enabled: true }),
+  );
 
   mockContentLoadingPhase = 'text-layout';
   await host.rerender(host.page(true, true));

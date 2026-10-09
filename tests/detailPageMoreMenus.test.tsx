@@ -39,6 +39,13 @@ interface MutationOptions {
   ) => void;
 }
 
+interface RelationshipNoticeProps {
+  contentType: 'answer' | 'pin';
+  contentId: string | number;
+  voteCount?: number;
+  enabled?: boolean;
+}
+
 let mockParams: { id: string; source?: string };
 let mockQueryData: Record<string, unknown>;
 let mockMenuProps: MenuProps;
@@ -47,6 +54,7 @@ const mockPush = jest.fn();
 const mockMutate = jest.fn();
 const mockInvalidateQueries = jest.fn();
 const mockDownvoteButton = jest.fn((_props: { voted?: number }) => null);
+const mockRelationshipNotice = jest.fn((_props: RelationshipNoticeProps) => {});
 const mockAnswer: AnswerDetail = {
   id: '84',
   question: { id: '7', title: '合成问题', type: 'question' },
@@ -197,6 +205,21 @@ jest.mock('../components/useColorScheme', () => ({
 jest.mock('../components/BouncyButton', () => ({
   BouncyButton: jest.requireActual('react-native').Pressable,
 }));
+jest.mock('../components/ContentRelationshipNotice', () => {
+  const react = jest.requireActual<typeof import('react')>('react');
+  const native =
+    jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    ContentRelationshipNotice: (props: RelationshipNoticeProps) => {
+      mockRelationshipNotice(props);
+      return react.createElement(
+        native.Text,
+        { testID: 'content-relationship-notice' },
+        '合成互动关系提示',
+      );
+    },
+  };
+});
 jest.mock('../components/DetailNavigationHeader', () => {
   const react = jest.requireActual<typeof import('react')>('react');
   const native =
@@ -262,7 +285,16 @@ jest.mock('../components/VoterListModal', () => ({
 jest.mock('../components/PinPollCard', () => ({ PinPollCard: () => null }));
 jest.mock('../features/rich-content', () => ({
   RICH_CONTENT_STALE_TIME: 60_000,
-  ZhihuContent: () => null,
+  ZhihuContent: () => {
+    const react = jest.requireActual<typeof import('react')>('react');
+    const native =
+      jest.requireActual<typeof import('react-native')>('react-native');
+    return react.createElement(
+      native.Text,
+      { testID: 'detail-body' },
+      '合成正文',
+    );
+  },
 }));
 jest.mock('../hooks/useReadingProgress', () => ({
   useReadingProgress: () => ({ restoredOffset: null }),
@@ -349,7 +381,8 @@ jest.mock('../api/zhihu/question', () => ({
   getQuestionAnswers: jest.fn(),
 }));
 jest.mock('../api/zhihu/voters', () => ({
-  getContentVoteCount: () => 0,
+  getContentVoteCount: (_type: string, content?: { reaction_count?: number }) =>
+    content?.reaction_count ?? 0,
   getContentVoteState: () => 0,
 }));
 
@@ -438,6 +471,45 @@ test('pin header and bottom more buttons open the same pin menu', async () => {
     expect(host.getByText('menu:pin:7')).toBeTruthy();
     await act(() => mockMenuProps.onClose());
   }
+});
+
+test('places the pin relationship notice before its body using the loaded pin identity and reaction count', async () => {
+  mockQueryData['pin-detail'] = {
+    ...(mockQueryData['pin-detail'] as object),
+    reaction_count: 34,
+  };
+  const host = await render(<PinDetailScreen />);
+
+  expect(mockRelationshipNotice).toHaveBeenLastCalledWith({
+    contentType: 'pin',
+    contentId: '7',
+    voteCount: 34,
+  });
+  expect(
+    host
+      .getAllByTestId(/^(content-relationship-notice|detail-body)$/)
+      .map((node) => node.props.testID),
+  ).toEqual(['content-relationship-notice', 'detail-body']);
+  expect(host.getByTestId('detail-body')).toHaveTextContent('合成正文');
+
+  mockParams = { id: '8' };
+  mockQueryData['pin-detail'] = undefined;
+  await host.rerender(<PinDetailScreen />);
+  expect(host.queryByTestId('content-relationship-notice')).toBeNull();
+
+  mockQueryData['pin-detail'] = {
+    id: '8',
+    author: mockAnswer.author,
+    content: [],
+    reaction_count: 12,
+  };
+  await host.rerender(<PinDetailScreen />);
+  expect(mockRelationshipNotice).toHaveBeenLastCalledWith({
+    contentType: 'pin',
+    contentId: '8',
+    voteCount: 12,
+  });
+  expect(host.getByTestId('detail-body')).toHaveTextContent('合成正文');
 });
 
 test.each([
