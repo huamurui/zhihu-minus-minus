@@ -334,6 +334,28 @@ export interface ZhihuColumnDetail {
   is_following?: boolean;
 }
 
+export type ZhihuColumnSummary = Pick<
+  ZhihuColumnDetail,
+  'id' | 'type' | 'title'
+> &
+  Partial<
+    Pick<
+      ZhihuColumnDetail,
+      | 'image_url'
+      | 'intro'
+      | 'excerpt'
+      | 'followers'
+      | 'items_count'
+      | 'articles_count'
+      | 'updated'
+    >
+  > & { voteup_count?: number };
+
+export interface ZhihuColumnContribution {
+  column: ZhihuColumnSummary;
+  contributions_count?: number;
+}
+
 export interface ZhihuPaging {
   is_end: boolean;
   is_start?: boolean;

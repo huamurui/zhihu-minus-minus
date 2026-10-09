@@ -1,6 +1,8 @@
 import type {
   ZhihuAnswer,
   ZhihuAuthor,
+  ZhihuColumnContribution,
+  ZhihuColumnSummary,
   ZhihuMemberRelation,
   ZhihuPaging,
 } from '@/types/zhihu';
@@ -12,6 +14,9 @@ export const MEMBER_INCLUDE =
 
 export const MEMBER_ANSWERS_INCLUDE =
   'data[*].is_normal,admin_closed_comment,reward_info,is_collapsed,annotation_action,annotation_detail,collapse_reason,collapsed_by,suggest_edit,comment_count,can_comment,content,editable_content,attachment,voteup_count,reshipment_settings,comment_permission,created_time,updated_time,review_info,excerpt,endorsements,paid_info,reaction_instruction,is_labeled,label_info,relationship.is_authorized,voting,is_author,is_thanked,is_nothelp,reaction,vessay_info;data[*].author.badge[?(type=best_answerer)].topics;data[*].author.kvip_info;data[*].author.vip_info;data[*].question.has_publishing_draft,relationship';
+
+const MEMBER_COLUMNS_INCLUDE =
+  'data[*].column.intro,followers,articles_count,voteup_count,items_count';
 
 const MEMBER_FALLBACK_INCLUDE =
   'id,url_token,name,avatar_url,follower_count,following_count,headline,cover_url,description,answer_count,articles_count,question_count,pins_count,voteup_count,is_following,mutual_followees_count';
@@ -283,6 +288,93 @@ export const getMemberAnswersVotedByMe = async (
   );
   return res.data;
 };
+
+function columnRecord(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function columnText(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  return value.trim() || undefined;
+}
+
+function columnCount(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+    ? value
+    : undefined;
+}
+
+export function normalizeMemberColumnContributions(
+  value: unknown,
+): ZhihuListResponse<ZhihuColumnContribution> {
+  const response = columnRecord(value);
+  if (!response || !Array.isArray(response.data)) {
+    throw new Error('专栏列表返回结构无效');
+  }
+  const data = response.data.flatMap((entry): ZhihuColumnContribution[] => {
+    const contribution = columnRecord(entry);
+    const source = columnRecord(contribution?.column);
+    if (!source || (source.type !== undefined && source.type !== 'column')) {
+      return [];
+    }
+    const id = columnText(source.id) ?? columnCount(source.id)?.toString();
+    const title = columnText(source.title);
+    if (!id || !title) return [];
+    const column: ZhihuColumnSummary = { id, type: 'column', title };
+    for (const key of ['image_url', 'intro', 'excerpt'] as const) {
+      const text = columnText(source[key]);
+      if (text !== undefined) column[key] = text;
+    }
+    for (const key of [
+      'followers',
+      'items_count',
+      'articles_count',
+      'voteup_count',
+      'updated',
+    ] as const) {
+      const count = columnCount(source[key]);
+      if (count !== undefined) column[key] = count;
+    }
+    const contributionsCount = columnCount(contribution?.contributions_count);
+    return [
+      {
+        column,
+        ...(contributionsCount !== undefined && {
+          contributions_count: contributionsCount,
+        }),
+      },
+    ];
+  });
+  const sourcePaging = columnRecord(response.paging);
+  const next = columnText(sourcePaging?.next) ?? '';
+  const totals = columnCount(sourcePaging?.totals);
+  return {
+    data,
+    paging: {
+      is_end:
+        typeof sourcePaging?.is_end === 'boolean' ? sourcePaging.is_end : !next,
+      next,
+      ...(totals !== undefined && { totals }),
+    },
+  };
+}
+
+export async function getMemberColumnContributions(
+  id: string | number,
+  offset = 0,
+  signal?: AbortSignal,
+): Promise<ZhihuListResponse<ZhihuColumnContribution>> {
+  const response = await apiClient.get<unknown>(
+    `/members/${encodeURIComponent(String(id))}/column-contributions`,
+    {
+      signal,
+      params: { include: MEMBER_COLUMNS_INCLUDE, offset, limit: 20 },
+    },
+  );
+  return normalizeMemberColumnContributions(response.data);
+}
 
 export const followMember = async (
   id: string | number,

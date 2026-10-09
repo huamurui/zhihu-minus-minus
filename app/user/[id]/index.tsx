@@ -43,6 +43,7 @@ import { addReadHistory } from '@/api/zhihu/history';
 import { BouncyButton } from '@/components/BouncyButton';
 import { FeedCard } from '@/components/FeedCard';
 import { FollowButton } from '@/components/FollowButton';
+import { ProfileColumnCard } from '@/components/profile/ProfileColumnCard';
 import { ProfileToolbarBackground } from '@/components/profile/ProfileCover';
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
 import {
@@ -61,10 +62,11 @@ import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { useUserAnswersVotedByMe } from '@/hooks/useUserAnswersVotedByMe';
+import { useUserColumns } from '@/hooks/useUserColumns';
 import { useUserCreations } from '@/hooks/useUserCreations';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
-import type { ZhihuAuthor } from '@/types/zhihu';
+import type { ZhihuAuthor, ZhihuColumnSummary } from '@/types/zhihu';
 import { getProfileAnswerReadingContext } from '@/utils/answerReadingContext';
 import {
   getProfileCoverState,
@@ -483,6 +485,11 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
     enabled: !!user && (visitedTabs.articles || activeTab === 'articles'),
   });
 
+  const columnsQuery = useUserColumns(
+    user,
+    Boolean(visitedTabs.columns || activeTab === 'columns'),
+  );
+
   // 5. 想法 Query
   const pinsQuery = useInfiniteQuery({
     queryKey: ['user-pins', id],
@@ -575,6 +582,19 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
           hasNextPage: questionsQuery.hasNextPage,
           fetchNextPage: questionsQuery.fetchNextPage,
           refetch: questionsQuery.refetch,
+        };
+      case 'columns':
+        return {
+          queryKey: columnsQuery.queryKey,
+          data: columnsQuery.columns,
+          isLoading: columnsQuery.isLoading,
+          isError: columnsQuery.isError,
+          isFetchingNextPage: columnsQuery.isFetchingNextPage,
+          isFetchNextPageError: columnsQuery.isFetchNextPageError,
+          isFetching: columnsQuery.isFetching,
+          hasNextPage: columnsQuery.hasNextPage,
+          fetchNextPage: columnsQuery.fetchNextPage,
+          refetch: columnsQuery.refetch,
         };
       case 'pins':
         return {
@@ -719,9 +739,11 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
             const count =
               tab.key === 'votes'
                 ? answersVotedByMeQuery.total
-                : tab.countKey
-                  ? user?.[tab.countKey]
-                  : undefined;
+                : tab.key === 'columns'
+                  ? columnsQuery.total
+                  : tab.countKey
+                    ? user?.[tab.countKey]
+                    : undefined;
             const countStr =
               count !== undefined && (count > 0 || tab.key === 'votes')
                 ? ` ${count}`
@@ -826,6 +848,8 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
   };
 
   const renderItemContent = (item: unknown, tabKey: ProfileTabKey) => {
+    if (tabKey === 'columns')
+      return <ProfileColumnCard column={item as ZhihuColumnSummary} />;
     if (tabKey === 'creations') {
       const feedItem = item as FeedItem;
       const target = creationTargets.get(`${feedItem.type}:${feedItem.id}`);
@@ -961,9 +985,11 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
   const activeCount =
     activeTab === 'votes'
       ? answersVotedByMeQuery.total
-      : activeMeta?.countKey
-        ? user?.[activeMeta.countKey]
-        : undefined;
+      : activeTab === 'columns'
+        ? columnsQuery.total
+        : activeMeta?.countKey
+          ? user?.[activeMeta.countKey]
+          : undefined;
 
   return (
     <NativeView

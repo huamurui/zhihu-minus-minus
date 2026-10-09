@@ -10,6 +10,7 @@ import {
 } from '../api/zhihu';
 import {
   getMemberAnswersVotedByMe,
+  getMemberColumnContributions,
   getRecentMemberActivities,
   type ZhihuMember,
 } from '../api/zhihu/member';
@@ -71,6 +72,7 @@ jest.mock('../api/zhihu', () => ({
 }));
 jest.mock('../api/zhihu/member', () => ({
   getMemberAnswersVotedByMe: jest.fn(),
+  getMemberColumnContributions: jest.fn(),
   getRecentMemberActivities: jest.fn(),
 }));
 jest.mock('../api/zhihu/history', () => ({ addReadHistory: jest.fn() }));
@@ -260,6 +262,7 @@ beforeEach(() => {
   jest.mocked(getMemberActivities).mockResolvedValue(emptyPage);
   jest.mocked(getMemberRelations).mockResolvedValue(emptyPage);
   jest.mocked(getMemberAnswersVotedByMe).mockResolvedValue(emptyPage);
+  jest.mocked(getMemberColumnContributions).mockResolvedValue(emptyPage);
   jest.mocked(searchContent).mockResolvedValue(emptyPage);
   jest.mocked(getRecentMemberActivities).mockResolvedValue({
     ...emptyPage,
@@ -310,7 +313,16 @@ test.each([
   const host = await render(screen());
   expect(
     host.getAllByRole('tab').map((tab) => tab.props.accessibilityLabel),
-  ).toEqual(['动态', '创作', '回答', '文章', '提问', '想法', '我赞同过']);
+  ).toEqual([
+    '动态',
+    '创作',
+    '回答',
+    '文章',
+    '专栏',
+    '提问',
+    '想法',
+    '我赞同过',
+  ]);
   expect(host.getByTestId('profile-owner')).toHaveTextContent(
     ownProfile ? '自己的主页' : '其他人的主页',
   );
@@ -347,6 +359,48 @@ test.each([
   expect(host.getByRole('tab', { name: '创作' })).toBeSelected();
   expect(getRecentMemberActivities).toHaveBeenCalledTimes(1);
   expect(getMemberRelations).not.toHaveBeenCalled();
+  await host.unmount();
+});
+
+test('columns load on first visit and unwrap the column for navigation', async () => {
+  mockRoute.tab = 'answers';
+  const column = {
+    id: 'synthetic-column',
+    type: 'column' as const,
+    title: '合成专栏',
+    intro: '专栏简介',
+    image_url: 'https://example.com/column.jpg',
+    followers: 3,
+    items_count: 2,
+  };
+  jest.mocked(getMemberColumnContributions).mockResolvedValue({
+    data: [{ column, contributions_count: 1 }],
+    paging: { ...emptyPage.paging, totals: 1 },
+  });
+  const host = await render(screen());
+  await flushQueries();
+  expect(getMemberColumnContributions).not.toHaveBeenCalled();
+
+  await fireEvent.press(host.getByRole('tab', { name: '专栏' }));
+  expect(mockSetPage).toHaveBeenLastCalledWith(4);
+  await act(() =>
+    mockPagerProps.onPageSelected({ nativeEvent: { position: 4 } }),
+  );
+  await flushQueries();
+  expect(getMemberColumnContributions).toHaveBeenCalledTimes(1);
+  expect(getMemberColumnContributions).toHaveBeenCalledWith(
+    member.url_token,
+    0,
+    expect.objectContaining({ aborted: false }),
+  );
+  expect(host.getByRole('tab', { name: '专栏' })).toBeSelected();
+  expect(mockListProps.get('专栏')?.query.data).toEqual([column]);
+  expect(host.getByText('专栏简介')).toBeTruthy();
+  await fireEvent.press(host.getByRole('button', { name: column.title }));
+  expect(mockPush).toHaveBeenLastCalledWith({
+    pathname: '/column/[id]',
+    params: { id: column.id },
+  });
   await host.unmount();
 });
 
@@ -566,9 +620,9 @@ test.each([
   expect(host.getByRole('tab', { name: '创作' })).toBeSelected();
 
   await fireEvent.press(host.getByRole('tab', { name: '我赞同过' }));
-  expect(mockSetPage).toHaveBeenLastCalledWith(6);
+  expect(mockSetPage).toHaveBeenLastCalledWith(7);
   await act(() =>
-    mockPagerProps.onPageSelected({ nativeEvent: { position: 6 } }),
+    mockPagerProps.onPageSelected({ nativeEvent: { position: 7 } }),
   );
   await flushQueries();
   expect(getMemberAnswersVotedByMe).toHaveBeenCalledTimes(1);
@@ -585,7 +639,7 @@ test.each([
     mockPagerProps.onPageSelected({ nativeEvent: { position: 1 } }),
   );
   await act(() =>
-    mockPagerProps.onPageSelected({ nativeEvent: { position: 6 } }),
+    mockPagerProps.onPageSelected({ nativeEvent: { position: 7 } }),
   );
   await flushQueries();
   expect(getMemberAnswersVotedByMe).toHaveBeenCalledTimes(1);
@@ -614,7 +668,7 @@ test('the votes route counts answers by this profile author that the current acc
   const host = await render(screen());
   await flushQueries();
 
-  expect(mockPagerProps.initialPage).toBe(6);
+  expect(mockPagerProps.initialPage).toBe(7);
   expect(host.getByRole('tab', { name: '我赞同过' })).toBeSelected();
   expect(getRecentMemberActivities).not.toHaveBeenCalled();
   expect(getMemberRelations).not.toHaveBeenCalled();
