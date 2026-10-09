@@ -344,12 +344,19 @@ export interface ZhihuPaging {
 
 export interface ZhihuColumnItem {
   id: string | number;
-  type?: 'article' | string;
-  title: string;
+  type?: 'answer' | 'article' | string;
+  title?: string;
+  question?: {
+    id: string | number;
+    title: string;
+  };
   excerpt?: string;
   title_image?: string;
+  thumbnail?: string;
   updated?: number;
+  updated_time?: number;
   created?: number;
+  created_time?: number;
   voteup_count?: number;
   comment_count?: number;
 }

@@ -76,7 +76,7 @@ export default function ColumnDetail() {
     successMessage: (isActive) => (isActive ? '已取消关注' : '已关注专栏'),
   });
 
-  // 2. 获取专栏下的文章列表
+  // 2. 获取专栏下的内容列表
   const {
     data: itemsData,
     isLoading: itemsLoading,
@@ -101,7 +101,7 @@ export default function ColumnDetail() {
     ]),
   );
 
-  const articles = itemsData?.pages.flatMap((page) => page.data) || [];
+  const items = itemsData?.pages.flatMap((page) => page.data) || [];
 
   const renderHeader = () => {
     if (!column && columnLoading) {
@@ -130,7 +130,7 @@ export default function ColumnDetail() {
             <Text className="text-xl font-bold">{column.title}</Text>
             <Text type="secondary" className="text-sm mt-1">
               {column.followers || 0} 关注者 ·{' '}
-              {column.items_count || column.articles_count || 0} 文章
+              {column.items_count || column.articles_count || 0} 内容
             </Text>
           </View>
           <FollowButton
@@ -174,20 +174,40 @@ export default function ColumnDetail() {
   };
 
   const renderItem = ({ item }: { item: ZhihuColumnItem }) => {
+    const isAnswer = item.type === 'answer';
+    const title = (isAnswer ? item.question?.title : undefined) || item.title;
+    const thumbnail = item.title_image || item.thumbnail;
+    const updated =
+      item.updated_time || item.updated || item.created_time || item.created;
+
     return (
       <BouncyButton
         className="p-4"
         style={{ borderBottomWidth: 0.5, borderBottomColor: borderColor }}
-        onPress={() => router.push(`/article/${item.id}`)}
+        onPress={() =>
+          isAnswer
+            ? router.push({
+                pathname: '/answer/[id]',
+                params: {
+                  id: String(item.id),
+                  questionId:
+                    item.question?.id === undefined
+                      ? undefined
+                      : String(item.question.id),
+                  title,
+                },
+              })
+            : router.push(`/article/${item.id}`)
+        }
       >
-        {item.title_image ? (
+        {thumbnail ? (
           <View className="flex-row bg-transparent">
             <View className="flex-1 pr-3 bg-transparent">
               <Text
                 className="text-[16px] font-bold leading-5"
                 numberOfLines={2}
               >
-                {item.title}
+                {title}
               </Text>
               <Text
                 type="secondary"
@@ -198,7 +218,7 @@ export default function ColumnDetail() {
               </Text>
             </View>
             <Image
-              source={getCachedImageSource(item.title_image)}
+              source={getCachedImageSource(thumbnail)}
               className="w-24 h-16 rounded"
               resizeMode="cover"
             />
@@ -206,7 +226,7 @@ export default function ColumnDetail() {
         ) : (
           <View className="bg-transparent">
             <Text className="text-[16px] font-bold leading-5" numberOfLines={2}>
-              {item.title}
+              {title}
             </Text>
             <Text
               type="secondary"
@@ -225,9 +245,9 @@ export default function ColumnDetail() {
           <Text type="secondary" className="text-xs ml-3">
             {item.comment_count || 0} 评论
           </Text>
-          {item.updated && (
+          {updated && (
             <Text type="secondary" className="text-xs ml-auto">
-              {formatDate(item.updated)}
+              {formatDate(updated)}
             </Text>
           )}
         </View>
@@ -255,7 +275,7 @@ export default function ColumnDetail() {
       />
 
       <FlashList
-        data={articles}
+        data={items}
         keyExtractor={(item) => `${item.type}-${item.id}`}
         contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
         renderItem={renderItem}
@@ -277,11 +297,11 @@ export default function ColumnDetail() {
             ) : itemsError ? (
               <QueryErrorView
                 compact
-                message="文章列表加载失败"
+                message="内容列表加载失败"
                 onRetry={() => void refetch()}
               />
             ) : (
-              <Text type="secondary">专栏里还没有文章喵</Text>
+              <Text type="secondary">专栏里还没有内容喵</Text>
             )}
           </View>
         )}
@@ -294,10 +314,10 @@ export default function ColumnDetail() {
           ) : isFetchNextPageError ? (
             <QueryErrorView
               compact
-              message="更多文章加载失败"
+              message="更多内容加载失败"
               onRetry={() => void fetchNextPage()}
             />
-          ) : articles.length > 0 && !hasNextPage ? (
+          ) : items.length > 0 && !hasNextPage ? (
             <Text type="secondary" className="text-center my-5">
               — 没有更多内容了 —
             </Text>
