@@ -105,12 +105,16 @@ beforeEach(() => {
 
 test('requests the target author answers upvoted by the current viewer with includes, sort, offset and cancellation signal', async () => {
   const response = page(['one']);
+  response.data[0].endorsements = [
+    { elements: [{ type: 'TEXT', content: '收录于 · 合成专栏' }] },
+  ];
   const signal = new AbortController().signal;
   jest.mocked(apiClient.get).mockResolvedValue({ data: response });
 
   await expect(
     getMemberAnswersVotedByMe(member.url_token ?? member.id, 40, signal),
   ).resolves.toEqual(response);
+  expect(MEMBER_ANSWERS_INCLUDE.split(',')).toContain('endorsements');
   expect(response.data[0].author.id).toBe(member.id);
   expect(response.data[0].author.id).not.toBe(useAuthStore.getState().me?.id);
   expect(apiClient.get).toHaveBeenCalledWith(

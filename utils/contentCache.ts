@@ -6,6 +6,7 @@ import {
   hasInlineRichContent,
   hasReusableAnswerDetail,
 } from '@/features/rich-content';
+import { seedAnswerEndorsements } from './answerEndorsements';
 
 export type CachedContentType = 'answers' | 'articles' | 'pins' | 'questions';
 
@@ -214,6 +215,7 @@ export function seedRichContentFromFeedItem(
   item: FeedItem,
   isAuthenticated = false,
 ): void {
+  if (item.type === 'answers') seedAnswerEndorsements(queryClient, item);
   if (
     item.type === 'videos' ||
     !hasInlineRichContent(item.content) ||
@@ -272,6 +274,9 @@ export function seedRichContentFromFeedItem(
       : contentType === 'answers'
         ? {
             ...common,
+            ...(Array.isArray(item.endorsements) && {
+              endorsements: item.endorsements,
+            }),
             question: item.questionId
               ? { id: item.questionId, title, type: 'question' }
               : undefined,
@@ -292,6 +297,7 @@ export function seedAnswerDetailFromList(
   queryClient: QueryClient,
   answer: AnswerDetail,
 ): void {
+  seedAnswerEndorsements(queryClient, answer);
   const id = String(answer.id).trim();
   const detail: AnswerDetail = { ...answer, type: 'answer' };
   if (!id || !hasReusableAnswerDetail(detail)) return;

@@ -23,6 +23,7 @@ import type {
   ZhihuPreviewLoginPrompt,
   ZhihuReadingPreviewItem,
 } from '@/api/zhihu/nextRender';
+import { AnswerEndorsements } from '@/components/AnswerEndorsements';
 import { AnswerPreviewFloatingBar } from '@/components/AnswerPreviewFloatingBar';
 import { AnswerPreviewPlainBody } from '@/components/AnswerPreviewPlainBody';
 import { AnswerPreviewQuestionHeader } from '@/components/AnswerPreviewQuestionHeader';
@@ -221,6 +222,7 @@ const AnswerPreviewCard = React.memo(function AnswerPreviewCard({
           ) : null}
         </View>
       </BouncyButton>
+      <AnswerEndorsements endorsements={item.endorsements} />
       {'structuredContent' in item ? (
         <AnswerPreviewStructuredBody
           item={item}

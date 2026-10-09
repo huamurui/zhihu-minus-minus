@@ -326,7 +326,7 @@ export default function QuestionDetail() {
     queryKey: ['question-answers', id, sortBy, isAuthenticated],
     queryFn: async ({ pageParam = 0 }) => {
       const include =
-        'data[*].content,excerpt,answer_type,paid_info,content_need_truncated,voteup_count,comment_count,favlists_count,author.name,author.avatar_url,author.headline,author.is_following,relationship.voting,relationship.is_author,relationship.is_favorited,created_time,updated_time,ip_info,segment_infos,link_card_info';
+        'data[*].content,excerpt,endorsements,answer_type,paid_info,content_need_truncated,voteup_count,comment_count,favlists_count,author.name,author.avatar_url,author.headline,author.is_following,relationship.voting,relationship.is_author,relationship.is_favorited,created_time,updated_time,ip_info,segment_infos,link_card_info';
       return getQuestionAnswers(id as string, pageParam, sortBy, include);
     },
     initialPageParam: 0,

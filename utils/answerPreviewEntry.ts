@@ -2,6 +2,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import type { ZhihuPlainPreviewAnswer } from '@/api/zhihu/nextRender';
 import { getAuthSessionVersion } from '@/store/useAuthStore';
 import type { ZhihuContentSegment, ZhihuSegmentInfo } from '@/types/zhihu';
+import { seedAnswerEndorsements } from './answerEndorsements';
 
 /** Ordinary list responses use both raw API fields and normalized feed aliases. */
 export interface AnswerPreviewEntrySource {
@@ -23,6 +24,7 @@ export interface AnswerPreviewEntrySource {
     description?: string;
   };
   excerpt?: unknown;
+  endorsements?: unknown;
   voteup_count?: number;
   voteCount?: number;
   comment_count?: number;
@@ -122,6 +124,9 @@ export function createAnswerPreviewEntry(
       headline: text(source.author?.headline ?? source.author?.description),
     },
     excerpt: text(source.excerpt),
+    ...(Array.isArray(source.endorsements) && {
+      endorsements: source.endorsements,
+    }),
     voteup_count: count(
       source.voteup_count ??
         source.voteCount ??
@@ -165,6 +170,13 @@ export function seedAnswerPreviewEntry(
   queryClient: QueryClient,
   source: AnswerPreviewEntrySource,
 ): void {
+  if (
+    source.type === undefined ||
+    source.type === 'answer' ||
+    source.type === 'answers'
+  ) {
+    seedAnswerEndorsements(queryClient, source);
+  }
   const entry = createAnswerPreviewEntry(source);
   if (!entry) return;
   queryClient.setQueryData(

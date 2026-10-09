@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { CanceledError } from 'axios';
 import type { PropsWithChildren } from 'react';
 import apiClient from '../api/client';
+import { normalizeAnswerPagerPage } from '../api/zhihu/answerPager';
 import {
   type AnswerPagerSourceOptions,
   useAnswerPagerSource,
@@ -36,6 +37,40 @@ function page(ids: string[], next = '') {
     paging: { is_end: !next, next, previous: '', totals: ids.length },
   };
 }
+
+test('preserves direct thin answer label metadata without promoting list entries to body content', () => {
+  const endorsements = [
+    {
+      elements: [
+        { type: 'IMAGE', image_key: 'zhicon_icon_24_column_fill' },
+        { type: 'TEXT', content: '收录于 · 合成专栏' },
+      ],
+    },
+  ];
+  const result = normalizeAnswerPagerPage({
+    data: [
+      { id: 'thin-answer', type: 'answer', endorsements },
+      { id: 'empty-labels', type: 'answer', endorsements: [] },
+      { id: 'malformed-labels', type: 'answer', endorsements: {} },
+      {
+        id: 'with-body',
+        type: 'answer',
+        content: '<p>列表正文不应被认证为详情</p>',
+        endorsements,
+      },
+    ],
+    need_force_login: false,
+    paging: { is_end: true, next: '' },
+  });
+  expect(result.data).toEqual([
+    { id: 'thin-answer', endorsements },
+    { id: 'empty-labels', endorsements: [] },
+    { id: 'malformed-labels' },
+    { id: 'with-body', endorsements },
+  ]);
+  expect(result.data[0].endorsements).toBe(endorsements);
+  for (const item of result.data) expect(item).not.toHaveProperty('content');
+});
 
 test('pages all non-profile origins within their question and isolates profile and account changes', async () => {
   const get = jest.mocked(apiClient.get);
@@ -80,7 +115,7 @@ test('pages all non-profile origins within their question and isolates profile a
     {
       signal: expect.any(AbortSignal),
       params: {
-        include: 'data[*].id',
+        include: 'data[*].id,endorsements',
         limit: 20,
         offset: 0,
         sort_by: 'default',
@@ -139,7 +174,7 @@ test('pages all non-profile origins within their question and isolates profile a
     {
       signal: expect.any(AbortSignal),
       params: {
-        include: 'data[*].id',
+        include: 'data[*].id,endorsements',
         limit: 20,
         offset: 0,
         sort_by: 'created',
@@ -225,7 +260,7 @@ test('pages all non-profile origins within their question and isolates profile a
     {
       signal: expect.any(AbortSignal),
       params: {
-        include: 'data[*].id,question.id',
+        include: 'data[*].id,question.id,endorsements',
         limit: 20,
         offset: 0,
         sort_by: 'voteups',
@@ -323,7 +358,7 @@ test('pages all non-profile origins within their question and isolates profile a
     {
       signal: expect.any(AbortSignal),
       params: {
-        include: 'data[*].id',
+        include: 'data[*].id,endorsements',
         limit: 20,
         offset: 0,
         sort_by: 'default',
@@ -411,7 +446,7 @@ test('waits for an unknown origin answer to resolve its question, then pages and
     {
       signal: expect.any(AbortSignal),
       params: {
-        include: 'data[*].id',
+        include: 'data[*].id,endorsements',
         limit: 20,
         offset: 0,
         sort_by: 'created',

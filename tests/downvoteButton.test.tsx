@@ -16,6 +16,9 @@ jest.mock('../api/zhihu/voters', () => jest.requireMock('../api/zhihu'));
 jest.mock('../features/rich-content', () =>
   jest.requireActual('../features/rich-content/queryPolicy'),
 );
+jest.mock('../store/useAuthStore', () => ({
+  getAuthSessionVersion: () => 1,
+}));
 jest.mock('react-native-reanimated', () => ({
   __esModule: true,
   default: { View: jest.requireActual('react-native').View },

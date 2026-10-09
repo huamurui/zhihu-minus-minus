@@ -535,6 +535,10 @@ function parseTopicFeedItem(item: ZhihuTopicFeedItem): FeedItem | null {
       headline: target.author?.headline || '',
     },
     excerpt: excerpt.replace(/<[^>]+>/g, ''),
+    ...(appType === 'answers' &&
+      Array.isArray(target.endorsements) && {
+        endorsements: target.endorsements,
+      }),
     image: image ?? null,
     voteCount: getContentVoteCount(appType, target) ?? 0,
     commentCount: target.comment_count || 0,

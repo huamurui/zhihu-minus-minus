@@ -19,10 +19,13 @@ function record(value: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
-/** Only complete, validated inline bodies may prewarm the detail cache. */
+/** Preserve answer labels independently; only validated inline bodies may prewarm detail. */
 export function getProfileFeedBody(
   value: unknown,
-): Pick<FeedItem, 'content' | 'answerType' | 'contentNeedTruncated'> {
+): Pick<
+  FeedItem,
+  'content' | 'answerType' | 'contentNeedTruncated' | 'endorsements'
+> {
   const source = record(value);
   if (!source) return {};
   let content: FeedItem['content'];
@@ -88,6 +91,10 @@ export function getProfileFeedBody(
   return {
     content,
     answerType,
+    ...((source.type === 'answer' || source.type === 'answers') &&
+      Array.isArray(source.endorsements) && {
+        endorsements: source.endorsements,
+      }),
     contentNeedTruncated:
       source.content_need_truncated != null
         ? source.content_need_truncated !== false

@@ -260,6 +260,8 @@ export default function SearchScreen() {
                 ? 'questions'
                 : 'videos',
       videoSource: getZhihuVideoSource(obj.type),
+      ...(obj.type === 'answer' &&
+        Array.isArray(obj.endorsements) && { endorsements: obj.endorsements }),
       title: highlight.title
         ? HighlightText(highlight.title)
         : obj.question?.title || obj.question?.name || obj.title || '无标题',

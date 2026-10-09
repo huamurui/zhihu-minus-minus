@@ -3,6 +3,7 @@ import apiClient, { type ApiRequestOptions } from '../client';
 export interface AnswerPagerItem {
   id: string | number;
   question?: { id: string | number };
+  endorsements?: readonly unknown[];
 }
 
 export interface AnswerPagerPage {
@@ -23,7 +24,7 @@ function identifier(value: unknown): string | number {
   throw new Error('回答列表返回结构无效');
 }
 
-/** Keep only pager identities; list bodies are not certified detail content. */
+/** Keep pager identity and label metadata; list bodies are not certified detail content. */
 export function normalizeAnswerPagerPage(value: unknown): AnswerPagerPage {
   const page = record(value);
   if (!Array.isArray(page.data)) throw new Error('回答列表返回结构无效');
@@ -39,6 +40,9 @@ export function normalizeAnswerPagerPage(value: unknown): AnswerPagerPage {
         id: identifier(item.id),
         ...(question?.id != null && {
           question: { id: identifier(question.id) },
+        }),
+        ...(Array.isArray(item.endorsements) && {
+          endorsements: item.endorsements,
         }),
       },
     ];
@@ -56,7 +60,7 @@ export function normalizeAnswerPagerPage(value: unknown): AnswerPagerPage {
   };
 }
 
-/** The question-origin pager retains the existing ID-only v4 request. */
+/** Fetch thin question pager entries with the label metadata used above each body. */
 export async function getQuestionAnswerPagerPage(
   questionId: string | number,
   sortBy: string,
@@ -67,7 +71,12 @@ export async function getQuestionAnswerPagerPage(
     `/questions/${encodeURIComponent(String(questionId))}/answers`,
     {
       ...options,
-      params: { include: 'data[*].id', limit: 20, offset, sort_by: sortBy },
+      params: {
+        include: 'data[*].id,endorsements',
+        limit: 20,
+        offset,
+        sort_by: sortBy,
+      },
     },
   );
   return normalizeAnswerPagerPage(response.data);

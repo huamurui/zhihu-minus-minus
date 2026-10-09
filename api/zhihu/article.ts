@@ -32,8 +32,8 @@ interface ArticleDraftPatch {
 export const getArticle = async (
   id: string | number,
 ): Promise<ZhihuArticle> => {
-  const res = await apiClient.get(`/articles/${id}`, {
-    params: { include: 'author.is_following' },
+  const res = await apiClient.get<ZhihuArticle>(`/articles/${id}`, {
+    params: { include: 'author.is_following,endorsements' },
   });
   return res.data;
 };

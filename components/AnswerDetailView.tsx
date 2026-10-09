@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { skipToken, useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useRef } from 'react';
 import {
@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type AnswerDetail, deleteAnswer, getAnswer } from '@/api/zhihu';
 import { getAllContentCollectionStatus } from '@/api/zhihu/collection';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
+import { AnswerEndorsements } from '@/components/AnswerEndorsements';
 import { AnswerLoadingPlaceholder } from '@/components/AnswerLoadingPlaceholder';
 import { BouncyButton } from '@/components/BouncyButton';
 import {
@@ -49,8 +50,10 @@ import {
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
 import { useReadingContentMeasurement } from '@/hooks/useReadingContentMeasurement';
 import { useReadingProgress } from '@/hooks/useReadingProgress';
+import { getAuthSessionVersion, useAuthStore } from '@/store/useAuthStore';
 import { useCollectionStore } from '@/store/useCollectionStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
+import { getAnswerEndorsementsKey } from '@/utils/answerEndorsements';
 import { formatDate } from '@/utils/date';
 import { calculateDetailHeaderAppearance } from '@/utils/detailHeaderAppearance';
 import { getZhihuErrorMessage, getZhihuErrorStatus } from '@/utils/zhihuError';
@@ -61,8 +64,15 @@ function renderContentPlaceholder(phase: RichContentLoadingPhase) {
   return <AnswerLoadingPlaceholder phase={phase} />;
 }
 
+export interface AnswerEndorsementSource {
+  answerId: string;
+  sessionVersion: number;
+  endorsements: readonly unknown[];
+}
+
 interface AnswerDetailViewProps {
   id: string;
+  endorsementSource?: AnswerEndorsementSource;
   initialTitle?: string;
   questionId?: string;
   onScroll?: (y: number) => void;
@@ -78,6 +88,7 @@ interface AnswerDetailViewProps {
 
 export const AnswerDetailView = ({
   id,
+  endorsementSource,
   initialTitle,
   questionId,
   onScroll,
@@ -91,6 +102,7 @@ export const AnswerDetailView = ({
   isPreloading = false,
 }: AnswerDetailViewProps) => {
   const router = useRouter();
+  const sessionVersion = useAuthStore(() => getAuthSessionVersion());
   const insets = useSafeAreaInsets();
   const actionBarBottom = getContentActionBarBottom(insets.bottom);
 
@@ -155,6 +167,18 @@ export const AnswerDetailView = ({
     retry: (failureCount, err) =>
       getZhihuErrorStatus(err) === 404 ? false : failureCount < 2,
   });
+  const { data: entryEndorsements } = useQuery<readonly unknown[]>({
+    queryKey: getAnswerEndorsementsKey(id, sessionVersion),
+    queryFn: skipToken,
+  });
+  // Thin answer lists may contain labels even when the detail response omits them.
+  const endorsements =
+    answer?.endorsements !== undefined
+      ? answer.endorsements
+      : endorsementSource?.answerId === id &&
+          endorsementSource.sessionVersion === sessionVersion
+        ? endorsementSource.endorsements
+        : entryEndorsements;
 
   const richContentRenderer = useSettingsStore(
     (state) => state.richContentRenderer,
@@ -559,6 +583,10 @@ export const AnswerDetailView = ({
           </View>
         ) : (
           <View className="px-5 pb-2 bg-transparent">
+            <AnswerEndorsements
+              endorsements={endorsements}
+              enabled={isFocused}
+            />
             <ContentRelationshipNotice
               contentType="answer"
               contentId={id}

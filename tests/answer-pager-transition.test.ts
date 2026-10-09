@@ -17,6 +17,11 @@ interface PagerProps {
 
 interface AnswerProps {
   id: string;
+  endorsementSource?: {
+    answerId: string;
+    sessionVersion: number;
+    endorsements: readonly unknown[];
+  };
   questionId?: string;
   initialTitle?: string;
   isFocused: boolean;
@@ -57,9 +62,16 @@ let mockParams: {
   memberSort?: string;
 };
 let mockReadingMode: 'detail' | 'preview-list' = 'detail';
+let mockSessionVersion = 1;
 const mockPreviewProps = jest.fn();
 let mockPages:
-  | { data: { id: string; question?: { id: string } }[] }[]
+  | {
+      data: {
+        id: string;
+        question?: { id: string };
+        endorsements?: unknown[];
+      }[];
+    }[]
   | undefined;
 const mockAnswerQuestions = new Map<string, { id: string; title: string }>();
 const mockUnavailableAnswers = new Set<string>();
@@ -121,7 +133,9 @@ jest.mock('../hooks/useAnswerPagerSource', () => ({
       hasNextPage: false,
       isFetchingNextPage: false,
       isQuestionSource: context.scene !== 'profile_answer',
+      sessionVersion: mockSessionVersion,
       pagerKey: JSON.stringify([
+        mockSessionVersion,
         context.scene,
         context.scene === 'profile_answer' ? context.memberId : questionId,
         context.scene === 'profile_answer' ? context.memberSort : sortBy,
@@ -237,6 +251,10 @@ jest.mock('../store/useSettingsStore', () => ({
       }),
     },
   ),
+}));
+jest.mock('../store/useAuthStore', () => ({
+  getAuthSessionVersion: () => mockSessionVersion,
+  useAuthStore: (selector: () => unknown) => selector(),
 }));
 jest.mock('../features/rich-content', () => ({
   getNeighborAnswerIds: () => [],
@@ -367,6 +385,7 @@ function renderedAnswerIds(): string[] {
 
 beforeEach(() => {
   mockReadingMode = 'detail';
+  mockSessionVersion = 1;
   jest.clearAllMocks();
   mockParams = {
     id: '42',
@@ -416,6 +435,62 @@ afterEach(() => {
 });
 
 describe('answer pager list transitions', () => {
+  it('passes metadata-only list endorsements to their matching pages across reordering and account sessions', async () => {
+    const firstEndorsements = [
+      { elements: [{ type: 'TEXT', content: '合成入口回答标签' }] },
+    ];
+    const nextEndorsements = [
+      { elements: [{ type: 'TEXT', content: '合成相邻回答标签' }] },
+    ];
+    const entries = [
+      { id: '42', endorsements: firstEndorsements },
+      { id: '11', endorsements: nextEndorsements },
+      { id: '99' },
+    ];
+    mockPages = [{ data: entries }];
+    const host = await render(React.createElement(AnswerDetailScreen));
+
+    expect(mockAnswerProps.get('42')?.endorsementSource).toEqual({
+      answerId: '42',
+      sessionVersion: 1,
+      endorsements: firstEndorsements,
+    });
+    expect(mockAnswerProps.get('11')?.endorsementSource).toEqual({
+      answerId: '11',
+      sessionVersion: 1,
+      endorsements: nextEndorsements,
+    });
+    expect(mockAnswerProps.get('99')?.endorsementSource).toBeUndefined();
+
+    mockPages = [{ data: [entries[1], entries[0], entries[2]] }];
+    await host.rerender(React.createElement(AnswerDetailScreen));
+
+    expect(mockAnswerProps.get('42')?.endorsementSource?.endorsements).toEqual(
+      firstEndorsements,
+    );
+    expect(mockAnswerProps.get('11')?.endorsementSource?.endorsements).toEqual(
+      nextEndorsements,
+    );
+
+    mockSessionVersion = 2;
+    mockPages = undefined;
+    await host.rerender(React.createElement(AnswerDetailScreen));
+    expect(mockAnswerProps.get('42')?.endorsementSource).toBeUndefined();
+
+    const newSessionEndorsements = [
+      { elements: [{ type: 'TEXT', content: '合成新账号标签' }] },
+    ];
+    mockPages = [
+      { data: [{ id: '42', endorsements: newSessionEndorsements }] },
+    ];
+    await host.rerender(React.createElement(AnswerDetailScreen));
+    expect(mockAnswerProps.get('42')?.endorsementSource).toEqual({
+      answerId: '42',
+      sessionVersion: 2,
+      endorsements: newSessionEndorsements,
+    });
+  });
+
   it('prepares only the immediate neighbors and moves that window with the selected answer', async () => {
     setList(['11', '42', '99', '100', '101']);
     await render(React.createElement(AnswerDetailScreen));

@@ -4,7 +4,10 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import PagerView from 'react-native-pager-view';
 import { getAnswer } from '@/api/zhihu';
 import { recordReadHistory } from '@/api/zhihu/history';
-import { AnswerDetailView } from '@/components/AnswerDetailView';
+import {
+  AnswerDetailView,
+  type AnswerEndorsementSource,
+} from '@/components/AnswerDetailView';
 import { AnswerLoadingPlaceholder } from '@/components/AnswerLoadingPlaceholder';
 import { AnswerPreviewList } from '@/components/AnswerPreviewList';
 import { DetailNavigationHeader } from '@/components/DetailNavigationHeader';
@@ -101,6 +104,7 @@ function AnswerDetailScreen() {
     isFetchingNextPage,
     pagerKey,
     isQuestionSource,
+    sessionVersion,
   } = useAnswerPagerSource({
     initialId,
     questionId,
@@ -120,6 +124,22 @@ function AnswerDetailScreen() {
       ids.set(initialId, String(initialAnswer.question.id));
     return ids;
   }, [answersData, initialAnswer, initialId]);
+  const endorsementSourcesByAnswer = useMemo(() => {
+    const sources = new Map<string, AnswerEndorsementSource>();
+    for (const page of answersData?.pages ?? []) {
+      for (const item of page.data) {
+        if (item.endorsements !== undefined) {
+          const answerId = String(item.id);
+          sources.set(answerId, {
+            answerId,
+            sessionVersion,
+            endorsements: item.endorsements,
+          });
+        }
+      }
+    }
+    return sources;
+  }, [answersData, sessionVersion]);
   const [selection, setSelection] = useState({
     pagerKey,
     answerId: initialId,
@@ -431,6 +451,7 @@ function AnswerDetailScreen() {
           <View key={aid} className="flex-1">
             <AnswerDetailView
               id={aid}
+              endorsementSource={endorsementSourcesByAnswer.get(aid)}
               initialTitle={aid === initialId ? initialTitle : undefined}
               questionId={
                 questionIdsByAnswer.get(aid) ||

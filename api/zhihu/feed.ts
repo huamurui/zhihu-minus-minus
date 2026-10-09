@@ -2,7 +2,10 @@ import axios, { type AxiosResponse } from 'axios';
 import type { ReactNode } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
-import type { ZhihuVideoSourceKind } from '@/types/zhihu';
+import type {
+  ZhihuEndorsement as RawFeedEndorsement,
+  ZhihuVideoSourceKind,
+} from '@/types/zhihu';
 import apiClient, { type ApiRequestOptions } from '../client';
 import {
   buildZhihuAppMomentsUrl,
@@ -227,34 +230,10 @@ export interface RawFeedQuestion {
   reaction_instruction?: Record<string, string> | null;
 }
 
-export interface RawFeedEndorsementElement {
-  type?: string;
-  image_key?: string;
-  image_color?: Record<string, unknown>;
-  width?: number;
-  height?: number;
-  content?: string;
-  font_size?: number;
-  font_color?: Record<string, unknown>;
-  is_bold?: boolean;
-  max_line?: number;
-}
-
-export interface RawFeedEndorsement {
-  elements?: RawFeedEndorsementElement[];
-  sub_elements?: unknown[];
-  sub_elements_type?: string;
-  background_color?: {
-    alpha?: number;
-    group?: string;
-  };
-  action_url?: string;
-  za?: {
-    block_text?: string;
-    type?: string;
-    text?: string;
-  };
-}
+export type {
+  ZhihuEndorsement as RawFeedEndorsement,
+  ZhihuEndorsementElement as RawFeedEndorsementElement,
+} from '@/types/zhihu';
 
 export interface RawFeedAdBrand {
   id?: number;
@@ -332,6 +311,8 @@ export interface FeedItem {
   author: FeedAuthor;
   excerpt: ReactNode;
   content?: string | FeedContentSegment[];
+  /** Answer labels received with the card, independent of inline body availability. */
+  endorsements?: readonly unknown[];
   image: string | null;
   voteCount: number;
   commentCount: number;

@@ -107,6 +107,10 @@ export function toUserCreationFeedItem(
     },
     excerpt: getCreationExcerpt(target),
     content: target.content,
+    ...(type === 'answers' &&
+      Array.isArray(target.endorsements) && {
+        endorsements: target.endorsements,
+      }),
     image:
       target.image_url ||
       target.thumbnail ||

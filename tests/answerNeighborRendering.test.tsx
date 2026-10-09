@@ -5,6 +5,10 @@ import { type AnswerDetail, getAnswer } from '../api/zhihu';
 import { getAllContentCollectionStatus } from '../api/zhihu/collection';
 import { AnswerDetailView } from '../components/AnswerDetailView';
 import type { RichContentLoadingPhase } from '../features/rich-content';
+import {
+  getAnswerEndorsementsKey,
+  seedAnswerEndorsements,
+} from '../utils/answerEndorsements';
 
 interface ReadingOptions {
   enabled: boolean;
@@ -36,6 +40,17 @@ interface RelationshipNoticeProps {
   enabled?: boolean;
 }
 
+interface AnswerEndorsementsProps {
+  endorsements?: unknown;
+  enabled: boolean;
+}
+
+interface EndorsementSource {
+  answerId: string;
+  sessionVersion: number;
+  endorsements: readonly unknown[];
+}
+
 const mockReadingProgress = jest.fn((_options: ReadingOptions) => ({
   beginContentMeasurement: jest.fn(),
   onContentSizeChange: jest.fn(),
@@ -52,6 +67,8 @@ const mockReadingMeasurement = jest.fn(
 const mockBodyMount = jest.fn();
 const mockBodyUnmount = jest.fn();
 const mockRelationshipNotice = jest.fn((_props: RelationshipNoticeProps) => {});
+const mockAnswerEndorsements = jest.fn((_props: AnswerEndorsementsProps) => {});
+let mockSessionVersion = 1;
 let mockLayoutReady: () => void;
 let mockContentLoadingPhase: RichContentLoadingPhase | null = null;
 
@@ -99,6 +116,36 @@ jest.mock('../components/BouncyButton', () => ({
   BouncyButton:
     jest.requireActual<typeof import('react-native')>('react-native').Pressable,
 }));
+jest.mock('../components/AnswerEndorsements', () => {
+  const react = jest.requireActual<typeof import('react')>('react');
+  const native =
+    jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    AnswerEndorsements: (props: AnswerEndorsementsProps) => {
+      mockAnswerEndorsements(props);
+      if (!Array.isArray(props.endorsements)) return null;
+      const labels = props.endorsements.flatMap((endorsement: unknown) => {
+        if (!endorsement || typeof endorsement !== 'object') return [];
+        const elements = (endorsement as Record<string, unknown>).elements;
+        if (!Array.isArray(elements)) return [];
+        return elements.flatMap((element: unknown) => {
+          if (!element || typeof element !== 'object') return [];
+          const value = element as Record<string, unknown>;
+          return value.type === 'TEXT' && typeof value.content === 'string'
+            ? [value.content]
+            : [];
+        });
+      });
+      return labels.length
+        ? react.createElement(
+            native.Text,
+            { testID: 'answer-endorsements' },
+            labels.join(' · '),
+          )
+        : null;
+    },
+  };
+});
 jest.mock('../components/ContentRelationshipNotice', () => {
   const react = jest.requireActual<typeof import('react')>('react');
   const native =
@@ -148,6 +195,10 @@ jest.mock('../hooks/useReadingProgress', () => ({
 jest.mock('../hooks/useReadingContentMeasurement', () => ({
   useReadingContentMeasurement: (options: MeasurementOptions) =>
     mockReadingMeasurement(options),
+}));
+jest.mock('../store/useAuthStore', () => ({
+  getAuthSessionVersion: () => mockSessionVersion,
+  useAuthStore: (selector: () => unknown) => selector(),
 }));
 jest.mock('../store/useSettingsStore', () => ({
   useSettingsStore: Object.assign(
@@ -238,16 +289,36 @@ async function renderAnswer({
   cached = true,
   isFocused = false,
   isPreloading = true,
+  cachedAnswer = answer,
+  endorsementSource,
+  entryEndorsements,
+}: {
+  cached?: boolean;
+  isFocused?: boolean;
+  isPreloading?: boolean;
+  cachedAnswer?: AnswerDetail;
+  endorsementSource?: EndorsementSource;
+  entryEndorsements?: unknown;
 } = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: Infinity } },
   });
   clients.push(queryClient);
-  if (cached) queryClient.setQueryData(['answer-detail', answer.id], answer);
-  const page = (focused: boolean, preloading: boolean) => (
+  seedAnswerEndorsements(queryClient, {
+    id: cachedAnswer.id,
+    endorsements: entryEndorsements,
+  });
+  if (cached)
+    queryClient.setQueryData(['answer-detail', cachedAnswer.id], cachedAnswer);
+  const page = (
+    focused: boolean,
+    preloading: boolean,
+    id = String(cachedAnswer.id),
+  ) => (
     <QueryClientProvider client={queryClient}>
       <AnswerDetailView
-        id={String(answer.id)}
+        id={id}
+        endorsementSource={endorsementSource}
         isFocused={focused}
         isPreloading={preloading}
       />
@@ -268,6 +339,7 @@ function expectInactiveReading() {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockSessionVersion = 1;
   mockContentLoadingPhase = null;
   jest.mocked(getAnswer).mockResolvedValue(answer);
   jest
@@ -299,6 +371,164 @@ test('mounts a cached neighboring body before focus without starting detail, col
       .map((node) => node.props.testID),
   ).toEqual(['content-relationship-notice', 'answer-body']);
   expectInactiveReading();
+});
+
+test('shows cached answer endorsements above relationship and body while disabling inactive actions', async () => {
+  const endorsements = [
+    { elements: [{ type: 'TEXT', content: '合成日报收录' }] },
+    {
+      action_url: 'https://www.zhihu.com/column/synthetic-column',
+      elements: [
+        { type: 'IMAGE', image_key: 'synthetic-column-icon' },
+        { type: 'TEXT', content: '收录于 · 合成专栏' },
+      ],
+    },
+  ];
+  const cachedAnswer: AnswerDetail = { ...answer, endorsements };
+  const host = await renderAnswer({ cachedAnswer });
+
+  expect(mockAnswerEndorsements).toHaveBeenLastCalledWith({
+    endorsements,
+    enabled: false,
+  });
+  expect(host.getByTestId('answer-endorsements')).toHaveTextContent(
+    '合成日报收录 · 收录于 · 合成专栏',
+  );
+  expect(
+    host
+      .getAllByTestId(
+        /^(answer-endorsements|content-relationship-notice|answer-body)$/,
+      )
+      .map((node) => node.props.testID),
+  ).toEqual([
+    'answer-endorsements',
+    'content-relationship-notice',
+    'answer-body',
+  ]);
+  expect(getAnswer).not.toHaveBeenCalled();
+
+  await host.rerender(host.page(true, true));
+  expect(mockAnswerEndorsements).toHaveBeenLastCalledWith({
+    endorsements,
+    enabled: true,
+  });
+  expect(host.getByTestId('answer-body')).toHaveTextContent(answer.content);
+});
+
+test('uses matching pager endorsement metadata when the loaded detail omits it', async () => {
+  const endorsements = [
+    { elements: [{ type: 'TEXT', content: '合成分页回答标签' }] },
+  ];
+  const host = await renderAnswer({
+    isFocused: true,
+    entryEndorsements: [
+      { elements: [{ type: 'TEXT', content: '合成旧入口标签' }] },
+    ],
+    endorsementSource: {
+      answerId: String(answer.id),
+      sessionVersion: mockSessionVersion,
+      endorsements,
+    },
+  });
+
+  expect(mockAnswerEndorsements).toHaveBeenLastCalledWith({
+    endorsements,
+    enabled: true,
+  });
+  expect(host.getByTestId('answer-endorsements')).toHaveTextContent(
+    '合成分页回答标签',
+  );
+  expect(host.getByTestId('answer-body')).toHaveTextContent(answer.content);
+});
+
+test('shows clicked metadata after fetching a body without needing a matching pager entry', async () => {
+  const endorsements = [
+    { elements: [{ type: 'TEXT', content: '合成无正文入口标签' }] },
+  ];
+  let finishRequest!: (value: AnswerDetail) => void;
+  jest.mocked(getAnswer).mockReturnValue(
+    new Promise<AnswerDetail>((resolve) => {
+      finishRequest = resolve;
+    }),
+  );
+  const host = await renderAnswer({
+    cached: false,
+    isFocused: true,
+    entryEndorsements: endorsements,
+  });
+  expect(host.queryByTestId('answer-body')).toBeNull();
+  expect(
+    host.queryClient.getQueryData(['answer-detail', answer.id]),
+  ).toBeUndefined();
+  expect(
+    host.queryClient.getQueryData(
+      getAnswerEndorsementsKey(String(answer.id), mockSessionVersion),
+    ),
+  ).toBe(endorsements);
+
+  await act(() => finishRequest(answer));
+  await waitFor(() =>
+    expect(host.getByTestId('answer-endorsements')).toHaveTextContent(
+      '合成无正文入口标签',
+    ),
+  );
+  expect(host.getByTestId('answer-body')).toHaveTextContent(answer.content);
+  expect(getAnswer).toHaveBeenCalledTimes(1);
+
+  mockSessionVersion += 1;
+  await host.rerender(host.page(true, true));
+  expect(host.queryByTestId('answer-endorsements')).toBeNull();
+  await act(() => {
+    seedAnswerEndorsements(host.queryClient, {
+      id: answer.id,
+      endorsements: [],
+    });
+  });
+  await waitFor(() =>
+    expect(mockAnswerEndorsements).toHaveBeenLastCalledWith({
+      endorsements: [],
+      enabled: true,
+    }),
+  );
+  expect(getAnswer).toHaveBeenCalledTimes(1);
+});
+
+test.each([
+  { label: 'an explicit empty detail list', detailEndorsements: [] },
+  {
+    label: 'the returned detail list',
+    detailEndorsements: [
+      { elements: [{ type: 'TEXT', content: '合成详情接口标签' }] },
+    ],
+  },
+])('prefers $label over pager metadata', async ({ detailEndorsements }) => {
+  const host = await renderAnswer({
+    isFocused: true,
+    entryEndorsements: [
+      { elements: [{ type: 'TEXT', content: '合成过时入口标签' }] },
+    ],
+    cachedAnswer: { ...answer, endorsements: detailEndorsements },
+    endorsementSource: {
+      answerId: String(answer.id),
+      sessionVersion: mockSessionVersion,
+      endorsements: [
+        { elements: [{ type: 'TEXT', content: '合成过时分页标签' }] },
+      ],
+    },
+  });
+
+  expect(mockAnswerEndorsements).toHaveBeenLastCalledWith({
+    endorsements: detailEndorsements,
+    enabled: true,
+  });
+  expect(host.queryByText('合成过时分页标签')).toBeNull();
+  if (detailEndorsements.length === 0)
+    expect(host.queryByTestId('answer-endorsements')).toBeNull();
+  else
+    expect(host.getByTestId('answer-endorsements')).toHaveTextContent(
+      '合成详情接口标签',
+    );
+  expect(host.getByTestId('answer-body')).toHaveTextContent(answer.content);
 });
 
 test.each<readonly [RichContentLoadingPhase, string]>([

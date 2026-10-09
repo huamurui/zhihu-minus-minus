@@ -1,4 +1,5 @@
 import {
+  skipToken,
   useInfiniteQuery,
   useQuery,
   useQueryClient,
@@ -18,6 +19,7 @@ import {
   hasReusableAnswerDetail,
 } from '@/features/rich-content';
 import { getAuthSessionVersion, useAuthStore } from '@/store/useAuthStore';
+import { getAnswerEndorsementsKey } from '@/utils/answerEndorsements';
 import {
   createAnswerPreviewEntry,
   getAnswerPreviewEntryKey,
@@ -72,6 +74,12 @@ export function useAnswerPreviewQuery({
     () => getAnswerPreviewEntryKey(answerId, sessionVersion),
     [answerId, sessionVersion],
   );
+  const cachedEndorsements = useQuery<readonly unknown[]>({
+    queryKey: getAnswerEndorsementsKey(answerId, sessionVersion),
+    queryFn: skipToken,
+    enabled: false,
+    staleTime: Infinity,
+  });
   const initialEntry = useMemo(() => {
     const entry =
       queryClient.getQueryData<ZhihuPlainPreviewAnswer>(selectedQueryKey);
@@ -100,6 +108,15 @@ export function useAnswerPreviewQuery({
         throw new Error('登录状态已变化');
       const entry = createAnswerPreviewEntry(detail);
       if (entry?.id !== answerId) throw new Error('回答正文返回结构无效');
+      const previous =
+        queryClient.getQueryData<ZhihuPlainPreviewAnswer>(selectedQueryKey);
+      if (
+        entry.endorsements === undefined &&
+        previous?.id === answerId &&
+        Array.isArray(previous.endorsements)
+      ) {
+        return { ...entry, endorsements: previous.endorsements };
+      }
       return entry;
     },
     initialData: initialEntry,
@@ -125,6 +142,35 @@ export function useAnswerPreviewQuery({
     enabled: enabled && Boolean(answerId),
     staleTime: 5 * 60 * 1000,
   });
+  const selectedAnswer = useMemo(() => {
+    if (
+      !selected.data ||
+      selected.data.endorsements !== undefined ||
+      sessionVersion !== getAuthSessionVersion()
+    )
+      return selected.data;
+    let endorsements: readonly unknown[] | undefined;
+    for (const page of query.data?.pages ?? []) {
+      for (const item of page.data) {
+        if (
+          item.type === 'answer' &&
+          item.id === answerId &&
+          Array.isArray(item.endorsements)
+        )
+          endorsements = item.endorsements;
+      }
+    }
+    if (endorsements === undefined) endorsements = cachedEndorsements.data;
+    return endorsements === undefined
+      ? selected.data
+      : { ...selected.data, endorsements };
+  }, [
+    selected.data,
+    query.data,
+    cachedEndorsements.data,
+    answerId,
+    sessionVersion,
+  ]);
   const items = useMemo<ZhihuReadingPreviewItem[]>(() => {
     const latestItems = new Map<
       string,
@@ -135,9 +181,9 @@ export function useAnswerPreviewQuery({
         if (item.type === 'answer' && item.id === answerId) continue;
         latestItems.set(`${item.type}:${item.id}`, item);
       }
-    if (!selected.data) return [...latestItems.values()];
-    return [selected.data, ...latestItems.values()];
-  }, [query.data, selected.data, answerId]);
+    if (!selectedAnswer) return [...latestItems.values()];
+    return [selectedAnswer, ...latestItems.values()];
+  }, [query.data, selectedAnswer, answerId]);
   const paginationError = query.data
     ? getAnswerPreviewContinuation(query.data.pages, query.data.pageParams)
         .error
@@ -148,7 +194,7 @@ export function useAnswerPreviewQuery({
     queryKey,
     sessionVersion,
     paginationError,
-    selectedAnswer: selected.data,
+    selectedAnswer,
     selectedQueryKey,
     selectedIsPending: selected.isPending,
     selectedIsError: selected.isError,

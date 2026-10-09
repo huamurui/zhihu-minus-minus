@@ -115,6 +115,36 @@ export interface ZhihuSegmentInfo {
   marks: ZhihuSegmentMark[];
 }
 
+/** Structured content labels returned by detail and feed endpoints. */
+export interface ZhihuEndorsementElement {
+  type?: string;
+  image_key?: string;
+  image_color?: Record<string, unknown>;
+  width?: number;
+  height?: number;
+  content?: string;
+  font_size?: number;
+  font_color?: Record<string, unknown>;
+  is_bold?: boolean;
+  max_line?: number;
+}
+
+export interface ZhihuEndorsement {
+  elements?: ZhihuEndorsementElement[];
+  sub_elements?: unknown[];
+  sub_elements_type?: string;
+  background_color?: {
+    alpha?: number;
+    group?: string;
+  };
+  action_url?: string;
+  za?: {
+    block_text?: string;
+    type?: string;
+    text?: string;
+  };
+}
+
 export interface ZhihuQuestion {
   id: string | number;
   title: string;
@@ -166,6 +196,7 @@ export interface ZhihuAnswer {
   /** 原生结构化正文；是否返回取决于接口与渲染模式。 */
   structured_content?: ZhihuStructuredContent;
   excerpt: string;
+  endorsements?: ZhihuEndorsement[];
   created_time: number;
   updated_time: number;
   comment_count: number;
@@ -191,6 +222,7 @@ export interface ZhihuArticle {
   title: string;
   content: string;
   excerpt: string;
+  endorsements?: ZhihuEndorsement[];
   created: number;
   updated: number;
   comment_count: number;
@@ -573,6 +605,7 @@ export interface ZhihuSearchResultObject {
   badge?: ZhihuBadge[];
   excerpt?: string;
   content?: string;
+  endorsements?: ZhihuEndorsement[];
   url?: string;
   excerpt_title?: string;
   thumbnail_info?: {
@@ -667,6 +700,7 @@ export interface ZhihuTopicFeedTarget {
   topic_thumbnails?: string[];
   content_img?: string[];
   content?: Array<{ type?: string; content?: string; url?: string }>;
+  endorsements?: ZhihuEndorsement[];
   question?: { id?: string | number; title?: string };
   author?: ZhihuAuthor;
   comment_count?: number;

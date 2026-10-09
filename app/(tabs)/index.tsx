@@ -1455,6 +1455,10 @@ function parseFollowingData(item: RawFeedItem): FeedItem | null {
         : target.content) ||
       '',
     content: target.content || '',
+    ...(appType === 'answers' &&
+      Array.isArray(target.endorsements) && {
+        endorsements: target.endorsements,
+      }),
     image:
       target.thumbnail ||
       (target.content_img && target.content_img.length > 0
@@ -1544,6 +1548,10 @@ function parseRecommendData(item: RawFeedItem): FeedItem | null {
         : target.content) ||
       '',
     content: target.content || '',
+    ...(appType === 'answers' &&
+      Array.isArray(target.endorsements) && {
+        endorsements: target.endorsements,
+      }),
     image:
       target.thumbnail ||
       (target.content_img && target.content_img.length > 0

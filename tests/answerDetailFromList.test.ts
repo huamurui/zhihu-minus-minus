@@ -7,6 +7,9 @@ import { seedAnswerDetailFromList } from '../utils/contentCache';
 jest.mock('../features/rich-content', () =>
   jest.requireActual('../features/rich-content/queryPolicy'),
 );
+jest.mock('../store/useAuthStore', () => ({
+  getAuthSessionVersion: () => 1,
+}));
 
 const clients: QueryClient[] = [];
 const queryKey = ['answer-detail', 'list-answer'] as const;

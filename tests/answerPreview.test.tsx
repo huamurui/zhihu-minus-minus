@@ -31,6 +31,7 @@ import {
 } from '../hooks/useAnswerPreviewQuery';
 import { useAuthStore } from '../store/useAuthStore';
 import type { ZhihuStructuredContent } from '../types/zhihu';
+import { seedAnswerEndorsements } from '../utils/answerEndorsements';
 import {
   createAnswerPreviewEntry,
   getAnswerPreviewEntryKey,
@@ -199,6 +200,59 @@ test('normalizes usable answers and login prompts while skipping broken bodies a
   expect(() =>
     normalizeZhihuAnswerPreviewPage({ ...response([answer()]), paging: null }),
   ).toThrow('回答预览返回结构无效');
+});
+
+test('retains plural label metadata across structured and clicked plain answer previews', () => {
+  const endorsements = [
+    {
+      action_url: 'https://www.zhihu.com/column/synthetic-column',
+      elements: [
+        { type: 'IMAGE', image_key: 'zhicon_icon_24_column_fill' },
+        { type: 'TEXT', content: '收录于 · 合成专栏' },
+      ],
+    },
+  ];
+  const structuredPage = normalizeZhihuAnswerPreviewPage(
+    response([{ ...answer('structured-labels'), endorsements }]),
+  );
+  expect(structuredPage.data[0]).toMatchObject({
+    id: 'structured-labels',
+    endorsements,
+  });
+  const plain = createAnswerPreviewEntry({
+    id: 'plain-labels',
+    content: '<p>合成普通正文</p>',
+    endorsements,
+  });
+  expect(plain?.endorsements).toBe(endorsements);
+  const client = new QueryClient();
+  seedAnswerPreviewEntry(client, {
+    id: 'plain-labels',
+    content: '<p>合成普通正文</p>',
+    endorsements,
+  });
+  expect(
+    client.getQueryData(getAnswerPreviewEntryKey('plain-labels', 1)),
+  ).toMatchObject({ endorsements });
+  expect(
+    client.getQueryData(['answer-detail', 'plain-labels']),
+  ).toBeUndefined();
+  client.clear();
+
+  const malformedPage = normalizeZhihuAnswerPreviewPage(
+    response([{ ...answer('malformed-labels'), endorsements: {} }]),
+  );
+  expect(malformedPage.data[0]).not.toHaveProperty('endorsements');
+  expect(
+    createAnswerPreviewEntry({
+      id: 'plain-invalid-labels',
+      content: '<p>合成正文</p>',
+      endorsements: '无效标签',
+    }),
+  ).not.toHaveProperty('endorsements');
+  expect(
+    createAnswerPreviewEntry({ id: 'thin-labels', endorsements }),
+  ).toBeUndefined();
 });
 
 test('renders all captured answers with seg_like annotations without losing prose, bold marks or paging boundaries', () => {
@@ -741,6 +795,120 @@ test('refreshes loaded body reactions without resetting the first page and rejec
   });
   expect(get).toHaveBeenCalledTimes(completedRequestCount);
   expect(onRefresh).toHaveBeenCalledTimes(refreshCount);
+  await host.unmount();
+  client.clear();
+});
+
+test('uses labels from a thin clicked source without seeding its body or requiring it in the first preview page', async () => {
+  const get = jest.mocked(apiClient.get);
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+  });
+  const wrapper = ({ children }: PropsWithChildren) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
+  const selectedId = 'thin-selected-labels';
+  const endorsements = [
+    { elements: [{ type: 'TEXT', content: '合成无正文来源标签' }] },
+  ];
+  seedAnswerEndorsements(client, { id: selectedId, endorsements });
+  expect(client.getQueryData(['answer-detail', selectedId])).toBeUndefined();
+  expect(
+    client.getQueryData(getAnswerPreviewEntryKey(selectedId, 1)),
+  ).toBeUndefined();
+  get.mockImplementation(async (url) => ({
+    data: String(url).startsWith('/answers/')
+      ? plainAnswer(selectedId, '<p>合成接口获取正文</p>')
+      : response([answer('first-page-other-answer')]),
+  }));
+  const host = await renderHook(useAnswerPreviewQuery, {
+    initialProps: { answerId: selectedId },
+    wrapper,
+  });
+  await waitFor(() =>
+    expect(host.result.current.selectedAnswer).toMatchObject({
+      content: '<p>合成接口获取正文</p>',
+      endorsements,
+    }),
+  );
+  expect(get).toHaveBeenCalledTimes(2);
+  expect(client.getQueryData(['answer-detail', selectedId])).toBeUndefined();
+  await host.unmount();
+  client.clear();
+});
+
+test('uses matching preview page labels without replacing the selected body and honors empty detail labels and account scope', async () => {
+  const get = jest.mocked(apiClient.get);
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+  });
+  const wrapper = ({ children }: PropsWithChildren) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
+  const selectedId = 'selected-labels-answer';
+  const initialBody = '<p>合成所选正文</p>';
+  const pageLabels = [
+    { elements: [{ type: 'TEXT', content: '合成分页标签' }] },
+  ];
+  seedAnswerPreviewEntry(client, {
+    id: selectedId,
+    content: initialBody,
+    voteup_count: 12,
+    relationship: { voting: -1 },
+  });
+  seedAnswerEndorsements(client, {
+    id: selectedId,
+    endorsements: [
+      { elements: [{ type: 'TEXT', content: '合成点击来源标签' }] },
+    ],
+  });
+  let detailLabels: unknown[] | undefined;
+  let includeSelected = true;
+  get.mockImplementation(async (url) => ({
+    data: String(url).startsWith('/answers/')
+      ? { ...plainAnswer(selectedId), endorsements: detailLabels }
+      : response([
+          includeSelected
+            ? { ...answer(selectedId), endorsements: pageLabels }
+            : answer('new-account-other-answer'),
+        ]),
+  }));
+  const host = await renderHook(useAnswerPreviewQuery, {
+    initialProps: { answerId: selectedId },
+    wrapper,
+  });
+  await waitFor(() => expect(host.result.current.isSuccess).toBe(true));
+  expect(host.result.current.selectedAnswer).toMatchObject({
+    content: initialBody,
+    voteup_count: 12,
+    relationship: { voting: -1 },
+    endorsements: pageLabels,
+  });
+  expect(host.result.current.selectedAnswer).not.toHaveProperty(
+    'structuredContent',
+  );
+
+  detailLabels = [];
+  await act(async () => host.result.current.refetchSelected());
+  await waitFor(() =>
+    expect(host.result.current.selectedAnswer?.endorsements).toEqual([]),
+  );
+
+  detailLabels = undefined;
+  includeSelected = false;
+  await act(() => {
+    mockSessionVersion = 2;
+    useAuthStore.setState({ cookies: 'synthetic-label-session' });
+  });
+  await waitFor(() => {
+    expect(host.result.current.selectedQueryKey).toEqual(
+      getAnswerPreviewEntryKey(selectedId, 2),
+    );
+    expect(host.result.current.selectedAnswer?.content).toBe(
+      '<p>合成普通正文</p>',
+    );
+  });
+  expect(host.result.current.selectedAnswer?.endorsements).toBeUndefined();
   await host.unmount();
   client.clear();
 });

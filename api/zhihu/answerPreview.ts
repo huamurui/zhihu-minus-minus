@@ -27,6 +27,7 @@ export interface ZhihuPreviewAnswerMetadata {
     headline: string;
   };
   excerpt: string;
+  endorsements?: readonly unknown[];
   voteup_count: number;
   comment_count: number;
   favlists_count: number;
@@ -170,6 +171,9 @@ function normalizeAnswer(value: Record<string, unknown>): ZhihuPreviewAnswer {
       headline: text(author?.description),
     },
     excerpt: text(value.excerpt),
+    ...(Array.isArray(value.endorsements) && {
+      endorsements: value.endorsements,
+    }),
     voteup_count: count(statistics?.up_vote_count),
     comment_count: count(statistics?.comment_count),
     favlists_count: count(statistics?.favorites),

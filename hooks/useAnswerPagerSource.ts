@@ -10,7 +10,7 @@ import { getAuthSessionVersion, useAuthStore } from '@/store/useAuthStore';
 import type { AnswerReadingContext } from '@/utils/answerReadingContext';
 import { useZhihuInfiniteQuery } from './useZhihuInfiniteQuery';
 
-const PROFILE_ANSWER_PAGER_INCLUDE = 'data[*].id,question.id';
+const PROFILE_ANSWER_PAGER_INCLUDE = 'data[*].id,question.id,endorsements';
 
 export interface AnswerPagerSourceOptions {
   initialId: string;
@@ -89,5 +89,6 @@ export function useAnswerPagerSource({
     pagerKey: JSON.stringify(queryKey),
     queryKey,
     isQuestionSource,
+    sessionVersion,
   };
 }

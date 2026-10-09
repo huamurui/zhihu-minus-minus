@@ -6,6 +6,7 @@ import type {
   ZhihuPreviewAnswer,
   ZhihuReadingPreviewItem,
 } from '../api/zhihu/nextRender';
+import type { AnswerEndorsements } from '../components/AnswerEndorsements';
 import { AnswerPreviewList } from '../components/AnswerPreviewList';
 import type { FeedCardActionRow } from '../components/FeedCardActionRow';
 import type {
@@ -24,6 +25,9 @@ const mockRefetchSelected = jest.fn(() => Promise.resolve(undefined));
 const mockScrollToIndex = jest.fn();
 const mockRenderCardActions = jest.fn(
   (_props: ComponentProps<typeof FeedCardActionRow>) => null,
+);
+const mockRenderEndorsements = jest.fn(
+  (_props: ComponentProps<typeof AnswerEndorsements>) => null,
 );
 const mockRenderFloatingBar = jest.fn(
   (_props: { canCollapse?: boolean; onCollapse: (id: string) => void }) => null,
@@ -160,6 +164,10 @@ jest.mock('../components/FeedCardActionRow', () => ({
   FeedCardActionRow: (props: ComponentProps<typeof FeedCardActionRow>) =>
     mockRenderCardActions(props),
 }));
+jest.mock('../components/AnswerEndorsements', () => ({
+  AnswerEndorsements: (props: ComponentProps<typeof AnswerEndorsements>) =>
+    mockRenderEndorsements(props),
+}));
 jest.mock('../components/StableAvatar', () => ({ StableAvatar: () => null }));
 jest.mock('../components/QueryErrorView', () => ({
   QueryErrorView: () => null,
@@ -261,6 +269,7 @@ function mockPlainAnswer(id: string): ZhihuPlainPreviewAnswer {
     comment_count: 0,
     favlists_count: 0,
     relationship: { is_author: false, is_favorited: false, voting: 0 },
+    endorsements: [{ elements: [{ type: 'TEXT', content: `合成标签:${id}` }] }],
     content: '<p>第一段</p><p>第二段</p><p>第三段</p><p>完整第四段</p>',
   };
 }
@@ -308,6 +317,11 @@ test('keeps the selected plain answer complete and interactive while later answe
   const { element } = createHost();
   const host = await render(element);
   for (const id of ['selected-answer', 'following-answer']) {
+    expect(mockRenderEndorsements).toHaveBeenCalledWith(
+      expect.objectContaining({
+        endorsements: mockPlainAnswer(id).endorsements,
+      }),
+    );
     expect(mockRenderCardActions).toHaveBeenCalledWith(
       expect.objectContaining({
         id,

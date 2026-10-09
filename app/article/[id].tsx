@@ -21,6 +21,7 @@ import {
 } from '@/api/zhihu/column';
 import { recordReadHistory } from '@/api/zhihu/history';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
+import { AnswerEndorsements } from '@/components/AnswerEndorsements';
 import { BouncyButton } from '@/components/BouncyButton';
 import {
   CONTENT_ACTION_BAR_HEIGHT,
@@ -432,6 +433,9 @@ export default function ArticleDetail() {
 
         {/* Content Render */}
         <View className="px-[15px] bg-transparent mt-3">
+          {!isDaily && (
+            <AnswerEndorsements endorsements={zhihuData?.endorsements} />
+          )}
           <ZhihuContent
             content={isDaily ? data.body : data.content}
             objectId={id as string}
