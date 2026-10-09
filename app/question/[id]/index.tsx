@@ -56,6 +56,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useCollectionStore } from '@/store/useCollectionStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { seedAnswerPreviewEntry } from '@/utils/answerPreviewEntry';
+import { seedAnswerDetailFromList } from '@/utils/contentCache';
 import { refreshInfiniteQuery } from '@/utils/query';
 import { getZhihuErrorMessage } from '@/utils/zhihuError';
 
@@ -118,11 +119,18 @@ const QuestionAnswerCard = React.memo(function QuestionAnswerCard({
     successMessage: (isActive) => (isActive ? '已取消关注' : '已关注'),
   });
   const openAnswer = () => {
-    seedAnswerPreviewEntry(queryClient, {
+    const initialAnswer: AnswerDetail = {
       ...item,
       type: 'answer',
-      question: { ...item.question, id: questionId, title: questionTitle },
-    });
+      question: {
+        ...item.question,
+        id: questionId,
+        title: questionTitle,
+        type: 'question',
+      },
+    };
+    seedAnswerDetailFromList(queryClient, initialAnswer);
+    seedAnswerPreviewEntry(queryClient, initialAnswer);
     router.push({
       pathname: '/answer/[id]',
       params: {
@@ -318,7 +326,7 @@ export default function QuestionDetail() {
     queryKey: ['question-answers', id, sortBy, isAuthenticated],
     queryFn: async ({ pageParam = 0 }) => {
       const include =
-        'data[*].content,excerpt,voteup_count,comment_count,favlists_count,author.name,author.avatar_url,author.headline,author.is_following,relationship.voting,relationship.is_author,relationship.is_favorited,created_time,updated_time,ip_info,segment_infos';
+        'data[*].content,excerpt,answer_type,paid_info,content_need_truncated,voteup_count,comment_count,favlists_count,author.name,author.avatar_url,author.headline,author.is_following,relationship.voting,relationship.is_author,relationship.is_favorited,created_time,updated_time,ip_info,segment_infos,link_card_info';
       return getQuestionAnswers(id as string, pageParam, sortBy, include);
     },
     initialPageParam: 0,

@@ -7,9 +7,13 @@ import PinDetailScreen from '../app/pin/[id]';
 import QuestionDetail from '../app/question/[id]/index';
 import type { ActionSheetOption } from '../components/overlays/ActionSheet';
 import { seedAnswerPreviewEntry } from '../utils/answerPreviewEntry';
+import { seedAnswerDetailFromList } from '../utils/contentCache';
 
 jest.mock('../utils/answerPreviewEntry', () => ({
   seedAnswerPreviewEntry: jest.fn(),
+}));
+jest.mock('../utils/contentCache', () => ({
+  seedAnswerDetailFromList: jest.fn(),
 }));
 
 interface MenuProps {
@@ -486,6 +490,18 @@ test('question and answer more entries target distinct content and preserve auth
   const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   const host = await render(<QuestionDetail />);
   await pressButton(host.getByRole('button', { name: '阅读 合成作者 的回答' }));
+  expect(seedAnswerDetailFromList).toHaveBeenCalledWith(
+    expect.any(Object),
+    expect.objectContaining({
+      id: mockAnswer.id,
+      type: 'answer',
+      content: mockAnswer.content,
+      question: expect.objectContaining({ id: '7', title: '合成问题' }),
+    }),
+  );
+  expect(
+    jest.mocked(seedAnswerDetailFromList).mock.invocationCallOrder[0],
+  ).toBeLessThan(mockPush.mock.invocationCallOrder[0]);
   expect(seedAnswerPreviewEntry).toHaveBeenCalledWith(
     expect.any(Object),
     expect.objectContaining({

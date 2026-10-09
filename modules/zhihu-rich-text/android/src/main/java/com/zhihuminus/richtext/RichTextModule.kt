@@ -16,6 +16,7 @@ class RichTextModule : Module() {
       Prop("layoutKey") { view: RichTextView, value: String -> view.setLayoutKey(value) }
       Prop("selectable") { view: RichTextView, value: Boolean -> view.setSelectable(value) }
 
+      OnViewDidUpdateProps { view: RichTextView -> view.commitProps() }
       OnViewDestroys { view: RichTextView -> view.dispose() }
     }
   }

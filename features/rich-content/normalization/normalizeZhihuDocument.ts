@@ -16,6 +16,7 @@ import type {
 import { isDailyAvatar, type RichContentVariant } from '../imagePolicy';
 import type { RichTextDiagnostic } from '../richText';
 import { parseZhihuSegmentHighlight } from '../segmentHighlight';
+import { createInlineRunSlicer } from './inlineRunSlicer';
 
 export interface ZhihuDocumentNormalizationOptions {
   documentId: string;
@@ -397,53 +398,6 @@ function inlineText(runs: readonly ZhihuInlineRun[]): string {
     .join('');
 }
 
-function sliceRuns(
-  runs: readonly ZhihuInlineRun[],
-  start: number,
-  end: number,
-  total: number,
-): ZhihuInlineRun[] {
-  if (start === end) return [];
-  let offset = 0;
-  const result: ZhihuInlineRun[] = [];
-  for (const run of runs) {
-    const length = inlineText([run]).length;
-    const from = Math.max(start, offset);
-    const to = Math.min(end, offset + length);
-    const suffix = `:slice:${start}:${end}`;
-    if (length === 0) {
-      if (
-        offset >= start &&
-        (offset < end || (end === total && offset === end))
-      )
-        result.push(run);
-    } else if (from < to) {
-      if (from === offset && to === offset + length) result.push(run);
-      else if ('children' in run)
-        result.push({
-          ...run,
-          id: run.id + suffix,
-          children: sliceRuns(run.children, from - offset, to - offset, length),
-        });
-      else if ('text' in run)
-        result.push({
-          ...run,
-          id: run.id + suffix,
-          text: run.text.slice(from - offset, to - offset),
-        });
-      else if (run.type === 'unsupported')
-        result.push({
-          ...run,
-          id: run.id + suffix,
-          fallbackText: run.fallbackText.slice(from - offset, to - offset),
-        });
-      else result.push(run);
-    }
-    offset += length;
-  }
-  return result;
-}
-
 export function normalizeZhihuDocument(
   html: string,
   options: ZhihuDocumentNormalizationOptions,
@@ -729,6 +683,7 @@ export function normalizeZhihuDocument(
       return children;
     }
     if (!source.length) return children;
+    const sliceRuns = createInlineRunSlicer(children);
     let previousEnd = 0;
     const result: ZhihuInlineRun[] = [];
     for (const mark of [...segment.marks].sort(
@@ -753,21 +708,19 @@ export function normalizeZhihuDocument(
         diagnostic('invalid-range', 'segment');
         continue;
       }
-      result.push(...sliceRuns(children, previousEnd, start, source.length));
+      result.push(...sliceRuns(previousEnd, start));
       result.push({
         id: id('segment'),
         type: 'segment',
         paragraphId: segment.pid,
         range: { start, end },
-        children: sliceRuns(children, start, end, source.length),
+        children: sliceRuns(start, end),
         ...(mark.seg_info && { segInfo: mark.seg_info }),
         ...(mark.master_seg_info && { masterSegInfo: mark.master_seg_info }),
       });
       previousEnd = end;
     }
-    result.push(
-      ...sliceRuns(children, previousEnd, source.length, source.length),
-    );
+    result.push(...sliceRuns(previousEnd, source.length));
     return result;
   }
 

@@ -338,6 +338,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
     renderer,
     renderPlaceholder,
     onLayoutReady,
+    initialContentWidth,
     fontSizeScale: fontSizeOverride,
     lineHeightScale: lineHeightOverride,
     typographyOptions,
@@ -774,6 +775,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
             renderFallback={renderWebViewContent}
             renderPlaceholder={renderPlaceholder}
             onLayoutReady={onLayoutReady}
+            initialContentWidth={initialContentWidth}
           />
         ) : (
           renderWebViewContent()

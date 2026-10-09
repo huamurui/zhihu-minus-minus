@@ -1,0 +1,43 @@
+{
+  "type": "answer",
+  "id": "synthetic-segment-slicing-boundaries",
+  "content": "<p data-pid=\"slicing-one\"><b><img eeimg=\"1\" src=\"https://example.com/equation?tex=x\" width=\"16\" height=\"16\">甲😀<i>乙<br>丙<img src=\"https://example.com/inline.png\" width=\"20\" height=\"20\">丁</i>戊</b><br></p>",
+  "segment_infos": [
+    {
+      "pid": "slicing-one",
+      "text": "甲😀乙丙丁戊",
+      "marks": [
+        {
+          "start_index": 0,
+          "end_index": 1,
+          "seg_info": {
+            "is_like": false,
+            "like_count": 0,
+            "comment_count": 0,
+            "seg_ids": ["9001"]
+          }
+        },
+        {
+          "start_index": 1,
+          "end_index": 4,
+          "seg_info": {
+            "is_like": false,
+            "like_count": 0,
+            "comment_count": 0,
+            "seg_ids": ["9002"]
+          }
+        },
+        {
+          "start_index": 5,
+          "end_index": 7,
+          "seg_info": {
+            "is_like": false,
+            "like_count": 0,
+            "comment_count": 0,
+            "seg_ids": ["9003"]
+          }
+        }
+      ]
+    }
+  ]
+}
