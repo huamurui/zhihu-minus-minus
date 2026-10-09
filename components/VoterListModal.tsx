@@ -141,9 +141,6 @@ export function VoterListModal({
           {...({ estimatedItemSize: 68 } as object)}
         />
       )}
-      <Text type="tertiary" className="px-5 py-2 text-center text-xs">
-        赞同者列表由知乎接口返回，可能受隐私设置影响
-      </Text>
     </BottomSheet>
   );
 }
