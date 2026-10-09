@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Image } from 'react-native';
 import { BouncyButton } from '@/components/BouncyButton';
 import { ImagePreviewModal } from '@/components/ImagePreviewModal';
+import { getCachedImageSource } from '@/utils/imageSource';
 import { Text, useThemeColor, View } from './Themed';
 
 interface CommentContentProps {
@@ -70,7 +71,7 @@ const CommentContentComponent: React.FC<CommentContentProps> = ({
               className="rounded-2xl overflow-hidden bg-gray-100 dark:bg-gray-800/60 border border-gray-200/40 dark:border-gray-700/40"
             >
               <Image
-                source={{ uri: url }}
+                source={getCachedImageSource(url)}
                 style={
                   imageUrls.length === 1
                     ? { width: 130, height: 130 }

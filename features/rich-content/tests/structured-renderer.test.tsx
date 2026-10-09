@@ -531,9 +531,10 @@ describe('isolated structured-content renderer', () => {
       />,
     );
     const formula = screen.getByLabelText('x + y');
-    expect(formula.props.source.uri).toBe(
-      'https://example.invalid/formula.png',
-    );
+    expect(formula.props.source).toEqual({
+      uri: 'https://example.invalid/formula.png',
+      cache: 'force-cache',
+    });
     await fireEvent(formula, 'error');
     expect(screen.getByText('x + y')).toBeVisible();
     await host.rerender(
@@ -577,9 +578,9 @@ describe('isolated structured-content renderer', () => {
         resources={mapped}
       />,
     );
-    expect(screen.getByLabelText('x + y').props.source.uri).toBe(
-      'file:///synthetic/formula.png',
-    );
+    expect(screen.getByLabelText('x + y').props.source).toEqual({
+      uri: 'file:///synthetic/formula.png',
+    });
     await host.rerender(
       <StructuredRenderer
         content={content()}

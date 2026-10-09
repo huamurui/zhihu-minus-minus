@@ -33,6 +33,7 @@ import type {
   ZhihuTopicFeedItem,
   ZhihuTopicFeedTarget,
 } from '@/types/zhihu';
+import { getCachedImageSource } from '@/utils/imageSource';
 import { refreshInfiniteQuery } from '@/utils/query';
 
 export default function TopicDetail() {
@@ -165,7 +166,7 @@ export default function TopicDetail() {
       <View type="surface" className="pb-4">
         <View className="flex-row p-5 items-center bg-transparent">
           <Image
-            source={{ uri: topic.avatar_url }}
+            source={getCachedImageSource(topic.avatar_url)}
             className="w-16 h-16 rounded-xl"
             resizeMode="cover"
           />
@@ -472,7 +473,7 @@ function TopicItem({ topic }: { topic: ZhihuTopic }) {
       }}
     >
       <Image
-        source={{ uri: topic.avatar_url }}
+        source={getCachedImageSource(topic.avatar_url)}
         className="w-8 h-8 rounded-lg"
       />
       <View className="ml-2.5 flex-1 bg-transparent">

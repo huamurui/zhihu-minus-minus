@@ -45,6 +45,7 @@ import { useCollectionStore } from '@/store/useCollectionStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ZhihuArticle } from '@/types/zhihu';
 import { formatDate } from '@/utils/date';
+import { getCachedImageSource } from '@/utils/imageSource';
 import { getZhihuErrorStatus } from '@/utils/zhihuError';
 
 const ARTICLE_ACTION_BAR_OFFSET = 10;
@@ -367,7 +368,10 @@ export default function ArticleDetail() {
       >
         {isDaily ? (
           <View className="w-full h-[300px] relative">
-            <Image source={{ uri: data.image }} className="w-full h-full" />
+            <Image
+              source={getCachedImageSource(data.image)}
+              className="w-full h-full"
+            />
             <View
               className="absolute bottom-0 p-5 w-full"
               style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
@@ -449,7 +453,7 @@ export default function ArticleDetail() {
               }}
             >
               <Image
-                source={{ uri: columnCard.image_url }}
+                source={getCachedImageSource(columnCard.image_url)}
                 className="w-12 h-12 rounded-lg"
               />
               <View className="flex-1 ml-3 bg-transparent">

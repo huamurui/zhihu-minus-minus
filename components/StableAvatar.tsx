@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Image, type ImageProps } from 'react-native';
+import { getCachedImageSource } from '@/utils/imageSource';
 
 interface StableAvatarProps {
   uri?: string | null;
@@ -7,10 +8,10 @@ interface StableAvatarProps {
   style?: ImageProps['style'];
 }
 
-/** Keep an unchanged native image source stable during content completion. */
+/** Keep avatars stable during updates and reuse cached bytes after remounting. */
 export const StableAvatar = React.memo(
   ({ uri, className, style }: StableAvatarProps) => {
-    const source = useMemo(() => (uri ? { uri } : undefined), [uri]);
+    const source = useMemo(() => getCachedImageSource(uri), [uri]);
 
     return <Image source={source} className={className} style={style} />;
   },

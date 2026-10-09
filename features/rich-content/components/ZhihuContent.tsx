@@ -35,6 +35,7 @@ import type {
   ZhihuSegmentMark,
   ZhihuSegmentReaction,
 } from '@/types/zhihu';
+import { getCachedImageSource } from '@/utils/imageSource';
 import { showToast } from '@/utils/toast';
 import {
   extractZhihuRedirectTarget,
@@ -281,7 +282,7 @@ export const LinkCard: React.FC<LinkCardProps> = React.memo(
           </View>
           {fetchedImage && (
             <Image
-              source={{ uri: fetchedImage }}
+              source={getCachedImageSource(fetchedImage)}
               className="w-full h-[120px] rounded-lg mt-2.5"
               style={[{ backgroundColor: themeColors.backgroundSecondary }]}
             />

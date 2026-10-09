@@ -23,6 +23,7 @@ import { useZhihuInfiniteQuery } from '@/hooks/useZhihuInfiniteQuery';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ZhihuColumnItem } from '@/types/zhihu';
 import { formatDate } from '@/utils/date';
+import { getCachedImageSource } from '@/utils/imageSource';
 import { refreshInfiniteQuery } from '@/utils/query';
 
 export default function ColumnDetail() {
@@ -121,7 +122,7 @@ export default function ColumnDetail() {
       <View type="surface" className="pb-4 border-b" style={{ borderColor }}>
         <View className="flex-row p-5 items-center bg-transparent">
           <Image
-            source={{ uri: column.image_url }}
+            source={getCachedImageSource(column.image_url)}
             className="w-16 h-16 rounded-xl"
             resizeMode="cover"
           />
@@ -197,7 +198,7 @@ export default function ColumnDetail() {
               </Text>
             </View>
             <Image
-              source={{ uri: item.title_image }}
+              source={getCachedImageSource(item.title_image)}
               className="w-24 h-16 rounded"
               resizeMode="cover"
             />

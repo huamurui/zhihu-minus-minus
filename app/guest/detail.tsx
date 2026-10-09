@@ -12,6 +12,7 @@ import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { ZhihuContent } from '@/features/rich-content';
 import { contrastingText } from '@/utils/colorContrast';
+import { getCachedImageSource } from '@/utils/imageSource';
 
 export default function GuestDetailScreen() {
   const router = useRouter();
@@ -270,7 +271,7 @@ export default function GuestDetailScreen() {
           {item.image && (
             <View className="px-5 my-3 rounded-lg overflow-hidden bg-transparent">
               <Image
-                source={{ uri: item.image }}
+                source={getCachedImageSource(item.image)}
                 className="w-full h-[180px] rounded-lg"
                 resizeMode="cover"
               />

@@ -267,6 +267,7 @@ describe('Native V2 renderer staging transitions', () => {
     const cover = screen.getByTestId('rich-content-video-cover');
     expect(cover.props.source).toEqual({
       uri: 'https://example.com/poster.png',
+      cache: 'force-cache',
     });
     await fireEvent.press(cover);
     expect(onLinkPress).toHaveBeenCalledWith(
