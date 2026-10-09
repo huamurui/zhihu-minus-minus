@@ -1,12 +1,63 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useState } from 'react';
-import { Modal, SafeAreaView, StyleSheet, View } from 'react-native';
+import {
+  Image,
+  type ImageProps,
+  Modal,
+  SafeAreaView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import ImageViewer from 'react-native-image-zoom-viewer';
 import { BouncyButton } from '@/components/BouncyButton';
 import { ImageActionBottomSheet } from '@/components/ImageActionBottomSheet';
 import { Text } from '@/components/Themed';
 import Colors from '@/constants/Colors';
+import { getCachedImageSource } from '@/utils/imageSource';
 import { saveImageToGallery } from '@/utils/saveImage';
+
+const MAX_CACHED_IMAGE_DIMENSIONS = 256;
+const imageDimensions = new Map<string, { width: number; height: number }>();
+
+function renderCachedImage(props: ImageProps) {
+  const { source, onLoad, ...rest } = props;
+  const uriSource =
+    typeof source === 'object' && !Array.isArray(source) ? source : undefined;
+  const uri = uriSource?.uri;
+  let cachedSource = getCachedImageSource(uri);
+  if (
+    cachedSource &&
+    uriSource &&
+    Object.keys(uriSource).some((key) => key !== 'uri' && key !== 'cache')
+  ) {
+    cachedSource = { ...uriSource, ...cachedSource };
+  }
+
+  return (
+    <Image
+      {...rest}
+      source={cachedSource ?? source}
+      onLoad={(event) => {
+        const { width, height } = event.nativeEvent.source;
+        if (
+          uri &&
+          Number.isFinite(width) &&
+          Number.isFinite(height) &&
+          width > 0 &&
+          height > 0
+        ) {
+          imageDimensions.delete(uri);
+          imageDimensions.set(uri, { width, height });
+          if (imageDimensions.size > MAX_CACHED_IMAGE_DIMENSIONS) {
+            const oldestUri = imageDimensions.keys().next().value;
+            if (oldestUri) imageDimensions.delete(oldestUri);
+          }
+        }
+        onLoad?.(event);
+      }}
+    />
+  );
+}
 
 export interface ImagePreviewModalProps {
   visible: boolean;
@@ -31,10 +82,19 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   }, [visible, initialIndex]);
 
   const formattedUrls = React.useMemo(() => {
-    return imageUrls.map((url) => ({ url }));
-  }, [imageUrls]);
+    // ImageViewer calls getSize on each mount unless the original size is known.
+    // Reopening the modal must read sizes learned by the previous Image onLoad.
+    return visible
+      ? imageUrls.map((url) => ({ url, ...imageDimensions.get(url) }))
+      : [];
+  }, [imageUrls, visible]);
 
-  const currentUrl = imageUrls[currentIndex] || imageUrls[0];
+  const viewerKey = JSON.stringify(imageUrls);
+  const displayedIndex = Math.min(
+    Math.max(currentIndex, 0),
+    Math.max(imageUrls.length - 1, 0),
+  );
+  const currentUrl = imageUrls[displayedIndex];
 
   if (!visible || imageUrls.length === 0) {
     return null;
@@ -49,8 +109,11 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     >
       <View style={styles.container}>
         <ImageViewer
+          key={viewerKey}
           imageUrls={formattedUrls}
-          index={currentIndex}
+          renderImage={renderCachedImage}
+          enablePreload={false}
+          index={displayedIndex}
           onChange={(index) => index != null && setCurrentIndex(index)}
           onCancel={onClose}
           onClick={onClose}
@@ -70,7 +133,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
 
             {imageUrls.length > 1 && (
               <Text style={styles.pageIndicator}>
-                {currentIndex + 1} / {imageUrls.length}
+                {displayedIndex + 1} / {imageUrls.length}
               </Text>
             )}
 

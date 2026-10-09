@@ -11,6 +11,7 @@ import {
 import { ContentActionButton } from '@/components/ContentActionButton';
 import { useRuntimeThemeColors } from '@/components/Themed';
 import type { ZhihuStructuredContent as ZhihuStructuredContentData } from '@/types/zhihu';
+import { getCachedImageSource } from '@/utils/imageSource';
 import type {
   ZhihuBlock,
   ZhihuFormula,
@@ -78,7 +79,7 @@ function InlineFormula({
   const scale = Math.min(1, width / rawWidth);
   return (
     <Image
-      source={{ uri }}
+      source={getCachedImageSource(uri)}
       accessibilityLabel={formula.latex || '公式'}
       resizeMode="contain"
       style={{ width: rawWidth * scale, height: rawHeight * scale }}
@@ -277,9 +278,9 @@ export const ZhihuStructuredContent = React.memo(
                   }
                 >
                   <Image
-                    source={{
-                      uri: block.resource.offlineUri ?? block.resource.url,
-                    }}
+                    source={getCachedImageSource(
+                      block.resource.offlineUri ?? block.resource.url,
+                    )}
                     accessibilityLabel={block.alt || '正文图片'}
                     resizeMode="contain"
                     style={{
@@ -330,7 +331,9 @@ export const ZhihuStructuredContent = React.memo(
               >
                 {block.image ? (
                   <Image
-                    source={{ uri: block.image.offlineUri ?? block.image.url }}
+                    source={getCachedImageSource(
+                      block.image.offlineUri ?? block.image.url,
+                    )}
                     style={{ width: 48, height: 48, borderRadius: 6 }}
                     resizeMode="cover"
                   />

@@ -25,6 +25,7 @@ import {
   flattenDailyPages,
   getDailyNextPageParam,
 } from '@/utils/dailyList';
+import { getCachedImageSource } from '@/utils/imageSource';
 import { refreshInfiniteQuery, shouldRetryQuery } from '@/utils/query';
 import { BouncyButton } from './BouncyButton';
 import { PullToRefresh } from './PullToRefresh';
@@ -284,7 +285,7 @@ export const DailyList = React.forwardRef<
             >
               <View type="surface" className="flex-row p-3">
                 <Image
-                  source={{ uri: story.images?.[0] }}
+                  source={getCachedImageSource(story.images?.[0])}
                   className="w-20 h-20 rounded-lg"
                 />
                 <View className="flex-1 ml-3 justify-center bg-transparent">

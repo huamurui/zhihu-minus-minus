@@ -53,6 +53,7 @@ test('the cover still fills the toolbar after scrolling and resizing', async () 
     for (const image of images) {
       expect(image.props.source).toEqual({
         uri: 'https://example.test/cover.jpg',
+        cache: 'force-cache',
       });
     }
   };
@@ -112,5 +113,6 @@ test('missing or failed covers keep the fallback and a new image can recover', a
     host.container.queryAll((node) => node.type === 'Image')[0].props.source,
   ).toEqual({
     uri: 'https://example.test/replacement.jpg',
+    cache: 'force-cache',
   });
 });

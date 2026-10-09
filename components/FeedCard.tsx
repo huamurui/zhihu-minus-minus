@@ -21,6 +21,7 @@ import {
   updateContentInteractionCaches,
 } from '@/utils/contentCache';
 import { ImpactFeedbackStyle, impactAsync } from '@/utils/haptics';
+import { getCachedImageSource } from '@/utils/imageSource';
 import { showToast } from '@/utils/toast';
 import { getZhihuErrorMessage } from '@/utils/zhihuError';
 import { BouncyButton } from './BouncyButton';
@@ -149,12 +150,12 @@ const FeedCardComponent = ({ item, tab, answerContext }: FeedCardProps) => {
   const cleanTitle =
     typeof item.title === 'string' ? item.title : item.titleString || '';
   const authorAvatarSource = useMemo(
-    () => ({ uri: item.author.avatar }),
+    () => getCachedImageSource(item.author.avatar),
     [item.author.avatar],
   );
   const authorId = item.author.url_token || item.author.id;
   const thumbnailSource = useMemo(
-    () => (item.image ? { uri: item.image } : undefined),
+    () => getCachedImageSource(item.image),
     [item.image],
   );
   const isAuthenticated = hasAuthenticationCookie(cookies);

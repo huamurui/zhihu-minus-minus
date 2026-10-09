@@ -181,6 +181,7 @@ xcrun simctl openurl booted 'zhihu--:///dev/rich-content/prototype?caseId=attach
 
 ## 持久化与敏感数据
 
+- RN 普通和 Animated 图片统一通过 `utils/imageSource.ts` 的 `getCachedImageSource` 创建 source。HTTP(S) 使用 `cache: 'force-cache'`，在本仓 RN 0.83.10 的 Android/iOS 实现中优先复用已有缓存，缓存未命中时仍可加载。按完整 URL（含版本参数、尺寸及主机）区分图片，不按账号或页面另存副本，也不定时清空或主动刷新；同 URL 的服务器原地替换不会主动校准。JS source 索引最多 512 条，灯箱另保存最多 256 条成功加载的原始尺寸，并关闭库的主动预加载，重新打开已有尺寸的图片不再调用 `getSize`。这两个索引只存元数据；图片字节仍由 RN 原生缓存管理和淘汰，未新增自建磁盘图片库或统一 MB 上限。WebView、SVG 和原生行内附件仍使用各自加载链路。回归见 `imageSource`、`imagePreviewModal` 和富文本测试；同页重复头像、重新进页、重启、离线命中及系统淘汰后的请求次数仍须 Android/iOS 真机验证。
 - 登录态主存于应用沙箱的 `auth-storage.json`，用于容纳多账号 Cookie；旧版本的 SecureStore Cookie 只在首次缺少文件时用于兼容导入。主文件与当前备份使用 AES-GCM，密钥另存 SecureStore，原子读取负责 Android `.bak` 恢复；旧明文与旧 store 均保留兼容迁移，详见 [账号保存与恢复](./AUTH_STORAGE.md)。
 - 设置和 telemetry 开关使用 SecureStore；内容阅读进度的记录与恢复目前由 `constants/readingProgress.ts` 中的 `ENABLE_READING_PROGRESS = false` 统一停用，回答、文章、日报和想法均不恢复历史位置或保存新进度，也不读取或迁移旧记录。页面尺寸测量与回答滚动条继续工作。已有阅读进度数据保留，持久格式仍为最多 100 条的双快照文件，迁移逻辑保留且仅在启用后运行，两个快照提交后才清理旧 SecureStore。推荐流缓存、曝光与创作草稿使用 Expo SQLite；缓存 24 小时过期、曝光 30 天保留并定期限量，草稿规则见 [发布编辑器](../features/publishing/README.md)。
 - 内容过滤仅作用于推荐流，默认开启广告/营销等现有规则，升级保留已保存的总开关。设置 v17 新增 `filterRegexPatterns`，迁移与更新时移除空白、重复、非法或不受支持的规则；新规则默认留空，修改其他设置或保存归一后相同的规则时保留数组引用，避免重复过滤和重编译。`utils/feedRegex.ts` 使用已有 htmlparser2 提取完整正文纯文本，只读取 Pin 的文字段落，忽略摘要、截断正文与纯媒体内容。关注豁免先于广告、正则与质量规则；正则与质量开关独立，折叠/隐藏和设置页统计共用 `evaluateFeedItem`。相关回归运行 `npm test -- tests/feedFilter.test.ts tests/FeedRegexSettings.test.tsx tests/settings-renderer-migration.test.ts --runInBand`。

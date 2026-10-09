@@ -23,6 +23,7 @@ import { Text, useThemeColor, View } from '@/components/Themed';
 import { UserCard } from '@/components/UserCard';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
+import { getCachedImageSource } from '@/utils/imageSource';
 import { refreshInfiniteQuery } from '@/utils/query';
 import { getNextPageOffset } from '@/utils/userProfile';
 
@@ -255,7 +256,7 @@ export default function FollowingScreen() {
           onPress={() => router.push(`/column/${column.id}`)}
         >
           <Image
-            source={{ uri: column.image_url }}
+            source={getCachedImageSource(column.image_url)}
             className="w-12 h-12 rounded-lg"
           />
           <View className="flex-1 ml-3 bg-transparent">
@@ -291,7 +292,7 @@ export default function FollowingScreen() {
           onPress={() => router.push(`/topic/${topic.id}`)}
         >
           <Image
-            source={{ uri: topic.avatar_url }}
+            source={getCachedImageSource(topic.avatar_url)}
             className="w-12 h-12 rounded-lg"
           />
           <View className="flex-1 ml-3 bg-transparent">

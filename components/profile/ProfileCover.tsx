@@ -7,6 +7,7 @@ import Reanimated, {
   useDerivedValue,
 } from 'react-native-reanimated';
 import { useRuntimeThemeColors } from '@/components/Themed';
+import { getCachedImageSource } from '@/utils/imageSource';
 import {
   getProfileCoverState,
   PROFILE_COVER_SCROLL_DISTANCE,
@@ -28,7 +29,7 @@ export function ProfileCover({
   const url = coverUrl?.trim();
   const [failedCover, setFailedCover] = useState<string | null>(null);
   const [failedBlur, setFailedBlur] = useState<string | null>(null);
-  const source = useMemo(() => (url ? { uri: url } : undefined), [url]);
+  const source = useMemo(() => getCachedImageSource(url), [url]);
   const showCover = !!url && failedCover !== url;
   const blurredStyle = useAnimatedStyle(() => ({
     opacity: blurOpacity?.value ?? 0,

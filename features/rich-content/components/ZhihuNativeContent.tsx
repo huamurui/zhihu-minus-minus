@@ -25,6 +25,7 @@ import {
 } from '@/modules/zhihu-rich-text';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ZhihuContentSegment, ZhihuSegmentInfo } from '@/types/zhihu';
+import { getCachedImageSource } from '@/utils/imageSource';
 import { getZhihuVideoRoute } from '@/utils/zhihuVideoRoute';
 import {
   compileZhihuDocument,
@@ -357,7 +358,7 @@ function FormulaBlock({
           />
         ) : (
           <Image
-            source={{ uri }}
+            source={getCachedImageSource(uri)}
             resizeMode="contain"
             style={{ width: formulaWidth, height }}
             onError={() => setFailedUri(uri)}
@@ -526,7 +527,7 @@ function NativeBlock(props: BlockViewProps) {
               />
             ) : (
               <Image
-                source={{ uri }}
+                source={getCachedImageSource(uri)}
                 style={{
                   width: imageWidth,
                   height: imageHeight,
@@ -606,7 +607,9 @@ function NativeBlock(props: BlockViewProps) {
             {block.poster ? (
               <Image
                 testID="rich-content-video-cover"
-                source={{ uri: block.poster.offlineUri ?? block.poster.url }}
+                source={getCachedImageSource(
+                  block.poster.offlineUri ?? block.poster.url,
+                )}
                 accessible={false}
                 resizeMode="cover"
                 style={StyleSheet.absoluteFill}
@@ -656,7 +659,7 @@ function NativeBlock(props: BlockViewProps) {
           </Text>
           {block.image ? (
             <Image
-              source={{ uri: block.image.url }}
+              source={getCachedImageSource(block.image.url)}
               style={{ width: width - 26, height: 120 }}
               resizeMode="cover"
             />

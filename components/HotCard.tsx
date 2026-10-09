@@ -7,6 +7,7 @@ import Colors from '@/constants/Colors';
 import { colors } from '@/constants/designTokens';
 import { useAuthStore } from '@/store/useAuthStore';
 import { contrastingText } from '@/utils/colorContrast';
+import { getCachedImageSource } from '@/utils/imageSource';
 import { BouncyButton } from './BouncyButton';
 import { Text, View } from './Themed';
 
@@ -58,7 +59,7 @@ const HotCardComponent = ({ item }: { item: HotItem }) => {
       ? item.labelArea?.night_color || colors.light.hotLabel
       : item.labelArea?.normal_color || colors.light.hotLabel;
   const imageSource = useMemo(
-    () => (item.image ? { uri: item.image } : undefined),
+    () => getCachedImageSource(item.image),
     [item.image],
   );
 
