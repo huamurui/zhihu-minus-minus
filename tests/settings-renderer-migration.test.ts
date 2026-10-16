@@ -30,12 +30,32 @@ beforeEach(() => {
   jest.mocked(SecureStore.getItemAsync).mockResolvedValue(null);
 });
 
-test('defaults to tiqian-super-mini with visual feedback and filtering enabled in settings version 17', () => {
+test('defaults to tiqian-super-mini with visual feedback and filtering enabled in settings version 18', () => {
   expect(useSettingsStore.getState().richContentRenderer).toBe('native-v2');
   expect(useSettingsStore.getState().enablePressFeedback).toBe(true);
   expect(useSettingsStore.getState().enableLocalFeedFilter).toBe(true);
   expect(useSettingsStore.getState().filterRegexPatterns).toEqual([]);
-  expect(useSettingsStore.persist.getOptions().version).toBe(17);
+  expect(useSettingsStore.persist.getOptions().version).toBe(18);
+});
+
+test('leaves the double-tap action unset until the user picks one', () => {
+  expect(useSettingsStore.getState().doubleTapAction).toBeUndefined();
+  useSettingsStore.getState().updateSettings({ doubleTapAction: 'comments' });
+  expect(useSettingsStore.getState().doubleTapAction).toBe('comments');
+  useSettingsStore.getState().updateSettings({
+    doubleTapAction: 'invalid',
+  } as unknown as Partial<AppSettings>);
+  expect(useSettingsStore.getState().doubleTapAction).toBeUndefined();
+});
+
+test('keeps a previously saved double-tap action and defaults unset legacy data', async () => {
+  expect((await migrate({ doubleTapAction: 'like' }, 17)).doubleTapAction).toBe(
+    'like',
+  );
+  expect(
+    (await migrate({ doubleTapAction: 'unknown' }, 17)).doubleTapAction,
+  ).toBeUndefined();
+  expect((await migrate({}, 17)).doubleTapAction).toBeUndefined();
 });
 
 test.each([
@@ -124,7 +144,7 @@ test('hydrates legacy settings and writes back only the new renderer field', asy
       fontSizeScale: 1.3,
       enablePressFeedback: true,
     },
-    version: 17,
+    version: 18,
   });
   expect(JSON.parse(persistedJson).state).not.toHaveProperty('useWebView');
 });
@@ -251,7 +271,7 @@ test('persists and restores sanitized custom regex rules together with a disable
       enableLocalFeedFilter: false,
       filterRegexPatterns: expectedPatterns,
     },
-    version: 17,
+    version: 18,
   });
   useSettingsStore.setState({
     enableLocalFeedFilter: true,

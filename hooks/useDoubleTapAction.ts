@@ -10,7 +10,7 @@ import { ImpactFeedbackStyle, impactAsync } from '@/utils/haptics';
 import { showToast } from '@/utils/toast';
 import { getZhihuErrorMessage } from '@/utils/zhihuError';
 
-export interface DoubleTapVoteOptions {
+export interface DoubleTapActionOptions {
   id: string;
   type: CachedContentType;
   voted?: number;
@@ -19,19 +19,18 @@ export interface DoubleTapVoteOptions {
 }
 
 /**
- * Double-tap to upvote a content surface. Upvoting is one-way here: a double
- * tap on already-upvoted content only gives feedback and never cancels.
- *
- * The write goes through `updateContentInteractionCaches`, the same path as
- * `LikeButton`, so the floating vote capsule follows the shared cache.
+ * Double-tap handler for answer / article / pin bodies. Upvoting is one-way
+ * here: a double tap on already-upvoted content only gives feedback and never
+ * cancels. The write goes through `updateContentInteractionCaches`, the same
+ * path as `LikeButton`, so the floating vote capsule follows the shared cache.
  */
-export function useDoubleTapVote({
+export function useDoubleTapAction({
   id,
   type,
   voted = 0,
   count = 0,
   enabled = true,
-}: DoubleTapVoteOptions) {
+}: DoubleTapActionOptions) {
   const queryClient = useQueryClient();
   const pendingRef = useRef(false);
   // Latest values without rebuilding the gesture on every render.
@@ -44,7 +43,7 @@ export function useDoubleTapVote({
     pendingRef.current = true;
     try {
       await impactAsync(ImpactFeedbackStyle.Light);
-      if (current.voted === 1) return; // 已赞同：只反馈，不取消。
+      if (current.voted === 1) return; // 已点赞：只反馈，不取消。
 
       const result = await voteContent(current.id, type, 'up');
       const voteCount =

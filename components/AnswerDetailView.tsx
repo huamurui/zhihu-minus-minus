@@ -55,7 +55,7 @@ import {
   type RichContentLoadingPhase,
   ZhihuContent,
 } from '@/features/rich-content';
-import { useDoubleTapVote } from '@/hooks/useDoubleTapVote';
+import { useDoubleTapAction } from '@/hooks/useDoubleTapAction';
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
 import { useReadingContentMeasurement } from '@/hooks/useReadingContentMeasurement';
 import { useReadingProgress } from '@/hooks/useReadingProgress';
@@ -430,7 +430,7 @@ export const AnswerDetailView = ({
     }
   }, [collectionStatus, id, isFetchedAfterMount, setCollectedStatus]);
 
-  const { gesture: doubleTapVote } = useDoubleTapVote({
+  const { gesture: doubleTapVote } = useDoubleTapAction({
     id,
     type: 'answers',
     voted:

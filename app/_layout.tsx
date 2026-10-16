@@ -16,6 +16,7 @@ import { RootSiblingParent } from 'react-native-root-siblings';
 import { ClipboardLinkModal } from '@/components/ClipboardLinkModal';
 import { CollectionSelectorModal } from '@/components/CollectionSelectorModal';
 import { CollectionToastOverlay } from '@/components/CollectionToastOverlay';
+import { DoubleTapActionSheet } from '@/components/DoubleTapActionSheet';
 import { GradientMaskOverlay } from '@/components/GradientMaskOverlay';
 import { useRuntimeThemeColors } from '@/components/Themed';
 import { UpdateChecker } from '@/components/UpdateChecker';
@@ -306,6 +307,9 @@ function RootLayout() {
 
               {/* 人机验证弹窗 */}
               <VerificationModal />
+
+              {/* 首次双击正文的快捷动作引导 */}
+              <DoubleTapActionSheet />
 
               {/* 全局收藏提醒和弹窗 */}
               <CollectionToastOverlay />

@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook } from '@testing-library/react-native';
 import type { PropsWithChildren } from 'react';
 import { voteContent } from '../api/zhihu';
-import { useDoubleTapVote } from '../hooks/useDoubleTapVote';
+import { useDoubleTapAction } from '../hooks/useDoubleTapAction';
 import { updateContentInteractionCaches } from '../utils/contentCache';
 import { impactAsync } from '../utils/haptics';
 import { showToast } from '../utils/toast';
@@ -40,11 +40,16 @@ beforeEach(() => {
   queryClient = new QueryClient();
 });
 
-function setup(options: Partial<Parameters<typeof useDoubleTapVote>[0]> = {}) {
+function setup(options: Partial<Parameters<typeof useDoubleTapAction>[0]> = {}) {
   return renderHook(
-    (props: Parameters<typeof useDoubleTapVote>[0]) => useDoubleTapVote(props),
+    (props: Parameters<typeof useDoubleTapAction>[0]) =>
+      useDoubleTapAction(props),
     {
-      initialProps: { id: 'answer-1', type: 'answers', ...options },
+      initialProps: {
+        id: 'answer-1',
+        type: 'answers' as const,
+        ...options,
+      },
       wrapper,
     },
   );

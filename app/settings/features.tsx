@@ -3,10 +3,24 @@ import { Stack, useRouter } from 'expo-router';
 import { View as RNView, ScrollView, StyleSheet, Switch } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BouncyButton } from '@/components/BouncyButton';
-import { Section, SettingItem } from '@/components/SettingItem';
+import {
+  Section,
+  SettingItem,
+  settingsChipStyles as s,
+} from '@/components/SettingItem';
 import { Text, useThemeColor } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
-import { useSettingsStore } from '@/store/useSettingsStore';
+import Colors from '@/constants/Colors';
+import {
+  type DoubleTapAction,
+  useSettingsStore,
+} from '@/store/useSettingsStore';
+
+const DOUBLE_TAP_ACTIONS: { key: DoubleTapAction; label: string }[] = [
+  { key: 'off', label: '关闭' },
+  { key: 'like', label: '点赞' },
+  { key: 'comments', label: '评论区' },
+];
 
 export default function FeatureSettings() {
   const router = useRouter();
@@ -15,8 +29,12 @@ export default function FeatureSettings() {
   const canvasColor = useThemeColor({}, 'background');
   const tintColor = useThemeColor({}, 'primary');
   const mutedColor = useThemeColor({}, 'textSecondary');
-  const { enableBrowseHistory, enablePrivateMessaging, updateSettings } =
-    useSettingsStore();
+  const {
+    enableBrowseHistory,
+    enablePrivateMessaging,
+    doubleTapAction,
+    updateSettings,
+  } = useSettingsStore();
 
   return (
     <RNView style={[styles.container, { backgroundColor: canvasColor }]}>
@@ -62,6 +80,46 @@ export default function FeatureSettings() {
               <Ionicons name="chevron-forward" size={18} color={mutedColor} />
             </SettingItem>
           </BouncyButton>
+          <SettingItem
+            label="双击正文"
+            icon="hand-left-outline"
+            colorScheme={colorScheme}
+          >
+            <RNView style={s.row}>
+              {DOUBLE_TAP_ACTIONS.map((option, index) => (
+                <BouncyButton
+                  key={option.key}
+                  accessibilityRole="button"
+                  accessibilityLabel={`双击正文：${option.label}`}
+                  onPress={() =>
+                    updateSettings({ doubleTapAction: option.key })
+                  }
+                  style={[
+                    s.tabChip,
+                    {
+                      backgroundColor: Colors[colorScheme].backgroundTertiary,
+                      marginLeft: index > 0 ? 8 : 0,
+                    },
+                    doubleTapAction === option.key && {
+                      backgroundColor: tintColor,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      s.tabChipText,
+                      doubleTapAction === option.key && {
+                        color: Colors[colorScheme].onPrimary,
+                        fontWeight: 'bold',
+                      },
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </BouncyButton>
+              ))}
+            </RNView>
+          </SettingItem>
         </Section>
 
         <Section title="沟通" colorScheme={colorScheme}>

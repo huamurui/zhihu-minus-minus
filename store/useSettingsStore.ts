@@ -89,6 +89,13 @@ function isValidAnswerReadingMode(value: unknown): value is AnswerReadingMode {
   return value === 'detail' || value === 'preview-list';
 }
 
+/** 双击正文快捷动作；undefined 表示尚未配置，首次双击会弹出引导 Sheet。 */
+export type DoubleTapAction = 'off' | 'like' | 'comments';
+
+function isValidDoubleTapAction(value: unknown): value is DoubleTapAction {
+  return value === 'off' || value === 'like' || value === 'comments';
+}
+
 function isValidRichContentRenderer(v: unknown): v is RichContentRenderer {
   return v === 'webview' || v === 'native-v2';
 }
@@ -122,6 +129,11 @@ export interface AppSettings {
   richContentRenderer: RichContentRenderer;
   /** 点击回答卡片后的阅读方式；列表入口始终使用普通卡片。 */
   answerReadingMode: AnswerReadingMode;
+  /**
+   * 双击回答/文章/想法正文的动作；未配置(undefined)时首次双击弹出引导 Sheet。
+   * 三处内容共用同一设置。
+   */
+  doubleTapAction?: DoubleTapAction;
   enablePrivateMessaging: boolean;
   /** 是否开启按压时的水波纹、缩放与透明度变化 */
   enablePressFeedback: boolean;
@@ -271,6 +283,12 @@ export const useSettingsStore = create<SettingsState>()(
           if (!isValidRichContentRenderer(nextSettings.richContentRenderer)) {
             nextSettings.richContentRenderer = 'native-v2';
           }
+          if (
+            nextSettings.doubleTapAction !== undefined &&
+            !isValidDoubleTapAction(nextSettings.doubleTapAction)
+          ) {
+            nextSettings.doubleTapAction = undefined;
+          }
           if (typeof nextSettings.enablePressFeedback !== 'boolean') {
             nextSettings.enablePressFeedback = true;
           }
@@ -318,7 +336,7 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'zhihu-settings-storage',
       storage: createJSONStorage(() => settingsStorage),
-      version: 17,
+      version: 18,
       migrate: (rawPersistedState: unknown, version: number) => {
         const persistedState =
           normalizePersistedSettingsState(rawPersistedState);
@@ -469,6 +487,13 @@ export const useSettingsStore = create<SettingsState>()(
         persistedState.filterRegexPatterns = normalizeFeedRegexPatterns(
           persistedState.filterRegexPatterns,
         );
+
+        // v18 adds the double-tap action; unset or invalid keeps it undefined so
+        persistedState.doubleTapAction = isValidDoubleTapAction(
+          persistedState.doubleTapAction,
+        )
+          ? persistedState.doubleTapAction
+          : undefined;
 
         return persistedState as unknown as SettingsState;
       },

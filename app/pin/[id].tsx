@@ -29,7 +29,7 @@ import { Text, ThemedIcon, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { RICH_CONTENT_STALE_TIME, ZhihuContent } from '@/features/rich-content';
-import { useDoubleTapVote } from '@/hooks/useDoubleTapVote';
+import { useDoubleTapAction } from '@/hooks/useDoubleTapAction';
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
 import { useReadingProgress } from '@/hooks/useReadingProgress';
 import { useSettingsStore } from '@/store/useSettingsStore';
@@ -120,7 +120,7 @@ export default function PinDetailScreen() {
     if (token) router.push(`/user/${token}`);
   }, [pin?.author, router]);
 
-  const { gesture: doubleTapVote } = useDoubleTapVote({
+  const { gesture: doubleTapVote } = useDoubleTapAction({
     id: String(id ?? ''),
     type: 'pins',
     voted: pinVoteState,

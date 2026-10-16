@@ -82,6 +82,9 @@ jest.mock('../components/CollectionSelectorModal', () => ({
 jest.mock('../components/CollectionToastOverlay', () => ({
   CollectionToastOverlay: () => null,
 }));
+jest.mock('../components/DoubleTapActionSheet', () => ({
+  DoubleTapActionSheet: () => null,
+}));
 jest.mock('../components/GradientMaskOverlay', () => ({
   GradientMaskOverlay: () => null,
 }));

@@ -18,7 +18,7 @@ jest.mock('../utils/contentCache', () => ({
   seedAnswerDetailFromList: jest.fn(),
 }));
 
-interface DoubleTapVoteOptions {
+interface DoubleTapActionOptions {
   id: string;
   type: string;
   voted: number;
@@ -26,11 +26,11 @@ interface DoubleTapVoteOptions {
   enabled: boolean;
 }
 
-const mockDoubleTapVote = jest.fn((_options: DoubleTapVoteOptions) => ({
+const mockDoubleTapVote = jest.fn((_options: DoubleTapActionOptions) => ({
   gesture: { synthetic: true },
 }));
-jest.mock('../hooks/useDoubleTapVote', () => ({
-  useDoubleTapVote: (options: DoubleTapVoteOptions) =>
+jest.mock('../hooks/useDoubleTapAction', () => ({
+  useDoubleTapAction: (options: DoubleTapActionOptions) =>
     mockDoubleTapVote(options),
 }));
 
