@@ -4,7 +4,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -166,6 +166,8 @@ function getProfileListItemKey(item: unknown) {
 }
 
 const AnimatedPagerView = Reanimated.createAnimatedComponent(PagerView);
+/** Keep page swipes off this long after a list stops scrolling. */
+const PAGER_UNLOCK_DELAY_MS = 250;
 
 type ProfileRouteParams = {
   id: string;
@@ -360,6 +362,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
 
   const syncLists = (sourceIndex: number) => {
     const offsets = scrollOffsets.value;
+    const synced = [...offsets];
     for (let index = 0; index < PROFILE_TABS.length; index += 1) {
       if (index === sourceIndex) continue;
       const offset = getProfileSyncedOffset(
@@ -367,9 +370,35 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
         offsets[index],
         collapseDistance,
       );
+      synced[index] = offset;
       listRefs.current[index]?.scrollToOffset(offset);
     }
+    // Offscreen or still-empty pages apply their scroll only once shown. Record
+    // the target now so the header holds its place during the swipe instead of
+    // easing toward a neighbour still at the top.
+    scrollOffsets.value = synced;
   };
+
+  // A diagonal flick in a list must not turn the page: hold the pager while
+  // the list is dragged or still flinging, and briefly after it stops.
+  const [pagerLocked, setPagerLocked] = useState(false);
+  const pagerUnlockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleListScrollActivity = useCallback((active: boolean) => {
+    if (pagerUnlockTimer.current) clearTimeout(pagerUnlockTimer.current);
+    pagerUnlockTimer.current = null;
+    if (active) setPagerLocked(true);
+    else
+      pagerUnlockTimer.current = setTimeout(
+        () => setPagerLocked(false),
+        PAGER_UNLOCK_DELAY_MS,
+      );
+  }, []);
+  useEffect(
+    () => () => {
+      if (pagerUnlockTimer.current) clearTimeout(pagerUnlockTimer.current);
+    },
+    [],
+  );
 
   const handleTabPress = (index: number) => {
     syncLists(activeIndexRef.current);
@@ -1062,6 +1091,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
               ref={pagerRef}
               style={{ flex: 1 }}
               initialPage={initialTabIndex}
+              scrollEnabled={!pagerLocked}
               onPageScroll={pageScrollHandler}
               onPageScrollStateChanged={(event) => {
                 if (event.nativeEvent.pageScrollState === 'dragging')
@@ -1116,6 +1146,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
                       bottomInset={insets.bottom}
                       offsets={scrollOffsets}
                       active={activeTab === tab.key}
+                      onScrollActivityChange={handleListScrollActivity}
                       keyExtractor={(item) => {
                         if (tab.key === 'creations') {
                           const content = item as FeedItem;

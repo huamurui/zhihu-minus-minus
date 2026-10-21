@@ -27,7 +27,11 @@ import type { AnswerReadingContext } from '../src/utils/answerReadingContext';
 
 interface MockPagerProps extends PropsWithChildren {
   initialPage: number;
+  scrollEnabled?: boolean;
   onPageSelected: (event: { nativeEvent: { position: number } }) => void;
+  onPageScrollStateChanged: (event: {
+    nativeEvent: { pageScrollState: string };
+  }) => void;
 }
 
 let mockPagerProps: MockPagerProps;
@@ -712,6 +716,55 @@ test('search opens a separate route without altering the active tab or list offs
   expect(mockPagerUnmount).not.toHaveBeenCalled();
   expect(mockListUnmount).not.toHaveBeenCalled();
   expect(searchContent).not.toHaveBeenCalled();
+  await host.unmount();
+});
+
+test('holds page swipes while a list scrolls vertically and briefly after', async () => {
+  mockRoute.tab = 'answers';
+  const host = await render(screen());
+  await flushQueries();
+  expect(mockPagerProps.scrollEnabled).toBe(true);
+  const reportActivity = mockListProps.get('回答')?.onScrollActivityChange;
+  await act(async () => reportActivity?.(true));
+  expect(mockPagerProps.scrollEnabled).toBe(false);
+  // The fling that follows a drag keeps the pager held.
+  await act(async () => {
+    reportActivity?.(false);
+    reportActivity?.(true);
+  });
+  expect(mockPagerProps.scrollEnabled).toBe(false);
+  await act(async () => reportActivity?.(false));
+  expect(mockPagerProps.scrollEnabled).toBe(false);
+  await flushQueries(300);
+  expect(mockPagerProps.scrollEnabled).toBe(true);
+  await host.unmount();
+});
+
+test('a page swipe records the synced offsets so the header holds its place', async () => {
+  mockRoute.tab = 'answers';
+  const host = await render(screen());
+  await flushQueries();
+  // Measure a real header so the lists have a collapse range to share.
+  await fireEvent(host.getByTestId('profile-collapsible-header'), 'layout', {
+    nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 600 } },
+  });
+  const offsets = mockListProps.get('回答')?.offsets;
+  if (!offsets) throw new Error('lists share the offsets');
+  const collapse = mockListProps.get('回答')?.collapseDistance ?? 0;
+  expect(collapse).toBeGreaterThan(0);
+  const answersIndex = mockListProps.get('回答')?.index ?? 0;
+  const deep = [...offsets.value];
+  deep[answersIndex] = collapse + 500;
+  offsets.value = deep;
+  await act(async () =>
+    mockPagerProps.onPageScrollStateChanged({
+      nativeEvent: { pageScrollState: 'dragging' },
+    }),
+  );
+  // Every other page now reports at least the collapsed header position.
+  offsets.value.forEach((offset, index) => {
+    if (index !== answersIndex) expect(offset).toBe(collapse);
+  });
   await host.unmount();
 });
 
