@@ -59,7 +59,7 @@ export default function LoginScreen() {
       return;
     if (!saved) {
       setSaveFailedVersion(savingSessionVersion);
-      showToast('登录状态未保存，请检查存储空间后重试');
+      showToast('登录状态未保存，请重试');
       return;
     }
     setSaveFailedVersion(null);

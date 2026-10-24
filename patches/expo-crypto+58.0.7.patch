@@ -1,0 +1,13 @@
+diff --git a/node_modules/expo-crypto/android/src/main/java/expo/modules/crypto/aes/extensions/CipherExtensions.kt b/node_modules/expo-crypto/android/src/main/java/expo/modules/crypto/aes/extensions/CipherExtensions.kt
+index 2ef52c1..51d2578 100644
+--- a/node_modules/expo-crypto/android/src/main/java/expo/modules/crypto/aes/extensions/CipherExtensions.kt
++++ b/node_modules/expo-crypto/android/src/main/java/expo/modules/crypto/aes/extensions/CipherExtensions.kt
+@@ -21,3 +21,5 @@
+-  return ByteBuffer.allocate(plaintextSize).also { outputBuf ->
+-    doFinal(inputBuf, outputBuf)
+-  }
++  val outputBuf = ByteBuffer.allocate(plaintextSize)
++  val written = doFinal(inputBuf, outputBuf)
++  // getOutputSize is an upper bound; Android 8 includes the GCM tag on decrypt.
++  // The caller returns array(), so its backing array must have the exact size.
++  return ByteBuffer.wrap(outputBuf.array().copyOf(written))

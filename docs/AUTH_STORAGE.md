@@ -22,12 +22,27 @@
 
 账号文件与 SecureStore 密钥必须同时可用。仅复制 JSON 到其他设备不能恢复账号；卸载、换机及系统备份恢复不保证登录态可迁移。遇到不可恢复的密钥丢失时，应由用户确认清除并重新登录。
 
+## Android 8 解密兼容
+
+Android 8.0/8.1 的系统 Conscrypt 在 AES-GCM 解密时，`Cipher.getOutputSize` 返回的容量上界包含认证标签；`doFinal` 返回的才是实际明文长度。Expo Crypto 原实现直接返回整个缓冲数组，可能在账号 JSON 后追加 16 个零字节，导致保存后的读回校验及下次启动恢复失败。此问题与 32/64 位无关；它在升级前使用的 Expo Crypto 55.0.19 中也已存在，不能据此单独认定为 SDK 58 引入的回归。
+
+版本边界按 AOSP 各版本首发源码核对：[Android 9](https://android.googlesource.com/platform/external/conscrypt/+/android-9.0.0_r1/common/src/main/java/org/conscrypt/OpenSSLCipher.java) 仍有相同的容量上界；[Android 10](https://android.googlesource.com/platform/external/conscrypt/+/android-10.0.0_r1/common/src/main/java/org/conscrypt/OpenSSLCipher.java) 的 AES.GCM 子类已按标签长度计算精确明文长度，Android 11–16 的 `OpenSSLAeadCipherAES` 也沿用精确计算。因此这个特定缺陷也可能影响 Android 9，标准 Android 10–16 实现不会因该计算产生尾零；厂商 ROM 或其他加密 provider 仍需实测，这不代表整个应用在这些系统上均已通过验证。
+
+[`expo-crypto` 补丁](../patches/expo-crypto+58.0.7.patch) 按 `doFinal` 的实际写入长度返回明文，保留合法尾零与 GCM 认证，不改变密文格式、密钥或迁移规则。已写入的有效密文可由修复后的实现直接读取，无需清除账号。`package.json` 对 Android 的 `expo-crypto` 指定 `buildFromSource`，确保补丁进入原生包；默认预编译 AAR 不会采用修改后的 Kotlin。必须重新 prebuild 并构建 APK，JS 热更新不能使补丁生效。
+
+本应用生产代码仅账号保存与恢复使用这条 Expo AES 链路，因此直接影响新登录、多账号切换/删除/退出的持久化和冷启动恢复。主题、设置、搜索与 telemetry 偏好直接使用 SecureStore；草稿和 Feed 缓存使用 SQLite，不经过此函数。它们不属于这个补丁所修复问题的直接范围，但其他升级回归仍需分别验证。
+
+首次无账号文件时，恢复流程可以完成，登录也会先更新内存；随后写入有效密文却在读回校验时失败，本次运行仍可能使用内存中的账号。重启或升级后，已有文件无法通过解密后的 JSON 校验，恢复保护会阻止新登录覆盖旧账号。这能解释“旧版只提示保存异常、升级重启后无法登录”的表现差异，但仍需在实际故障设备上确认，不应据此自动清除账号或绕过恢复保护。
+
 ## 验证
 
 ```bash
 npm test -- tests/encryptedAuthStorage.test.ts tests/authPersistenceQueue.test.ts tests/apiClientSession.test.ts tests/loginPersistence.test.tsx tests/nativeSessionSync.test.ts --runInBand
+bash scripts/test-android-auth-crypto.sh
 ```
 
 测试使用合成账号及临时密钥，覆盖旧格式迁移、密文篡改、损坏恢复、Android 原子读取合同、保存中断、并发、冷启动账号恢复时的请求会话一致性与退出后不恢复旧登录。Android 合同测试模拟 `AtomicFile` 行为，不冒充 Android 系统实现的实际运行。
+
+AES 原生回归脚本需要 JDK 17+、Node.js 和 `kotlinc` 或已缓存的 Kotlin 编译器，直接编译安装包中的 `CipherExtensions.kt`；用真实 JVM AES-GCM 和 Android 8 的输出容量合同验证 Unicode、空明文、合法零字节、篡改及错误 AAD 拒绝，再以真实 JSON 解析检查账号快照。它不替代 Android 8/8.1、armeabi-v7a 的 Keystore、Expo 桥接与重启恢复实机验证。
 
 开发包可通过 `zhihu--:///dev/native-validation` 检查原生 AES、SecureStore、文件和哈希。只读取该页产生的 `native-validation-result.json`（时间戳和布尔结果）；不要导出真实账号文件、密钥或原生 Cookie。生产包会重定向所有 `/dev/*` 页面。

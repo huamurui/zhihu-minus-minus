@@ -220,6 +220,44 @@ test('interruption before primary replacement leaves the old primary usable', as
   expect(await h.reopen().getItem()).toBe(A);
 });
 
+test('preserves an Android 8 save rejected by padded decryption and recovers it after the cipher fix', async () => {
+  const h = harness();
+  expect(await h.storage.getItem()).toBeNull();
+  expect(h.storage.hasReadableSnapshot()).toBe(true);
+  const decrypt = h.operations.decrypt.getMockImplementation();
+  if (!decrypt) throw new Error('Synthetic decryption implementation missing');
+  // Model the old native bridge returning its entire allocation, including the
+  // unwritten 16-byte GCM tag allowance, after successful authentication.
+  h.operations.decrypt.mockImplementation(
+    async (value) => `${await decrypt(value)}${'\u0000'.repeat(16)}`,
+  );
+
+  await expect(h.storage.setItem(A)).rejects.toThrow('保存登录状态失败');
+  const saved = new Map(h.files);
+  expect(saved.get('primary')).toBeDefined();
+  expect(saved.get('primary')).not.toContain('synthetic-a');
+  expect(saved.get('backup')).toBe(saved.get('primary'));
+  expect(h.operations.onFailure).toHaveBeenLastCalledWith(true);
+
+  const restarted = h.reopen();
+  await expect(restarted.getItem()).rejects.toThrow('无法读取已保存账号');
+  expect(restarted.hasReadableSnapshot()).toBe(false);
+  await expect(restarted.ensureWritable()).rejects.toThrow(
+    '请先恢复已保存账号',
+  );
+  await expect(restarted.setItem(B)).rejects.toThrow('未覆盖原文件');
+  expect(h.files).toEqual(saved);
+
+  h.operations.decrypt.mockImplementation(decrypt);
+  expect(await restarted.getItem()).toBe(A);
+  expect(restarted.hasReadableSnapshot()).toBe(true);
+  expect(h.files).toEqual(saved);
+  await restarted.ensureWritable();
+  await restarted.setItem(B);
+  expect(await h.reopen().getItem()).toBe(B);
+  expect(h.operations.onFailure).toHaveBeenLastCalledWith(false);
+});
+
 test('serializes recovery with a later write so it cannot overwrite the new backup', async () => {
   const h = harness({ primary: A });
   let release: () => void = () => {};
