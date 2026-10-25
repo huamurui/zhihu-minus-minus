@@ -120,6 +120,14 @@ npm run web
 
 Web 适合检查路由和不依赖原生模块的页面，不代表 Android/iOS 的原生行为已经验证。
 
+### QQ 扫码登录验证
+
+`LoginWebView` 拦截 QQ 的 `https://graph.qq.com/oauth2.0/authorize`，保留知乎生成的 `client_id`、`redirect_uri`、`state` 等参数，仅将 `display` 改为 `pc`，并在首次请求前切换桌面 User-Agent。QQ 授权新窗口留在同一登录视图和持久 WebView Cookie 容器中；扫码阶段阻止外部协议跳转，不注册 QQ 或浏览器回调 scheme。普通知乎登录仍使用默认移动 User-Agent。
+
+二维码和授权轮询由 QQ 网页管理。切到 QQ 扫码后返回应用时不重新加载 WebView，以免销毁尚未完成的二维码会话；只有知乎 HTTPS 首页的页面消息可以触发登录 Cookie 捕获，首页携带查询参数也支持。扫码凭据、完整 URL、Cookie 不能进入日志或测试 fixture。
+
+运行 `npm test -- tests/loginWebView.test.tsx tests/loginPersistence.test.tsx --runInBand` 和 `npm run check`。真机仍须验证 Android/iOS 的 QQ 入口、新窗口、二维码显示与缩放、扫码确认后的首页回跳、同机截图/相册识别、前后台切换、过期码刷新、网络失败重试和取消登录。相册识别是否可用由 QQ 版本及其安全策略决定；不支持时使用另一台设备扫码。授权失败或登录进程被系统回收时重新发起登录，不应导入 Chrome Cookie。此改动不涉及原生配置，无需 prebuild。
+
 ## 什么时候需要重新 prebuild
 
 以下改动后应重新生成原生工程：
