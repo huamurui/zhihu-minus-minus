@@ -112,7 +112,10 @@ afterEach(() => jest.restoreAllMocks());
 async function beginFailedLogin() {
   const host = await render(<LoginScreen />);
   await fireEvent(host.getByTestId('login-webview'), 'message', {
-    nativeEvent: { data: 'd_c0=synthetic-device' },
+    nativeEvent: {
+      url: 'https://www.zhihu.com/',
+      data: 'd_c0=synthetic-device',
+    },
   });
   await waitFor(() => {
     expect(host.getByText('登录状态保存失败，点此重试')).toBeTruthy();
@@ -197,7 +200,7 @@ test('late CookieManager reads cannot replace a session selected during capture'
   );
   const host = await render(<LoginScreen />);
   await fireEvent(host.getByTestId('login-webview'), 'message', {
-    nativeEvent: { data: 'd_c0=synthetic' },
+    nativeEvent: { url: 'https://www.zhihu.com/', data: 'd_c0=synthetic' },
   });
   await act(() => {
     mockSessionVersion += 1;
@@ -219,7 +222,7 @@ test('cancelled login ignores late native cookie capture', async () => {
   );
   const host = await render(<LoginScreen />);
   await fireEvent(host.getByTestId('login-webview'), 'message', {
-    nativeEvent: { data: 'd_c0=synthetic' },
+    nativeEvent: { url: 'https://www.zhihu.com/', data: 'd_c0=synthetic' },
   });
   await fireEvent.press(host.getByText('取消'));
   await act(() =>
@@ -241,7 +244,7 @@ test('unmounted login cannot finish an in-flight profile request', async () => {
   );
   const host = await render(<LoginScreen />);
   await fireEvent(host.getByTestId('login-webview'), 'message', {
-    nativeEvent: { data: 'd_c0=synthetic' },
+    nativeEvent: { url: 'https://www.zhihu.com/', data: 'd_c0=synthetic' },
   });
   await waitFor(() => expect(mockGetMe).toHaveBeenCalledTimes(1));
   await host.unmount();
@@ -250,4 +253,40 @@ test('unmounted login cannot finish an in-flight profile request', async () => {
   expect(mockSaveAuthState).not.toHaveBeenCalled();
   expect(mockRouter.back).not.toHaveBeenCalled();
   expect(mockQueryClient.clear).not.toHaveBeenCalled();
+});
+
+test('QQ authorization returns to a queried Zhihu homepage and persists the session', async () => {
+  mockSyncNativeSession.mockResolvedValue(undefined);
+  mockSaveAuthState.mockReset();
+  mockSaveAuthState.mockResolvedValue(true);
+  const host = await render(<LoginScreen />);
+  await fireEvent(
+    host.getByTestId('login-webview'),
+    'shouldStartLoadWithRequest',
+    {
+      url: 'https://graph.qq.com/oauth2.0/authorize?client_id=synthetic&state=synthetic&display=mobile',
+    },
+  );
+  expect(host.getByText('QQ 扫码登录')).toBeTruthy();
+
+  await fireEvent(host.getByTestId('login-webview'), 'message', {
+    nativeEvent: {
+      url: 'https://graph.qq.com/oauth2.0/authorize',
+      data: 'z_c0=synthetic-foreign-session',
+    },
+  });
+  expect(mockCookieGet).not.toHaveBeenCalled();
+
+  await fireEvent(host.getByTestId('login-webview'), 'message', {
+    nativeEvent: {
+      url: 'https://www.zhihu.com/?utm_id=synthetic',
+      data: 'd_c0=synthetic-device',
+    },
+  });
+  await waitFor(() => expect(mockRouter.back).toHaveBeenCalledTimes(1));
+  expect(mockAuthState.cookies).toContain('z_c0=synthetic-session');
+  expect(mockAuthState.cookies).not.toContain('synthetic-foreign-session');
+  expect(mockSaveAuthState).toHaveBeenCalledTimes(1);
+  expect(mockQueryClient.clear).toHaveBeenCalledTimes(1);
+  await host.unmount();
 });

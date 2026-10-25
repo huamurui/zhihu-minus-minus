@@ -2,16 +2,11 @@ import CookieManager from '@preeternal/react-native-cookie-manager';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, StyleSheet } from 'react-native';
-import {
-  WebView,
-  type WebViewMessageEvent,
-  type WebViewNavigation,
-  type WebViewProps,
-} from 'react-native-webview';
+import { Platform } from 'react-native';
 import { getMe } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
-import { Text, useThemeColor, View } from '@/components/Themed';
+import { LoginWebView } from '@/components/LoginWebView';
+import { Text, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import {
@@ -23,18 +18,14 @@ import { useSettingsStore } from '@/store/useSettingsStore';
 import { useVerificationStore } from '@/store/useVerificationStore';
 import { syncNativeSessionCookies } from '@/utils/authSession';
 import { showToast } from '@/utils/toast';
-import { sanitizeNavigationUrlForLog } from '@/utils/url';
 
 export default function LoginScreen() {
   const colorScheme = useColorScheme();
-  const primaryColor = useThemeColor({}, 'primary');
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [loading, setLoading] = useState(true);
   const [saveFailedVersion, setSaveFailedVersion] = useState<number | null>(
     null,
   );
-  const webViewRef = useRef<WebView<WebViewProps>>(null);
   const borderColor = Colors[colorScheme].border;
   const capturingSessionRef = useRef(false);
   const abandonedRef = useRef(false);
@@ -239,43 +230,7 @@ export default function LoginScreen() {
         <View className="w-10 bg-transparent" />
       </View>
 
-      <WebView<WebViewProps>
-        ref={webViewRef}
-        source={{ uri: 'https://www.zhihu.com/signin' }}
-        sharedCookiesEnabled={true}
-        incognito={false}
-        onMessage={(event: WebViewMessageEvent) => {
-          handleCookies(event.nativeEvent.data);
-        }}
-        onNavigationStateChange={(navState: WebViewNavigation) => {
-          const { url } = navState;
-          console.log('🌐 导航至:', sanitizeNavigationUrlForLog(url));
-          if (
-            url === 'https://www.zhihu.com/' ||
-            url === 'https://www.zhihu.com'
-          ) {
-            webViewRef.current?.injectJavaScript(
-              `window.ReactNativeWebView.postMessage(document.cookie); true;`,
-            );
-            return;
-          }
-        }}
-        onLoadStart={() => setLoading(true)}
-        onLoadEnd={() => setLoading(false)}
-      />
-
-      {loading && (
-        <View
-          pointerEvents="none"
-          className="justify-center items-center"
-          style={{
-            ...StyleSheet.absoluteFill,
-            backgroundColor: 'rgba(0,0,0,0.3)',
-          }}
-        >
-          <ActivityIndicator size="large" color={primaryColor} />
-        </View>
-      )}
+      <LoginWebView onCookies={(cookies) => void handleCookies(cookies)} />
     </View>
   );
 }
