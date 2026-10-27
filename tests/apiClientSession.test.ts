@@ -865,27 +865,31 @@ function riskControlled(config: InternalAxiosRequestConfig): AxiosError {
   );
 }
 
-const SIGNING_HEADERS = [
-  'x-zse-96',
-  'x-zse-93',
-  'X-Udid',
-  'x-xsrftoken',
-  'x-requested-with',
-  'Referer',
-];
+function nativeCookies(cookies: Record<string, string>) {
+  jest
+    .mocked(CookieManager.get)
+    .mockResolvedValue(
+      Object.fromEntries(
+        Object.entries(cookies).map(([name, value]) => [name, { name, value }]),
+      ),
+    );
+}
 
 describe('Zhihu risk control (40362)', () => {
+  const STORED = `${COOKIE_A}; d_c0=test-device|1`;
+
   beforeEach(() => {
-    // A device cookie makes the client sign requests.
-    useAuthStore
-      .getState()
-      .setCookies(`${COOKIE_A}; d_c0=test-device|1; _xsrf=test-xsrf`);
+    useAuthStore.getState().setCookies(STORED);
+  });
+  afterEach(() => {
+    jest.mocked(CookieManager.get).mockResolvedValue({});
   });
 
-  test('retries a signed request once with only the cookie and user agent', async () => {
-    const sent: InternalAxiosRequestConfig['headers'][] = [];
+  test('retries once with the anti-crawl cookie from the WebView store and keeps it', async () => {
+    nativeCookies({ __zse_ck: 'test-anti-crawl', z_c0: 'test-native-only' });
+    const sent: string[] = [];
     apiClient.defaults.adapter = async (config) => {
-      sent.push(config.headers);
+      sent.push(String(config.headers.get('Cookie')));
       if (sent.length === 1) throw riskControlled(config);
       return response(config, { paging: {}, data: [] });
     };
@@ -894,13 +898,18 @@ describe('Zhihu risk control (40362)', () => {
       status: 200,
     });
     expect(sent).toHaveLength(2);
-    for (const name of SIGNING_HEADERS) expect(sent[0].get(name)).toBeTruthy();
-    for (const name of SIGNING_HEADERS) expect(sent[1].get(name)).toBeFalsy();
-    expect(sent[1].get('Cookie')).toContain('z_c0=test-account-a');
-    expect(sent[1].get('User-Agent')).toBeTruthy();
+    expect(sent[0]).not.toContain('__zse_ck');
+    expect(sent[1]).toContain('__zse_ck=test-anti-crawl');
+    // Only that cookie is taken from the WebView store.
+    expect(sent[1]).toContain('z_c0=test-account-a');
+    expect(sent[1]).not.toContain('test-native-only');
+    expect(useAuthStore.getState().cookies).toContain(
+      '__zse_ck=test-anti-crawl',
+    );
   });
 
-  test('gives up after the one unsigned retry', async () => {
+  test('gives up after the one retry', async () => {
+    nativeCookies({ __zse_ck: 'test-anti-crawl' });
     let attempts = 0;
     apiClient.defaults.adapter = async (config) => {
       attempts += 1;
@@ -913,8 +922,13 @@ describe('Zhihu risk control (40362)', () => {
     expect(attempts).toBe(2);
   });
 
-  test('does not retry a request that was never signed', async () => {
-    useAuthStore.getState().setCookies(COOKIE_A);
+  test.each([
+    ['the WebView store has no anti-crawl cookie', {}],
+    ['the request already carried it', { __zse_ck: 'test-anti-crawl' }],
+  ])('does not retry when %s', async (_case, native) => {
+    if ('__zse_ck' in native)
+      useAuthStore.getState().setCookies(`${STORED}; __zse_ck=test-anti-crawl`);
+    nativeCookies(native);
     let attempts = 0;
     apiClient.defaults.adapter = async (config) => {
       attempts += 1;

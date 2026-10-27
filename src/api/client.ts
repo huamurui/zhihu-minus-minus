@@ -37,16 +37,35 @@ interface SessionRequestConfig extends InternalAxiosRequestConfig {
   zhihuSessionVersion?: number;
   zhihuSessionRetried?: boolean;
   zhihuSkipVerification?: boolean;
-  /** Set on the one retry after Zhihu's risk control rejected a signed request. */
-  zhihuUnsignedRetry?: boolean;
+  /** Set on the one retry after adding the anti-crawl cookie. */
+  zhihuAntiCrawlRetried?: boolean;
 }
 
 /**
- * While Zhihu's risk control lasted, the followers list rejected every request
- * carrying the app's signing headers and served the same request sent with
- * only these.
+ * Zhihu's anti-crawl cookie. Zhihu's page script writes it into the WebView
+ * cookie store, which the client does not send (`withCredentials: false`), and
+ * a login does not always capture it. Endpoints such as the followers list
+ * answer risk control 40362 without it.
  */
-const RISK_CONTROL_RETRY_HEADERS = new Set(['Cookie', 'User-Agent']);
+const ZHIHU_ANTI_CRAWL_COOKIE = '__zse_ck';
+
+async function readNativeAntiCrawlCookie(): Promise<string | undefined> {
+  try {
+    const cookies = await CookieManager.get('https://www.zhihu.com', true);
+    return cookies?.[ZHIHU_ANTI_CRAWL_COOKIE]?.value || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function getCookieValue(cookie: string, name: string): string | undefined {
+  for (const assignment of cookie.split(';')) {
+    const separator = assignment.indexOf('=');
+    if (separator > 0 && assignment.slice(0, separator).trim() === name)
+      return assignment.slice(separator + 1).trim();
+  }
+  return undefined;
+}
 
 interface SessionRefreshResult {
   success: boolean;
@@ -464,14 +483,6 @@ apiClient.interceptors.request.use(async (config) => {
     const authHeaders = await buildZhihuAuthHeaders(fullUrl, cookie, body);
     requireCurrentSession(sessionVersion);
     if (configuredReferer) authHeaders.Referer = configuredReferer;
-    if (sessionConfig.zhihuUnsignedRetry) {
-      for (const name of Object.keys(authHeaders)) {
-        if (RISK_CONTROL_RETRY_HEADERS.has(name)) continue;
-        delete authHeaders[name];
-        // The retry reuses the rejected request's config and its headers.
-        config.headers.delete(name);
-      }
-    }
     Object.assign(config.headers, authHeaders);
   }
   sessionConfig.zhihuSessionVersion = sessionVersion;
@@ -559,14 +570,34 @@ apiClient.interceptors.response.use(
     if (
       verificationCode === ZHIHU_RISK_CONTROL_CODE &&
       sessionConfig &&
-      !sessionConfig.zhihuUnsignedRetry &&
-      getHeaderValue(sessionConfig.headers, 'x-zse-96')
+      !sessionConfig.zhihuAntiCrawlRetried
     ) {
-      sessionConfig.zhihuUnsignedRetry = true;
-      console.warn(
-        `⚠️ [API ${requestId}] ${method} ${path} 触发知乎风控 ${ZHIHU_RISK_CONTROL_CODE}，去掉签名请求头重试一次`,
-      );
-      return apiClient.request(sessionConfig);
+      const requestCookie = getHeaderValue(sessionConfig.headers, 'Cookie');
+      const antiCrawl = requestCookie
+        ? await readNativeAntiCrawlCookie()
+        : undefined;
+      requireCurrentSession(sessionConfig.zhihuSessionVersion);
+      const storedCookie = useAuthStore.getState().cookies;
+      if (
+        requestCookie &&
+        antiCrawl &&
+        storedCookie &&
+        getCookieValue(requestCookie, ZHIHU_ANTI_CRAWL_COOKIE) !== antiCrawl
+      ) {
+        sessionConfig.zhihuAntiCrawlRetried = true;
+        // Keep it on the account so later requests carry it too.
+        useAuthStore
+          .getState()
+          .updateActiveAccountCookies(
+            mergeCookieHeader(storedCookie, [
+              `${ZHIHU_ANTI_CRAWL_COOKIE}=${antiCrawl}`,
+            ]),
+          );
+        console.warn(
+          `⚠️ [API ${requestId}] ${method} ${path} 触发知乎风控 ${ZHIHU_RISK_CONTROL_CODE}，补上 ${ZHIHU_ANTI_CRAWL_COOKIE} 重试一次`,
+        );
+        return apiClient.request(sessionConfig);
+      }
     }
 
     const status = error.response?.status;
