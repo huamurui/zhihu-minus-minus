@@ -985,3 +985,35 @@ test('keeps prose through bad annotations and textual unknown blocks without ena
     }),
   ]);
 });
+
+test('loads the watermark-free upload of images unless the reader opts out', () => {
+  const watermarked = 'v2-00000000000000000000000000000000';
+  const token = 'v2-11111111111111111111111111111111';
+  const source = content([
+    {
+      ...imageSegment(),
+      image: {
+        ...imageSegment().image,
+        original_token: token,
+        urls: [`https://pic1.zhimg.com/${watermarked}_720w.jpg`],
+        original_urls: [`https://pic1.zhimg.com/${watermarked}_r.jpg`],
+      },
+    },
+  ]);
+  const imageOf = (removeImageWatermark?: boolean) => {
+    const [block] = normalizeZhihuStructuredContent(source, {
+      removeImageWatermark,
+    }).blocks;
+    if (block?.type !== 'image') throw new Error('expected an image block');
+    return { url: block.resource.url, originalUrl: block.resource.originalUrl };
+  };
+
+  expect(imageOf()).toEqual({
+    url: `https://pic1.zhimg.com/${token}_720w.jpg`,
+    originalUrl: `https://pic1.zhimg.com/${token}_r.jpg`,
+  });
+  expect(imageOf(false)).toEqual({
+    url: `https://pic1.zhimg.com/${watermarked}_720w.jpg`,
+    originalUrl: `https://pic1.zhimg.com/${watermarked}_r.jpg`,
+  });
+});

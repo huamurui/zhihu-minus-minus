@@ -158,6 +158,7 @@ export default React.memo(function ZhihuDOMContent({
   const settings = useSettingsStore();
   const fontSizeScale = fontSizeOverride ?? settings.fontSizeScale;
   const lineHeightScale = lineHeightOverride ?? settings.lineHeightScale;
+  const removeImageWatermark = settings.removeImageWatermark;
   const metrics = useMemo(
     () => createRichContentMetrics(fontSizeScale, lineHeightScale),
     [fontSizeScale, lineHeightScale],
@@ -556,7 +557,7 @@ export default React.memo(function ZhihuDOMContent({
             const originalToken = img.getAttribute('data-original-token');
             let actualSrc = img.getAttribute('data-actualsrc') || img.getAttribute('data-original') || src;
 
-            if (actualSrc && originalToken) {
+            if (${removeImageWatermark ? 'true' : 'false'} && actualSrc && originalToken) {
               const cleanToken = originalToken.trim();
               const tokenRegex = /v2-[a-fA-F0-9]{32}/;
               if (tokenRegex.test(actualSrc)) {
@@ -954,6 +955,7 @@ export default React.memo(function ZhihuDOMContent({
     return { documentIdentity, source: { html } };
   }, [
     safeHtmlContent,
+    removeImageWatermark,
     segmentInfosStr,
     linkCardInfoStr,
     textColor,

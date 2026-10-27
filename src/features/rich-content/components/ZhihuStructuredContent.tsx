@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { ContentActionButton } from '@/components/ContentActionButton';
 import { useRuntimeThemeColors } from '@/components/Themed';
+import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ZhihuStructuredContent as ZhihuStructuredContentData } from '@/types/zhihu';
 import { getCachedImageSource } from '@/utils/imageSource';
 import type {
@@ -129,13 +130,17 @@ export const ZhihuStructuredContent = React.memo(
     const previewCount = Number.isSafeInteger(previewSegmentCount)
       ? Math.max(1, previewSegmentCount)
       : 3;
+    const removeImageWatermark = useSettingsStore(
+      (state) => state.removeImageWatermark,
+    );
     const completeDocument = useMemo(
       () =>
         normalizeZhihuStructuredContent(content, {
           documentId,
           resources,
+          removeImageWatermark,
         }),
-      [content, documentId, resources],
+      [content, documentId, resources, removeImageWatermark],
     );
     const document = useMemo(
       () =>

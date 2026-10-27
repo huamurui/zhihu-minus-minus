@@ -1090,6 +1090,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
       variant,
       segmentInfos,
       linkCardInfo,
+      removeImageWatermark: settings.removeImageWatermark,
     };
     return contentArray
       ? normalizeZhihuContentSegments(contentArray, normalizationOptions)
@@ -1101,6 +1102,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
     linkCardInfo,
     objectId,
     segmentInfos,
+    settings.removeImageWatermark,
     type,
     variant,
   ]);

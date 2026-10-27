@@ -86,9 +86,18 @@ jest.mock('../../../components/Themed', () => ({
     onPrimary: '#ffffff',
   }),
 }));
-jest.mock('../../../store/useSettingsStore', () => ({
-  useSettingsStore: () => ({ fontSizeScale: 1, lineHeightScale: 1.5 }),
-}));
+jest.mock('../../../store/useSettingsStore', () => {
+  // One stable state, read like zustand: whole, or through a selector.
+  const state = {
+    fontSizeScale: 1,
+    lineHeightScale: 1.5,
+    removeImageWatermark: true,
+  };
+  return {
+    useSettingsStore: (selector?: (value: typeof state) => unknown) =>
+      selector ? selector(state) : state,
+  };
+});
 jest.mock('react-native-svg', () => ({ SvgUri: () => null }));
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
 

@@ -80,6 +80,7 @@ export default function AppearanceSettings() {
     textContrast,
     surfaceStyle,
     richContentRenderer,
+    removeImageWatermark,
     answerReadingMode,
     updateSettings,
   } = useSettingsStore();
@@ -197,6 +198,21 @@ export default function AppearanceSettings() {
               </BouncyButton>
             );
           })}
+          <SettingItem
+            label="去除图片水印"
+            icon="image-outline"
+            colorScheme={colorScheme}
+          >
+            <Switch
+              accessibilityLabel="去除图片水印"
+              accessibilityHint="正文图片加载作者上传的原文件，不带知乎水印"
+              value={removeImageWatermark}
+              onValueChange={(value) =>
+                updateSettings({ removeImageWatermark: value })
+              }
+              trackColor={{ true: tintColor }}
+            />
+          </SettingItem>
         </Section>
 
         <Section title="回答阅读方式" colorScheme={colorScheme}>

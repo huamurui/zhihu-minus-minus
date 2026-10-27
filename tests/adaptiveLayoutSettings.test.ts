@@ -22,12 +22,12 @@ beforeEach(() => {
   jest.mocked(SecureStore.getItemAsync).mockResolvedValue(null);
 });
 
-test('defaults adaptive panes to disabled with a one-third list width in settings version 19', () => {
+test('defaults adaptive panes to disabled with a one-third list width in settings version 20', () => {
   expect(useSettingsStore.getState()).toMatchObject({
     enableLargeScreenLayout: false,
     largeScreenListRatio: 1 / 3,
   });
-  expect(useSettingsStore.persist.getOptions().version).toBe(19);
+  expect(useSettingsStore.persist.getOptions().version).toBe(20);
 });
 
 test('migrates v18 settings without changing unrelated preferences or the input object', async () => {
@@ -126,7 +126,7 @@ test('rehydrates both layout preferences after restart', async () => {
     .mock.calls.at(-1)?.[1];
   if (!persistedJson) throw new Error('Layout preferences must be persisted');
   expect(JSON.parse(persistedJson)).toMatchObject({
-    version: 19,
+    version: 20,
     state: { enableLargeScreenLayout: false, largeScreenListRatio: 0.45 },
   });
 
@@ -139,7 +139,7 @@ test('rehydrates both layout preferences after restart', async () => {
   });
 });
 
-test('rehydrates v18 settings and persists the v19 layout defaults', async () => {
+test('rehydrates v18 settings and persists the layout defaults added in v19', async () => {
   jest
     .mocked(SecureStore.getItemAsync)
     .mockResolvedValue(
@@ -156,7 +156,7 @@ test('rehydrates v18 settings and persists the v19 layout defaults', async () =>
     .mock.calls.at(-1)?.[1];
   if (!persistedJson) throw new Error('Migrated settings must be persisted');
   expect(JSON.parse(persistedJson)).toMatchObject({
-    version: 19,
+    version: 20,
     state: { enableLargeScreenLayout: false, largeScreenListRatio: 1 / 3 },
   });
 });

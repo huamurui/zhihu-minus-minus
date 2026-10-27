@@ -240,6 +240,20 @@ describe('prototype HTML to ZhihuDocument normalization', () => {
     );
   });
 
+  it('keeps the watermarked copies Zhihu serves when watermark removal is off', () => {
+    const token = 'v2-11111111111111111111111111111111';
+    const watermarked = 'v2-00000000000000000000000000000000';
+    const { document } = normalizeZhihuDocument(
+      `<img data-actualsrc="https://example.com/${watermarked}_720w.jpg" data-original="https://example.com/${watermarked}_r.jpg" data-original-token="${token}">`,
+      { documentId: 'test', removeImageWatermark: false },
+    );
+    const [image] = document.blocks.filter((node) => node.type === 'image');
+    expect(image.resource).toMatchObject({
+      url: `https://example.com/${watermarked}_720w.jpg`,
+      originalUrl: `https://example.com/${watermarked}_r.jpg`,
+    });
+  });
+
   it('recovers raw formula tex from a lazy image URL when alt is absent without promoting it to a block', () => {
     const latex = '  \\frac{a}{b} + c % keep comment\n';
     const { document } = normalize(

@@ -30,7 +30,7 @@ beforeEach(() => {
   jest.mocked(SecureStore.getItemAsync).mockResolvedValue(null);
 });
 
-test('defaults to tiqian-super-mini with visual feedback and filtering enabled in settings version 19', () => {
+test('defaults to tiqian-super-mini with visual feedback and filtering enabled in settings version 20', () => {
   expect(useSettingsStore.getState().richContentRenderer).toBe('native-v2');
   expect(useSettingsStore.getState().enablePressFeedback).toBe(true);
   expect(useSettingsStore.getState().enableLocalFeedFilter).toBe(true);
@@ -39,7 +39,7 @@ test('defaults to tiqian-super-mini with visual feedback and filtering enabled i
   expect(useSettingsStore.getState().filterEnableQuality).toBe(false);
   expect(useSettingsStore.getState().filterBlockLabeled).toBe(false);
   expect(useSettingsStore.getState().filterRegexPatterns).toEqual([]);
-  expect(useSettingsStore.persist.getOptions().version).toBe(19);
+  expect(useSettingsStore.persist.getOptions().version).toBe(20);
 });
 
 test('leaves the double-tap action unset until the user picks one', () => {
@@ -151,7 +151,7 @@ test('hydrates legacy settings and writes back only the new renderer field', asy
       fontSizeScale: 1.3,
       enablePressFeedback: true,
     },
-    version: 19,
+    version: 20,
   });
   expect(JSON.parse(persistedJson).state).not.toHaveProperty('useWebView');
 });
@@ -304,7 +304,7 @@ test('persists and restores sanitized custom regex rules together with a disable
       enableLocalFeedFilter: false,
       filterRegexPatterns: expectedPatterns,
     },
-    version: 19,
+    version: 20,
   });
   useSettingsStore.setState({
     enableLocalFeedFilter: true,
@@ -410,4 +410,15 @@ test('preserves an explicit new regex rule order without mutating saved rules', 
     '广告\\s*推广',
   ]);
   expect(savedPatterns).toEqual(['广告\\s*推广', '^(?:优惠|福利)']);
+});
+
+test('v20 turns watermark removal on for older settings and keeps a saved choice', async () => {
+  expect((await migrate({}, 19)).removeImageWatermark).toBe(true);
+  expect(
+    (await migrate({ removeImageWatermark: false }, 19)).removeImageWatermark,
+  ).toBe(false);
+  expect(
+    (await migrate({ removeImageWatermark: 'off' }, 19)).removeImageWatermark,
+  ).toBe(true);
+  expect(useSettingsStore.getInitialState().removeImageWatermark).toBe(true);
 });

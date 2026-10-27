@@ -14,7 +14,12 @@ import type {
   ZhihuTableAlignment,
   ZhihuTableRow,
 } from '../document';
-import { isDailyAvatar, type RichContentVariant } from '../imagePolicy';
+import {
+  isDailyAvatar,
+  isZhihuImageId,
+  type RichContentVariant,
+  withOriginalImageId,
+} from '../imagePolicy';
 import type { RichTextDiagnostic } from '../richText';
 import { parseZhihuSegmentHighlight } from '../segmentHighlight';
 import { createInlineRunSlicer } from './inlineRunSlicer';
@@ -24,6 +29,8 @@ export interface ZhihuDocumentNormalizationOptions {
   variant?: RichContentVariant;
   segmentInfos?: readonly ZhihuSegmentInfo[];
   linkCardInfo?: unknown;
+  /** Load the watermark-free upload of body images when Zhihu provides one. Defaults to true. */
+  removeImageWatermark?: boolean;
 }
 
 export interface ZhihuDocumentNormalizationResult {
@@ -263,10 +270,13 @@ function safeUrl(value: string | undefined, image = false): string | undefined {
   return undefined;
 }
 
-function resolveImageUrl(element: Element): string | undefined {
+function resolveImageUrl(
+  element: Element,
+  removeWatermark = true,
+): string | undefined {
   const token = element.attribs['data-original-token'];
-  const validToken =
-    token && /^v2-[a-f\d]{32}$/i.test(token) ? token : undefined;
+  const validToken = isZhihuImageId(token) ? token : undefined;
+  const swapToken = removeWatermark ? validToken : undefined;
   const sources = [
     element.attribs['data-actualsrc'],
     element.attribs['data-original'],
@@ -279,9 +289,7 @@ function resolveImageUrl(element: Element): string | undefined {
   return sources
     .map((source) =>
       safeUrl(
-        validToken && source
-          ? source.replace(/v2-[a-f\d]{32}/i, validToken)
-          : source,
+        swapToken && source ? withOriginalImageId(source, swapToken) : source,
         true,
       ),
     )
@@ -413,6 +421,7 @@ export function normalizeZhihuDocument(
   );
   let serial = 0;
   const id = (kind: string) => `${options.documentId}:${kind}:${++serial}`;
+  const removeWatermark = options.removeImageWatermark ?? true;
   const diagnostic = (
     kind: RichTextDiagnostic['kind'],
     sourceType: string,
@@ -422,7 +431,7 @@ export function normalizeZhihuDocument(
     `${options.documentId}:footnote:${encodeURIComponent(label)}`;
 
   function imageResource(element: Element): ZhihuImageResource | undefined {
-    const url = resolveImageUrl(element);
+    const url = resolveImageUrl(element, removeWatermark);
     if (!url) {
       diagnostic('unsafe-url', 'img');
       return undefined;
@@ -438,8 +447,8 @@ export function normalizeZhihuDocument(
       true,
     );
     const originalToken = element.attribs['data-original-token'];
-    if (originalUrl && originalToken && /^v2-[a-f\d]{32}$/i.test(originalToken))
-      originalUrl = originalUrl.replace(/v2-[a-f\d]{32}/i, originalToken);
+    if (originalUrl && removeWatermark && isZhihuImageId(originalToken))
+      originalUrl = withOriginalImageId(originalUrl, originalToken);
     return {
       mediaType: 'image',
       url,
@@ -1206,7 +1215,9 @@ export function normalizeZhihuDocument(
       const poster =
         safeUrl(node.attribs.poster, true) ??
         safeUrl(node.attribs['data-thumbnail'], true) ??
-        (posterImage ? resolveImageUrl(posterImage) : undefined);
+        (posterImage
+          ? resolveImageUrl(posterImage, removeWatermark)
+          : undefined);
       if (url)
         return [
           {

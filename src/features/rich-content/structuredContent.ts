@@ -17,6 +17,7 @@ import type {
   ZhihuListItem,
   ZhihuTextRange,
 } from './document';
+import { isZhihuImageId, withOriginalImageId } from './imagePolicy';
 import { getSafeRichContentUrl } from './webviewSecurity';
 
 const INVALID_CONTENT = '原生正文返回结构无效';
@@ -332,6 +333,8 @@ export interface ZhihuStructuredContentNormalizationOptions {
   documentId?: string;
   /** Explicit trusted test assets, keyed by their validated source image URL. */
   resources?: Readonly<Record<string, ZhihuImageResource>>;
+  /** Load the watermark-free upload of body images when Zhihu provides one. Defaults to true. */
+  removeImageWatermark?: boolean;
 }
 
 /** Source ranges remain UTF-16 offsets into the unmodified paragraph text. */
@@ -774,8 +777,18 @@ export function normalizeZhihuStructuredContent(
       }
       case 'image': {
         const source = segment.image;
+        const token =
+          (options.removeImageWatermark ?? true) &&
+          isZhihuImageId(source.original_token)
+            ? source.original_token
+            : undefined;
+        const unwatermarked = (urls: readonly string[]) =>
+          token ? urls.map((url) => withOriginalImageId(url, token)) : urls;
         const resource = imageResource(
-          [...source.urls, ...source.original_urls],
+          [
+            ...unwatermarked(source.urls),
+            ...unwatermarked(source.original_urls),
+          ],
           source.width,
           source.height,
           options.resources,
@@ -788,7 +801,7 @@ export function normalizeZhihuStructuredContent(
             fallbackText: source.description || '图片资源不可用',
           };
         }
-        const originalUrl = source.original_urls
+        const originalUrl = unwatermarked(source.original_urls)
           .map((url) => getSafeRichContentUrl(url, true))
           .find((url) => url !== undefined);
         return {

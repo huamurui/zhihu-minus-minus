@@ -18,6 +18,7 @@ import {
   type ZhihuDocument,
 } from '@/features/rich-content';
 import { getAuthSessionVersion } from '@/store/useAuthStore';
+import { useSettingsStore } from '@/store/useSettingsStore';
 import type {
   ZhihuContentSegment,
   ZhihuStructuredContent,
@@ -101,6 +102,11 @@ function isPartial(detail: Record<string, unknown>): boolean {
   );
 }
 
+/** Exports carry the same images the reader sees. */
+function exportsUnwatermarkedImages(): boolean {
+  return useSettingsStore.getState().removeImageWatermark;
+}
+
 function htmlDocument(
   html: string,
   target: ExportTarget,
@@ -111,6 +117,7 @@ function htmlDocument(
     documentId: `export:${target.type}:${target.id}`,
     variant: target.type === 'daily' ? 'daily' : 'default',
     linkCardInfo: detail.link_card_info,
+    removeImageWatermark: exportsUnwatermarkedImages(),
   });
   if (result.diagnostics.length) warnings.push(UNSUPPORTED);
   return result.document;
@@ -269,6 +276,7 @@ async function answerBody(
       mergeStructuredContentPages(pages),
       {
         documentId: `export:answer:${target.id}`,
+        removeImageWatermark: exportsUnwatermarkedImages(),
       },
     ),
     partial,
@@ -368,6 +376,7 @@ export async function resolveExportSource(
         const result = normalizeZhihuContentSegments(segments, {
           documentId: `export:pin:${target.id}`,
           linkCardInfo: detail.link_card_info,
+          removeImageWatermark: exportsUnwatermarkedImages(),
         });
         document = result.document;
         if (result.diagnostics.length) warnings.push(UNSUPPORTED);
