@@ -845,3 +845,85 @@ test('clears the active auth session when z_c0 is deleted but anonymous cookies 
   expect(useAuthStore.getState().cookies).toBe('');
   expect(useAuthStore.getState().accounts[0].cookies).toBe('');
 });
+
+function riskControlled(config: InternalAxiosRequestConfig): AxiosError {
+  return new AxiosError(
+    'Synthetic risk control',
+    'ERR_BAD_REQUEST',
+    config,
+    undefined,
+    {
+      ...response(config, {
+        error: {
+          code: 40362,
+          message: '您当前请求存在异常，暂时限制本次访问。',
+        },
+      }),
+      status: 403,
+      statusText: 'Forbidden',
+    },
+  );
+}
+
+const SIGNING_HEADERS = [
+  'x-zse-96',
+  'x-zse-93',
+  'X-Udid',
+  'x-xsrftoken',
+  'x-requested-with',
+  'Referer',
+];
+
+describe('Zhihu risk control (40362)', () => {
+  beforeEach(() => {
+    // A device cookie makes the client sign requests.
+    useAuthStore
+      .getState()
+      .setCookies(`${COOKIE_A}; d_c0=test-device|1; _xsrf=test-xsrf`);
+  });
+
+  test('retries a signed request once with only the cookie and user agent', async () => {
+    const sent: InternalAxiosRequestConfig['headers'][] = [];
+    apiClient.defaults.adapter = async (config) => {
+      sent.push(config.headers);
+      if (sent.length === 1) throw riskControlled(config);
+      return response(config, { paging: {}, data: [] });
+    };
+
+    await expect(apiClient.get('/test-followers')).resolves.toMatchObject({
+      status: 200,
+    });
+    expect(sent).toHaveLength(2);
+    for (const name of SIGNING_HEADERS) expect(sent[0].get(name)).toBeTruthy();
+    for (const name of SIGNING_HEADERS) expect(sent[1].get(name)).toBeFalsy();
+    expect(sent[1].get('Cookie')).toContain('z_c0=test-account-a');
+    expect(sent[1].get('User-Agent')).toBeTruthy();
+  });
+
+  test('gives up after the one unsigned retry', async () => {
+    let attempts = 0;
+    apiClient.defaults.adapter = async (config) => {
+      attempts += 1;
+      throw riskControlled(config);
+    };
+
+    await expect(apiClient.get('/test-followers')).rejects.toMatchObject({
+      response: { status: 403, data: { error: { code: 40362 } } },
+    });
+    expect(attempts).toBe(2);
+  });
+
+  test('does not retry a request that was never signed', async () => {
+    useAuthStore.getState().setCookies(COOKIE_A);
+    let attempts = 0;
+    apiClient.defaults.adapter = async (config) => {
+      attempts += 1;
+      throw riskControlled(config);
+    };
+
+    await expect(apiClient.get('/test-followers')).rejects.toMatchObject({
+      response: { status: 403 },
+    });
+    expect(attempts).toBe(1);
+  });
+});

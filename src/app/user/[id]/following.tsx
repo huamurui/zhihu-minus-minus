@@ -148,6 +148,7 @@ export default function FollowingScreen() {
           data: usersQuery.data?.pages.flatMap((page) => page.data) || [],
           isLoading: usersQuery.isLoading,
           isError: usersQuery.isError,
+          error: usersQuery.error,
           isFetchingNextPage: usersQuery.isFetchingNextPage,
           isFetching: usersQuery.isFetching,
           hasNextPage: usersQuery.hasNextPage,
@@ -161,6 +162,7 @@ export default function FollowingScreen() {
           data: columnsQuery.data?.pages.flatMap((page) => page.data) || [],
           isLoading: columnsQuery.isLoading,
           isError: columnsQuery.isError,
+          error: columnsQuery.error,
           isFetchingNextPage: columnsQuery.isFetchingNextPage,
           isFetching: columnsQuery.isFetching,
           hasNextPage: columnsQuery.hasNextPage,
@@ -174,6 +176,7 @@ export default function FollowingScreen() {
           data: topicsQuery.data?.pages.flatMap((page) => page.data) || [],
           isLoading: topicsQuery.isLoading,
           isError: topicsQuery.isError,
+          error: topicsQuery.error,
           isFetchingNextPage: topicsQuery.isFetchingNextPage,
           isFetching: topicsQuery.isFetching,
           hasNextPage: topicsQuery.hasNextPage,
@@ -187,6 +190,7 @@ export default function FollowingScreen() {
           data: questionsQuery.data?.pages.flatMap((page) => page.data) || [],
           isLoading: questionsQuery.isLoading,
           isError: questionsQuery.isError,
+          error: questionsQuery.error,
           isFetchingNextPage: questionsQuery.isFetchingNextPage,
           isFetching: questionsQuery.isFetching,
           hasNextPage: questionsQuery.hasNextPage,
@@ -200,6 +204,7 @@ export default function FollowingScreen() {
           data: favlistsQuery.data?.pages.flatMap((page) => page.data) || [],
           isLoading: favlistsQuery.isLoading,
           isError: favlistsQuery.isError,
+          error: favlistsQuery.error,
           isFetchingNextPage: favlistsQuery.isFetchingNextPage,
           isFetching: favlistsQuery.isFetching,
           hasNextPage: favlistsQuery.hasNextPage,
@@ -213,6 +218,7 @@ export default function FollowingScreen() {
           data: [],
           isLoading: false,
           isError: false,
+          error: null,
           isFetchingNextPage: false,
           isFetching: false,
           hasNextPage: false,
@@ -465,6 +471,7 @@ export default function FollowingScreen() {
                       <QueryErrorView
                         compact
                         message={`${tab.title}加载失败`}
+                        error={query.error}
                         onRetry={() => void query.refetch()}
                       />
                     ) : (

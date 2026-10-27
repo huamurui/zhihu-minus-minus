@@ -23,6 +23,7 @@ export default function MutualFollowersScreen() {
     isFetchingNextPage,
     isFetching,
     isError,
+    error,
     refetch,
     isRefetching,
   } = useInfiniteQuery({
@@ -61,6 +62,7 @@ export default function MutualFollowersScreen() {
               <QueryErrorView
                 compact
                 message="共同关注加载失败"
+                error={error}
                 onRetry={() => void refetch()}
               />
             ) : (

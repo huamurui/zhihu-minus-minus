@@ -23,6 +23,7 @@ export default function FollowersScreen() {
     isFetchingNextPage,
     isFetching,
     isError,
+    error,
     refetch,
     isRefetching,
   } = useInfiniteQuery({
@@ -68,6 +69,7 @@ export default function FollowersScreen() {
               <QueryErrorView
                 compact
                 message="关注者加载失败"
+                error={error}
                 onRetry={() => void refetch()}
               />
             ) : (

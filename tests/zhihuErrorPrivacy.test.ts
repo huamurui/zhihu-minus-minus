@@ -5,6 +5,8 @@ import {
   sanitizeBusinessFeedback,
 } from '../src/utils/safeFeedback';
 import {
+  describeZhihuError,
+  getZhihuErrorCode,
   getZhihuErrorMessage,
   getZhihuErrorStatus,
 } from '../src/utils/zhihuError';
@@ -128,3 +130,40 @@ test.each([NaN, Infinity, -1, 0, 600, 403.5, '403'])(
     expect(getZhihuErrorStatus({ response: { status } })).toBeUndefined();
   },
 );
+
+test('names Zhihu risk control instead of a generic permission error', () => {
+  // The real message ends in a trace ID; this one is synthetic.
+  const riskControl = {
+    response: {
+      status: 403,
+      data: {
+        error: {
+          code: 40362,
+          message: `您当前请求存在异常，暂时限制本次访问。${'0'.repeat(32)}`,
+        },
+      },
+    },
+  };
+  expect(getZhihuErrorCode(riskControl)).toBe(40362);
+  expect(getZhihuErrorMessage(riskControl)).toBe(
+    '知乎暂时限制了本次访问，请稍后重试',
+  );
+  expect(describeZhihuError(riskControl)).toBe(
+    '知乎暂时限制了本次访问，请稍后重试（HTTP 403 · 错误码 40362）',
+  );
+});
+
+test('describes a failure by its safe message and whatever identifies it', () => {
+  expect(describeZhihuError(undefined)).toBeUndefined();
+  expect(describeZhihuError(failedResponse('内容不存在', 404))).toBe(
+    '内容不存在（HTTP 404）',
+  );
+  expect(
+    describeZhihuError({
+      response: { status: 500, data: { error: { code: 'x' } } },
+    }),
+  ).toBe('知乎服务暂时不可用，请稍后重试（HTTP 500）');
+  expect(describeZhihuError({ code: 'ERR_NETWORK' })).toBe(
+    '网络连接失败，请检查网络后重试',
+  );
+});

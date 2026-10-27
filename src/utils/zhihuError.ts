@@ -18,6 +18,43 @@ export function getZhihuErrorStatus(error: unknown): number | undefined {
     : undefined;
 }
 
+/** Zhihu's own error code, from a failed API response. */
+export function getZhihuErrorCode(error: unknown): number | undefined {
+  if (!isRecord(error) || !isRecord(error.response)) return undefined;
+  const data = error.response.data;
+  return isRecord(data) &&
+    isRecord(data.error) &&
+    typeof data.error.code === 'number' &&
+    Number.isSafeInteger(data.error.code)
+    ? data.error.code
+    : undefined;
+}
+
+/**
+ * Zhihu's risk control, sent with HTTP 403: "您当前请求存在异常，暂时限制本次
+ * 访问", followed by a trace ID.
+ */
+export const ZHIHU_RISK_CONTROL_CODE = 40362;
+
+/**
+ * The reason a request failed, for showing under a screen's own failure
+ * message: the safe message, then the HTTP status and Zhihu error code that
+ * identify it in a bug report.
+ */
+export function describeZhihuError(error: unknown): string | undefined {
+  if (!error) return undefined;
+  const status = getZhihuErrorStatus(error);
+  const code = getZhihuErrorCode(error);
+  const reference = [
+    status !== undefined ? `HTTP ${status}` : undefined,
+    code !== undefined ? `错误码 ${code}` : undefined,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const message = getZhihuErrorMessage(error);
+  return reference ? `${message}（${reference}）` : message;
+}
+
 export function getZhihuErrorMessage(error: unknown): string {
   const localMessage = getSafeFeedbackMessage(error);
   if (localMessage) return localMessage;
@@ -30,6 +67,9 @@ export function getZhihuErrorMessage(error: unknown): string {
     return '操作已取消';
   if (isRecord(error) && isRecord(error.response)) {
     const status = getZhihuErrorStatus(error);
+    // Its message ends in a trace ID, which the sanitizer rightly rejects.
+    if (getZhihuErrorCode(error) === ZHIHU_RISK_CONTROL_CODE)
+      return '知乎暂时限制了本次访问，请稍后重试';
     const data = error.response.data;
     if (isRecord(data) && isRecord(data.error)) {
       const message = sanitizeBusinessFeedback(data.error.message);

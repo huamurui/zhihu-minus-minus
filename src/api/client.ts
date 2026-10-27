@@ -14,6 +14,7 @@ import {
 import { useVerificationStore } from '@/store/useVerificationStore';
 import { waitForNativeSessionCookies } from '@/utils/authSession';
 import { classifyNetworkError } from '@/utils/networkFailure';
+import { ZHIHU_RISK_CONTROL_CODE } from '@/utils/zhihuError';
 import {
   encryptZseV4,
   hmacSha1Hex,
@@ -36,7 +37,16 @@ interface SessionRequestConfig extends InternalAxiosRequestConfig {
   zhihuSessionVersion?: number;
   zhihuSessionRetried?: boolean;
   zhihuSkipVerification?: boolean;
+  /** Set on the one retry after Zhihu's risk control rejected a signed request. */
+  zhihuUnsignedRetry?: boolean;
 }
+
+/**
+ * While Zhihu's risk control lasted, the followers list rejected every request
+ * carrying the app's signing headers and served the same request sent with
+ * only these.
+ */
+const RISK_CONTROL_RETRY_HEADERS = new Set(['Cookie', 'User-Agent']);
 
 interface SessionRefreshResult {
   success: boolean;
@@ -454,6 +464,14 @@ apiClient.interceptors.request.use(async (config) => {
     const authHeaders = await buildZhihuAuthHeaders(fullUrl, cookie, body);
     requireCurrentSession(sessionVersion);
     if (configuredReferer) authHeaders.Referer = configuredReferer;
+    if (sessionConfig.zhihuUnsignedRetry) {
+      for (const name of Object.keys(authHeaders)) {
+        if (RISK_CONTROL_RETRY_HEADERS.has(name)) continue;
+        delete authHeaders[name];
+        // The retry reuses the rejected request's config and its headers.
+        config.headers.delete(name);
+      }
+    }
     Object.assign(config.headers, authHeaders);
   }
   sessionConfig.zhihuSessionVersion = sessionVersion;
@@ -537,6 +555,18 @@ apiClient.interceptors.response.use(
         useVerificationStore.getState().setVerification(redirectUrl);
       }
       return Promise.reject(error); // 拦截 40352，不抛出红屏错误
+    }
+    if (
+      verificationCode === ZHIHU_RISK_CONTROL_CODE &&
+      sessionConfig &&
+      !sessionConfig.zhihuUnsignedRetry &&
+      getHeaderValue(sessionConfig.headers, 'x-zse-96')
+    ) {
+      sessionConfig.zhihuUnsignedRetry = true;
+      console.warn(
+        `⚠️ [API ${requestId}] ${method} ${path} 触发知乎风控 ${ZHIHU_RISK_CONTROL_CODE}，去掉签名请求头重试一次`,
+      );
+      return apiClient.request(sessionConfig);
     }
 
     const status = error.response?.status;
