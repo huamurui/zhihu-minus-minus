@@ -560,7 +560,7 @@ export default React.memo(function ZhihuDOMContent({
             if (${removeImageWatermark ? 'true' : 'false'} && actualSrc && originalToken) {
               const cleanToken = originalToken.trim();
               const tokenRegex = /v2-[a-fA-F0-9]{32}/;
-              if (tokenRegex.test(actualSrc)) {
+              if (/^v2-[a-fA-F0-9]{32}$/.test(cleanToken) && tokenRegex.test(actualSrc)) {
                 actualSrc = actualSrc.replace(tokenRegex, cleanToken);
               }
             }

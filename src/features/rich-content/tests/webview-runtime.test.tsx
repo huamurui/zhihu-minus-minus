@@ -8,6 +8,7 @@ import ZhihuDOMContent, {
 } from '../components/ZhihuDOMContent';
 
 let mockWebViewProps: WebViewProps;
+let mockRemoveImageWatermark = true;
 const mockInjectJavaScript = jest.fn<void, [string]>();
 jest.mock('react-native-webview', () => {
   const { forwardRef, useImperativeHandle } =
@@ -34,11 +35,16 @@ jest.mock('../../../components/Themed', () => ({
   }),
 }));
 jest.mock('../../../store/useSettingsStore', () => ({
-  useSettingsStore: () => ({ fontSizeScale: 1, lineHeightScale: 1.5 }),
+  useSettingsStore: () => ({
+    fontSizeScale: 1,
+    lineHeightScale: 1.5,
+    removeImageWatermark: mockRemoveImageWatermark,
+  }),
 }));
 
 beforeEach(() => {
   mockInjectJavaScript.mockClear();
+  mockRemoveImageWatermark = true;
 });
 
 async function renderPage(overrides: Partial<ZhihuDOMContentProps> = {}) {
@@ -139,6 +145,59 @@ test.each([
     expect(postMessage).toHaveBeenLastCalledWith(
       bridgeMessage(html, { type: 'height', height: 120 }),
     );
+  },
+);
+
+test.each([
+  [
+    true,
+    'v2-11111111111111111111111111111111',
+    'v2-11111111111111111111111111111111',
+  ],
+  [
+    false,
+    'v2-11111111111111111111111111111111',
+    'v2-00000000000000000000000000000000',
+  ],
+  [true, 'invalid-token', 'v2-00000000000000000000000000000000'],
+])(
+  'WebView image rewriting respects the preference and validates token',
+  async (enabled, token, expected) => {
+    mockRemoveImageWatermark = enabled;
+    const { html } = await renderPage();
+    const attrs: Record<string, string> = {
+      src: 'https://pic1.zhimg.com/v2-00000000000000000000000000000000_720w.jpg',
+      'data-original-token': token,
+    };
+    const image = {
+      getAttribute: (name: string) => attrs[name] ?? null,
+      setAttribute: (name: string, value: string) => {
+        attrs[name] = value;
+      },
+      style: {},
+    };
+    const container = {
+      innerHTML: '',
+      children: [],
+      scrollHeight: 1,
+      getBoundingClientRect: () => ({ height: 1 }),
+      querySelectorAll: (selector: string) =>
+        selector === 'img' ? [image] : [],
+      addEventListener: jest.fn(),
+    };
+    vm.runInNewContext(inlineScript(html), {
+      document: {
+        getElementById: () => container,
+        addEventListener: jest.fn(),
+        documentElement: { style: {} },
+      },
+      window: {
+        ReactNativeWebView: { postMessage: jest.fn() },
+        addEventListener: jest.fn(),
+      },
+      setTimeout: jest.fn(),
+    });
+    expect(attrs.src).toBe(`https://pic1.zhimg.com/${expected}_720w.jpg`);
   },
 );
 
@@ -313,6 +372,7 @@ test('toggles selection without reloading and rejects delayed events and scripts
   const context = { document, window };
   vm.runInNewContext(enabledScript, context);
   mockInjectJavaScript.mockClear();
+  mockRemoveImageWatermark = true;
 
   await view.rerender(<ZhihuDOMContent {...props} selectable={false} />);
   expect(mockWebViewProps.source).toBe(source);
