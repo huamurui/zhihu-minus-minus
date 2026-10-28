@@ -573,9 +573,12 @@ apiClient.interceptors.response.use(
       !sessionConfig.zhihuAntiCrawlRetried
     ) {
       const requestCookie = getHeaderValue(sessionConfig.headers, 'Cookie');
-      const antiCrawl = requestCookie
-        ? await readNativeAntiCrawlCookie()
-        : undefined;
+      // Right after an account switch the native jar may still hold the
+      // previous account's cookies; read it only once it mirrors this session.
+      const antiCrawl =
+        requestCookie && (await waitForNativeSessionCookies())
+          ? await readNativeAntiCrawlCookie()
+          : undefined;
       requireCurrentSession(sessionConfig.zhihuSessionVersion);
       const storedCookie = useAuthStore.getState().cookies;
       if (

@@ -940,4 +940,27 @@ describe('Zhihu risk control (40362)', () => {
     });
     expect(attempts).toBe(1);
   });
+  test('does not read the WebView store while it still mirrors another session', async () => {
+    nativeCookies({ __zse_ck: 'test-previous-account' });
+    jest
+      .mocked(CookieManager.clearAllStores)
+      .mockRejectedValueOnce(new Error('synthetic native failure'));
+    await expect(syncNativeSessionCookies(null)).rejects.toThrow();
+    let attempts = 0;
+    apiClient.defaults.adapter = async (config) => {
+      attempts += 1;
+      throw riskControlled(config);
+    };
+
+    try {
+      await expect(apiClient.get('/test-followers')).rejects.toMatchObject({
+        response: { status: 403 },
+      });
+      expect(attempts).toBe(1);
+      expect(useAuthStore.getState().cookies).not.toContain('__zse_ck');
+    } finally {
+      // Later requests read the jar again once a synchronization succeeds.
+      await syncNativeSessionCookies(null);
+    }
+  });
 });
