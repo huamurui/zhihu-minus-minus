@@ -101,6 +101,8 @@ jest.mock('../src/utils/authPersistenceFeedback', () => ({
   persistAuthStateWithFeedback: jest.fn(),
 }));
 jest.mock('../src/utils/authSession', () => ({
+  beginNativeLoginFlow: jest.fn(),
+  finishNativeLoginFlow: jest.fn(),
   syncNativeSessionCookies: jest.fn(),
 }));
 jest.mock('../src/utils/haptics', () => ({

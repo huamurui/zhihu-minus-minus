@@ -314,7 +314,7 @@ xcrun simctl openurl booted 'zhihu--:///dev/rich-content/prototype?caseId=attach
 
 根布局通过 `useQueryConnectivity` 将 `expo-network` 和原生 AppState 接入 TanStack 的在线/前台状态。首次网络快照不得覆盖更新的网络事件，回到前台重新读取状态；相同在线事件去重。确认断网恢复或 Wi-Fi/移动网络类型切换时，`restartInterruptedQueries` 先取消仍在执行的活跃读取，再保留缓存与 `fetchMeta` 重启，使首屏和下一页无需等旧连接超时。后台可能漏掉断开与重连事件，前台确认在线后也重启回前台前就已挂起的读取，不取消此后新发起的请求。已经暂停的查询沿原任务继续，本地 `networkMode: always` 查询与非活跃查询不主动重启。
 
-已有页缓存的无限列表不因回前台/重连而从头串行重抓全部页，已有内容可继续阅读；无缓存首屏照常恢复，在途翻页保留原方向，已终止的分页失败仍可手动重试。普通无 HTTP 响应的传输失败最多自动重试一次；408、429 和 5xx 保留两次重试。知乎风控 `40362`（HTTP 403，“您当前请求存在异常，暂时限制本次访问”）在关注者列表等接口上由缺少反爬 Cookie `__zse_ck` 触发：它由知乎页面脚本写入 WebView Cookie 存储，API 客户端以 `withCredentials: false` 只发送账号保存的 Cookie，登录时也不一定取到它。收到 40362 时，若 WebView 存储中有不同的 `__zse_ck`，只把这一项合并进当前账号 Cookie 并重试一次；不读取或合并 WebView 中的其他 Cookie。列表失败页向 `QueryErrorView` 传入 `error`，在页面文案下显示安全提示、HTTP 状态和知乎错误码。游客推荐与同城接口遇传输失败不再串行尝试兼容接口，HTTP 兼容回退保持。
+已有页缓存的无限列表不因回前台/重连而从头串行重抓全部页，已有内容可继续阅读；无缓存首屏照常恢复，在途翻页保留原方向，已终止的分页失败仍可手动重试。普通无 HTTP 响应的传输失败最多自动重试一次；408、429 和 5xx 保留两次重试。知乎风控 `40362`（HTTP 403，“您当前请求存在异常，暂时限制本次访问”）在关注者列表等接口上由缺少反爬 Cookie `__zse_ck` 触发：它由知乎页面脚本写入 WebView Cookie 存储，API 客户端以 `withCredentials: false` 只发送账号保存的 Cookie，登录时也不一定取到它。读取请求收到 40362 时，若 WebView 的 `z_c0` 与当前账号一致且有不同的 `__zse_ck`，只把这一项合并进当前账号 Cookie 并重试一次；添加账号期间跳过读取，写入请求不自动重试。列表失败页向 `QueryErrorView` 传入 `error`，在页面文案下显示安全提示、HTTP 状态和知乎错误码。游客推荐与同城接口遇传输失败不再串行尝试兼容接口，HTTP 兼容回退保持。
 
 写入查询默认使用 `networkMode: always`、`retry: false`，离线时按请求失败和既有回滚处理，避免评论、私信和发布排队后在恢复网络时自动提交。不要为恢复读取而取消或重放 mutation。离线首屏处于 `pending/paused`，页面需保留加载状态，不能显示“暂无内容”或“内容已删除”。
 

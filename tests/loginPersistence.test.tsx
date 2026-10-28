@@ -63,6 +63,7 @@ jest.mock('../src/store/useVerificationStore', () => ({
   },
 }));
 jest.mock('../src/utils/authSession', () => ({
+  finishNativeLoginFlow: jest.fn(),
   syncNativeSessionCookies: (...args: unknown[]) =>
     mockSyncNativeSession(...args),
 }));

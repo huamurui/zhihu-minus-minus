@@ -24,7 +24,11 @@ import { getAuthSessionVersion, useAuthStore } from '@/store/useAuthStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { useVerificationStore } from '@/store/useVerificationStore';
 import { persistAuthStateWithFeedback } from '@/utils/authPersistenceFeedback';
-import { syncNativeSessionCookies } from '@/utils/authSession';
+import {
+  beginNativeLoginFlow,
+  finishNativeLoginFlow,
+  syncNativeSessionCookies,
+} from '@/utils/authSession';
 import { ImpactFeedbackStyle, impactAsync } from '@/utils/haptics';
 
 interface ProfileScreenProps {
@@ -273,10 +277,13 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
     setAccountModalVisible(false);
     // Keep the current app account selected, but start the login WebView with
     // an empty native session. A successful login will write the new cookies.
+    beginNativeLoginFlow();
     try {
       await CookieManager.clearAllStores();
       if (session === getAuthSessionVersion()) router.push('/login');
+      else finishNativeLoginFlow();
     } catch {
+      finishNativeLoginFlow();
       if (session === getAuthSessionVersion()) {
         Alert.alert('无法添加账号', '清理网页登录状态失败，请稍后重试。');
       }

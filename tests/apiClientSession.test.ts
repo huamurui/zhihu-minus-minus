@@ -25,6 +25,8 @@ import {
 import { useCollectionStore } from '../src/store/useCollectionStore';
 import { useVerificationStore } from '../src/store/useVerificationStore';
 import {
+  beginNativeLoginFlow,
+  finishNativeLoginFlow,
   NATIVE_SESSION_SYNC_TIMEOUT_MS,
   syncNativeSessionCookies,
 } from '../src/utils/authSession';
@@ -886,7 +888,11 @@ describe('Zhihu risk control (40362)', () => {
   });
 
   test('retries once with the anti-crawl cookie from the WebView store and keeps it', async () => {
-    nativeCookies({ __zse_ck: 'test-anti-crawl', z_c0: 'test-native-only' });
+    nativeCookies({
+      __zse_ck: 'test-anti-crawl',
+      z_c0: 'test-account-a',
+      extra: 'test-native-only',
+    });
     const sent: string[] = [];
     apiClient.defaults.adapter = async (config) => {
       sent.push(String(config.headers.get('Cookie')));
@@ -909,7 +915,7 @@ describe('Zhihu risk control (40362)', () => {
   });
 
   test('gives up after the one retry', async () => {
-    nativeCookies({ __zse_ck: 'test-anti-crawl' });
+    nativeCookies({ __zse_ck: 'test-anti-crawl', z_c0: 'test-account-a' });
     let attempts = 0;
     apiClient.defaults.adapter = async (config) => {
       attempts += 1;
@@ -928,7 +934,7 @@ describe('Zhihu risk control (40362)', () => {
   ])('does not retry when %s', async (_case, native) => {
     if ('__zse_ck' in native)
       useAuthStore.getState().setCookies(`${STORED}; __zse_ck=test-anti-crawl`);
-    nativeCookies(native);
+    nativeCookies({ z_c0: 'test-account-a', ...native });
     let attempts = 0;
     apiClient.defaults.adapter = async (config) => {
       attempts += 1;
@@ -939,6 +945,95 @@ describe('Zhihu risk control (40362)', () => {
       response: { status: 403 },
     });
     expect(attempts).toBe(1);
+  });
+  test.each([
+    ['another account', { z_c0: 'test-account-b', __zse_ck: 'test-other' }],
+    ['no authenticated account', { __zse_ck: 'test-other' }],
+  ])(
+    'does not import cookies from a native jar with %s',
+    async (_case, native) => {
+      nativeCookies(native);
+      let attempts = 0;
+      apiClient.defaults.adapter = async (config) => {
+        attempts += 1;
+        throw riskControlled(config);
+      };
+      await expect(apiClient.get('/test-followers')).rejects.toMatchObject({
+        response: { status: 403 },
+      });
+      expect(attempts).toBe(1);
+      expect(useAuthStore.getState().cookies).not.toContain('__zse_ck');
+    },
+  );
+
+  test('does not replay a mutation on risk control', async () => {
+    nativeCookies({ z_c0: 'test-account-a', __zse_ck: 'test-anti-crawl' });
+    let attempts = 0;
+    apiClient.defaults.adapter = async (config) => {
+      attempts += 1;
+      throw riskControlled(config);
+    };
+    await expect(apiClient.post('/test-write', {})).rejects.toMatchObject({
+      response: { status: 403 },
+    });
+    expect(attempts).toBe(1);
+    expect(useAuthStore.getState().cookies).not.toContain('__zse_ck');
+  });
+
+  test('does not import an in-flight native read after add-account starts', async () => {
+    let resolveRead: (
+      cookies: Awaited<ReturnType<typeof CookieManager.get>>,
+    ) => void = () => {};
+    let readStarted: () => void = () => {};
+    const started = new Promise<void>((resolve) => {
+      readStarted = resolve;
+    });
+    jest.mocked(CookieManager.get).mockImplementationOnce(() => {
+      readStarted();
+      return new Promise((resolve) => {
+        resolveRead = resolve;
+      });
+    });
+    let attempts = 0;
+    apiClient.defaults.adapter = async (config) => {
+      attempts += 1;
+      throw riskControlled(config);
+    };
+    const request = apiClient.get('/test-followers');
+    await started;
+    beginNativeLoginFlow();
+    resolveRead({
+      z_c0: { name: 'z_c0', value: 'test-account-a' },
+      __zse_ck: { name: '__zse_ck', value: 'test-other' },
+    });
+    await expect(request).rejects.toMatchObject({ response: { status: 403 } });
+    expect(attempts).toBe(1);
+    expect(useAuthStore.getState().cookies).not.toContain('__zse_ck');
+    finishNativeLoginFlow();
+    await syncNativeSessionCookies(null);
+  });
+
+  test('does not overwrite a cookie refreshed while the request was in flight', async () => {
+    nativeCookies({ z_c0: 'test-account-a', __zse_ck: 'test-stale' });
+    let attempts = 0;
+    apiClient.defaults.adapter = async (config) => {
+      attempts += 1;
+      if (attempts === 1) {
+        useAuthStore
+          .getState()
+          .updateActiveAccountCookies(`${STORED}; __zse_ck=test-new`);
+        throw riskControlled(config);
+      }
+      expect(String(config.headers.get('Cookie'))).toContain(
+        '__zse_ck=test-new',
+      );
+      return response(config);
+    };
+    await expect(apiClient.get('/test-followers')).resolves.toMatchObject({
+      status: 200,
+    });
+    expect(attempts).toBe(2);
+    expect(useAuthStore.getState().cookies).toContain('__zse_ck=test-new');
   });
   test('does not read the WebView store while it still mirrors another session', async () => {
     nativeCookies({ __zse_ck: 'test-previous-account' });

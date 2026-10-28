@@ -12,7 +12,11 @@ import {
   useAuthStore,
 } from '@/store/useAuthStore';
 import { useVerificationStore } from '@/store/useVerificationStore';
-import { waitForNativeSessionCookies } from '@/utils/authSession';
+import {
+  getNativeCookieReadGeneration,
+  isNativeCookieReadCurrent,
+  waitForNativeSessionCookies,
+} from '@/utils/authSession';
 import { classifyNetworkError } from '@/utils/networkFailure';
 import { ZHIHU_RISK_CONTROL_CODE } from '@/utils/zhihuError';
 import {
@@ -49,9 +53,15 @@ interface SessionRequestConfig extends InternalAxiosRequestConfig {
  */
 const ZHIHU_ANTI_CRAWL_COOKIE = '__zse_ck';
 
-async function readNativeAntiCrawlCookie(): Promise<string | undefined> {
+async function readNativeAntiCrawlCookie(
+  accountCookie: string,
+): Promise<string | undefined> {
   try {
     const cookies = await CookieManager.get('https://www.zhihu.com', true);
+    // The native jar can survive a failed switch and an app restart. Match the
+    // authenticated session before importing anything from it.
+    if (!accountCookie || cookies?.z_c0?.value !== accountCookie)
+      return undefined;
     return cookies?.[ZHIHU_ANTI_CRAWL_COOKIE]?.value || undefined;
   } catch {
     return undefined;
@@ -570,36 +580,58 @@ apiClient.interceptors.response.use(
     if (
       verificationCode === ZHIHU_RISK_CONTROL_CODE &&
       sessionConfig &&
+      ['get', 'head'].includes(sessionConfig.method?.toLowerCase() ?? '') &&
       !sessionConfig.zhihuAntiCrawlRetried
     ) {
       const requestCookie = getHeaderValue(sessionConfig.headers, 'Cookie');
-      // Right after an account switch the native jar may still hold the
-      // previous account's cookies; read it only once it mirrors this session.
+      const requestAccount =
+        requestCookie && getCookieValue(requestCookie, 'z_c0');
+      const generation = getNativeCookieReadGeneration();
       const antiCrawl =
-        requestCookie && (await waitForNativeSessionCookies())
-          ? await readNativeAntiCrawlCookie()
+        requestAccount &&
+        generation !== undefined &&
+        (await waitForNativeSessionCookies()) &&
+        isNativeCookieReadCurrent(generation)
+          ? await readNativeAntiCrawlCookie(requestAccount)
           : undefined;
       requireCurrentSession(sessionConfig.zhihuSessionVersion);
       const storedCookie = useAuthStore.getState().cookies;
+      const requestAntiCrawl =
+        requestCookie && getCookieValue(requestCookie, ZHIHU_ANTI_CRAWL_COOKIE);
+      const storedAntiCrawl =
+        storedCookie && getCookieValue(storedCookie, ZHIHU_ANTI_CRAWL_COOKIE);
       if (
         requestCookie &&
-        antiCrawl &&
+        requestAccount &&
         storedCookie &&
-        getCookieValue(requestCookie, ZHIHU_ANTI_CRAWL_COOKIE) !== antiCrawl
+        getCookieValue(storedCookie, 'z_c0') === requestAccount &&
+        generation !== undefined &&
+        isNativeCookieReadCurrent(generation)
       ) {
-        sessionConfig.zhihuAntiCrawlRetried = true;
-        // Keep it on the account so later requests carry it too.
-        useAuthStore
-          .getState()
-          .updateActiveAccountCookies(
-            mergeCookieHeader(storedCookie, [
-              `${ZHIHU_ANTI_CRAWL_COOKIE}=${antiCrawl}`,
-            ]),
+        if (storedAntiCrawl && storedAntiCrawl !== requestAntiCrawl) {
+          // Another response already refreshed this account; never replace it
+          // with an older value from the native jar.
+          sessionConfig.zhihuAntiCrawlRetried = true;
+          return apiClient.request(sessionConfig);
+        }
+        if (
+          antiCrawl &&
+          requestAntiCrawl === storedAntiCrawl &&
+          antiCrawl !== storedAntiCrawl
+        ) {
+          sessionConfig.zhihuAntiCrawlRetried = true;
+          useAuthStore
+            .getState()
+            .updateActiveAccountCookies(
+              mergeCookieHeader(storedCookie, [
+                `${ZHIHU_ANTI_CRAWL_COOKIE}=${antiCrawl}`,
+              ]),
+            );
+          console.warn(
+            `⚠️ [API ${requestId}] ${method} ${path} 触发知乎风控 ${ZHIHU_RISK_CONTROL_CODE}，补上 ${ZHIHU_ANTI_CRAWL_COOKIE} 重试一次`,
           );
-        console.warn(
-          `⚠️ [API ${requestId}] ${method} ${path} 触发知乎风控 ${ZHIHU_RISK_CONTROL_CODE}，补上 ${ZHIHU_ANTI_CRAWL_COOKIE} 重试一次`,
-        );
-        return apiClient.request(sessionConfig);
+          return apiClient.request(sessionConfig);
+        }
       }
     }
 

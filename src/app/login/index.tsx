@@ -21,7 +21,10 @@ import {
 } from '@/store/useAuthStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { useVerificationStore } from '@/store/useVerificationStore';
-import { syncNativeSessionCookies } from '@/utils/authSession';
+import {
+  finishNativeLoginFlow,
+  syncNativeSessionCookies,
+} from '@/utils/authSession';
 import { showToast } from '@/utils/toast';
 import { sanitizeNavigationUrlForLog } from '@/utils/url';
 
@@ -42,6 +45,7 @@ export default function LoginScreen() {
     abandonedRef.current = false;
     return () => {
       abandonedRef.current = true;
+      finishNativeLoginFlow();
     };
   }, []);
 

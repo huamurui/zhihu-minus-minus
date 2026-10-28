@@ -24,6 +24,37 @@ let pendingSynchronization: Promise<boolean> = Promise.resolve(true);
 let synchronizationStartedAt = 0;
 export const NATIVE_SESSION_SYNC_TIMEOUT_MS = 5000;
 
+// A login WebView owns the jar until it closes. Its partially written cookies
+// must not be imported into the still-selected app account.
+let nativeLoginVersion: number | undefined;
+let nativeCookieReadGeneration = 0;
+
+export function beginNativeLoginFlow(): void {
+  nativeLoginVersion = getAuthSessionVersion();
+  nativeCookieReadGeneration += 1;
+}
+
+export function getNativeCookieReadGeneration(): number | undefined {
+  return nativeLoginVersion === undefined
+    ? nativeCookieReadGeneration
+    : undefined;
+}
+
+export function isNativeCookieReadCurrent(generation: number): boolean {
+  return (
+    nativeLoginVersion === undefined &&
+    generation === nativeCookieReadGeneration
+  );
+}
+
+export function finishNativeLoginFlow(): void {
+  if (nativeLoginVersion === undefined) return;
+  const restore = nativeLoginVersion === getAuthSessionVersion();
+  nativeLoginVersion = undefined;
+  nativeCookieReadGeneration += 1;
+  if (restore) void syncNativeSessionCookies(null).catch(() => undefined);
+}
+
 /** Readers must not use the old native jar while a selected session is mirrored. */
 export async function waitForNativeSessionCookies(): Promise<boolean> {
   let timeout: ReturnType<typeof setTimeout> | undefined;
