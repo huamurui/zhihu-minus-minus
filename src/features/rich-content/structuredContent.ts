@@ -438,6 +438,31 @@ function localTestUri(value: unknown): string | undefined {
   return getSafeRichContentUrl(value, true);
 }
 
+/** A rewritten image URL keeps the resource supplied for its source URL. */
+function withRewrittenResourceKeys(
+  resources: Readonly<Record<string, ZhihuImageResource>> | undefined,
+  urls: readonly string[],
+  rewrite: (url: string) => string,
+): Readonly<Record<string, ZhihuImageResource>> | undefined {
+  if (!resources) return resources;
+  let mapped: Record<string, ZhihuImageResource> | undefined;
+  for (const url of urls) {
+    const from = getSafeRichContentUrl(url, true);
+    const to = getSafeRichContentUrl(rewrite(url), true);
+    if (
+      !from ||
+      !to ||
+      from === to ||
+      !Object.hasOwn(resources, from) ||
+      Object.hasOwn(resources, to)
+    )
+      continue;
+    mapped ??= { ...resources };
+    mapped[to] = resources[from];
+  }
+  return mapped ?? resources;
+}
+
 function imageResource(
   candidates: readonly string[],
   width: number,
@@ -791,7 +816,13 @@ export function normalizeZhihuStructuredContent(
           ],
           source.width,
           source.height,
-          options.resources,
+          token
+            ? withRewrittenResourceKeys(
+                options.resources,
+                [...source.urls, ...source.original_urls],
+                (url) => withOriginalImageId(url, token),
+              )
+            : options.resources,
         );
         if (!resource) {
           return {
