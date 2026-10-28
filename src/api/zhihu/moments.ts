@@ -1,4 +1,5 @@
 import type { ZhihuPaging } from '@/types/zhihu';
+import type { ZhihuCreationEntry } from '@/utils/memberCreations';
 import apiClient from '../client';
 import {
   buildZhihuAppMomentOriginUrl,
@@ -82,6 +83,33 @@ export const fetchMomentOrigin = async (
   const url = buildZhihuAppMomentOriginUrl(momentId, { limit });
   const response = await apiClient.get<MomentOriginResponse>(url, {
     headers: getZhihuAppEndpointHeaders(url),
+  });
+  return response.data;
+};
+
+export interface MemberCreationsResponse {
+  data: ZhihuCreationEntry[];
+  paging?: ZhihuPaging;
+}
+
+/**
+ * One page of a member's 「创作」, as the App's profile tab loads it: answers,
+ * articles and pins newest first, down to the oldest. Pass the previous page's
+ * `paging.next` to continue; its cursor is opaque.
+ */
+export const fetchMemberCreations = async (
+  memberId: string,
+  nextUrl?: string,
+  signal?: AbortSignal,
+): Promise<MemberCreationsResponse> => {
+  const url = nextUrl ?? buildZhihuAppMomentOriginUrl(memberId, { limit: 20 });
+  const response = await apiClient.get<MemberCreationsResponse>(url, {
+    signal,
+    headers: {
+      ...getZhihuAppEndpointHeaders(url),
+      // The profile page's ID, not the moments detail page's.
+      'x-page-id': '10164',
+    },
   });
   return response.data;
 };

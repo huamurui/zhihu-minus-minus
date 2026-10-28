@@ -65,13 +65,14 @@ import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { useFixedHeaderEntryProgress } from '@/features/adaptive-layout/PaneContext';
+import { useMemberCreations } from '@/hooks/useMemberCreations';
 import { useUserAnswersVotedByMe } from '@/hooks/useUserAnswersVotedByMe';
 import { useUserColumns } from '@/hooks/useUserColumns';
-import { useUserCreations } from '@/hooks/useUserCreations';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ZhihuAuthor, ZhihuColumnSummary } from '@/types/zhihu';
 import { getProfileAnswerReadingContext } from '@/utils/answerReadingContext';
+import type { MemberCreation } from '@/utils/memberCreations';
 import {
   getProfileCoverState,
   getProfileHeaderOffset,
@@ -459,23 +460,9 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
     enabled: !!user && (visitedTabs.activities || activeTab === 'activities'),
   });
 
-  const creationsQuery = useUserCreations(
+  const creationsQuery = useMemberCreations(
     user,
     Boolean(visitedTabs.creations || activeTab === 'creations'),
-  );
-  const creationTargets = useMemo(
-    () =>
-      new Map(
-        creationsQuery.activities.flatMap((activity) => {
-          const target = activity.target;
-          const targetId = target && getRecentActivityTargetId(target);
-          const type = normalizeUserFeedType(target?.type);
-          return target && targetId !== undefined && type
-            ? [[`${type}:${targetId}`, target] as const]
-            : [];
-        }),
-      ),
-    [creationsQuery.activities],
   );
 
   const answersVotedByMeQuery = useUserAnswersVotedByMe(
@@ -592,7 +579,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
       case 'creations':
         return {
           queryKey: creationsQuery.queryKey,
-          data: creationsQuery.feedItems,
+          data: creationsQuery.items,
           isLoading: creationsQuery.isLoading,
           isError: creationsQuery.isError,
           isFetchingNextPage: creationsQuery.isFetchingNextPage,
@@ -922,22 +909,18 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
     );
   };
 
-  const renderItemContent = (item: unknown, tabKey: ProfileTabKey) => {
+  const renderItemContent = (
+    item: unknown,
+    tabKey: ProfileTabKey,
+    // 创作 lists answers by publish time, whatever the 回答 tab's sort.
+    answerSort: 'created' | 'voteups' = sortBy,
+  ): ReactNode => {
     if (tabKey === 'columns')
       return <ProfileColumnCard column={item as ZhihuColumnSummary} />;
     if (tabKey === 'creations') {
-      const feedItem = item as FeedItem;
-      const target = creationTargets.get(`${feedItem.type}:${feedItem.id}`);
-      return (
-        <FeedCard
-          item={{ ...feedItem, ...getProfileFeedBody(target) }}
-          answerContext={getProfileAnswerReadingContext(
-            target?.author ?? {},
-            user ?? {},
-            id,
-          )}
-        />
-      );
+      const creation = item as MemberCreation;
+      return renderItemContent(creation.item, creation.kind, 'created');
+    }
     }
     const displayItem = getProfileContentItem(item, tabKey);
     if (!displayItem) return null;
@@ -1040,12 +1023,12 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
           tabKey === 'answers' &&
           !displayItem.author?.id &&
           !displayItem.author?.url_token
-            ? { scene: 'profile_answer', memberId: id, memberSort: sortBy }
+            ? { scene: 'profile_answer', memberId: id, memberSort: answerSort }
             : getProfileAnswerReadingContext(
                 displayItem.author ?? {},
                 user ?? {},
                 id,
-                tabKey === 'answers' ? sortBy : 'created',
+                tabKey === 'answers' ? answerSort : 'created',
               )
         }
       />
@@ -1149,8 +1132,8 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
                       onScrollActivityChange={handleListScrollActivity}
                       keyExtractor={(item) => {
                         if (tab.key === 'creations') {
-                          const content = item as FeedItem;
-                          return `user-creation-${content.type}-${content.id}`;
+                          const creation = item as MemberCreation;
+                          return `user-creation-${creation.kind}-${getProfileListItemKey(creation.item)}`;
                         }
                         return `user-item-${tab.key}-${getProfileListItemKey(item)}`;
                       }}
@@ -1191,6 +1174,34 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
                                 </Text>
                               </BouncyButton>
                             )}
+                          </View>
+                        ) : tab.key === 'creations' &&
+                          !creationsQuery.isAuthenticated ? (
+                          <View className="items-center py-20 bg-transparent">
+                            <Text type="secondary">
+                              登录后查看创作者的全部创作
+                            </Text>
+                            <BouncyButton
+                              accessibilityRole="button"
+                              accessibilityLabel="登录"
+                              onPress={() => router.push('/login')}
+                              style={{
+                                marginTop: 16,
+                                paddingHorizontal: 20,
+                                paddingVertical: 10,
+                                borderRadius: 8,
+                                backgroundColor: primaryColor,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  color: onPrimaryColor,
+                                  fontWeight: '600',
+                                }}
+                              >
+                                登录
+                              </Text>
+                            </BouncyButton>
                           </View>
                         ) : undefined
                       }
