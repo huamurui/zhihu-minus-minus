@@ -91,7 +91,9 @@ function RichContentExperimentScreen() {
   const [mountIndex, setMountIndex] = useState(0);
   const [ready, setReady] = useState(false);
   const [trace, setTrace] = useState<ZhihuNativePerformanceTrace | undefined>();
-  const [traceEvents, setTraceEvents] = useState<ZhihuNativePerformanceEvent[]>([]);
+  const [traceEvents, setTraceEvents] = useState<ZhihuNativePerformanceEvent[]>(
+    [],
+  );
   const requestRef = useRef<AbortController | null>(null);
   const activeRenderKey = useRef<string | null>(null);
   const traceIdRef = useRef(0);
@@ -132,6 +134,7 @@ function RichContentExperimentScreen() {
     });
   };
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: account or cookie changes must clear existing content and active traces.
   useEffect(() => {
     setContent(null);
     activeRenderKey.current = null;
@@ -268,7 +271,9 @@ function RichContentExperimentScreen() {
                 ]}
               >
                 <Text
-                  style={selectedType === type ? { color: onPrimary } : undefined}
+                  style={
+                    selectedType === type ? { color: onPrimary } : undefined
+                  }
                 >
                   {type === 'answer' ? '回答' : '文章'}
                 </Text>
@@ -284,7 +289,11 @@ function RichContentExperimentScreen() {
             autoCorrect={false}
             style={[
               styles.input,
-              { color: foreground, borderColor: border, backgroundColor: surface },
+              {
+                color: foreground,
+                borderColor: border,
+                backgroundColor: surface,
+              },
             ]}
           />
           <Pressable
@@ -305,9 +314,16 @@ function RichContentExperimentScreen() {
           </Pressable>
           {error ? <Text style={styles.hint}>{error}</Text> : null}
           {!nativeAvailable ? (
-            <Text style={styles.hint}>当前构建缺少原生文字模块，无法进行此对照。</Text>
+            <Text style={styles.hint}>
+              当前构建缺少原生文字模块，无法进行此对照。
+            </Text>
           ) : null}
-          <View style={[styles.controls, { borderColor: border, backgroundColor: surface }]}>
+          <View
+            style={[
+              styles.controls,
+              { borderColor: border, backgroundColor: surface },
+            ]}
+          >
             <View style={styles.controlRow}>
               <Text style={styles.controlLabel}>Fabric 原生尺寸（实验）</Text>
               <Switch
@@ -355,19 +371,46 @@ function RichContentExperimentScreen() {
                 </Text>
               ) : null}
               {nativeAvailable && trace ? (
-                <View style={[styles.controls, { borderColor: border, backgroundColor: surface }]}>
+                <View
+                  style={[
+                    styles.controls,
+                    { borderColor: border, backgroundColor: surface },
+                  ]}
+                >
                   <Text style={styles.controlLabel}>本次布局计时</Text>
                   <Text type="secondary" style={styles.hint}>
-                    JS 起点 → IR 准备：{maximum(irEvents.map((event) => event.elapsedMs))}
-                    {'\n'}JS 起点 → 高度事件，首次 / 最晚：{firstAndLast(heightEvents)}（{heightEvents.length} 个事件）
-                    {'\n'}JS 起点 → 匹配布局，首次 / 最晚：{firstAndLast(layoutEvents)}（{layoutEvents.length} 个事件）
-                    {'\n'}原生 props 批次处理起点 → 测量结束：{maximum(heightEvents.map((event) => event.nativePropsToMeasureMs))}
-                    {'\n'}单次原生文字测量：{maximum(heightEvents.map((event) => event.nativeMeasureMs))}
-                    {'\n'}原生 props 批次处理起点 → 请求尺寸更新：{maximum(heightEvents.map((event) => event.nativePropsToSizeRequestMs))}
-                    {'\n'}原生 props 批次处理起点 → 高度事件派发：{maximum(heightEvents.map((event) => event.nativePropsToDispatchMs))}
+                    JS 起点 → IR 准备：
+                    {maximum(irEvents.map((event) => event.elapsedMs))}
+                    {'\n'}JS 起点 → 高度事件，首次 / 最晚：
+                    {firstAndLast(heightEvents)}（{heightEvents.length} 个事件）
+                    {'\n'}JS 起点 → 匹配布局，首次 / 最晚：
+                    {firstAndLast(layoutEvents)}（{layoutEvents.length} 个事件）
+                    {'\n'}原生 props 批次处理起点 → 测量结束：
+                    {maximum(
+                      heightEvents.map((event) => event.nativePropsToMeasureMs),
+                    )}
+                    {'\n'}单次原生文字测量：
+                    {maximum(
+                      heightEvents.map((event) => event.nativeMeasureMs),
+                    )}
+                    {'\n'}原生 props 批次处理起点 → 请求尺寸更新：
+                    {maximum(
+                      heightEvents.map(
+                        (event) => event.nativePropsToSizeRequestMs,
+                      ),
+                    )}
+                    {'\n'}原生 props 批次处理起点 → 高度事件派发：
+                    {maximum(
+                      heightEvents.map(
+                        (event) => event.nativePropsToDispatchMs,
+                      ),
+                    )}
                   </Text>
                   <Text type="secondary" style={styles.hint}>
-                    仅统计顶层文字流，后续附件重排也会产生事件；原生数字为各流最长耗时。原生和 JS 时钟不直接相减，iOS 的 props 批次起点位于各属性 setter 之后。尺寸更新请求不代表 Fabric Commit 完成，匹配布局也不代表屏幕已绘制。最多保留 1024 个事件。
+                    仅统计顶层文字流，后续附件重排也会产生事件；原生数字为各流最长耗时。原生和
+                    JS 时钟不直接相减，iOS 的 props 批次起点位于各属性 setter
+                    之后。尺寸更新请求不代表 Fabric Commit
+                    完成，匹配布局也不代表屏幕已绘制。最多保留 1024 个事件。
                   </Text>
                 </View>
               ) : null}

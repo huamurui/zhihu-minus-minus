@@ -1262,10 +1262,17 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
   }
   useEffect(() => {
     const recorded = irTraceRef.current;
-    if (!performanceTrace || recorded?.trace !== performanceTrace || recorded.sent)
+    if (
+      !performanceTrace ||
+      recorded?.trace !== performanceTrace ||
+      recorded.sent
+    )
       return;
     recorded.sent = true;
-    performanceTrace.onEvent({ phase: 'ir-ready', elapsedMs: recorded.elapsedMs });
+    performanceTrace.onEvent({
+      phase: 'ir-ready',
+      elapsedMs: recorded.elapsedMs,
+    });
   }, [performanceTrace]);
   const documentRevision = useRef({
     content,
