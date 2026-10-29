@@ -42,6 +42,11 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
   private var suppressSelection = false
   private var lastHeightKey = ""
   private var lastSelectionKey = ""
+  private var lastParseMs: Double?
+  private var lastRebuildMs: Double?
+  private var lastSpannableMs: Double?
+  private var lastSetTextMs: Double?
+  private var measureCount = 0
   private var attachments: [RichTextAttachmentSlot] = []
   private var attachmentUpdates: [(RichTextAttachmentSlot, Int, RichTextAttachmentAsset)] = []
   private var viewportObservations: [NSKeyValueObservation] = []
@@ -137,7 +142,9 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
   func setFlowJson(_ value: String) {
     guard previousFlowJson != value else { return }
     previousFlowJson = value
+    let parseStart = performanceTracing ? ProcessInfo.processInfo.systemUptime : nil
     flow = RichTextFlow.parse(value)
+    if let parseStart { lastParseMs = (ProcessInfo.processInfo.systemUptime - parseStart) * 1000 }
     needsRebuild = true
     lastSelectionKey = ""
     lastHeightKey = ""
@@ -190,6 +197,7 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
 
   func applyPendingProps() {
     tracePropsTime = performanceTracing ? ProcessInfo.processInfo.systemUptime : nil
+    measureCount = 0
     let width = effectiveWidth
     guard width > 0 else { setNeedsLayout(); return }
     if needsRebuild || width != lastWidth { rebuild(width: width) }
@@ -216,6 +224,7 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
   private var effectiveWidth: CGFloat { contentWidth > 0 ? contentWidth : bounds.width }
 
   private func rebuild(width: CGFloat) {
+    let rebuildStart = performanceTracing ? ProcessInfo.processInfo.systemUptime : nil
     let previousFlowIdentity = renderedIdentity
     let selection = textView.selectedRange
     generation += 1
@@ -332,7 +341,9 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
       content.addAttribute(.attachment, value: attachment, range: range)
       attachments.append(RichTextAttachmentSlot(spec: spec, attachment: attachment, range: range, fontSize: baseFont.pointSize, maxWidth: width, scale: scale))
     }
+    let spannableEnd = performanceTracing ? ProcessInfo.processInfo.systemUptime : nil
     storage.setAttributedString(content)
+    let setTextEnd = performanceTracing ? ProcessInfo.processInfo.systemUptime : nil
     textView.isSelectable = selectable
     if let previous = previousFlowIdentity, previous.0 == flow.id, previous.1 == flow.textVersion,
        selection.location != NSNotFound, selection.location <= flow.text.length,
@@ -341,6 +352,11 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
       textView.selectedRange = selection
     } else {
       textView.selectedRange = NSRange(location: 0, length: 0)
+    }
+    if let rebuildStart {
+      lastRebuildMs = (ProcessInfo.processInfo.systemUptime - rebuildStart) * 1000
+      if let spannableEnd { lastSpannableMs = (spannableEnd - rebuildStart) * 1000 }
+      if let setTextEnd, let spannableEnd { lastSetTextMs = (setTextEnd - spannableEnd) * 1000 }
     }
   }
 
@@ -439,6 +455,7 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
 
   private func measureAndLayout(width: CGFloat) {
     guard width > 0, let flow else { textView.frame = .zero; return }
+    measureCount += 1
     let measurementStart = performanceTracing ? ProcessInfo.processInfo.systemUptime : nil
     container.size = CGSize(width: width, height: .greatestFiniteMagnitude)
     manager.ensureLayout(for: container)
@@ -467,13 +484,20 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
             self.lastHeightKey == key, self.flow?.id == flow.id, self.flow?.textVersion == flow.textVersion else { return }
       var event: [String: Any] = ["flowId": flow.id, "textVersion": flow.textVersion, "layoutKey": currentLayoutKey, "height": Double(height)]
       if let measurementStart, let measurementEnd {
-        event["nativeMeasureMs"] = (measurementEnd - measurementStart) * 1000
+        let measureDuration = (measurementEnd - measurementStart) * 1000
+        event["nativeMeasureMs"] = measureDuration
+        event["nativeSuperMeasureMs"] = measureDuration
         if let propsTime {
           event["nativePropsToMeasureMs"] = (measurementEnd - propsTime) * 1000
           if let sizeRequestTime { event["nativePropsToSizeRequestMs"] = (sizeRequestTime - propsTime) * 1000 }
           event["nativePropsToDispatchMs"] = (ProcessInfo.processInfo.systemUptime - propsTime) * 1000
         }
       }
+      if let rebuildMs = self.lastRebuildMs { event["nativeRebuildMs"] = rebuildMs }
+      if let parseMs = self.lastParseMs { event["nativeParseMs"] = parseMs }
+      if let spannableMs = self.lastSpannableMs { event["nativeSpannableMs"] = spannableMs }
+      if let setTextMs = self.lastSetTextMs { event["nativeSetTextMs"] = setTextMs }
+      event["measureCount"] = self.measureCount
       self.onHeightChange(event)
     }
   }

@@ -19,6 +19,12 @@ export interface RichTextHeightEventData {
   readonly nativePropsToMeasureMs?: number | null;
   readonly nativePropsToSizeRequestMs?: number | null;
   readonly nativePropsToDispatchMs?: number | null;
+  readonly nativeRebuildMs?: number | null;
+  readonly nativeSuperMeasureMs?: number | null;
+  readonly nativeParseMs?: number | null;
+  readonly nativeSpannableMs?: number | null;
+  readonly nativeSetTextMs?: number | null;
+  readonly measureCount?: number;
 }
 
 export interface RichTextActionEventData extends RichTextSelectionEventData {

@@ -91,12 +91,19 @@ export interface ZhihuNativeSegmentAction {
 }
 
 export interface ZhihuNativePerformanceEvent {
+  flowId?: string;
   phase: 'ir-ready' | 'height' | 'layout';
   elapsedMs: number;
   nativeMeasureMs?: number | null;
   nativePropsToMeasureMs?: number | null;
   nativePropsToSizeRequestMs?: number | null;
   nativePropsToDispatchMs?: number | null;
+  nativeRebuildMs?: number | null;
+  nativeSuperMeasureMs?: number | null;
+  nativeParseMs?: number | null;
+  nativeSpannableMs?: number | null;
+  nativeSetTextMs?: number | null;
+  measureCount?: number;
 }
 
 export interface ZhihuNativePerformanceTrace {
@@ -349,6 +356,7 @@ const NativeFlow = React.memo(function NativeFlow({
     notifiedNativeMeasurement.current = notification;
     if (performanceTrace) {
       performanceTrace.onEvent({
+        flowId: flow.id,
         phase: 'layout',
         elapsedMs: performance.now() - performanceTrace.startedAt,
       });
@@ -413,12 +421,19 @@ const NativeFlow = React.memo(function NativeFlow({
           }
           if (performanceTrace) {
             performanceTrace.onEvent({
+              flowId: event.flowId,
               phase: 'height',
               elapsedMs: performance.now() - performanceTrace.startedAt,
               nativeMeasureMs: event.nativeMeasureMs,
               nativePropsToMeasureMs: event.nativePropsToMeasureMs,
               nativePropsToSizeRequestMs: event.nativePropsToSizeRequestMs,
               nativePropsToDispatchMs: event.nativePropsToDispatchMs,
+              nativeRebuildMs: event.nativeRebuildMs,
+              nativeSuperMeasureMs: event.nativeSuperMeasureMs,
+              nativeParseMs: event.nativeParseMs,
+              nativeSpannableMs: event.nativeSpannableMs,
+              nativeSetTextMs: event.nativeSetTextMs,
+              measureCount: event.measureCount,
             });
           }
           if (measuredFlowHeights.size >= 128)
