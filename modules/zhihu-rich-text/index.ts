@@ -28,6 +28,10 @@ export interface RichTextHeightEventData {
   readonly setViewSizeCount?: number;
   readonly schedulePostWaitMs?: number | null;
   readonly heightPostWaitMs?: number | null;
+  readonly nativePropsSetEpochMs?: number | null;
+  readonly nativeFirstMeasureEpochMs?: number | null;
+  readonly nativeFirstLayoutEpochMs?: number | null;
+  readonly nativeDispatchEpochMs?: number | null;
 }
 
 export interface RichTextActionEventData extends RichTextSelectionEventData {

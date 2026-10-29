@@ -59,7 +59,11 @@ data class HeightEvent(
   @Field val measureCount: Int = 1,
   @Field val setViewSizeCount: Int = 0,
   @Field val schedulePostWaitMs: Double? = null,
-  @Field val heightPostWaitMs: Double? = null
+  @Field val heightPostWaitMs: Double? = null,
+  @Field val nativePropsSetEpochMs: Double? = null,
+  @Field val nativeFirstMeasureEpochMs: Double? = null,
+  @Field val nativeFirstLayoutEpochMs: Double? = null,
+  @Field val nativeDispatchEpochMs: Double? = null
 ) : Record
 
 data class ActionEvent(
@@ -124,6 +128,9 @@ class RichTextView(context: Context, appContext: AppContext) : ExpoView(context,
   private var measureCount = 0
   private var setViewSizeCount = 0
   private var lastSchedulePostWaitMs: Double? = null
+  private var lastPropsSetEpochMs: Double? = null
+  private var firstMeasureEpochMs: Double? = null
+  private var firstLayoutEpochMs: Double? = null
   private val fontScale: Float get() = resources.configuration.fontScale
   private val textScale: Float get() = density * fontScale
 
@@ -177,6 +184,9 @@ class RichTextView(context: Context, appContext: AppContext) : ExpoView(context,
     val props = change.current
     val tracing = props.performanceTracing
     tracePropsTimeNs = if (tracing) SystemClock.elapsedRealtimeNanos() else 0L
+    lastPropsSetEpochMs = if (tracing) System.currentTimeMillis().toDouble() else null
+    firstMeasureEpochMs = null
+    firstLayoutEpochMs = null
     measureCount = 0
     setViewSizeCount = 0
     lastSchedulePostWaitMs = null
@@ -218,6 +228,9 @@ class RichTextView(context: Context, appContext: AppContext) : ExpoView(context,
   override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
     val tracing = propBatch.current.performanceTracing
     measureCount += 1
+    if (tracing && firstMeasureEpochMs == null) {
+      firstMeasureEpochMs = System.currentTimeMillis().toDouble()
+    }
     val superStart = if (tracing) SystemClock.elapsedRealtimeNanos() else 0L
     if (tracing) Trace.beginSection("RichText.superOnMeasure")
     super.onMeasure(widthMeasureSpec, heightMeasureSpec)
@@ -229,6 +242,10 @@ class RichTextView(context: Context, appContext: AppContext) : ExpoView(context,
   }
 
   override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+    val tracing = propBatch.current.performanceTracing
+    if (tracing && firstLayoutEpochMs == null) {
+      firstLayoutEpochMs = System.currentTimeMillis().toDouble()
+    }
     super.onLayout(changed, left, top, right, bottom)
     val desiredWidth = if (contentWidthPx > 0) contentWidthPx else max(1, right - left)
     textView.layout(0, 0, desiredWidth, measuredTextHeight)
@@ -535,9 +552,13 @@ class RichTextView(context: Context, appContext: AppContext) : ExpoView(context,
     val spannableMs = lastSpannableMs
     val setTextMs = lastSetTextMs
     val count = measureCount
+    val propsSetEpoch = lastPropsSetEpochMs
+    val firstMeasureEpoch = firstMeasureEpochMs
+    val firstLayoutEpoch = firstLayoutEpochMs
     val heightScheduledAt = if (tracing) SystemClock.elapsedRealtimeNanos() else 0L
     post {
       if (!disposed && generation == currentGeneration && propBatch.accepts(currentRevision) && layoutKey == currentLayoutKey && lastHeightKey == key) {
+        val dispatchEpoch = if (tracing) System.currentTimeMillis().toDouble() else null
         val heightPostWait = if (heightScheduledAt != 0L) (SystemClock.elapsedRealtimeNanos() - heightScheduledAt) / 1_000_000.0 else null
         if (autoSize) {
           shadowNodeProxy.setViewSize(measuredWidthDp, measuredHeightDp)
@@ -559,7 +580,11 @@ class RichTextView(context: Context, appContext: AppContext) : ExpoView(context,
           count,
           sizeCount,
           lastSchedulePostWaitMs,
-          heightPostWait
+          heightPostWait,
+          propsSetEpoch,
+          firstMeasureEpoch,
+          firstLayoutEpoch,
+          dispatchEpoch
         )
         onHeightChange(event)
       }

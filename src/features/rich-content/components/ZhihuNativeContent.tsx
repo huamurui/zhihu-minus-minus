@@ -2,6 +2,7 @@ import * as Clipboard from 'expo-clipboard';
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -95,7 +96,12 @@ export interface ZhihuNativePerformanceEvent {
   flowId?: string;
   phase:
     | 'react-render-enter'
+    | 'react-layout-effect'
+    | 'react-effect'
     | 'ir-ready'
+    | 'native-props-set'
+    | 'native-first-measure'
+    | 'native-first-layout'
     | 'height'
     | 'layout'
     | 'raw-layout'
@@ -119,12 +125,17 @@ export interface ZhihuNativePerformanceEvent {
   setViewSizeCount?: number;
   schedulePostWaitMs?: number | null;
   heightPostWaitMs?: number | null;
+  nativePropsSetMs?: number | null;
+  nativeFirstMeasureMs?: number | null;
+  nativeFirstLayoutMs?: number | null;
+  nativeDispatchMs?: number | null;
   width?: number;
   height?: number;
 }
 
 export interface ZhihuNativePerformanceTrace {
   startedAt: number;
+  startedEpochMs?: number;
   onEvent: (event: ZhihuNativePerformanceEvent) => void;
 }
 
@@ -476,6 +487,28 @@ const NativeFlow = React.memo(function NativeFlow({
             );
           }
           if (performanceTrace) {
+            const baseEpoch = performanceTrace.startedEpochMs;
+            if (baseEpoch && event.nativePropsSetEpochMs) {
+              performanceTrace.onEvent({
+                flowId: event.flowId,
+                phase: 'native-props-set',
+                elapsedMs: event.nativePropsSetEpochMs - baseEpoch,
+              });
+            }
+            if (baseEpoch && event.nativeFirstMeasureEpochMs) {
+              performanceTrace.onEvent({
+                flowId: event.flowId,
+                phase: 'native-first-measure',
+                elapsedMs: event.nativeFirstMeasureEpochMs - baseEpoch,
+              });
+            }
+            if (baseEpoch && event.nativeFirstLayoutEpochMs) {
+              performanceTrace.onEvent({
+                flowId: event.flowId,
+                phase: 'native-first-layout',
+                elapsedMs: event.nativeFirstLayoutEpochMs - baseEpoch,
+              });
+            }
             performanceTrace.onEvent({
               flowId: event.flowId,
               phase: 'height',
@@ -493,6 +526,22 @@ const NativeFlow = React.memo(function NativeFlow({
               setViewSizeCount: event.setViewSizeCount,
               schedulePostWaitMs: event.schedulePostWaitMs,
               heightPostWaitMs: event.heightPostWaitMs,
+              nativePropsSetMs:
+                event.nativePropsSetEpochMs && baseEpoch
+                  ? event.nativePropsSetEpochMs - baseEpoch
+                  : null,
+              nativeFirstMeasureMs:
+                event.nativeFirstMeasureEpochMs && baseEpoch
+                  ? event.nativeFirstMeasureEpochMs - baseEpoch
+                  : null,
+              nativeFirstLayoutMs:
+                event.nativeFirstLayoutEpochMs && baseEpoch
+                  ? event.nativeFirstLayoutEpochMs - baseEpoch
+                  : null,
+              nativeDispatchMs:
+                event.nativeDispatchEpochMs && baseEpoch
+                  ? event.nativeDispatchEpochMs - baseEpoch
+                  : null,
             });
           }
           if (measuredFlowHeights.size >= 128)
@@ -1383,6 +1432,26 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
       elapsedMs: recorded.elapsedMs,
     });
   }, [performanceTrace]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: layout effect timing must re-record when compiled parts change.
+  useLayoutEffect(() => {
+    if (performanceTrace) {
+      performanceTrace.onEvent({
+        phase: 'react-layout-effect',
+        elapsedMs: performance.now() - performanceTrace.startedAt,
+      });
+    }
+  }, [performanceTrace, compiled]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: passive effect timing must re-record when compiled parts change.
+  useEffect(() => {
+    if (performanceTrace) {
+      performanceTrace.onEvent({
+        phase: 'react-effect',
+        elapsedMs: performance.now() - performanceTrace.startedAt,
+      });
+    }
+  }, [performanceTrace, compiled]);
   const documentRevision = useRef({
     content,
     contentArray,

@@ -1,8 +1,16 @@
 import * as Clipboard from 'expo-clipboard';
 import { Redirect, Stack } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
+  type LayoutChangeEvent,
   Platform,
   Pressable,
   ScrollView,
@@ -15,12 +23,22 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getAnswer } from '@/api/zhihu/answer';
 import { getArticle } from '@/api/zhihu/article';
-import { Text, useThemeColor } from '@/components/Themed';
+import {
+  Text,
+  useRuntimeThemeColors,
+  useThemeColor,
+} from '@/components/Themed';
 import {
   clearMeasuredFlowHeightCache,
+  compileZhihuDocument,
+  createRichContentMetrics,
   getMeasuredFlowHeightCacheSize,
   isRichTextNativeAvailable,
   normalizeZhihuDocument,
+  RICH_CONTENT_PARAGRAPH_SPACING,
+  type ZhihuBlock,
+  type ZhihuDocument,
+  type ZhihuInlineRun,
   ZhihuNativeContent,
   type ZhihuNativePerformanceEvent,
   type ZhihuNativePerformanceTrace,
@@ -31,6 +49,8 @@ import type { ZhihuSegmentInfo } from '@/types/zhihu';
 import { richContentExperimentEnabled } from '@/utils/richContentExperiment';
 
 type ContentType = 'answer' | 'article';
+type FlowCountMode = 'default' | '1' | '50';
+type RendererMode = 'rich-text' | 'pure-rn-text';
 
 interface LoadedContent {
   type: ContentType;
@@ -106,11 +126,72 @@ function computeStats(values: number[]): StatSummary {
   };
 }
 
-function computeStatsForMetric(values: (number | null)[]): StatSummary {
+function computeStatsForMetric(
+  values: (number | null | undefined)[],
+): StatSummary {
   const valid = values.filter(
-    (v): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0,
+    (v): v is number => typeof v === 'number' && Number.isFinite(v),
   );
   return computeStats(valid);
+}
+
+function makeSingleFlowDocument(doc: ZhihuDocument): ZhihuDocument {
+  const allRuns: ZhihuInlineRun[] = [];
+  for (const block of doc.blocks) {
+    if ('children' in block && Array.isArray(block.children)) {
+      if (allRuns.length > 0)
+        allRuns.push({
+          id: `sep-${allRuns.length}`,
+          type: 'text',
+          text: '\n\n',
+        });
+      allRuns.push(...block.children);
+    } else if (block.type === 'quote') {
+      for (const child of block.blocks) {
+        if ('children' in child && Array.isArray(child.children)) {
+          if (allRuns.length > 0)
+            allRuns.push({
+              id: `sep-${allRuns.length}`,
+              type: 'text',
+              text: '\n\n',
+            });
+          allRuns.push(...child.children);
+        }
+      }
+    }
+  }
+  return {
+    ...doc,
+    id: `${doc.id}:1-flow`,
+    blocks: [
+      {
+        id: 'single-paragraph',
+        type: 'paragraph',
+        children:
+          allRuns.length > 0
+            ? allRuns
+            : [{ id: 'fallback-text', type: 'text', text: ' ' }],
+      },
+    ],
+  };
+}
+
+function make50FlowsDocument(doc: ZhihuDocument): ZhihuDocument {
+  const paragraphBlocks = doc.blocks.filter((b) => b.type === 'paragraph');
+  const source = paragraphBlocks.length > 0 ? paragraphBlocks : doc.blocks;
+  const blocks: ZhihuBlock[] = [];
+  for (let i = 0; i < 50; i++) {
+    const template = source[i % source.length];
+    blocks.push({
+      ...template,
+      id: `flow-50-${i}`,
+    });
+  }
+  return {
+    ...doc,
+    id: `${doc.id}:50-flows`,
+    blocks,
+  };
 }
 
 interface FlowTraceSummary {
@@ -128,6 +209,8 @@ interface FlowTraceSummary {
   lastLayoutMs: number | null;
   firstRawLayoutMs: number | null;
   lastRawLayoutMs: number | null;
+  propsSetMs: number | null;
+  firstMeasureMs: number | null;
   rebuildMs: number | null;
   superMeasureMs: number | null;
   measureMs: number | null;
@@ -162,6 +245,8 @@ function aggregateFlowSummaries(
         lastLayoutMs: null,
         firstRawLayoutMs: null,
         lastRawLayoutMs: null,
+        propsSetMs: null,
+        firstMeasureMs: null,
         rebuildMs: null,
         superMeasureMs: null,
         measureMs: null,
@@ -174,7 +259,17 @@ function aggregateFlowSummaries(
       };
       map.set(event.flowId, entry);
     }
-    if (event.phase === 'height') {
+    if (event.phase === 'native-props-set') {
+      entry.propsSetMs =
+        entry.propsSetMs == null
+          ? event.elapsedMs
+          : Math.min(entry.propsSetMs, event.elapsedMs);
+    } else if (event.phase === 'native-first-measure') {
+      entry.firstMeasureMs =
+        entry.firstMeasureMs == null
+          ? event.elapsedMs
+          : Math.min(entry.firstMeasureMs, event.elapsedMs);
+    } else if (event.phase === 'height') {
       entry.heightCount += 1;
       if (
         entry.firstHeightMs === null ||
@@ -287,6 +382,10 @@ function computeRunMetrics(events: readonly ZhihuNativePerformanceEvent[]) {
   const flowJsonEvents = events.filter((e) => e.phase === 'flow-json');
   const irReadyEvent = events.find((e) => e.phase === 'ir-ready');
   const renderEnterEvent = events.find((e) => e.phase === 'react-render-enter');
+  const layoutEffectEvent = events.find(
+    (e) => e.phase === 'react-layout-effect',
+  );
+  const effectEvent = events.find((e) => e.phase === 'react-effect');
   const firstFlowReadyEvent = events.find(
     (e) => e.phase === 'first-flow-ready',
   );
@@ -295,6 +394,13 @@ function computeRunMetrics(events: readonly ZhihuNativePerformanceEvent[]) {
   const heightEvents = events.filter((e) => e.phase === 'height');
   const layoutEvents = events.filter((e) => e.phase === 'layout');
   const rawLayoutEvents = events.filter((e) => e.phase === 'raw-layout');
+  const propsSetEvents = events.filter((e) => e.phase === 'native-props-set');
+  const firstMeasureEvents = events.filter(
+    (e) => e.phase === 'native-first-measure',
+  );
+  const firstLayoutEvents = events.filter(
+    (e) => e.phase === 'native-first-layout',
+  );
   const flows = aggregateFlowSummaries(events);
 
   const numOrNull = (v: number | null | undefined): number | null =>
@@ -325,21 +431,64 @@ function computeRunMetrics(events: readonly ZhihuNativePerformanceEvent[]) {
     return valid.length > 0 ? Number(Math.min(...valid).toFixed(2)) : null;
   };
 
+  const irReadyMs = numOrNull(irReadyEvent?.elapsedMs);
+  const firstRawLayoutMs = minValid(rawLayoutEvents.map((e) => e.elapsedMs));
+  const lastLayoutMs = maxValid(layoutEvents.map((e) => e.elapsedMs));
+  const lastHeightMs = maxValid(heightEvents.map((e) => e.elapsedMs));
+  const layoutEffectMs = numOrNull(layoutEffectEvent?.elapsedMs);
+  const propsSetMinMs = minValid(propsSetEvents.map((e) => e.elapsedMs));
+
   return {
     renderEnterMs: numOrNull(renderEnterEvent?.elapsedMs),
+    layoutEffectMs,
+    effectMs: numOrNull(effectEvent?.elapsedMs),
     normalizeMs: numOrNull(normalizeEvent?.elapsedMs),
     compileMs: numOrNull(compileEvent?.elapsedMs),
     flowJsonSumMs: sumValid(flowJsonEvents.map((e) => e.elapsedMs)),
-    irReadyMs: numOrNull(irReadyEvent?.elapsedMs),
+    irReadyMs,
     firstFlowReadyMs: numOrNull(firstFlowReadyEvent?.elapsedMs),
     allFlowsReadyMs: numOrNull(allFlowsReadyEvent?.elapsedMs),
     documentReadyMs: numOrNull(documentReadyEvent?.elapsedMs),
     firstHeightMs: minValid(heightEvents.map((e) => e.elapsedMs)),
-    lastHeightMs: maxValid(heightEvents.map((e) => e.elapsedMs)),
+    lastHeightMs,
     firstLayoutMs: minValid(layoutEvents.map((e) => e.elapsedMs)),
-    lastLayoutMs: maxValid(layoutEvents.map((e) => e.elapsedMs)),
-    firstRawLayoutMs: minValid(rawLayoutEvents.map((e) => e.elapsedMs)),
+    lastLayoutMs,
+    firstRawLayoutMs,
     lastRawLayoutMs: maxValid(rawLayoutEvents.map((e) => e.elapsedMs)),
+    propsSetMinMs,
+    propsSetMaxMs: maxValid(propsSetEvents.map((e) => e.elapsedMs)),
+    firstMeasureMinMs: minValid(firstMeasureEvents.map((e) => e.elapsedMs)),
+    firstMeasureMaxMs: maxValid(firstMeasureEvents.map((e) => e.elapsedMs)),
+    firstNativeLayoutMinMs: minValid(firstLayoutEvents.map((e) => e.elapsedMs)),
+    // Timeline breakdown intervals
+    irReadyToFirstRawLayoutMs:
+      irReadyMs != null && firstRawLayoutMs != null
+        ? Number((firstRawLayoutMs - irReadyMs).toFixed(2))
+        : null,
+    firstRawLayoutToLastLayoutMs:
+      firstRawLayoutMs != null && lastLayoutMs != null
+        ? Number((lastLayoutMs - firstRawLayoutMs).toFixed(2))
+        : null,
+    irReadyToLastLayoutMs:
+      irReadyMs != null && lastLayoutMs != null
+        ? Number((lastLayoutMs - irReadyMs).toFixed(2))
+        : null,
+    lastHeightToLastLayoutMs:
+      lastHeightMs != null && lastLayoutMs != null
+        ? Number((lastLayoutMs - lastHeightMs).toFixed(2))
+        : null,
+    irReadyToLayoutEffectMs:
+      irReadyMs != null && layoutEffectMs != null
+        ? Number((layoutEffectMs - irReadyMs).toFixed(2))
+        : null,
+    layoutEffectToPropsSetMs:
+      layoutEffectMs != null && propsSetMinMs != null
+        ? Number((propsSetMinMs - layoutEffectMs).toFixed(2))
+        : null,
+    propsSetToFirstRawLayoutMs:
+      propsSetMinMs != null && firstRawLayoutMs != null
+        ? Number((firstRawLayoutMs - propsSetMinMs).toFixed(2))
+        : null,
     rebuildSumMs: sumValid(flows.map((f) => f.rebuildMs)),
     rebuildMaxMs: maxValid(flows.map((f) => f.rebuildMs)),
     superMeasureSumMs: sumValid(flows.map((f) => f.superMeasureMs)),
@@ -354,6 +503,138 @@ function computeRunMetrics(events: readonly ZhihuNativePerformanceEvent[]) {
     rawLayoutEventsCount: rawLayoutEvents.length,
     flows,
   };
+}
+
+function PureRNTextContent({
+  document,
+  contentWidth,
+  fontSizeScale,
+  lineHeightScale,
+  performanceTrace,
+  onLayoutReady,
+}: {
+  document: ZhihuDocument;
+  contentWidth: number;
+  fontSizeScale?: number;
+  lineHeightScale?: number;
+  performanceTrace?: ZhihuNativePerformanceTrace;
+  onLayoutReady?: () => void;
+}) {
+  const settings = useSettingsStore();
+  const themeColors = useRuntimeThemeColors();
+  const metrics = useMemo(
+    () =>
+      createRichContentMetrics(
+        fontSizeScale ?? settings.fontSizeScale,
+        lineHeightScale ?? settings.lineHeightScale,
+      ),
+    [
+      fontSizeScale,
+      lineHeightScale,
+      settings.fontSizeScale,
+      settings.lineHeightScale,
+    ],
+  );
+  const { fontSize, lineHeight } = metrics.body;
+  const layoutCountRef = useRef(0);
+  const notifiedRef = useRef(false);
+
+  const compiled = useMemo(() => {
+    const start = performance.now();
+    const result = compileZhihuDocument(document, {
+      fontSize,
+      lineHeight,
+      paragraphSpacing: RICH_CONTENT_PARAGRAPH_SPACING,
+    });
+    if (performanceTrace) {
+      performanceTrace.onEvent({
+        phase: 'compile',
+        elapsedMs: performance.now() - start,
+      });
+      performanceTrace.onEvent({
+        phase: 'ir-ready',
+        elapsedMs: performance.now() - performanceTrace.startedAt,
+      });
+    }
+    return result;
+  }, [document, fontSize, lineHeight, performanceTrace]);
+
+  const flowParts = useMemo(
+    () => compiled.parts.filter((p) => p.type === 'flow'),
+    [compiled],
+  );
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: layout effect timing must re-record when compiled parts change.
+  useLayoutEffect(() => {
+    if (performanceTrace) {
+      performanceTrace.onEvent({
+        phase: 'react-layout-effect',
+        elapsedMs: performance.now() - performanceTrace.startedAt,
+      });
+    }
+  }, [performanceTrace, compiled]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: passive effect timing must re-record when compiled parts change.
+  useEffect(() => {
+    if (performanceTrace) {
+      performanceTrace.onEvent({
+        phase: 'react-effect',
+        elapsedMs: performance.now() - performanceTrace.startedAt,
+      });
+    }
+  }, [performanceTrace, compiled]);
+
+  const handleLayout = (flowId: string, event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+    if (performanceTrace) {
+      const now = performance.now();
+      performanceTrace.onEvent({
+        flowId,
+        phase: 'raw-layout',
+        elapsedMs: now - performanceTrace.startedAt,
+        width,
+        height,
+      });
+      performanceTrace.onEvent({
+        flowId,
+        phase: 'layout',
+        elapsedMs: now - performanceTrace.startedAt,
+        width,
+        height,
+      });
+    }
+    layoutCountRef.current += 1;
+    if (layoutCountRef.current >= flowParts.length && !notifiedRef.current) {
+      notifiedRef.current = true;
+      if (performanceTrace) {
+        performanceTrace.onEvent({
+          phase: 'document-ready',
+          elapsedMs: performance.now() - performanceTrace.startedAt,
+        });
+      }
+      onLayoutReady?.();
+    }
+  };
+
+  return (
+    <View style={{ width: contentWidth }}>
+      {flowParts.map((part) => (
+        <Text
+          key={part.flow.id}
+          selectable
+          style={{
+            fontSize,
+            lineHeight,
+            color: themeColors.text,
+            marginBottom: RICH_CONTENT_PARAGRAPH_SPACING,
+          }}
+          onLayout={(e) => handleLayout(part.flow.id, e)}
+        >
+          {part.flow.text}
+        </Text>
+      ))}
+    </View>
+  );
 }
 
 export default function RichContentExperimentRoute() {
@@ -386,6 +667,8 @@ function RichContentExperimentScreen() {
   const [error, setError] = useState<string | null>(null);
 
   // Experiment toggles
+  const [flowCountMode, setFlowCountMode] = useState<FlowCountMode>('default');
+  const [rendererMode, setRendererMode] = useState<RendererMode>('rich-text');
   const [nativeAutoSize, setNativeAutoSize] = useState(false);
   const [clearCacheBeforeMount, setClearCacheBeforeMount] = useState(true);
   const [usePreparedDocument, setUsePreparedDocument] = useState(false);
@@ -405,15 +688,21 @@ function RichContentExperimentScreen() {
     [],
   );
 
-  // 10-run testing and export state
-  const [isTesting10Runs, setIsTesting10Runs] = useState(false);
-  const [test10Progress, setTest10Progress] = useState({
+  // Testing and export states
+  const [isTesting, setIsTesting] = useState(false);
+  const [testProgress, setTestProgress] = useState({
     current: 0,
     total: 10,
+    label: '',
   });
   const [exportedJsonResult, setExportedJsonResult] = useState<string | null>(
     null,
   );
+  const [interleavedSummary, setInterleavedSummary] = useState<{
+    offSummary: Record<string, StatSummary>;
+    onSummary: Record<string, StatSummary>;
+    pairDiffSummary: Record<string, StatSummary>;
+  } | null>(null);
   const [copyToast, setCopyToast] = useState<string | null>(null);
 
   const requestRef = useRef<AbortController | null>(null);
@@ -440,15 +729,17 @@ function RichContentExperimentScreen() {
     traceTimerRef.current = null;
     traceEventsRef.current = [];
     setTraceEvents([]);
+    const startPerf = performance.now();
+    const startEpoch = Date.now();
     setTrace({
-      startedAt: performance.now(),
+      startedAt: startPerf,
+      startedEpochMs: startEpoch,
       onEvent: (event) => {
         if (traceIdRef.current !== traceId || !Number.isFinite(event.elapsedMs))
           return;
-        if (traceEventsRef.current.length >= 1024) return;
+        if (traceEventsRef.current.length >= 2048) return;
         traceEventsRef.current.push(event);
         if (traceTimerRef.current) return;
-        // Do not re-render the screen for each flow while measuring layout.
         traceTimerRef.current = setTimeout(() => {
           traceTimerRef.current = null;
           if (traceIdRef.current === traceId)
@@ -470,6 +761,7 @@ function RichContentExperimentScreen() {
     setError(null);
     setReady(false);
     setExportedJsonResult(null);
+    setInterleavedSummary(null);
     setCopyToast(null);
     return () => {
       requestRef.current?.abort();
@@ -498,6 +790,7 @@ function RichContentExperimentScreen() {
     setError(null);
     setLoading(true);
     setExportedJsonResult(null);
+    setInterleavedSummary(null);
     setCopyToast(null);
     try {
       let loaded: LoadedContent;
@@ -560,8 +853,8 @@ function RichContentExperimentScreen() {
   const visibleContent =
     content?.session === getAuthSessionVersion() ? content : null;
 
-  // Experiment A: pre-normalize document
-  const preparedDocument = useMemo(() => {
+  // Base normalized document
+  const baseDocument = useMemo(() => {
     if (!visibleContent) return undefined;
     const result = normalizeZhihuDocument(visibleContent.content, {
       documentId: `${visibleContent.type}:${visibleContent.id}`,
@@ -572,13 +865,20 @@ function RichContentExperimentScreen() {
     return result.document;
   }, [visibleContent, removeImageWatermark]);
 
-  // Experiment B: initial inner width
-  const initialContentWidth = useInitialContentWidth
-    ? Math.max(0, windowWidth - 32)
-    : undefined;
+  // Transformed document according to flowCountMode
+  const activeDocument = useMemo(() => {
+    if (!baseDocument) return undefined;
+    if (flowCountMode === '1') return makeSingleFlowDocument(baseDocument);
+    if (flowCountMode === '50') return make50FlowsDocument(baseDocument);
+    return baseDocument;
+  }, [baseDocument, flowCountMode]);
+
+  // Initial inner content width
+  const contentWidth = Math.max(0, windowWidth - 32);
+  const initialContentWidth = useInitialContentWidth ? contentWidth : undefined;
 
   const renderKey = visibleContent
-    ? `${visibleContent.type}:${visibleContent.id}:${nativeAutoSize}:${usePreparedDocument}:${useInitialContentWidth}:${nativeAutoSizeCachedHeight}:${mountIndex}`
+    ? `${visibleContent.type}:${visibleContent.id}:${rendererMode}:${flowCountMode}:${nativeAutoSize}:${usePreparedDocument}:${useInitialContentWidth}:${nativeAutoSizeCachedHeight}:${mountIndex}`
     : null;
   activeRenderKey.current = renderKey;
 
@@ -589,7 +889,7 @@ function RichContentExperimentScreen() {
   const flowSummaries = singleRunMetrics.flows;
 
   const formatMs = (value: number | null | undefined) =>
-    typeof value === 'number' && Number.isFinite(value) && value >= 0
+    typeof value === 'number' && Number.isFinite(value)
       ? `${value.toFixed(2)} ms`
       : '—';
 
@@ -646,11 +946,71 @@ function RichContentExperimentScreen() {
     setCacheSize(getMeasuredFlowHeightCacheSize());
   };
 
+  const buildSummaryFromRuns = (
+    runs: ReturnType<typeof computeRunMetrics>[],
+  ) => ({
+    normalizeMs: computeStatsForMetric(runs.map((r) => r.normalizeMs)),
+    compileMs: computeStatsForMetric(runs.map((r) => r.compileMs)),
+    flowJsonSumMs: computeStatsForMetric(runs.map((r) => r.flowJsonSumMs)),
+    irReadyMs: computeStatsForMetric(runs.map((r) => r.irReadyMs)),
+    layoutEffectMs: computeStatsForMetric(runs.map((r) => r.layoutEffectMs)),
+    firstRawLayoutMs: computeStatsForMetric(
+      runs.map((r) => r.firstRawLayoutMs),
+    ),
+    firstHeightMs: computeStatsForMetric(runs.map((r) => r.firstHeightMs)),
+    lastHeightMs: computeStatsForMetric(runs.map((r) => r.lastHeightMs)),
+    firstLayoutMs: computeStatsForMetric(runs.map((r) => r.firstLayoutMs)),
+    lastLayoutMs: computeStatsForMetric(runs.map((r) => r.lastLayoutMs)),
+    documentReadyMs: computeStatsForMetric(runs.map((r) => r.documentReadyMs)),
+    propsSetMinMs: computeStatsForMetric(runs.map((r) => r.propsSetMinMs)),
+    firstMeasureMinMs: computeStatsForMetric(
+      runs.map((r) => r.firstMeasureMinMs),
+    ),
+    // Timeline intervals
+    irReadyToFirstRawLayoutMs: computeStatsForMetric(
+      runs.map((r) => r.irReadyToFirstRawLayoutMs),
+    ),
+    firstRawLayoutToLastLayoutMs: computeStatsForMetric(
+      runs.map((r) => r.firstRawLayoutToLastLayoutMs),
+    ),
+    irReadyToLastLayoutMs: computeStatsForMetric(
+      runs.map((r) => r.irReadyToLastLayoutMs),
+    ),
+    lastHeightToLastLayoutMs: computeStatsForMetric(
+      runs.map((r) => r.lastHeightToLastLayoutMs),
+    ),
+    irReadyToLayoutEffectMs: computeStatsForMetric(
+      runs.map((r) => r.irReadyToLayoutEffectMs),
+    ),
+    layoutEffectToPropsSetMs: computeStatsForMetric(
+      runs.map((r) => r.layoutEffectToPropsSetMs),
+    ),
+    propsSetToFirstRawLayoutMs: computeStatsForMetric(
+      runs.map((r) => r.propsSetToFirstRawLayoutMs),
+    ),
+    rebuildSumMs: computeStatsForMetric(runs.map((r) => r.rebuildSumMs)),
+    superMeasureSumMs: computeStatsForMetric(
+      runs.map((r) => r.superMeasureSumMs),
+    ),
+    measureMaxMs: computeStatsForMetric(runs.map((r) => r.measureMaxMs)),
+    schedulePostWaitMaxMs: computeStatsForMetric(
+      runs.map((r) => r.schedulePostWaitMaxMs),
+    ),
+    heightPostWaitMaxMs: computeStatsForMetric(
+      runs.map((r) => r.heightPostWaitMaxMs),
+    ),
+    setViewSizeCountMax: computeStatsForMetric(
+      runs.map((r) => r.setViewSizeCountMax),
+    ),
+  });
+
+  // 10-run single-mode test
   const run10Tests = async () => {
-    if (!visibleContent || !nativeAvailable || isTesting10Runs) return;
-    setIsTesting10Runs(true);
-    setTest10Progress({ current: 0, total: 10 });
+    if (!visibleContent || isTesting) return;
+    setIsTesting(true);
+    setTestProgress({ current: 0, total: 10, label: '单模式 10 轮测试' });
     setExportedJsonResult(null);
+    setInterleavedSummary(null);
     setCopyToast(null);
     isTestingRef.current = true;
 
@@ -659,7 +1019,11 @@ function RichContentExperimentScreen() {
     try {
       for (let round = 1; round <= 10; round++) {
         if (!isTestingRef.current) break;
-        setTest10Progress({ current: round, total: 10 });
+        setTestProgress({
+          current: round,
+          total: 10,
+          label: `第 ${round}/10 轮`,
+        });
 
         if (clearCacheBeforeMount) {
           clearMeasuredFlowHeightCache();
@@ -672,7 +1036,7 @@ function RichContentExperimentScreen() {
             if (resolved) return;
             resolved = true;
             roundLayoutReadyRef.current = null;
-            setTimeout(resolve, 250);
+            setTimeout(resolve, 200);
           };
           roundLayoutReadyRef.current = finish;
           setTimeout(finish, 3500);
@@ -687,78 +1051,15 @@ function RichContentExperimentScreen() {
         if (!isTestingRef.current) break;
 
         const roundEvents = [...traceEventsRef.current];
-        const runMetrics = computeRunMetrics(roundEvents);
-        runsData.push(runMetrics);
-
-        // Brief pause between runs for runtime breathing room
-        await new Promise((r) => setTimeout(r, 150));
+        runsData.push(computeRunMetrics(roundEvents));
+        await new Promise((r) => setTimeout(r, 120));
       }
 
       if (runsData.length > 0 && isTestingRef.current) {
-        const summaryMetrics = {
-          normalizeMs: computeStatsForMetric(
-            runsData.map((r) => r.normalizeMs),
-          ),
-          compileMs: computeStatsForMetric(runsData.map((r) => r.compileMs)),
-          flowJsonSumMs: computeStatsForMetric(
-            runsData.map((r) => r.flowJsonSumMs),
-          ),
-          irReadyMs: computeStatsForMetric(runsData.map((r) => r.irReadyMs)),
-          firstFlowReadyMs: computeStatsForMetric(
-            runsData.map((r) => r.firstFlowReadyMs),
-          ),
-          allFlowsReadyMs: computeStatsForMetric(
-            runsData.map((r) => r.allFlowsReadyMs),
-          ),
-          documentReadyMs: computeStatsForMetric(
-            runsData.map((r) => r.documentReadyMs),
-          ),
-          firstHeightMs: computeStatsForMetric(
-            runsData.map((r) => r.firstHeightMs),
-          ),
-          lastHeightMs: computeStatsForMetric(
-            runsData.map((r) => r.lastHeightMs),
-          ),
-          firstLayoutMs: computeStatsForMetric(
-            runsData.map((r) => r.firstLayoutMs),
-          ),
-          lastLayoutMs: computeStatsForMetric(
-            runsData.map((r) => r.lastLayoutMs),
-          ),
-          firstRawLayoutMs: computeStatsForMetric(
-            runsData.map((r) => r.firstRawLayoutMs),
-          ),
-          lastRawLayoutMs: computeStatsForMetric(
-            runsData.map((r) => r.lastRawLayoutMs),
-          ),
-          rebuildSumMs: computeStatsForMetric(
-            runsData.map((r) => r.rebuildSumMs),
-          ),
-          rebuildMaxMs: computeStatsForMetric(
-            runsData.map((r) => r.rebuildMaxMs),
-          ),
-          superMeasureSumMs: computeStatsForMetric(
-            runsData.map((r) => r.superMeasureSumMs),
-          ),
-          superMeasureMaxMs: computeStatsForMetric(
-            runsData.map((r) => r.superMeasureMaxMs),
-          ),
-          measureMaxMs: computeStatsForMetric(
-            runsData.map((r) => r.measureMaxMs),
-          ),
-          schedulePostWaitMaxMs: computeStatsForMetric(
-            runsData.map((r) => r.schedulePostWaitMaxMs),
-          ),
-          heightPostWaitMaxMs: computeStatsForMetric(
-            runsData.map((r) => r.heightPostWaitMaxMs),
-          ),
-          setViewSizeCountMax: computeStatsForMetric(
-            runsData.map((r) => r.setViewSizeCountMax),
-          ),
-        };
-
+        const summary = buildSummaryFromRuns(runsData);
         const exportPayload = {
           exportTime: new Date().toISOString(),
+          testMode: '10-runs-single-mode',
           environment: {
             platform: Platform.OS,
             target: {
@@ -767,6 +1068,8 @@ function RichContentExperimentScreen() {
               title: visibleContent.title,
             },
             settings: {
+              flowCountMode,
+              rendererMode,
               nativeAutoSize,
               clearCacheBeforeMount,
               usePreparedDocument,
@@ -778,12 +1081,9 @@ function RichContentExperimentScreen() {
           },
           summary: {
             runsCompleted: runsData.length,
-            metrics: summaryMetrics,
+            metrics: summary,
           },
-          runs: runsData.map((run, idx) => ({
-            round: idx + 1,
-            ...run,
-          })),
+          runs: runsData.map((run, idx) => ({ round: idx + 1, ...run })),
         };
 
         const jsonString = JSON.stringify(exportPayload, null, 2);
@@ -792,9 +1092,207 @@ function RichContentExperimentScreen() {
         setCopyToast('10 次测试已完成，测试数据已自动复制到剪贴板！');
       }
     } catch {
-      setCopyToast('10 次测试过程中发生异常');
+      setCopyToast('测试过程中发生异常');
     } finally {
-      setIsTesting10Runs(false);
+      setIsTesting(false);
+      isTestingRef.current = false;
+      setCacheSize(getMeasuredFlowHeightCacheSize());
+    }
+  };
+
+  // 20-run interleaved A/B test (10 pairs alternating off and on)
+  const run20InterleavedTests = async () => {
+    if (!visibleContent || isTesting) return;
+    setIsTesting(true);
+    setTestProgress({ current: 0, total: 20, label: '交错测试 (A/B 交替)' });
+    setExportedJsonResult(null);
+    setInterleavedSummary(null);
+    setCopyToast(null);
+    isTestingRef.current = true;
+
+    const runsA: ReturnType<typeof computeRunMetrics>[] = [];
+    const runsB: ReturnType<typeof computeRunMetrics>[] = [];
+
+    try {
+      for (let round = 1; round <= 20; round++) {
+        if (!isTestingRef.current) break;
+        const currentIsAutoSize = round % 2 === 0;
+        setNativeAutoSize(currentIsAutoSize);
+        setTestProgress({
+          current: round,
+          total: 20,
+          label: `第 ${round}/20 轮 (${currentIsAutoSize ? 'AutoSize 开' : 'AutoSize 关'})`,
+        });
+
+        if (clearCacheBeforeMount) {
+          clearMeasuredFlowHeightCache();
+          setCacheSize(0);
+        }
+
+        const roundPromise = new Promise<void>((resolve) => {
+          let resolved = false;
+          const finish = () => {
+            if (resolved) return;
+            resolved = true;
+            roundLayoutReadyRef.current = null;
+            setTimeout(resolve, 200);
+          };
+          roundLayoutReadyRef.current = finish;
+          setTimeout(finish, 3500);
+        });
+
+        activeRenderKey.current = null;
+        setReady(false);
+        startTrace();
+        setMountIndex((v) => v + 1);
+
+        await roundPromise;
+        if (!isTestingRef.current) break;
+
+        const roundEvents = [...traceEventsRef.current];
+        const metrics = computeRunMetrics(roundEvents);
+        if (currentIsAutoSize) {
+          runsB.push(metrics);
+        } else {
+          runsA.push(metrics);
+        }
+
+        await new Promise((r) => setTimeout(r, 120));
+      }
+
+      if (runsA.length > 0 && runsB.length > 0 && isTestingRef.current) {
+        const offSummary = buildSummaryFromRuns(runsA);
+        const onSummary = buildSummaryFromRuns(runsB);
+
+        // Compute pairwise differences (B - A for pair i)
+        const pairCount = Math.min(runsA.length, runsB.length);
+        const pairDiffs = {
+          irReadyToFirstRawLayout: [] as number[],
+          firstRawLayoutToLastLayout: [] as number[],
+          irReadyToLastLayout: [] as number[],
+          lastHeightToLastLayout: [] as number[],
+          lastLayout: [] as number[],
+          documentReady: [] as number[],
+          rebuildSum: [] as number[],
+          superMeasureSum: [] as number[],
+        };
+
+        for (let i = 0; i < pairCount; i++) {
+          const a = runsA[i];
+          const b = runsB[i];
+          if (
+            b.irReadyToFirstRawLayoutMs != null &&
+            a.irReadyToFirstRawLayoutMs != null
+          ) {
+            pairDiffs.irReadyToFirstRawLayout.push(
+              b.irReadyToFirstRawLayoutMs - a.irReadyToFirstRawLayoutMs,
+            );
+          }
+          if (
+            b.firstRawLayoutToLastLayoutMs != null &&
+            a.firstRawLayoutToLastLayoutMs != null
+          ) {
+            pairDiffs.firstRawLayoutToLastLayout.push(
+              b.firstRawLayoutToLastLayoutMs - a.firstRawLayoutToLastLayoutMs,
+            );
+          }
+          if (
+            b.irReadyToLastLayoutMs != null &&
+            a.irReadyToLastLayoutMs != null
+          ) {
+            pairDiffs.irReadyToLastLayout.push(
+              b.irReadyToLastLayoutMs - a.irReadyToLastLayoutMs,
+            );
+          }
+          if (
+            b.lastHeightToLastLayoutMs != null &&
+            a.lastHeightToLastLayoutMs != null
+          ) {
+            pairDiffs.lastHeightToLastLayout.push(
+              b.lastHeightToLastLayoutMs - a.lastHeightToLastLayoutMs,
+            );
+          }
+          if (b.lastLayoutMs != null && a.lastLayoutMs != null) {
+            pairDiffs.lastLayout.push(b.lastLayoutMs - a.lastLayoutMs);
+          }
+          if (b.documentReadyMs != null && a.documentReadyMs != null) {
+            pairDiffs.documentReady.push(b.documentReadyMs - a.documentReadyMs);
+          }
+          if (b.rebuildSumMs != null && a.rebuildSumMs != null) {
+            pairDiffs.rebuildSum.push(b.rebuildSumMs - a.rebuildSumMs);
+          }
+          if (b.superMeasureSumMs != null && a.superMeasureSumMs != null) {
+            pairDiffs.superMeasureSum.push(
+              b.superMeasureSumMs - a.superMeasureSumMs,
+            );
+          }
+        }
+
+        const pairDiffSummary = {
+          irReadyToFirstRawLayout: computeStats(
+            pairDiffs.irReadyToFirstRawLayout,
+          ),
+          firstRawLayoutToLastLayout: computeStats(
+            pairDiffs.firstRawLayoutToLastLayout,
+          ),
+          irReadyToLastLayout: computeStats(pairDiffs.irReadyToLastLayout),
+          lastHeightToLastLayout: computeStats(
+            pairDiffs.lastHeightToLastLayout,
+          ),
+          lastLayout: computeStats(pairDiffs.lastLayout),
+          documentReady: computeStats(pairDiffs.documentReady),
+          rebuildSum: computeStats(pairDiffs.rebuildSum),
+          superMeasureSum: computeStats(pairDiffs.superMeasureSum),
+        };
+
+        setInterleavedSummary({
+          offSummary,
+          onSummary,
+          pairDiffSummary,
+        });
+
+        const exportPayload = {
+          exportTime: new Date().toISOString(),
+          testMode: '20-runs-interleaved-ab-mode',
+          environment: {
+            platform: Platform.OS,
+            target: {
+              type: visibleContent.type,
+              id: visibleContent.id,
+              title: visibleContent.title,
+            },
+            settings: {
+              flowCountMode,
+              rendererMode,
+              clearCacheBeforeMount,
+              usePreparedDocument,
+              useInitialContentWidth,
+              nativeAutoSizeCachedHeight,
+              fontSizeScale,
+              lineHeightScale,
+            },
+          },
+          summary: {
+            pairsCompleted: pairCount,
+            autoSizeOff: offSummary,
+            autoSizeOn: onSummary,
+            pairwiseDifference_B_minus_A: pairDiffSummary,
+          },
+          runs: {
+            autoSizeOff: runsA.map((r, i) => ({ pairIndex: i + 1, ...r })),
+            autoSizeOn: runsB.map((r, i) => ({ pairIndex: i + 1, ...r })),
+          },
+        };
+
+        const jsonString = JSON.stringify(exportPayload, null, 2);
+        setExportedJsonResult(jsonString);
+        await Clipboard.setStringAsync(jsonString);
+        setCopyToast('20 次交错测试已完成，A/B 对比数据已自动复制到剪贴板！');
+      }
+    } catch {
+      setCopyToast('交错测试过程中发生异常');
+    } finally {
+      setIsTesting(false);
       isTestingRef.current = false;
       setCacheSize(getMeasuredFlowHeightCacheSize());
     }
@@ -873,19 +1371,98 @@ function RichContentExperimentScreen() {
             )}
           </Pressable>
           {error ? <Text style={styles.hint}>{error}</Text> : null}
-          {!nativeAvailable ? (
-            <Text style={styles.hint}>
-              当前构建缺少原生文字模块，无法进行此对照。
-            </Text>
-          ) : null}
 
-          {/* Test Switches Panel */}
+          {/* Experiment Controls Panel */}
           <View
             style={[
               styles.controls,
               { borderColor: border, backgroundColor: surface },
             ]}
           >
+            {/* Flow Count Selection */}
+            <View style={styles.controlRow}>
+              <Text style={styles.controlLabel}>Flow 数量对照</Text>
+              <View style={styles.row}>
+                {(
+                  [
+                    { mode: '1', label: '1 个' },
+                    { mode: 'default', label: '默认' },
+                    { mode: '50', label: '50 个' },
+                  ] as const
+                ).map((item) => (
+                  <Pressable
+                    key={item.mode}
+                    accessibilityRole="button"
+                    onPress={() => {
+                      activeRenderKey.current = null;
+                      setReady(false);
+                      if (visibleContent) startTrace();
+                      setFlowCountMode(item.mode);
+                    }}
+                    style={[
+                      styles.modePill,
+                      { borderColor: border },
+                      flowCountMode === item.mode && {
+                        backgroundColor: primary,
+                        borderColor: primary,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.modePillText,
+                        flowCountMode === item.mode && { color: onPrimary },
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            {/* Renderer Baseline Selection */}
+            <View style={styles.controlRow}>
+              <Text style={styles.controlLabel}>渲染后端对照</Text>
+              <View style={styles.row}>
+                {(
+                  [
+                    { mode: 'rich-text', label: 'RichFlow 原生' },
+                    { mode: 'pure-rn-text', label: '纯 RN <Text> 基线' },
+                  ] as const
+                ).map((item) => (
+                  <Pressable
+                    key={item.mode}
+                    accessibilityRole="button"
+                    onPress={() => {
+                      activeRenderKey.current = null;
+                      setReady(false);
+                      if (visibleContent) startTrace();
+                      setRendererMode(item.mode);
+                    }}
+                    style={[
+                      styles.modePill,
+                      { borderColor: border },
+                      rendererMode === item.mode && {
+                        backgroundColor: primary,
+                        borderColor: primary,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.modePillText,
+                        rendererMode === item.mode && { color: onPrimary },
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            {/* Fabric AutoSize Toggle */}
             <View style={styles.controlRow}>
               <Text style={styles.controlLabel}>Fabric 原生尺寸（实验）</Text>
               <Switch
@@ -893,11 +1470,13 @@ function RichContentExperimentScreen() {
                 onValueChange={(value) => {
                   activeRenderKey.current = null;
                   setReady(false);
-                  if (visibleContent && nativeAvailable) startTrace();
+                  if (visibleContent) startTrace();
                   setNativeAutoSize(value);
                 }}
               />
             </View>
+
+            {/* Cold Cache Toggle */}
             <View style={styles.controlRow}>
               <Text style={styles.controlLabel}>
                 冷缓存测试（挂载前清空高度缓存）
@@ -907,6 +1486,8 @@ function RichContentExperimentScreen() {
                 onValueChange={setClearCacheBeforeMount}
               />
             </View>
+
+            {/* Experiment A Toggle */}
             <View style={styles.controlRow}>
               <Text style={styles.controlLabel}>
                 实验 A：预备 Document 模式（跳过 HTML 规范化）
@@ -916,11 +1497,13 @@ function RichContentExperimentScreen() {
                 onValueChange={(value) => {
                   activeRenderKey.current = null;
                   setReady(false);
-                  if (visibleContent && nativeAvailable) startTrace();
+                  if (visibleContent) startTrace();
                   setUsePreparedDocument(value);
                 }}
               />
             </View>
+
+            {/* Experiment B Toggle */}
             <View style={styles.controlRow}>
               <Text style={styles.controlLabel}>
                 实验 B：预置容器宽度模式（避免等待首次 onLayout）
@@ -930,11 +1513,13 @@ function RichContentExperimentScreen() {
                 onValueChange={(value) => {
                   activeRenderKey.current = null;
                   setReady(false);
-                  if (visibleContent && nativeAvailable) startTrace();
+                  if (visibleContent) startTrace();
                   setUseInitialContentWidth(value);
                 }}
               />
             </View>
+
+            {/* Fabric Cached Height Toggle */}
             <View style={styles.controlRow}>
               <Text style={styles.controlLabel}>
                 Fabric 预置缓存尺寸模式（热测试公平对比）
@@ -944,7 +1529,7 @@ function RichContentExperimentScreen() {
                 onValueChange={(value) => {
                   activeRenderKey.current = null;
                   setReady(false);
-                  if (visibleContent && nativeAvailable) startTrace();
+                  if (visibleContent) startTrace();
                   setNativeAutoSizeCachedHeight(value);
                 }}
               />
@@ -954,17 +1539,15 @@ function RichContentExperimentScreen() {
             <View style={styles.actionRow}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityState={{
-                  disabled: !visibleContent || isTesting10Runs,
-                }}
-                disabled={!visibleContent || isTesting10Runs}
+                accessibilityState={{ disabled: !visibleContent || isTesting }}
+                disabled={!visibleContent || isTesting}
                 onPress={handleManualRemount}
                 style={[
                   styles.button,
                   styles.flexButton,
                   {
                     borderColor: border,
-                    opacity: visibleContent && !isTesting10Runs ? 1 : 0.5,
+                    opacity: visibleContent && !isTesting ? 1 : 0.5,
                   },
                 ]}
               >
@@ -972,10 +1555,8 @@ function RichContentExperimentScreen() {
               </Pressable>
               <Pressable
                 accessibilityRole="button"
-                accessibilityState={{
-                  disabled: !visibleContent || isTesting10Runs,
-                }}
-                disabled={!visibleContent || isTesting10Runs}
+                accessibilityState={{ disabled: !visibleContent || isTesting }}
+                disabled={!visibleContent || isTesting}
                 onPress={() => void run10Tests()}
                 style={[
                   styles.button,
@@ -983,19 +1564,49 @@ function RichContentExperimentScreen() {
                   {
                     backgroundColor: primary,
                     borderColor: primary,
-                    opacity: visibleContent && !isTesting10Runs ? 1 : 0.5,
+                    opacity: visibleContent && !isTesting ? 1 : 0.5,
                   },
                 ]}
               >
-                {isTesting10Runs ? (
+                {isTesting && testProgress.total === 10 ? (
                   <View style={styles.inlineLoading}>
                     <ActivityIndicator size="small" color={onPrimary} />
-                    <Text style={{ color: onPrimary, fontSize: 13 }}>
-                      {test10Progress.current}/{test10Progress.total}
+                    <Text style={{ color: onPrimary, fontSize: 12 }}>
+                      {testProgress.current}/10
                     </Text>
                   </View>
                 ) : (
-                  <Text style={{ color: onPrimary }}>一键测试 10 次并导出</Text>
+                  <Text style={{ color: onPrimary, fontSize: 13 }}>
+                    测试 10 次
+                  </Text>
+                )}
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !visibleContent || isTesting }}
+                disabled={!visibleContent || isTesting}
+                onPress={() => void run20InterleavedTests()}
+                style={[
+                  styles.button,
+                  styles.flexButton,
+                  {
+                    backgroundColor: primary,
+                    borderColor: primary,
+                    opacity: visibleContent && !isTesting ? 1 : 0.5,
+                  },
+                ]}
+              >
+                {isTesting && testProgress.total === 20 ? (
+                  <View style={styles.inlineLoading}>
+                    <ActivityIndicator size="small" color={onPrimary} />
+                    <Text style={{ color: onPrimary, fontSize: 12 }}>
+                      {testProgress.current}/20
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={{ color: onPrimary, fontSize: 13 }}>
+                    交错 20 次 (A/B)
+                  </Text>
                 )}
               </Pressable>
             </View>
@@ -1025,7 +1636,87 @@ function RichContentExperimentScreen() {
             ) : null}
           </View>
 
-          {/* 10-Run Export Results Panel */}
+          {/* Interleaved A/B Comparison Card */}
+          {interleavedSummary ? (
+            <View
+              style={[
+                styles.controls,
+                { borderColor: primary, backgroundColor: surface },
+              ]}
+            >
+              <Text style={[styles.controlLabel, { fontWeight: '700' }]}>
+                A/B 交错测试对比结果（各 10 轮交替运行，单位：ms 中位数）
+              </Text>
+              <Text type="secondary" style={styles.hint}>
+                【阶段耗时对比】
+                {'\n'}IR Ready：
+                {interleavedSummary.offSummary.irReadyMs.median} vs{' '}
+                {interleavedSummary.onSummary.irReadyMs.median}
+                {'\n'}First Raw Layout：
+                {interleavedSummary.offSummary.firstRawLayoutMs.median} vs{' '}
+                {interleavedSummary.onSummary.firstRawLayoutMs.median}
+                {'\n'}First Height：
+                {interleavedSummary.offSummary.firstHeightMs.median} vs{' '}
+                {interleavedSummary.onSummary.firstHeightMs.median}
+                {'\n'}Last Height：
+                {interleavedSummary.offSummary.lastHeightMs.median} vs{' '}
+                {interleavedSummary.onSummary.lastHeightMs.median}
+                {'\n'}First Layout：
+                {interleavedSummary.offSummary.firstLayoutMs.median} vs{' '}
+                {interleavedSummary.onSummary.firstLayoutMs.median}
+                {'\n'}Last Layout：
+                {interleavedSummary.offSummary.lastLayoutMs.median} vs{' '}
+                {interleavedSummary.onSummary.lastLayoutMs.median}
+                {'\n'}Document Ready：
+                {interleavedSummary.offSummary.documentReadyMs.median} vs{' '}
+                {interleavedSummary.onSummary.documentReadyMs.median}
+                {'\n'}────────────────────────
+                {'\n'}【核心阶段间隔对比（中位数）】
+                {'\n'}IR Ready → First Raw Layout：
+                {interleavedSummary.offSummary.irReadyToFirstRawLayoutMs.median}{' '}
+                vs{' '}
+                {interleavedSummary.onSummary.irReadyToFirstRawLayoutMs.median}
+                {'\n'}First Raw Layout → Last Layout：
+                {
+                  interleavedSummary.offSummary.firstRawLayoutToLastLayoutMs
+                    .median
+                }{' '}
+                vs{' '}
+                {
+                  interleavedSummary.onSummary.firstRawLayoutToLastLayoutMs
+                    .median
+                }
+                {'\n'}IR Ready → Last Layout（总布局用时）：
+                {interleavedSummary.offSummary.irReadyToLastLayoutMs.median} vs{' '}
+                {interleavedSummary.onSummary.irReadyToLastLayoutMs.median}
+                {'\n'}Last Height → Last Layout：
+                {interleavedSummary.offSummary.lastHeightToLastLayoutMs.median}{' '}
+                vs{' '}
+                {interleavedSummary.onSummary.lastHeightToLastLayoutMs.median}
+                {'\n'}────────────────────────
+                {'\n'}【逐对相减中位数（Pairwise B - A）】
+                {'\n'}IR Ready → First Raw Layout 差异：
+                {
+                  interleavedSummary.pairDiffSummary.irReadyToFirstRawLayout
+                    .median
+                }{' '}
+                ms
+                {'\n'}First Raw Layout → Last Layout 差异：
+                {
+                  interleavedSummary.pairDiffSummary.firstRawLayoutToLastLayout
+                    .median
+                }{' '}
+                ms
+                {'\n'}IR Ready → Last Layout 差异：
+                {interleavedSummary.pairDiffSummary.irReadyToLastLayout.median}{' '}
+                ms
+                {'\n'}最终 Last Layout 差异：
+                {interleavedSummary.pairDiffSummary.lastLayout.median} ms
+              </Text>
+            </View>
+          ) : null}
+
+          {/* Export JSON Results Panel */}
           {exportedJsonResult ? (
             <View
               style={[
@@ -1035,7 +1726,7 @@ function RichContentExperimentScreen() {
             >
               <View style={styles.controlRow}>
                 <Text style={[styles.controlLabel, { fontWeight: '700' }]}>
-                  10 次自动测试完成（已写入剪贴板）
+                  测试数据已就绪（已写入剪贴板）
                 </Text>
                 <Pressable
                   accessibilityRole="button"
@@ -1091,12 +1782,10 @@ function RichContentExperimentScreen() {
                   此回答可能包含付费或截断内容，当前仅展示接口返回的正文。
                 </Text>
               ) : null}
-              {nativeAvailable ? (
-                <Text type="secondary" style={styles.hint}>
-                  {ready ? '正文布局就绪' : '正文正在布局'}
-                </Text>
-              ) : null}
-              {nativeAvailable && trace ? (
+              <Text type="secondary" style={styles.hint}>
+                {ready ? '正文布局就绪' : '正文正在布局'}
+              </Text>
+              {trace ? (
                 <>
                   <View
                     style={[
@@ -1108,8 +1797,8 @@ function RichContentExperimentScreen() {
                       单次运行阶段耗时（共 {flowSummaries.length} 个文字 Flow）
                     </Text>
                     <Text type="secondary" style={styles.hint}>
-                      【JS 规范化、编译与序列化阶段】
-                      {'\n'}react-render-enter：
+                      【JS 规范化、编译与 React 生命周期】
+                      {'\n'}react-render-enter（进入 Render）：
                       {formatMs(singleRunMetrics.renderEnterMs)}
                       {'\n'}normalize (规范化)：
                       {formatMs(singleRunMetrics.normalizeMs)}
@@ -1119,13 +1808,42 @@ function RichContentExperimentScreen() {
                       {formatMs(singleRunMetrics.flowJsonSumMs)}
                       {'\n'}IR 准备 (ir-ready)：
                       {formatMs(singleRunMetrics.irReadyMs)}
-                      {'\n'}首个 Flow 就绪 / 全部就绪：
-                      {formatMs(singleRunMetrics.firstFlowReadyMs)} /{' '}
-                      {formatMs(singleRunMetrics.allFlowsReadyMs)}
-                      {'\n'}文档揭示对齐 (document-ready)：
-                      {formatMs(singleRunMetrics.documentReadyMs)}
+                      {'\n'}react-layout-effect (React Commit 完成)：
+                      {formatMs(singleRunMetrics.layoutEffectMs)}
+                      {'\n'}react-effect (被动调度完成)：
+                      {formatMs(singleRunMetrics.effectMs)}
                       {'\n'}────────────────────────
-                      {'\n'}【原生文字排版与测量核心耗时】
+                      {'\n'}【原生 Props 应用与首次系统测量/布局】
+                      {'\n'}Native 收到 Props (commitProps)：
+                      {firstAndLast(
+                        singleRunMetrics.propsSetMinMs,
+                        singleRunMetrics.propsSetMaxMs,
+                        singleRunMetrics.flows.length,
+                      )}
+                      {'\n'}Native 首次收到 onMeasure：
+                      {firstAndLast(
+                        singleRunMetrics.firstMeasureMinMs,
+                        singleRunMetrics.firstMeasureMaxMs,
+                        singleRunMetrics.flows.length,
+                      )}
+                      {'\n'}Native 首次 onLayout 回调：
+                      {firstAndLast(
+                        singleRunMetrics.firstRawLayoutMs,
+                        singleRunMetrics.lastRawLayoutMs,
+                        singleRunMetrics.rawLayoutEventsCount,
+                      )}
+                      {'\n'}────────────────────────
+                      {'\n'}【IR Ready 到 First Raw Layout 拆解】
+                      {'\n'}IR Ready → React Commit：
+                      {formatMs(singleRunMetrics.irReadyToLayoutEffectMs)}
+                      {'\n'}React Commit → Native 收到 Props：
+                      {formatMs(singleRunMetrics.layoutEffectToPropsSetMs)}
+                      {'\n'}Native 收到 Props → 首次 onLayout：
+                      {formatMs(singleRunMetrics.propsSetToFirstRawLayoutMs)}
+                      {'\n'}IR Ready → 首次 onLayout 合计：
+                      {formatMs(singleRunMetrics.irReadyToFirstRawLayoutMs)}
+                      {'\n'}────────────────────────
+                      {'\n'}【文字排版、高度与布局完成】
                       {'\n'}rebuild()（Spannable + setText）：
                       {sumAndMax(flowSummaries.map((f) => f.rebuildMs))}
                       {'\n'}rebuild() 细分（parse / span / setText 合计）：
@@ -1136,30 +1854,10 @@ function RichContentExperimentScreen() {
                       {sumAndMax(flowSummaries.map((f) => f.superMeasureMs))}
                       {'\n'}显式二次 measure()：
                       {maximum(flowSummaries.map((f) => f.measureMs))}
-                      {'\n'}────────────────────────
-                      {'\n'}【UI 线程队列等待与原生调度】
                       {'\n'}scheduleMeasurement post 排队等待：
                       {maximum(flowSummaries.map((f) => f.schedulePostWaitMs))}
-                      {'\n'}measureText 高度事件 post 排队等待：
+                      {'\n'}measureText 高度 post 排队等待：
                       {maximum(flowSummaries.map((f) => f.heightPostWaitMs))}
-                      {'\n'}setViewSize 调用次数 (单 Flow 最大)：
-                      {maximum(flowSummaries.map((f) => f.setViewSizeCount))}
-                      {'\n'}原生 props 批次起点 → 测量结束：
-                      {maximum(flowSummaries.map((f) => f.propsToMeasureMs))}
-                      {'\n'}原生 props 批次起点 → 请求尺寸更新：
-                      {maximum(
-                        flowSummaries.map((f) => f.propsToSizeRequestMs),
-                      )}
-                      {'\n'}原生 props 批次起点 → 高度事件派发：
-                      {maximum(flowSummaries.map((f) => f.propsToDispatchMs))}
-                      {'\n'}────────────────────────
-                      {'\n'}【事件到达与布局】
-                      {'\n'}原生 View onLayout (raw-layout)：
-                      {firstAndLast(
-                        singleRunMetrics.firstRawLayoutMs,
-                        singleRunMetrics.lastRawLayoutMs,
-                        singleRunMetrics.rawLayoutEventsCount,
-                      )}
                       {'\n'}高度事件到达：
                       {firstAndLast(
                         singleRunMetrics.firstHeightMs,
@@ -1172,11 +1870,8 @@ function RichContentExperimentScreen() {
                         singleRunMetrics.lastLayoutMs,
                         singleRunMetrics.layoutEventsCount,
                       )}
-                    </Text>
-                    <Text type="secondary" style={styles.hint}>
-                      统计仅覆盖顶层文字流。原生与 JS
-                      时钟不直接相减。尺寸更新请求不代表 Fabric Commit
-                      完成，匹配布局也不代表屏幕已完成渲染。
+                      {'\n'}文档整体就绪 (document-ready)：
+                      {formatMs(singleRunMetrics.documentReadyMs)}
                     </Text>
                   </View>
                   {flowSummaries.length > 0 ? (
@@ -1208,8 +1903,7 @@ function RichContentExperimentScreen() {
                             >
                               <Text style={styles.flowTitle}>
                                 {flow.flowId}（高度 {flow.heightCount} 次 / 布局{' '}
-                                {flow.layoutCount} 次 / 测量{' '}
-                                {flow.measureCount ?? 1} 次 / setViewSize{' '}
+                                {flow.layoutCount} 次 / setViewSize{' '}
                                 {flow.setViewSizeCount ?? 0} 次）
                               </Text>
                               <Text type="secondary" style={styles.hint}>
@@ -1222,8 +1916,7 @@ function RichContentExperimentScreen() {
                                 {'\n'}schedule wait:{' '}
                                 {formatMs(flow.schedulePostWaitMs)} | height
                                 wait: {formatMs(flow.heightPostWaitMs)}
-                                {'\n'}props → dispatch:{' '}
-                                {formatMs(flow.propsToDispatchMs)} | JS起点 →
+                                {'\n'}propsSet: {formatMs(flow.propsSetMs)} →
                                 首次高度 {formatMs(flow.firstHeightMs)} →
                                 匹配布局 {formatMs(flow.lastLayoutMs)}
                               </Text>
@@ -1238,29 +1931,54 @@ function RichContentExperimentScreen() {
             </>
           ) : null}
         </View>
-        {visibleContent && nativeAvailable ? (
+
+        {/* Content Renderers */}
+        {visibleContent ? (
           <View style={styles.body}>
-            <ZhihuNativeContent
-              key={renderKey}
-              content={visibleContent.content}
-              document={usePreparedDocument ? preparedDocument : undefined}
-              objectId={visibleContent.id}
-              type={visibleContent.type}
-              segmentInfos={visibleContent.segmentInfos}
-              linkCardInfo={visibleContent.linkCardInfo}
-              nativeAutoSize={nativeAutoSize}
-              nativeAutoSizeCachedHeight={nativeAutoSizeCachedHeight}
-              initialContentWidth={initialContentWidth}
-              performanceTrace={trace}
-              fontSizeScale={fontSizeScale}
-              lineHeightScale={lineHeightScale}
-              selectable
-              onLayoutReady={() => {
-                if (activeRenderKey.current === renderKey) setReady(true);
-                roundLayoutReadyRef.current?.();
-              }}
-              renderFallback={() => <Text>原生正文不可用。</Text>}
-            />
+            {rendererMode === 'pure-rn-text' && activeDocument ? (
+              <PureRNTextContent
+                key={renderKey}
+                document={activeDocument}
+                contentWidth={contentWidth}
+                fontSizeScale={fontSizeScale}
+                lineHeightScale={lineHeightScale}
+                performanceTrace={trace}
+                onLayoutReady={() => {
+                  if (activeRenderKey.current === renderKey) setReady(true);
+                  roundLayoutReadyRef.current?.();
+                }}
+              />
+            ) : nativeAvailable ? (
+              <ZhihuNativeContent
+                key={renderKey}
+                content={visibleContent.content}
+                document={
+                  flowCountMode !== 'default' || usePreparedDocument
+                    ? activeDocument
+                    : undefined
+                }
+                objectId={visibleContent.id}
+                type={visibleContent.type}
+                segmentInfos={visibleContent.segmentInfos}
+                linkCardInfo={visibleContent.linkCardInfo}
+                nativeAutoSize={nativeAutoSize}
+                nativeAutoSizeCachedHeight={nativeAutoSizeCachedHeight}
+                initialContentWidth={initialContentWidth}
+                performanceTrace={trace}
+                fontSizeScale={fontSizeScale}
+                lineHeightScale={lineHeightScale}
+                selectable
+                onLayoutReady={() => {
+                  if (activeRenderKey.current === renderKey) setReady(true);
+                  roundLayoutReadyRef.current?.();
+                }}
+                renderFallback={() => <Text>原生正文不可用。</Text>}
+              />
+            ) : (
+              <Text style={styles.hint}>
+                当前构建缺少原生文字模块，无法测试原生渲染器。
+              </Text>
+            )}
           </View>
         ) : null}
       </ScrollView>
@@ -1271,7 +1989,7 @@ function RichContentExperimentScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   header: { paddingHorizontal: 16, paddingTop: 12, gap: 10 },
-  row: { flexDirection: 'row', gap: 8 },
+  row: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   actionRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   button: {
     minHeight: 42,
@@ -1286,6 +2004,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  modePill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  modePillText: {
+    fontSize: 12,
+    fontWeight: '500',
   },
   input: {
     minHeight: 44,

@@ -48,6 +48,9 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
   private var lastSetTextMs: Double?
   private var measureCount = 0
   private var setViewSizeCount = 0
+  private var lastPropsSetEpochMs: Double?
+  private var firstMeasureEpochMs: Double?
+  private var firstLayoutEpochMs: Double?
   private var attachments: [RichTextAttachmentSlot] = []
   private var attachmentUpdates: [(RichTextAttachmentSlot, Int, RichTextAttachmentAsset)] = []
   private var viewportObservations: [NSKeyValueObservation] = []
@@ -199,6 +202,9 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
 
   func applyPendingProps() {
     tracePropsTime = performanceTracing ? ProcessInfo.processInfo.systemUptime : nil
+    lastPropsSetEpochMs = performanceTracing ? Date().timeIntervalSince1970 * 1000 : nil
+    firstMeasureEpochMs = nil
+    firstLayoutEpochMs = nil
     measureCount = 0
     setViewSizeCount = 0
     let width = effectiveWidth
@@ -210,6 +216,9 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
 
   public override func layoutSubviews() {
     super.layoutSubviews()
+    if performanceTracing && firstLayoutEpochMs == nil {
+      firstLayoutEpochMs = Date().timeIntervalSince1970 * 1000
+    }
     let width = effectiveWidth
     guard width > 0 else { return }
     if needsRebuild || width != lastWidth { rebuild(width: width) }
@@ -459,6 +468,9 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
   private func measureAndLayout(width: CGFloat) {
     guard width > 0, let flow else { textView.frame = .zero; return }
     measureCount += 1
+    if performanceTracing && firstMeasureEpochMs == nil {
+      firstMeasureEpochMs = Date().timeIntervalSince1970 * 1000
+    }
     let measurementStart = performanceTracing ? ProcessInfo.processInfo.systemUptime : nil
     container.size = CGSize(width: width, height: .greatestFiniteMagnitude)
     manager.ensureLayout(for: container)
@@ -508,6 +520,10 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
       if let setTextMs = self.lastSetTextMs { event["nativeSetTextMs"] = setTextMs }
       event["measureCount"] = self.measureCount
       event["setViewSizeCount"] = self.setViewSizeCount
+      if let propsSetEpoch = self.lastPropsSetEpochMs { event["nativePropsSetEpochMs"] = propsSetEpoch }
+      if let firstMeasureEpoch = self.firstMeasureEpochMs { event["nativeFirstMeasureEpochMs"] = firstMeasureEpoch }
+      if let firstLayoutEpoch = self.firstLayoutEpochMs { event["nativeFirstLayoutEpochMs"] = firstLayoutEpoch }
+      if self.performanceTracing { event["nativeDispatchEpochMs"] = Date().timeIntervalSince1970 * 1000 }
       self.onHeightChange(event)
     }
   }

@@ -93,6 +93,7 @@ export {
 export {
   createRichContentMetrics,
   RICH_CONTENT_BODY_FONT_SIZE,
+  RICH_CONTENT_PARAGRAPH_SPACING,
 } from './presentation';
 export {
   getNeighborAnswerIds,
