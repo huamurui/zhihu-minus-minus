@@ -15,6 +15,8 @@ export {
   ZhihuNativeContent,
   type ZhihuNativeContentProps,
   type ZhihuNativeContentSelection,
+  type ZhihuNativePerformanceEvent,
+  type ZhihuNativePerformanceTrace,
   type ZhihuNativeSegmentAction,
   type ZhihuNativeTypographyOptions,
 } from './components/ZhihuNativeContent';

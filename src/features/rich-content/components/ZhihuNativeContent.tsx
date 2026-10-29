@@ -90,6 +90,20 @@ export interface ZhihuNativeSegmentAction {
   segment?: ZhihuSegmentRun | ZhihuSegmentHighlightRun;
 }
 
+export interface ZhihuNativePerformanceEvent {
+  phase: 'ir-ready' | 'height' | 'layout';
+  elapsedMs: number;
+  nativeMeasureMs?: number | null;
+  nativePropsToMeasureMs?: number | null;
+  nativePropsToSizeRequestMs?: number | null;
+  nativePropsToDispatchMs?: number | null;
+}
+
+export interface ZhihuNativePerformanceTrace {
+  startedAt: number;
+  onEvent: (event: ZhihuNativePerformanceEvent) => void;
+}
+
 export interface ZhihuNativeContentProps {
   content: string;
   contentArray?: readonly ZhihuContentSegment[];
@@ -101,6 +115,10 @@ export interface ZhihuNativeContentProps {
   linkCardInfo?: Readonly<Record<string, unknown>>;
   variant?: RichContentVariant;
   selectable?: boolean;
+  /** Opt-in experiment for native Fabric sizing. */
+  nativeAutoSize?: boolean;
+  /** Optional local experiment; timestamps are never sent to telemetry. */
+  performanceTrace?: ZhihuNativePerformanceTrace;
   suppressDoubleTapSelection?: boolean;
   fontSizeScale?: number;
   lineHeightScale?: number;
@@ -202,6 +220,8 @@ interface FlowViewProps {
   fontSize: number;
   lineHeight: number;
   selectable: boolean;
+  nativeAutoSize?: boolean;
+  performanceTrace?: ZhihuNativePerformanceTrace;
   suppressDoubleTapSelection?: boolean;
   options: ZhihuNativeTypographyOptions;
   linkColor: string;
@@ -227,6 +247,8 @@ const NativeFlow = React.memo(function NativeFlow({
   fontSize,
   lineHeight,
   selectable,
+  nativeAutoSize = false,
+  performanceTrace,
   suppressDoubleTapSelection = false,
   options,
   linkColor,
@@ -257,8 +279,11 @@ const NativeFlow = React.memo(function NativeFlow({
   );
   const measureKey = flowMeasureKey(flow, contentWidth, configJson);
   const geometryKey = useMemo(
-    () => `${contentWidth}:${configJson}:${flowLayoutIdentity(flow)}`,
-    [flow, contentWidth, configJson],
+    () =>
+      nativeAutoSize
+        ? ''
+        : `${contentWidth}:${configJson}:${flowLayoutIdentity(flow)}`,
+    [flow, contentWidth, configJson, nativeAutoSize],
   );
   const [measuredHeight, setMeasuredHeight] = useState<{
     key: string;
@@ -272,6 +297,17 @@ const NativeFlow = React.memo(function NativeFlow({
       : null;
   });
   const currentInput = useRef({ flow, measureKey });
+  // Fabric state and native events can arrive in either order. Keep the most
+  // recent actual layout so an equal-height reflow can reuse its geometry.
+  const nativeLayout = useRef<{ width: number; height: number } | null>(null);
+  const nativeMeasurement = useRef<{ key: string; height: number } | null>(
+    null,
+  );
+  const notifiedNativeMeasurement = useRef<string | null>(null);
+  if (currentInput.current.measureKey !== measureKey) {
+    nativeMeasurement.current = null;
+    notifiedNativeMeasurement.current = null;
+  }
   currentInput.current = { flow, measureKey };
   const mounted = useRef(true);
   useEffect(() => {
@@ -296,6 +332,30 @@ const NativeFlow = React.memo(function NativeFlow({
     ? 1
     : lineHeight;
 
+  const notifyNativeLayout = () => {
+    const measurement = nativeMeasurement.current;
+    const layout = nativeLayout.current;
+    if (
+      (!nativeAutoSize && !performanceTrace) ||
+      !measurement ||
+      measurement.key !== measureKey ||
+      !layout ||
+      Math.abs(layout.width - contentWidth) > 1 ||
+      Math.abs(layout.height - Math.max(minimumHeight, measurement.height)) > 1
+    )
+      return;
+    const notification = `${measureKey}:${measurement.height}`;
+    if (notifiedNativeMeasurement.current === notification) return;
+    notifiedNativeMeasurement.current = notification;
+    if (performanceTrace) {
+      performanceTrace.onEvent({
+        phase: 'layout',
+        elapsedMs: performance.now() - performanceTrace.startedAt,
+      });
+    }
+    if (nativeAutoSize) onMeasured?.(flow);
+  };
+
   return (
     <RichTextNativeView
       flowJson={flowJson}
@@ -303,8 +363,22 @@ const NativeFlow = React.memo(function NativeFlow({
       contentWidth={contentWidth}
       layoutKey={measureKey}
       selectable={selectable}
+      nativeAutoSize={nativeAutoSize}
+      performanceTracing={Boolean(performanceTrace)}
       suppressDoubleTapSelection={suppressDoubleTapSelection}
-      style={{ width: contentWidth, height: Math.max(minimumHeight, height) }}
+      style={
+        nativeAutoSize
+          ? { width: contentWidth, minHeight: minimumHeight }
+          : { width: contentWidth, height: Math.max(minimumHeight, height) }
+      }
+      onLayout={(event) => {
+        if (!mounted.current || currentInput.current.measureKey !== measureKey)
+          return;
+        const { width, height: layoutHeight } = event.nativeEvent.layout;
+        if (!Number.isFinite(width) || !Number.isFinite(layoutHeight)) return;
+        nativeLayout.current = { width, height: layoutHeight };
+        notifyNativeLayout();
+      }}
       onHeightChange={(raw) => {
         if (!mounted.current || currentInput.current.measureKey !== measureKey)
           return;
@@ -316,18 +390,44 @@ const NativeFlow = React.memo(function NativeFlow({
           Number.isFinite(event.height) &&
           event.height > 0
         ) {
-          setMeasuredHeight({
-            key: measureKey,
-            geometryKey,
-            height: event.height,
-            verified: true,
-          });
+          if (nativeAutoSize || performanceTrace) {
+            nativeMeasurement.current = {
+              key: measureKey,
+              height: event.height,
+            };
+          }
+          if (!nativeAutoSize) {
+            setMeasuredHeight((previous) =>
+              previous?.key === measureKey &&
+              previous.geometryKey === geometryKey &&
+              previous.height === event.height &&
+              previous.verified
+                ? previous
+                : {
+                    key: measureKey,
+                    geometryKey,
+                    height: event.height,
+                    verified: true,
+                  },
+            );
+          }
+          if (performanceTrace) {
+            performanceTrace.onEvent({
+              phase: 'height',
+              elapsedMs: performance.now() - performanceTrace.startedAt,
+              nativeMeasureMs: event.nativeMeasureMs,
+              nativePropsToMeasureMs: event.nativePropsToMeasureMs,
+              nativePropsToSizeRequestMs: event.nativePropsToSizeRequestMs,
+              nativePropsToDispatchMs: event.nativePropsToDispatchMs,
+            });
+          }
           if (measuredFlowHeights.size >= 128)
             measuredFlowHeights.delete(
               measuredFlowHeights.keys().next().value || '',
             );
           measuredFlowHeights.set(measureKey, event.height);
-          onMeasured?.(flow);
+          if (!nativeAutoSize) onMeasured?.(flow);
+          if (nativeAutoSize || performanceTrace) notifyNativeLayout();
         }
       }}
       onSelectionChange={(raw) => {
@@ -398,6 +498,7 @@ interface BlockViewProps {
   onImageLongPress?: (url: string) => void;
   configJson: string;
   selectable: boolean;
+  nativeAutoSize?: boolean;
   suppressDoubleTapSelection?: boolean;
   options: ZhihuNativeTypographyOptions;
   onFlowAction: (event: ActionEvent, flow: RichTextFlow) => void;
@@ -456,6 +557,7 @@ function NativeParagraph(props: BlockViewProps) {
             fontSize={fontSize}
             lineHeight={lineHeight}
             selectable={props.selectable}
+            nativeAutoSize={props.nativeAutoSize}
             suppressDoubleTapSelection={props.suppressDoubleTapSelection}
             options={props.options}
             linkColor={props.linkColor}
@@ -1023,6 +1125,8 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
   linkCardInfo,
   variant = 'default',
   selectable = true,
+  nativeAutoSize = false,
+  performanceTrace,
   suppressDoubleTapSelection = false,
   fontSizeScale,
   lineHeightScale,
@@ -1144,6 +1248,25 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
       ),
     };
   }, [document, fontSize, lineHeight, normalized.document]);
+  const irTraceRef = useRef<{
+    trace: ZhihuNativePerformanceTrace;
+    elapsedMs: number;
+    sent: boolean;
+  } | null>(null);
+  if (performanceTrace && irTraceRef.current?.trace !== performanceTrace) {
+    irTraceRef.current = {
+      trace: performanceTrace,
+      elapsedMs: performance.now() - performanceTrace.startedAt,
+      sent: false,
+    };
+  }
+  useEffect(() => {
+    const recorded = irTraceRef.current;
+    if (!performanceTrace || recorded?.trace !== performanceTrace || recorded.sent)
+      return;
+    recorded.sent = true;
+    performanceTrace.onEvent({ phase: 'ir-ready', elapsedMs: recorded.elapsedMs });
+  }, [performanceTrace]);
   const documentRevision = useRef({
     content,
     contentArray,
@@ -1520,6 +1643,8 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
                 fontSize={fontSize}
                 lineHeight={lineHeight}
                 selectable={selectable}
+                nativeAutoSize={nativeAutoSize}
+                performanceTrace={performanceTrace}
                 suppressDoubleTapSelection={suppressDoubleTapSelection}
                 options={options}
                 linkColor={linkColor}
@@ -1544,6 +1669,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
                 onImageLongPress={onImageLongPress}
                 configJson={configJson}
                 selectable={selectable}
+                nativeAutoSize={nativeAutoSize}
                 suppressDoubleTapSelection={suppressDoubleTapSelection}
                 options={options}
                 onFlowAction={handleAction}
@@ -1585,6 +1711,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
                   onImageLongPress={onImageLongPress}
                   configJson={configJson}
                   selectable={selectable}
+                  nativeAutoSize={nativeAutoSize}
                   options={options}
                   onFlowAction={handleAction}
                   renderLinkCard={renderLinkCard}

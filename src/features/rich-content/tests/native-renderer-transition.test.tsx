@@ -29,7 +29,11 @@ jest.mock('../../../../modules/zhihu-rich-text', () => {
       }, [flow.id]);
       return react.createElement(
         native.View,
-        { testID: `native-flow-${flow.id}`, style: props.style },
+        {
+          testID: `native-flow-${flow.id}`,
+          style: props.style,
+          onLayout: props.onLayout,
+        },
         react.createElement(native.Text, null, flow.text),
       );
     },
@@ -110,6 +114,95 @@ beforeEach(() => {
 });
 
 describe('Native V2 renderer staging transitions', () => {
+  it.each(['event-first', 'layout-first'])(
+    'waits for both matching Fabric layout and measurement in either order: %s',
+    async (order) => {
+      const onLayoutReady = jest.fn();
+      await render(
+        <ZhihuNativeContent
+          content="<p>实验正文</p>"
+          objectId={`fabric-${order}`}
+          type="answer"
+          nativeAutoSize
+          renderFallback={() => null}
+          onLayoutReady={onLayoutReady}
+        />,
+      );
+      await containerLayout(320);
+      const view = currentViews()[0];
+      expect(view.nativeAutoSize).toBe(true);
+      expect(view.style).toEqual(expect.objectContaining({ width: 320 }));
+      expect(view.style).not.toHaveProperty('height');
+      const layout = async (width: number, height: number) => {
+        await fireEvent(
+          screen.getByTestId(`native-flow-${flowId(view)}`, {
+            includeHiddenElements: true,
+          }),
+          'layout',
+          {
+            nativeEvent: { layout: { x: 0, y: 0, width, height } },
+          },
+        );
+      };
+      if (order === 'event-first') {
+        await heightEvent(view, { layoutKey: 'stale' });
+        await heightEvent(view);
+        await layout(288, 120);
+        await layout(320, 100);
+        expect(onLayoutReady).not.toHaveBeenCalled();
+        await layout(320, 120);
+      } else {
+        await layout(320, 120);
+        expect(onLayoutReady).not.toHaveBeenCalled();
+        await heightEvent(view);
+      }
+      expect(onLayoutReady).toHaveBeenCalledTimes(1);
+      expect(screen.getByText('实验正文')).toBeVisible();
+    },
+  );
+
+  it('waits for the remounted Fabric layout after configuration changes and rejects stale events', async () => {
+    const onLayoutReady = jest.fn();
+    const props = {
+      content: '<p>同一段</p>',
+      objectId: 'fabric-reflow',
+      type: 'answer' as const,
+      nativeAutoSize: true,
+      renderFallback: () => null,
+      onLayoutReady,
+    };
+    const host = await render(<ZhihuNativeContent {...props} />);
+    await containerLayout(320);
+    const before = currentViews()[0];
+    await fireEvent(
+      screen.getByTestId(`native-flow-${flowId(before)}`, {
+        includeHiddenElements: true,
+      }),
+      'layout',
+      { nativeEvent: { layout: { x: 0, y: 0, width: 320, height: 120 } } },
+    );
+    await heightEvent(before);
+    expect(onLayoutReady).toHaveBeenCalledTimes(1);
+    await host.rerender(
+      <ZhihuNativeContent {...props} options={{ justify: true }} />,
+    );
+    const after = currentViews()[0];
+    expect(after.layoutKey).not.toBe(before.layoutKey);
+    await containerLayout(320);
+    await heightEvent(before);
+    expect(onLayoutReady).toHaveBeenCalledTimes(1);
+    await heightEvent(after);
+    expect(onLayoutReady).toHaveBeenCalledTimes(1);
+    await fireEvent(
+      screen.getByTestId(`native-flow-${flowId(after)}`, {
+        includeHiddenElements: true,
+      }),
+      'layout',
+      { nativeEvent: { layout: { x: 0, y: 0, width: 320, height: 120 } } },
+    );
+    expect(onLayoutReady).toHaveBeenCalledTimes(2);
+  });
+
   it('distinguishes width confirmation from native layout even for one character', async () => {
     const onLayoutReady = jest.fn();
     await render(

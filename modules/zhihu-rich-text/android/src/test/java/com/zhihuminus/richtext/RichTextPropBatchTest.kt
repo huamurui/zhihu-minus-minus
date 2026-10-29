@@ -91,4 +91,23 @@ class RichTextPropBatchTest {
     assertFalse(batch.accepts(oldRevision))
     assertTrue(batch.accepts(batch.revision))
   }
+
+  @Test fun autoSizeChangesAreCommittedAtomicallyAndInvalidatePriorMeasurements() {
+    val batch = RichTextPropBatch()
+    batch.update { initial }
+    batch.commit()
+    val previousRevision = batch.revision
+    batch.update { it.copy(nativeAutoSize = true, layoutKey = "layout-b") }
+    assertFalse(batch.current.nativeAutoSize)
+    assertFalse(batch.accepts(previousRevision))
+    val change = batch.commit()!!
+    assertTrue(change.current.nativeAutoSize)
+    assertFalse(change.requiresRebuild)
+    assertFalse(batch.accepts(previousRevision))
+    val autoSizeRevision = batch.revision
+    batch.update { it.copy(nativeAutoSize = false) }
+    batch.commit()
+    assertFalse(batch.accepts(autoSizeRevision))
+    assertFalse(batch.current.nativeAutoSize)
+  }
 }

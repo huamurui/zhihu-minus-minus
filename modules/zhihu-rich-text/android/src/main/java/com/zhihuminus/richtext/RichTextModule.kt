@@ -16,6 +16,8 @@ class RichTextModule : Module() {
       Prop("layoutKey") { view: RichTextView, value: String -> view.setLayoutKey(value) }
       Prop("selectable") { view: RichTextView, value: Boolean -> view.setSelectable(value) }
       Prop("suppressDoubleTapSelection") { view: RichTextView, value: Boolean -> view.setSuppressDoubleTapSelection(value) }
+      Prop("nativeAutoSize") { view: RichTextView, value: Boolean -> view.setNativeAutoSize(value) }
+      Prop("performanceTracing") { view: RichTextView, value: Boolean -> view.setPerformanceTracing(value) }
 
       OnViewDidUpdateProps { view: RichTextView -> view.commitProps() }
       OnViewDestroys { view: RichTextView -> view.dispose() }

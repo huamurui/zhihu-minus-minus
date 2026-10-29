@@ -169,6 +169,8 @@ node src/features/rich-content/tools/benchmark-flow-layout.mjs
 
 开发deeplink可用 `zhihu--:///dev/rich-content/prototype?caseId=attachments` 选择合成案例；caseId只接受页面六个已知标识，忽略无效值，不接受URL中的任意HTML。iOS CLI模拟器命令见 [开发指南](../../../docs/DEVELOPMENT.md)。
 
+原型中的“Fabric 原生尺寸（实验）”可对照原生文字流的两种高度管理方式；切换时重新挂载正文，不改变生产设置。开启后原生测量直接更新 Fabric 尺寸，仍等待高度事件及匹配的实际布局才放行。需要重新编译包含本次原生模块的开发构建；实验尚无双端 Release 性能结论，验收范围见[专项记录](./docs/optimizations-2026-10-01.md)。
+
 两个后端统一经过 `ZhihuContent` 的交互外壳，复用站内/站外链接分流、内容宽度、图片预览及共享排版指标。Android/iOS V2模块直接消费IR，初步支持选择事件、自定义装饰和行内附件；完整附件几何和无障碍映射仍需后续验收。tiqian-super-mini需要重新生成并编译development build，不能运行于Expo Go；模块缺失时可继续用 WebView 查看内容。
 
 本轮Android V2已完成prebuild、arm64 Debug构建及vivo真机功能查看；Enriched移除前后的验证记录与未验证项见 [实验03](./docs/renderer-v2-experiment-03-native-flow.md)。iOS新增UIKit/TextKit初步adapter，其构建与平台验证另行记录；尚无双端Release验证。Tiqian保留为[历史集成草案](./docs/renderer-v2-experiment-02-tiqian.md)，是否需要接入取决于后续系统布局能力的实际缺口。

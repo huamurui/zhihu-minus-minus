@@ -14,6 +14,11 @@ export interface RichTextHeightEventData {
   readonly textVersion: string;
   readonly layoutKey: string;
   readonly height: number;
+  /** Native-clock durations, present only when performance tracing is enabled. */
+  readonly nativeMeasureMs?: number | null;
+  readonly nativePropsToMeasureMs?: number | null;
+  readonly nativePropsToSizeRequestMs?: number | null;
+  readonly nativePropsToDispatchMs?: number | null;
 }
 
 export interface RichTextActionEventData extends RichTextSelectionEventData {
@@ -31,6 +36,9 @@ export interface RichTextNativeViewProps extends ViewProps {
   readonly contentWidth: number;
   readonly layoutKey: string;
   readonly selectable: boolean;
+  /** Opt-in experiment: the native view updates its Fabric size. */
+  readonly nativeAutoSize?: boolean;
+  readonly performanceTracing?: boolean;
   /** Reserve double taps for a host gesture, keeping long-press selection. */
   readonly suppressDoubleTapSelection?: boolean;
   readonly onSelectionChange?: (

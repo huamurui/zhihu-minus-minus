@@ -119,6 +119,7 @@ export default function RichContentPrototypeScreen() {
   const [lineHeightScale, setLineHeightScale] = useState(1.6);
   const [justify, setJustify] = useState(false);
   const [integerMeasure, setIntegerMeasure] = useState(false);
+  const [nativeAutoSize, setNativeAutoSize] = useState(false);
   const [autoSpacing, setAutoSpacing] = useState(true);
   const [trimPunctuation, setTrimPunctuation] = useState(true);
   const [decorations, setDecorations] = useState(true);
@@ -332,6 +333,16 @@ export default function RichContentPrototypeScreen() {
                   color={textColor}
                 />
               </View>
+              {renderer === 'native-v2' ? (
+                <View style={styles.toggles}>
+                  <Toggle
+                    title="Fabric 原生尺寸（实验）"
+                    value={nativeAutoSize}
+                    onChange={setNativeAutoSize}
+                    color={textColor}
+                  />
+                </View>
+              ) : null}
               <View style={styles.toggles}>
                 <Toggle
                   title="装饰线"
@@ -395,13 +406,14 @@ export default function RichContentPrototypeScreen() {
         <View style={styles.body}>
           {renderer === 'native-v2' ? (
             <ZhihuNativeContent
-              key={`${caseId}:v2`}
+              key={`${caseId}:v2:${nativeAutoSize}`}
               content={currentCase.html}
               objectId={`prototype-${caseId}`}
               type="article"
               segmentInfos={currentCase.segmentInfos}
               variant={currentCase.variant}
               selectable
+              nativeAutoSize={nativeAutoSize}
               fontSizeScale={fontSizeScale}
               lineHeightScale={lineHeightScale}
               options={{ justify, integerMeasure, decorations, decorationKind }}

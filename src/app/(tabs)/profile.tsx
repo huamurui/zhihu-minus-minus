@@ -31,6 +31,7 @@ import {
   syncNativeSessionCookies,
 } from '@/utils/authSession';
 import { ImpactFeedbackStyle, impactAsync } from '@/utils/haptics';
+import { richContentExperimentEnabled } from '@/utils/richContentExperiment';
 
 interface ProfileScreenProps {
   isActive?: boolean;
@@ -498,6 +499,14 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
             title="富文本测试案例（开发）"
             color={accentColor}
             onPress={() => router.push('/dev/rich-content' as Href)}
+          />
+        )}
+        {richContentExperimentEnabled && (
+          <MenuItem
+            icon="flask-outline"
+            title="知乎正文 Fabric 实验"
+            color={accentColor}
+            onPress={() => router.push('/rich-content-experiment' as Href)}
           />
         )}
       </MenuSection>

@@ -32,6 +32,9 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
   private var previousConfigJson = ""
   private var contentWidth: CGFloat = 0
   private var layoutKey = ""
+  private var nativeAutoSize = false
+  private var performanceTracing = false
+  private var tracePropsTime: TimeInterval?
   private var selectable = true
   private var needsRebuild = false
   private var lastWidth: CGFloat = 0
@@ -102,6 +105,11 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
     lifecycleObservers.forEach { NotificationCenter.default.removeObserver($0) }
     lifecycleObservers.removeAll()
     guard window != nil else { releaseAttachments(); return }
+    // Prop updates can precede installation of Fabric's state. Re-submit the
+    // latest measured size after mounting without emitting a duplicate event.
+    if nativeAutoSize, textView.frame.width > 0, !needsRebuild {
+      setViewSize(textView.frame.size)
+    }
     pausedAttachments = UIApplication.shared.applicationState == .background
     var ancestor = superview
     while let view = ancestor {
@@ -155,6 +163,20 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
     lastHeightKey = ""
   }
 
+  func setNativeAutoSize(_ value: Bool) {
+    guard nativeAutoSize != value else { return }
+    nativeAutoSize = value
+    lastHeightKey = ""
+    if !value {
+      // Clear the intrinsic dimensions when returning ownership to React.
+      setViewSize(CGSize(width: -1, height: -1))
+    }
+  }
+
+  func setPerformanceTracing(_ value: Bool) {
+    performanceTracing = value
+  }
+
   func setSelectable(_ value: Bool) {
     selectable = value
     textView.isSelectable = value
@@ -167,6 +189,7 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
   }
 
   func applyPendingProps() {
+    tracePropsTime = performanceTracing ? ProcessInfo.processInfo.systemUptime : nil
     let width = effectiveWidth
     guard width > 0 else { setNeedsLayout(); return }
     if needsRebuild || width != lastWidth { rebuild(width: width) }
@@ -416,9 +439,11 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
 
   private func measureAndLayout(width: CGFloat) {
     guard width > 0, let flow else { textView.frame = .zero; return }
+    let measurementStart = performanceTracing ? ProcessInfo.processInfo.systemUptime : nil
     container.size = CGSize(width: width, height: .greatestFiniteMagnitude)
     manager.ensureLayout(for: container)
     let fit = textView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+    let measurementEnd = measurementStart == nil ? nil : ProcessInfo.processInfo.systemUptime
     let rawHeight = flow.text.length == 0 ? 0 : max(fit.height, manager.usedRect(for: container).maxY)
     guard rawHeight.isFinite else { return }
     let pixelScale = max(1, traitCollection.displayScale)
@@ -428,12 +453,28 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
     let key = "\(flow.id)|\(flow.textVersion)|\(layoutKey)|\(height)"
     guard key != lastHeightKey else { return }
     lastHeightKey = key
+    if nativeAutoSize {
+      // UIKit and Fabric both use points. React still receives the measured
+      // height event for readiness and stale-document checks.
+      setViewSize(CGSize(width: width, height: height))
+    }
+    let sizeRequestTime = performanceTracing && nativeAutoSize ? ProcessInfo.processInfo.systemUptime : nil
+    let propsTime = tracePropsTime
     let currentGeneration = generation
     let currentLayoutKey = layoutKey
     DispatchQueue.main.async { [weak self] in
       guard let self, self.generation == currentGeneration, self.layoutKey == currentLayoutKey,
             self.lastHeightKey == key, self.flow?.id == flow.id, self.flow?.textVersion == flow.textVersion else { return }
-      self.onHeightChange(["flowId": flow.id, "textVersion": flow.textVersion, "layoutKey": currentLayoutKey, "height": Double(height)])
+      var event: [String: Any] = ["flowId": flow.id, "textVersion": flow.textVersion, "layoutKey": currentLayoutKey, "height": Double(height)]
+      if let measurementStart, let measurementEnd {
+        event["nativeMeasureMs"] = (measurementEnd - measurementStart) * 1000
+        if let propsTime {
+          event["nativePropsToMeasureMs"] = (measurementEnd - propsTime) * 1000
+          if let sizeRequestTime { event["nativePropsToSizeRequestMs"] = (sizeRequestTime - propsTime) * 1000 }
+          event["nativePropsToDispatchMs"] = (ProcessInfo.processInfo.systemUptime - propsTime) * 1000
+        }
+      }
+      self.onHeightChange(event)
     }
   }
 

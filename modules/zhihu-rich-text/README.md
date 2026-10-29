@@ -47,6 +47,8 @@ iOS完整Simulator app已在iOS27 SDK、deployment target15.1下构建通过；�
 
 JS props还必须提供 `layoutKey`，代表本次字体/宽度/配置输入。更新key会调度重测；高度去重包含key，原生posted measurement会核对当前key和generation，避免旧测量覆盖新布局。宿主应使用紧凑稳定key，不把整篇flow JSON重复塞入事件。
 
+`nativeAutoSize` 是默认关闭的开发实验：原生测量后通过 Expo 的 Fabric 尺寸 state 更新 view，仍发送高度事件；宿主必须等待当前测量和匹配的实际布局后再认定正文就绪。它目前仅由富文本开发原型启用，不能以事件到达代替 Fabric 布局完成。切换需要包含新原生模块的构建，性能及交互仍需双端 Release 验证。
+
 事件均附带 `flowId`、`textVersion`：
 
 | 事件 | 额外字段 |

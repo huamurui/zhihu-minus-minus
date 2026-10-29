@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Typeface
 import android.graphics.Rect
 import android.os.Build
+import android.os.SystemClock
 import android.text.Layout
 import android.text.Selection
 import android.text.Spannable
@@ -44,7 +45,11 @@ data class HeightEvent(
   @Field val flowId: String,
   @Field val textVersion: String,
   @Field val layoutKey: String,
-  @Field val height: Double
+  @Field val height: Double,
+  @Field val nativeMeasureMs: Double? = null,
+  @Field val nativePropsToMeasureMs: Double? = null,
+  @Field val nativePropsToSizeRequestMs: Double? = null,
+  @Field val nativePropsToDispatchMs: Double? = null
 ) : Record
 
 data class ActionEvent(
@@ -100,6 +105,7 @@ class RichTextView(context: Context, appContext: AppContext) : ExpoView(context,
   private var lastHeightKey = ""
   private var lastSelectionKey = ""
   private var measuredTextHeight = 0
+  private var tracePropsTimeNs = 0L
   private val fontScale: Float get() = resources.configuration.fontScale
   private val textScale: Float get() = density * fontScale
 
@@ -139,10 +145,24 @@ class RichTextView(context: Context, appContext: AppContext) : ExpoView(context,
     propBatch.update { it.copy(suppressDoubleTapSelection = value) }
   }
 
+  fun setNativeAutoSize(value: Boolean) {
+    propBatch.update { it.copy(nativeAutoSize = value) }
+  }
+
+  fun setPerformanceTracing(value: Boolean) {
+    propBatch.update { it.copy(performanceTracing = value) }
+  }
+
   fun commitProps() {
     if (disposed) return
     val change = propBatch.commit() ?: return
     val props = change.current
+    tracePropsTimeNs = if (props.performanceTracing) SystemClock.elapsedRealtimeNanos() else 0L
+    if (change.previous.nativeAutoSize && !props.nativeAutoSize) {
+      // Clear both the Fabric state and any queued size update when returning
+      // ownership to the React style.
+      shadowNodeProxy.setViewSize(Double.NaN, Double.NaN)
+    }
     if (change.flowChanged) {
       flow = FlowData.parse(props.flowJson)
       lastSelectionKey = ""
@@ -437,18 +457,32 @@ class RichTextView(context: Context, appContext: AppContext) : ExpoView(context,
   private fun measureText() {
     if (disposed || propBatch.hasPending) return
     val desiredWidth = if (contentWidthPx > 0) contentWidthPx else max(1, measuredWidth)
+    val traceStart = if (propBatch.current.performanceTracing) SystemClock.elapsedRealtimeNanos() else 0L
     textView.measure(View.MeasureSpec.makeMeasureSpec(desiredWidth, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+    val traceMeasured = if (traceStart != 0L) SystemClock.elapsedRealtimeNanos() else 0L
     measuredTextHeight = textView.measuredHeight
     val activeFlow = flow ?: return
     val currentLayoutKey = layoutKey
     val currentGeneration = generation
     val currentRevision = propBatch.revision
+    val autoSize = propBatch.current.nativeAutoSize
+    val measuredWidthDp = desiredWidth / density.toDouble()
+    val measuredHeightDp = measuredTextHeight / density.toDouble()
     val key = "${activeFlow.id}:${activeFlow.textVersion}:$currentLayoutKey:$measuredTextHeight"
     if (key == lastHeightKey) return
     lastHeightKey = key
-    val event = HeightEvent(activeFlow.id, activeFlow.textVersion, currentLayoutKey, measuredTextHeight / density.toDouble())
+    val propsTimeNs = tracePropsTimeNs
     post {
       if (!disposed && generation == currentGeneration && propBatch.accepts(currentRevision) && layoutKey == currentLayoutKey && lastHeightKey == key) {
+        if (autoSize) shadowNodeProxy.setViewSize(measuredWidthDp, measuredHeightDp)
+        val afterSizeRequest = if (traceStart != 0L) SystemClock.elapsedRealtimeNanos() else 0L
+        val event = HeightEvent(
+          activeFlow.id, activeFlow.textVersion, currentLayoutKey, measuredHeightDp,
+          if (traceStart != 0L) (traceMeasured - traceStart) / 1_000_000.0 else null,
+          if (traceStart != 0L && propsTimeNs != 0L) (traceMeasured - propsTimeNs) / 1_000_000.0 else null,
+          if (autoSize && afterSizeRequest != 0L && propsTimeNs != 0L) (afterSizeRequest - propsTimeNs) / 1_000_000.0 else null,
+          if (afterSizeRequest != 0L && propsTimeNs != 0L) (afterSizeRequest - propsTimeNs) / 1_000_000.0 else null
+        )
         onHeightChange(event)
       }
     }

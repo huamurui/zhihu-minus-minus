@@ -19,6 +19,12 @@ public final class ZhihuRichTextModule: Module {
       Prop("layoutKey") { (view: RichTextView, value: String) in
         view.setLayoutKey(value)
       }
+      Prop("nativeAutoSize") { (view: RichTextView, value: Bool) in
+        view.setNativeAutoSize(value)
+      }
+      Prop("performanceTracing") { (view: RichTextView, value: Bool) in
+        view.setPerformanceTracing(value)
+      }
       Prop("selectable") { (view: RichTextView, value: Bool) in
         view.setSelectable(value)
       }
