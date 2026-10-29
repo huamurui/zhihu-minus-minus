@@ -56,7 +56,10 @@ data class HeightEvent(
   @Field val nativeParseMs: Double? = null,
   @Field val nativeSpannableMs: Double? = null,
   @Field val nativeSetTextMs: Double? = null,
-  @Field val measureCount: Int = 1
+  @Field val measureCount: Int = 1,
+  @Field val setViewSizeCount: Int = 0,
+  @Field val schedulePostWaitMs: Double? = null,
+  @Field val heightPostWaitMs: Double? = null
 ) : Record
 
 data class ActionEvent(
@@ -119,6 +122,8 @@ class RichTextView(context: Context, appContext: AppContext) : ExpoView(context,
   private var lastSetTextMs: Double? = null
   private var lastSuperMeasureMs: Double? = null
   private var measureCount = 0
+  private var setViewSizeCount = 0
+  private var lastSchedulePostWaitMs: Double? = null
   private val fontScale: Float get() = resources.configuration.fontScale
   private val textScale: Float get() = density * fontScale
 
@@ -173,6 +178,8 @@ class RichTextView(context: Context, appContext: AppContext) : ExpoView(context,
     val tracing = props.performanceTracing
     tracePropsTimeNs = if (tracing) SystemClock.elapsedRealtimeNanos() else 0L
     measureCount = 0
+    setViewSizeCount = 0
+    lastSchedulePostWaitMs = null
     if (change.previous.nativeAutoSize && !props.nativeAutoSize) {
       // Clear both the Fabric state and any queued size update when returning
       // ownership to the React style.
@@ -528,9 +535,15 @@ class RichTextView(context: Context, appContext: AppContext) : ExpoView(context,
     val spannableMs = lastSpannableMs
     val setTextMs = lastSetTextMs
     val count = measureCount
+    val heightScheduledAt = if (tracing) SystemClock.elapsedRealtimeNanos() else 0L
     post {
       if (!disposed && generation == currentGeneration && propBatch.accepts(currentRevision) && layoutKey == currentLayoutKey && lastHeightKey == key) {
-        if (autoSize) shadowNodeProxy.setViewSize(measuredWidthDp, measuredHeightDp)
+        val heightPostWait = if (heightScheduledAt != 0L) (SystemClock.elapsedRealtimeNanos() - heightScheduledAt) / 1_000_000.0 else null
+        if (autoSize) {
+          shadowNodeProxy.setViewSize(measuredWidthDp, measuredHeightDp)
+          setViewSizeCount += 1
+        }
+        val sizeCount = setViewSizeCount
         val afterSizeRequest = if (traceStart != 0L) SystemClock.elapsedRealtimeNanos() else 0L
         val event = HeightEvent(
           activeFlow.id, activeFlow.textVersion, currentLayoutKey, measuredHeightDp,
@@ -543,7 +556,10 @@ class RichTextView(context: Context, appContext: AppContext) : ExpoView(context,
           parseMs,
           spannableMs,
           setTextMs,
-          count
+          count,
+          sizeCount,
+          lastSchedulePostWaitMs,
+          heightPostWait
         )
         onHeightChange(event)
       }
@@ -553,8 +569,14 @@ class RichTextView(context: Context, appContext: AppContext) : ExpoView(context,
   private fun scheduleMeasurement() {
     val currentGeneration = generation
     val currentRevision = propBatch.revision
+    val scheduleScheduledAt = if (propBatch.current.performanceTracing) SystemClock.elapsedRealtimeNanos() else 0L
     post {
-      if (!disposed && generation == currentGeneration && propBatch.accepts(currentRevision)) measureText()
+      if (!disposed && generation == currentGeneration && propBatch.accepts(currentRevision)) {
+        if (scheduleScheduledAt != 0L) {
+          lastSchedulePostWaitMs = (SystemClock.elapsedRealtimeNanos() - scheduleScheduledAt) / 1_000_000.0
+        }
+        measureText()
+      }
     }
   }
 

@@ -25,6 +25,9 @@ export interface RichTextHeightEventData {
   readonly nativeSpannableMs?: number | null;
   readonly nativeSetTextMs?: number | null;
   readonly measureCount?: number;
+  readonly setViewSizeCount?: number;
+  readonly schedulePostWaitMs?: number | null;
+  readonly heightPostWaitMs?: number | null;
 }
 
 export interface RichTextActionEventData extends RichTextSelectionEventData {

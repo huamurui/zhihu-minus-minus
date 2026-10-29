@@ -47,6 +47,7 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
   private var lastSpannableMs: Double?
   private var lastSetTextMs: Double?
   private var measureCount = 0
+  private var setViewSizeCount = 0
   private var attachments: [RichTextAttachmentSlot] = []
   private var attachmentUpdates: [(RichTextAttachmentSlot, Int, RichTextAttachmentAsset)] = []
   private var viewportObservations: [NSKeyValueObservation] = []
@@ -114,6 +115,7 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
     // latest measured size after mounting without emitting a duplicate event.
     if nativeAutoSize, textView.frame.width > 0, !needsRebuild {
       setViewSize(textView.frame.size)
+      setViewSizeCount += 1
     }
     pausedAttachments = UIApplication.shared.applicationState == .background
     var ancestor = superview
@@ -198,6 +200,7 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
   func applyPendingProps() {
     tracePropsTime = performanceTracing ? ProcessInfo.processInfo.systemUptime : nil
     measureCount = 0
+    setViewSizeCount = 0
     let width = effectiveWidth
     guard width > 0 else { setNeedsLayout(); return }
     if needsRebuild || width != lastWidth { rebuild(width: width) }
@@ -474,15 +477,21 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
       // UIKit and Fabric both use points. React still receives the measured
       // height event for readiness and stale-document checks.
       setViewSize(CGSize(width: width, height: height))
+      setViewSizeCount += 1
     }
     let sizeRequestTime = performanceTracing && nativeAutoSize ? ProcessInfo.processInfo.systemUptime : nil
     let propsTime = tracePropsTime
     let currentGeneration = generation
     let currentLayoutKey = layoutKey
+    let dispatchScheduledAt = performanceTracing ? ProcessInfo.processInfo.systemUptime : nil
     DispatchQueue.main.async { [weak self] in
       guard let self, self.generation == currentGeneration, self.layoutKey == currentLayoutKey,
             self.lastHeightKey == key, self.flow?.id == flow.id, self.flow?.textVersion == flow.textVersion else { return }
       var event: [String: Any] = ["flowId": flow.id, "textVersion": flow.textVersion, "layoutKey": currentLayoutKey, "height": Double(height)]
+      let now = ProcessInfo.processInfo.systemUptime
+      if let dispatchScheduledAt {
+        event["heightPostWaitMs"] = (now - dispatchScheduledAt) * 1000
+      }
       if let measurementStart, let measurementEnd {
         let measureDuration = (measurementEnd - measurementStart) * 1000
         event["nativeMeasureMs"] = measureDuration
@@ -490,7 +499,7 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
         if let propsTime {
           event["nativePropsToMeasureMs"] = (measurementEnd - propsTime) * 1000
           if let sizeRequestTime { event["nativePropsToSizeRequestMs"] = (sizeRequestTime - propsTime) * 1000 }
-          event["nativePropsToDispatchMs"] = (ProcessInfo.processInfo.systemUptime - propsTime) * 1000
+          event["nativePropsToDispatchMs"] = (now - propsTime) * 1000
         }
       }
       if let rebuildMs = self.lastRebuildMs { event["nativeRebuildMs"] = rebuildMs }
@@ -498,6 +507,7 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
       if let spannableMs = self.lastSpannableMs { event["nativeSpannableMs"] = spannableMs }
       if let setTextMs = self.lastSetTextMs { event["nativeSetTextMs"] = setTextMs }
       event["measureCount"] = self.measureCount
+      event["setViewSizeCount"] = self.setViewSizeCount
       self.onHeightChange(event)
     }
   }

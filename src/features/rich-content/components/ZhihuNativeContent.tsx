@@ -50,6 +50,7 @@ import { DAILY_AVATAR_SIZE, type RichContentVariant } from '../imagePolicy';
 import {
   normalizeZhihuContentSegments,
   normalizeZhihuDocument,
+  type ZhihuDocumentNormalizationResult,
 } from '../normalization/normalizeZhihuDocument';
 import {
   createRichContentMetrics,
@@ -92,7 +93,18 @@ export interface ZhihuNativeSegmentAction {
 
 export interface ZhihuNativePerformanceEvent {
   flowId?: string;
-  phase: 'ir-ready' | 'height' | 'layout';
+  phase:
+    | 'react-render-enter'
+    | 'ir-ready'
+    | 'height'
+    | 'layout'
+    | 'raw-layout'
+    | 'normalize'
+    | 'compile'
+    | 'flow-json'
+    | 'first-flow-ready'
+    | 'all-flows-ready'
+    | 'document-ready';
   elapsedMs: number;
   nativeMeasureMs?: number | null;
   nativePropsToMeasureMs?: number | null;
@@ -104,6 +116,11 @@ export interface ZhihuNativePerformanceEvent {
   nativeSpannableMs?: number | null;
   nativeSetTextMs?: number | null;
   measureCount?: number;
+  setViewSizeCount?: number;
+  schedulePostWaitMs?: number | null;
+  heightPostWaitMs?: number | null;
+  width?: number;
+  height?: number;
 }
 
 export interface ZhihuNativePerformanceTrace {
@@ -124,6 +141,8 @@ export interface ZhihuNativeContentProps {
   selectable?: boolean;
   /** Opt-in experiment for native Fabric sizing. */
   nativeAutoSize?: boolean;
+  /** In Fabric experiment, whether to also seed initial height from the flow height cache. */
+  nativeAutoSizeCachedHeight?: boolean;
   /** Optional local experiment; timestamps are never sent to telemetry. */
   performanceTrace?: ZhihuNativePerformanceTrace;
   suppressDoubleTapSelection?: boolean;
@@ -228,6 +247,7 @@ interface FlowViewProps {
   lineHeight: number;
   selectable: boolean;
   nativeAutoSize?: boolean;
+  nativeAutoSizeCachedHeight?: boolean;
   performanceTrace?: ZhihuNativePerformanceTrace;
   suppressDoubleTapSelection?: boolean;
   options: ZhihuNativeTypographyOptions;
@@ -238,6 +258,14 @@ interface FlowViewProps {
 }
 
 const measuredFlowHeights = new Map<string, number>();
+
+export function clearMeasuredFlowHeightCache(): void {
+  measuredFlowHeights.clear();
+}
+
+export function getMeasuredFlowHeightCacheSize(): number {
+  return measuredFlowHeights.size;
+}
 
 function flowMeasureKey(
   flow: RichTextFlow,
@@ -255,6 +283,7 @@ const NativeFlow = React.memo(function NativeFlow({
   lineHeight,
   selectable,
   nativeAutoSize = false,
+  nativeAutoSizeCachedHeight = false,
   performanceTrace,
   suppressDoubleTapSelection = false,
   options,
@@ -263,27 +292,40 @@ const NativeFlow = React.memo(function NativeFlow({
   onAction,
   onMeasured,
 }: FlowViewProps) {
-  const flowJson = useMemo(
-    () =>
-      JSON.stringify({
-        id: flow.id,
-        textVersion: flow.textVersion,
-        text: flow.text,
-        spans: flow.spans,
-        paragraphs: flow.paragraphs,
-        attachments: flow.attachments,
-        // Source mapping remains in JS; neither native backend consumes it.
-        decorations:
-          options.decorations === false
-            ? []
-            : flow.decorations.map((decoration) => ({
-                ...decoration,
-                color: decoration.color || linkColor,
-                kind: options.decorationKind || decoration.kind,
-              })),
-      }),
-    [flow, linkColor, options.decorationKind, options.decorations],
-  );
+  const flowJson = useMemo(() => {
+    const start = performance.now();
+    const result = JSON.stringify({
+      id: flow.id,
+      textVersion: flow.textVersion,
+      text: flow.text,
+      spans: flow.spans,
+      paragraphs: flow.paragraphs,
+      attachments: flow.attachments,
+      // Source mapping remains in JS; neither native backend consumes it.
+      decorations:
+        options.decorations === false
+          ? []
+          : flow.decorations.map((decoration) => ({
+              ...decoration,
+              color: decoration.color || linkColor,
+              kind: options.decorationKind || decoration.kind,
+            })),
+    });
+    if (performanceTrace) {
+      performanceTrace.onEvent({
+        phase: 'flow-json',
+        flowId: flow.id,
+        elapsedMs: performance.now() - start,
+      });
+    }
+    return result;
+  }, [
+    flow,
+    linkColor,
+    options.decorationKind,
+    options.decorations,
+    performanceTrace,
+  ]);
   const measureKey = flowMeasureKey(flow, contentWidth, configJson);
   const geometryKey = useMemo(
     () =>
@@ -376,7 +418,12 @@ const NativeFlow = React.memo(function NativeFlow({
       suppressDoubleTapSelection={suppressDoubleTapSelection}
       style={
         nativeAutoSize
-          ? { width: contentWidth, minHeight: minimumHeight }
+          ? nativeAutoSizeCachedHeight && measuredHeight?.height
+            ? {
+                width: contentWidth,
+                height: Math.max(minimumHeight, measuredHeight.height),
+              }
+            : { width: contentWidth, minHeight: minimumHeight }
           : { width: contentWidth, height: Math.max(minimumHeight, height) }
       }
       onLayout={(event) => {
@@ -384,6 +431,15 @@ const NativeFlow = React.memo(function NativeFlow({
           return;
         const { width, height: layoutHeight } = event.nativeEvent.layout;
         if (!Number.isFinite(width) || !Number.isFinite(layoutHeight)) return;
+        if (performanceTrace) {
+          performanceTrace.onEvent({
+            phase: 'raw-layout',
+            flowId: flow.id,
+            elapsedMs: performance.now() - performanceTrace.startedAt,
+            width,
+            height: layoutHeight,
+          });
+        }
         nativeLayout.current = { width, height: layoutHeight };
         notifyNativeLayout();
       }}
@@ -434,6 +490,9 @@ const NativeFlow = React.memo(function NativeFlow({
               nativeSpannableMs: event.nativeSpannableMs,
               nativeSetTextMs: event.nativeSetTextMs,
               measureCount: event.measureCount,
+              setViewSizeCount: event.setViewSizeCount,
+              schedulePostWaitMs: event.schedulePostWaitMs,
+              heightPostWaitMs: event.heightPostWaitMs,
             });
           }
           if (measuredFlowHeights.size >= 128)
@@ -1141,6 +1200,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
   variant = 'default',
   selectable = true,
   nativeAutoSize = false,
+  nativeAutoSizeCachedHeight = false,
   performanceTrace,
   suppressDoubleTapSelection = false,
   fontSizeScale,
@@ -1166,6 +1226,14 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
   const linkColor = themeColors.link;
   const surfaceColor = themeColors.backgroundSecondary;
   const borderColor = themeColors.border;
+  const renderTraceRef = useRef<ZhihuNativePerformanceTrace | null>(null);
+  if (performanceTrace && renderTraceRef.current !== performanceTrace) {
+    renderTraceRef.current = performanceTrace;
+    performanceTrace.onEvent({
+      phase: 'react-render-enter',
+      elapsedMs: performance.now() - performanceTrace.startedAt,
+    });
+  }
   // Prepare the document immediately, but defer native layout until its actual
   // container width is available. A fixed-width host can avoid this first wait.
   const [availableWidth, setAvailableWidth] = useState(() =>
@@ -1203,66 +1271,92 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
       ? Math.max(scaledEm, Math.floor(availableWidth / scaledEm) * scaledEm)
       : availableWidth;
   const normalized = useMemo(() => {
-    if (document) return { document, diagnostics: [] };
-    const normalizationOptions = {
-      documentId: `${type}:${objectId}`,
-      variant,
-      segmentInfos,
-      linkCardInfo,
-      removeImageWatermark: settings.removeImageWatermark,
-    };
-    return contentArray
-      ? normalizeZhihuContentSegments(contentArray, normalizationOptions)
-      : normalizeZhihuDocument(content, normalizationOptions);
+    const start = performance.now();
+    let result: ZhihuDocumentNormalizationResult;
+    if (document) {
+      result = { document, diagnostics: [] };
+    } else {
+      const normalizationOptions = {
+        documentId: `${type}:${objectId}`,
+        variant,
+        segmentInfos,
+        linkCardInfo,
+        removeImageWatermark: settings.removeImageWatermark,
+      };
+      result = contentArray
+        ? normalizeZhihuContentSegments(contentArray, normalizationOptions)
+        : normalizeZhihuDocument(content, normalizationOptions);
+    }
+    const duration = performance.now() - start;
+    if (performanceTrace) {
+      performanceTrace.onEvent({
+        phase: 'normalize',
+        elapsedMs: duration,
+      });
+    }
+    return result;
   }, [
     content,
     contentArray,
     document,
     linkCardInfo,
     objectId,
+    performanceTrace,
     segmentInfos,
     settings.removeImageWatermark,
     type,
     variant,
   ]);
   const compiled = useMemo(() => {
+    const start = performance.now();
     const result = compileZhihuDocument(normalized.document, {
       fontSize,
       lineHeight,
       paragraphSpacing: RICH_CONTENT_PARAGRAPH_SPACING,
     });
-    if (!document) return result;
-    // Supplied JSON documents can map images to bundled resources. Keep their
-    // remote identity in the document while native loads the explicit local URI.
-    const localUris = new Map<string, string>();
-    for (const node of walkZhihuDocument(document)) {
-      const resource =
-        node.type === 'inlineImage'
-          ? node.resource
-          : node.type === 'inlineFormula'
-            ? node.formula.image
-            : undefined;
-      if (resource?.offlineUri) localUris.set(node.id, resource.offlineUri);
+    let finalResult = result;
+    if (document) {
+      // Supplied JSON documents can map images to bundled resources. Keep their
+      // remote identity in the document while native loads the explicit local URI.
+      const localUris = new Map<string, string>();
+      for (const node of walkZhihuDocument(document)) {
+        const resource =
+          node.type === 'inlineImage'
+            ? node.resource
+            : node.type === 'inlineFormula'
+              ? node.formula.image
+              : undefined;
+        if (resource?.offlineUri) localUris.set(node.id, resource.offlineUri);
+      }
+      if (localUris.size > 0) {
+        finalResult = {
+          ...result,
+          parts: result.parts.map((part) =>
+            part.type !== 'flow'
+              ? part
+              : {
+                  ...part,
+                  flow: {
+                    ...part.flow,
+                    attachments: part.flow.attachments.map((attachment) => {
+                      const uri = localUris.get(attachment.nodeId);
+                      return uri ? { ...attachment, url: uri } : attachment;
+                    }),
+                  },
+                },
+          ),
+        };
+      }
     }
-    if (localUris.size === 0) return result;
-    return {
-      ...result,
-      parts: result.parts.map((part) =>
-        part.type !== 'flow'
-          ? part
-          : {
-              ...part,
-              flow: {
-                ...part.flow,
-                attachments: part.flow.attachments.map((attachment) => {
-                  const uri = localUris.get(attachment.nodeId);
-                  return uri ? { ...attachment, url: uri } : attachment;
-                }),
-              },
-            },
-      ),
-    };
-  }, [document, fontSize, lineHeight, normalized.document]);
+    const duration = performance.now() - start;
+    if (performanceTrace) {
+      performanceTrace.onEvent({
+        phase: 'compile',
+        elapsedMs: duration,
+      });
+    }
+    return finalResult;
+  }, [document, fontSize, lineHeight, normalized.document, performanceTrace]);
   const irTraceRef = useRef<{
     trace: ZhihuNativePerformanceTrace;
     elapsedMs: number;
@@ -1386,6 +1480,8 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
   }
   const currentLayout = useRef({ compiled, key: documentLayoutKey });
   currentLayout.current = { compiled, key: documentLayoutKey };
+  const firstFlowReadyRef = useRef<ZhihuNativePerformanceTrace | null>(null);
+  const allFlowsReadyRef = useRef<ZhihuNativePerformanceTrace | null>(null);
   const notifyLayoutReady = useCallback(
     (key: string) => {
       if (currentCompilation.current !== compiled) return;
@@ -1397,9 +1493,15 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
       }
       if (notifiedLayoutRef.current?.key === key) return;
       notifiedLayoutRef.current = { compiled, key };
+      if (performanceTrace) {
+        performanceTrace.onEvent({
+          phase: 'document-ready',
+          elapsedMs: performance.now() - performanceTrace.startedAt,
+        });
+      }
       onLayoutReady?.();
     },
-    [compiled, onLayoutReady],
+    [compiled, onLayoutReady, performanceTrace],
   );
   const onFlowMeasured = useCallback(
     (flow: RichTextFlow) => {
@@ -1408,19 +1510,36 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
         currentLayout.current.key !== documentLayoutKey
       )
         return;
+      if (performanceTrace && firstFlowReadyRef.current !== performanceTrace) {
+        firstFlowReadyRef.current = performanceTrace;
+        performanceTrace.onEvent({
+          phase: 'first-flow-ready',
+          flowId: flow.id,
+          elapsedMs: performance.now() - performanceTrace.startedAt,
+        });
+      }
       measuredFlowsRef.current.set(
         flow.id,
         flowMeasureKey(flow, width, configJson),
       );
+      const allMeasured = compiled.parts.every(
+        (part) =>
+          part.type !== 'flow' ||
+          measuredFlowsRef.current.get(part.flow.id) ===
+            flowMeasureKey(part.flow, width, configJson),
+      );
       if (
-        measuredContainerWidthRef.current === availableWidth &&
-        compiled.parts.every(
-          (part) =>
-            part.type !== 'flow' ||
-            measuredFlowsRef.current.get(part.flow.id) ===
-              flowMeasureKey(part.flow, width, configJson),
-        )
+        performanceTrace &&
+        allFlowsReadyRef.current !== performanceTrace &&
+        allMeasured
       ) {
+        allFlowsReadyRef.current = performanceTrace;
+        performanceTrace.onEvent({
+          phase: 'all-flows-ready',
+          elapsedMs: performance.now() - performanceTrace.startedAt,
+        });
+      }
+      if (measuredContainerWidthRef.current === availableWidth && allMeasured) {
         // Notify in the same event batch that reveals the body. The host's
         // content-size handler must already consider this layout ready.
         notifyLayoutReady(documentGeometryKey);
@@ -1434,6 +1553,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
       notifyLayoutReady,
       width,
       configJson,
+      performanceTrace,
     ],
   );
   const initialLayoutReady =
@@ -1666,6 +1786,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
                 lineHeight={lineHeight}
                 selectable={selectable}
                 nativeAutoSize={nativeAutoSize}
+                nativeAutoSizeCachedHeight={nativeAutoSizeCachedHeight}
                 performanceTrace={performanceTrace}
                 suppressDoubleTapSelection={suppressDoubleTapSelection}
                 options={options}
