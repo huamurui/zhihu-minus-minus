@@ -12,6 +12,7 @@ export { LinkCard, ZhihuContent } from './components/ZhihuContent';
 export type { ZhihuDOMContentProps } from './components/ZhihuDOMContent';
 export {
   clearMeasuredFlowHeightCache,
+  flowMeasureKey,
   getMeasuredFlowHeightCacheSize,
   getMeasuredFlowHeightMap,
   isRichTextNativeAvailable,

@@ -112,7 +112,8 @@ export interface ZhihuNativePerformanceEvent {
     | 'first-flow-ready'
     | 'all-flows-ready'
     | 'document-ready'
-    | 'content-visible-commit';
+    | 'content-visible-commit'
+    | 'layout-mismatch';
   elapsedMs: number;
   nativeMeasureMs?: number | null;
   nativePropsToMeasureMs?: number | null;
@@ -133,6 +134,10 @@ export interface ZhihuNativePerformanceEvent {
   nativeDispatchMs?: number | null;
   width?: number;
   height?: number;
+  measureKey?: string;
+  cachedExactHeight?: number | null;
+  nativeMeasuredHeight?: number | null;
+  actualLayoutHeight?: number | null;
 }
 
 export interface ZhihuNativePerformanceTrace {
@@ -159,6 +164,8 @@ export interface ZhihuNativeContentProps {
   /** In diagnostic mode, seed exact measured heights directly to Yoga style to eliminate 2-stage layout. */
   exactHeightMode?: boolean;
   exactFlowHeights?: Readonly<Record<string, number>>;
+  /** Diagnostic mode: keep body in-flow from frame 0 and only switch opacity, preventing position reflow. */
+  inFlowRevealMode?: boolean;
   /** Optional local experiment; timestamps are never sent to telemetry. */
   performanceTrace?: ZhihuNativePerformanceTrace;
   suppressDoubleTapSelection?: boolean;
@@ -266,6 +273,7 @@ interface FlowViewProps {
   nativeAutoSizeCachedHeight?: boolean;
   exactHeightMode?: boolean;
   exactHeight?: number;
+  exactFlowHeights?: Readonly<Record<string, number>>;
   performanceTrace?: ZhihuNativePerformanceTrace;
   suppressDoubleTapSelection?: boolean;
   options: ZhihuNativeTypographyOptions;
@@ -276,9 +284,11 @@ interface FlowViewProps {
 }
 
 const measuredFlowHeights = new Map<string, number>();
+const measuredFlowIdHeights = new Map<string, number>();
 
 export function clearMeasuredFlowHeightCache(): void {
   measuredFlowHeights.clear();
+  measuredFlowIdHeights.clear();
 }
 
 export function getMeasuredFlowHeightCacheSize(): number {
@@ -289,11 +299,26 @@ export function getMeasuredFlowHeightMap(): Record<string, number> {
   const map: Record<string, number> = {};
   for (const [key, value] of measuredFlowHeights.entries()) {
     map[key] = value;
+    const jsonStart = key.indexOf(':{');
+    if (jsonStart > 0) {
+      const prefix = key.slice(0, jsonStart);
+      const lastColon = prefix.lastIndexOf(':');
+      if (lastColon > 0) {
+        const secondLastColon = prefix.lastIndexOf(':', lastColon - 1);
+        if (secondLastColon > 0) {
+          const flowId = prefix.slice(0, secondLastColon);
+          map[flowId] = value;
+        }
+      }
+    }
+  }
+  for (const [flowId, value] of measuredFlowIdHeights.entries()) {
+    map[flowId] = value;
   }
   return map;
 }
 
-function flowMeasureKey(
+export function flowMeasureKey(
   flow: RichTextFlow,
   width: number,
   configJson: string,
@@ -312,6 +337,7 @@ const NativeFlow = React.memo(function NativeFlow({
   nativeAutoSizeCachedHeight = false,
   exactHeightMode = false,
   exactHeight,
+  exactFlowHeights,
   performanceTrace,
   suppressDoubleTapSelection = false,
   options,
@@ -355,6 +381,10 @@ const NativeFlow = React.memo(function NativeFlow({
     performanceTrace,
   ]);
   const measureKey = flowMeasureKey(flow, contentWidth, configJson);
+  const resolvedExactHeight =
+    exactHeight ??
+    exactFlowHeights?.[measureKey] ??
+    exactFlowHeights?.[flow.id];
   const geometryKey = useMemo(
     () =>
       nativeAutoSize
@@ -414,14 +444,29 @@ const NativeFlow = React.memo(function NativeFlow({
   const notifyNativeLayout = () => {
     const measurement = nativeMeasurement.current;
     const layout = nativeLayout.current;
-    if (
-      !measurement ||
-      measurement.key !== measureKey ||
-      !layout ||
-      Math.abs(layout.width - contentWidth) > 1 ||
-      Math.abs(layout.height - Math.max(minimumHeight, measurement.height)) > 1
-    )
+    if (!measurement || measurement.key !== measureKey || !layout) return;
+
+    const targetHeight = Math.max(minimumHeight, measurement.height);
+    const widthMatched = Math.abs(layout.width - contentWidth) <= 1;
+    const heightMatched = Math.abs(layout.height - targetHeight) <= 1;
+
+    if (!widthMatched || !heightMatched) {
+      if (performanceTrace) {
+        performanceTrace.onEvent({
+          flowId: flow.id,
+          phase: 'layout-mismatch',
+          elapsedMs: performance.now() - performanceTrace.startedAt,
+          width: layout.width,
+          height: layout.height,
+          measureKey,
+          cachedExactHeight: resolvedExactHeight ?? null,
+          nativeMeasuredHeight: measurement.height,
+          actualLayoutHeight: layout.height,
+        });
+      }
       return;
+    }
+
     const notification = `${measureKey}:${measurement.height}`;
     if (notifiedNativeMeasurement.current === notification) return;
     notifiedNativeMeasurement.current = notification;
@@ -434,6 +479,10 @@ const NativeFlow = React.memo(function NativeFlow({
           elapsedMs: performance.now() - performanceTrace.startedAt,
           width: layout.width,
           height: layout.height,
+          measureKey,
+          cachedExactHeight: resolvedExactHeight ?? null,
+          nativeMeasuredHeight: measurement.height,
+          actualLayoutHeight: layout.height,
         });
       }
       performanceTrace.onEvent({
@@ -442,6 +491,10 @@ const NativeFlow = React.memo(function NativeFlow({
         elapsedMs: performance.now() - performanceTrace.startedAt,
         width: layout.width,
         height: layout.height,
+        measureKey,
+        cachedExactHeight: resolvedExactHeight ?? null,
+        nativeMeasuredHeight: measurement.height,
+        actualLayoutHeight: layout.height,
       });
     }
     // When tracing performance or running nativeAutoSize/exactHeightMode,
@@ -462,10 +515,13 @@ const NativeFlow = React.memo(function NativeFlow({
       performanceTracing={Boolean(performanceTrace)}
       suppressDoubleTapSelection={suppressDoubleTapSelection}
       style={
-        exactHeightMode && exactHeight && exactHeight > 0
+        exactHeightMode
           ? {
               width: contentWidth,
-              height: Math.max(minimumHeight, exactHeight),
+              height:
+                resolvedExactHeight && resolvedExactHeight > 0
+                  ? Math.max(minimumHeight, resolvedExactHeight)
+                  : undefined,
             }
           : nativeAutoSize
             ? nativeAutoSizeCachedHeight && measuredHeight?.height
@@ -481,6 +537,7 @@ const NativeFlow = React.memo(function NativeFlow({
           return;
         const { width, height: layoutHeight } = event.nativeEvent.layout;
         if (!Number.isFinite(width) || !Number.isFinite(layoutHeight)) return;
+        nativeLayout.current = { width, height: layoutHeight };
         if (performanceTrace) {
           performanceTrace.onEvent({
             phase: 'raw-layout',
@@ -488,9 +545,12 @@ const NativeFlow = React.memo(function NativeFlow({
             elapsedMs: performance.now() - performanceTrace.startedAt,
             width,
             height: layoutHeight,
+            measureKey,
+            cachedExactHeight: resolvedExactHeight ?? null,
+            nativeMeasuredHeight: nativeMeasurement.current?.height ?? null,
+            actualLayoutHeight: layoutHeight,
           });
         }
-        nativeLayout.current = { width, height: layoutHeight };
         notifyNativeLayout();
       }}
       onHeightChange={(raw) => {
@@ -550,6 +610,12 @@ const NativeFlow = React.memo(function NativeFlow({
               flowId: event.flowId,
               phase: 'height',
               elapsedMs: performance.now() - performanceTrace.startedAt,
+              measureKey,
+              cachedExactHeight: resolvedExactHeight ?? null,
+              nativeMeasuredHeight: event.height,
+              actualLayoutHeight: nativeLayout.current?.height ?? null,
+              width: contentWidth,
+              height: event.height,
               nativeMeasureMs: event.nativeMeasureMs,
               nativePropsToMeasureMs: event.nativePropsToMeasureMs,
               nativePropsToSizeRequestMs: event.nativePropsToSizeRequestMs,
@@ -586,6 +652,7 @@ const NativeFlow = React.memo(function NativeFlow({
               measuredFlowHeights.keys().next().value || '',
             );
           measuredFlowHeights.set(measureKey, event.height);
+          measuredFlowIdHeights.set(event.flowId, event.height);
           // In standard non-traced production, call onMeasured on height event to preserve
           // established single-pass display and unit test compatibility.
           if (!nativeAutoSize && !performanceTrace) {
@@ -666,6 +733,8 @@ interface BlockViewProps {
   nativeAutoSizeCachedHeight?: boolean;
   exactHeightMode?: boolean;
   exactFlowHeights?: Readonly<Record<string, number>>;
+  /** Diagnostic mode: keep body in-flow from frame 0 and only switch opacity, preventing position reflow. */
+  inFlowRevealMode?: boolean;
   suppressDoubleTapSelection?: boolean;
   options: ZhihuNativeTypographyOptions;
   onFlowAction: (event: ActionEvent, flow: RichTextFlow) => void;
@@ -727,7 +796,12 @@ function NativeParagraph(props: BlockViewProps) {
             nativeAutoSize={props.nativeAutoSize}
             nativeAutoSizeCachedHeight={props.nativeAutoSizeCachedHeight}
             exactHeightMode={props.exactHeightMode}
-            exactHeight={props.exactFlowHeights?.[part.flow.id]}
+            exactHeight={
+              props.exactFlowHeights?.[
+                flowMeasureKey(part.flow, props.width, configJson)
+              ] ?? props.exactFlowHeights?.[part.flow.id]
+            }
+            exactFlowHeights={props.exactFlowHeights}
             suppressDoubleTapSelection={props.suppressDoubleTapSelection}
             options={props.options}
             linkColor={props.linkColor}
@@ -1299,6 +1373,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
   nativeAutoSizeCachedHeight = false,
   exactHeightMode = false,
   exactFlowHeights,
+  inFlowRevealMode = false,
   performanceTrace,
   suppressDoubleTapSelection = false,
   fontSizeScale,
@@ -1856,29 +1931,44 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
       style={styles.content}
     >
       {!initialLayoutReady ? (
-        renderPlaceholder ? (
-          renderPlaceholder(loadingPhase)
-        ) : (
-          <View
-            testID="native-content-placeholder"
-            accessibilityLabel="正文正在加载"
-            accessibilityRole="progressbar"
-            style={{ width: '100%', gap: lineHeight - fontSize }}
-          >
-            {[1, 2, 3, 4].map((line) => (
-              <View
-                key={line}
-                style={{
-                  width: line === 4 ? '65%' : '100%',
-                  height: fontSize,
-                  backgroundColor: borderColor,
-                  borderRadius: 3,
-                  opacity: 0.4,
-                }}
-              />
-            ))}
-          </View>
-        )
+        <View
+          pointerEvents="none"
+          style={
+            inFlowRevealMode
+              ? {
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  zIndex: 1,
+                }
+              : undefined
+          }
+        >
+          {renderPlaceholder ? (
+            renderPlaceholder(loadingPhase)
+          ) : (
+            <View
+              testID="native-content-placeholder"
+              accessibilityLabel="正文正在加载"
+              accessibilityRole="progressbar"
+              style={{ width: '100%', gap: lineHeight - fontSize }}
+            >
+              {[1, 2, 3, 4].map((line) => (
+                <View
+                  key={line}
+                  style={{
+                    width: line === 4 ? '65%' : '100%',
+                    height: fontSize,
+                    backgroundColor: borderColor,
+                    borderRadius: 3,
+                    opacity: 0.4,
+                  }}
+                />
+              ))}
+            </View>
+          )}
+        </View>
       ) : null}
       {availableWidth > 0 ? (
         <View
@@ -1901,12 +1991,14 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
           style={[
             styles.content,
             { width: availableWidth },
-            !initialLayoutReady && {
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              opacity: 0,
-            },
+            inFlowRevealMode
+              ? { opacity: initialLayoutReady ? 1 : 0 }
+              : !initialLayoutReady && {
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  opacity: 0,
+                },
           ]}
         >
           {compiled.parts.map((part) =>
@@ -1922,7 +2014,12 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
                 nativeAutoSize={nativeAutoSize}
                 nativeAutoSizeCachedHeight={nativeAutoSizeCachedHeight}
                 exactHeightMode={exactHeightMode}
-                exactHeight={exactFlowHeights?.[part.flow.id]}
+                exactHeight={
+                  exactFlowHeights?.[
+                    flowMeasureKey(part.flow, width, configJson)
+                  ] ?? exactFlowHeights?.[part.flow.id]
+                }
+                exactFlowHeights={exactFlowHeights}
                 performanceTrace={performanceTrace}
                 suppressDoubleTapSelection={suppressDoubleTapSelection}
                 options={options}

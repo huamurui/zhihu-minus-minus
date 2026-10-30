@@ -1,5 +1,6 @@
-import * as Clipboard from 'expo-clipboard';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Redirect, Stack } from 'expo-router';
+import * as Sharing from 'expo-sharing';
 import {
   useCallback,
   useEffect,
@@ -32,11 +33,13 @@ import {
   clearMeasuredFlowHeightCache,
   compileZhihuDocument,
   createRichContentMetrics,
+  flowMeasureKey,
   getMeasuredFlowHeightCacheSize,
   getMeasuredFlowHeightMap,
   isRichTextNativeAvailable,
   normalizeZhihuDocument,
   RICH_CONTENT_PARAGRAPH_SPACING,
+  type RichTextFlow,
   type ZhihuBlock,
   type ZhihuDocument,
   type ZhihuInlineRun,
@@ -195,8 +198,80 @@ function make50FlowsDocument(doc: ZhihuDocument): ZhihuDocument {
   };
 }
 
+export interface ExactHeightCoverageResult {
+  totalFlows: number;
+  coveredFlows: number;
+  missingFlowIds: string[];
+  isFullyCovered: boolean;
+}
+
+export function checkExactFlowHeightsCoverage(
+  document: ZhihuDocument | undefined,
+  fontSize: number,
+  lineHeight: number,
+  exactHeights: Readonly<Record<string, number>>,
+  width?: number,
+  configJson?: string,
+): ExactHeightCoverageResult {
+  if (!document) {
+    return {
+      totalFlows: 0,
+      coveredFlows: 0,
+      missingFlowIds: [],
+      isFullyCovered: false,
+    };
+  }
+  const compiled = compileZhihuDocument(document, {
+    fontSize,
+    lineHeight,
+    paragraphSpacing: RICH_CONTENT_PARAGRAPH_SPACING,
+  });
+  const flows = compiled.parts.filter(
+    (p): p is { type: 'flow'; flow: RichTextFlow } => p.type === 'flow',
+  );
+  if (flows.length === 0) {
+    return {
+      totalFlows: 0,
+      coveredFlows: 0,
+      missingFlowIds: [],
+      isFullyCovered: true,
+    };
+  }
+  const missingFlowIds: string[] = [];
+  let coveredCount = 0;
+  for (const part of flows) {
+    const flow = part.flow;
+    const fullKey =
+      width && configJson ? flowMeasureKey(flow, width, configJson) : undefined;
+    const height =
+      (fullKey ? exactHeights[fullKey] : undefined) ?? exactHeights[flow.id];
+    if (typeof height === 'number' && Number.isFinite(height) && height > 0) {
+      coveredCount += 1;
+    } else {
+      missingFlowIds.push(flow.id);
+    }
+  }
+  return {
+    totalFlows: flows.length,
+    coveredFlows: coveredCount,
+    missingFlowIds,
+    isFullyCovered: coveredCount === flows.length,
+  };
+}
+
 interface FlowTraceSummary {
   flowId: string;
+  measureKey: string | null;
+  contentWidth: number | null;
+  cachedExactHeight: number | null;
+  nativeMeasuredHeight: number | null;
+  actualLayoutHeight: number | null;
+  diffCachedVsNative: number | null;
+  diffNativeVsLayout: number | null;
+  isMatched: boolean;
+  hasMismatchEvent: boolean;
+  mismatchCount: number;
+  postMatchUpdateCount: number;
   heightCount: number;
   layoutCount: number;
   rawLayoutCount: number;
@@ -233,6 +308,17 @@ function aggregateFlowSummaries(
     if (!entry) {
       entry = {
         flowId: event.flowId,
+        measureKey: null,
+        contentWidth: null,
+        cachedExactHeight: null,
+        nativeMeasuredHeight: null,
+        actualLayoutHeight: null,
+        diffCachedVsNative: null,
+        diffNativeVsLayout: null,
+        isMatched: false,
+        hasMismatchEvent: false,
+        mismatchCount: 0,
+        postMatchUpdateCount: 0,
         heightCount: 0,
         layoutCount: 0,
         rawLayoutCount: 0,
@@ -259,6 +345,24 @@ function aggregateFlowSummaries(
         propsToSizeRequestMs: null,
       };
       map.set(event.flowId, entry);
+    }
+    if (event.measureKey) entry.measureKey = event.measureKey;
+    if (event.width != null) entry.contentWidth = event.width;
+    if (event.cachedExactHeight != null)
+      entry.cachedExactHeight = event.cachedExactHeight;
+    if (event.nativeMeasuredHeight != null)
+      entry.nativeMeasuredHeight = event.nativeMeasuredHeight;
+    if (event.actualLayoutHeight != null)
+      entry.actualLayoutHeight = event.actualLayoutHeight;
+
+    if (event.phase === 'layout-mismatch') {
+      entry.hasMismatchEvent = true;
+      entry.mismatchCount += 1;
+    } else if (
+      event.phase === 'first-matched-layout' ||
+      event.phase === 'layout'
+    ) {
+      entry.isMatched = true;
     }
     if (event.phase === 'native-props-set') {
       entry.propsSetMs =
@@ -374,10 +478,42 @@ function aggregateFlowSummaries(
       }
     }
   }
+
+  for (const entry of map.values()) {
+    if (entry.nativeMeasuredHeight != null && entry.cachedExactHeight != null) {
+      entry.diffCachedVsNative = Number(
+        (entry.nativeMeasuredHeight - entry.cachedExactHeight).toFixed(2),
+      );
+    }
+    if (
+      entry.actualLayoutHeight != null &&
+      entry.nativeMeasuredHeight != null
+    ) {
+      entry.diffNativeVsLayout = Number(
+        (entry.actualLayoutHeight - entry.nativeMeasuredHeight).toFixed(2),
+      );
+    }
+    if (
+      !entry.isMatched &&
+      entry.layoutCount > 0 &&
+      entry.actualLayoutHeight != null &&
+      entry.nativeMeasuredHeight != null
+    ) {
+      entry.isMatched =
+        Math.abs(entry.actualLayoutHeight - entry.nativeMeasuredHeight) <= 1;
+    }
+    entry.postMatchUpdateCount = entry.isMatched
+      ? Math.max(0, entry.layoutCount - 1)
+      : 0;
+  }
+
   return Array.from(map.values());
 }
 
-function computeRunMetrics(events: readonly ZhihuNativePerformanceEvent[]) {
+function computeRunMetrics(
+  events: readonly ZhihuNativePerformanceEvent[],
+  expectedFlowCount?: number,
+) {
   const normalizeEvent = events.find((e) => e.phase === 'normalize');
   const compileEvent = events.find((e) => e.phase === 'compile');
   const flowJsonEvents = events.filter((e) => e.phase === 'flow-json');
@@ -441,6 +577,7 @@ function computeRunMetrics(events: readonly ZhihuNativePerformanceEvent[]) {
   const irReadyMs = numOrNull(irReadyEvent?.elapsedMs);
   const firstRawLayoutMs = minValid(rawLayoutEvents.map((e) => e.elapsedMs));
   const lastLayoutMs = maxValid(layoutEvents.map((e) => e.elapsedMs));
+  const lastMatchedUpdateMs = lastLayoutMs;
   const lastHeightMs = maxValid(heightEvents.map((e) => e.elapsedMs));
   const layoutEffectMs = numOrNull(layoutEffectEvent?.elapsedMs);
   const propsSetMinMs = minValid(propsSetEvents.map((e) => e.elapsedMs));
@@ -454,18 +591,38 @@ function computeRunMetrics(events: readonly ZhihuNativePerformanceEvent[]) {
   const lastMatchedLayoutMs = maxValid(
     firstMatchedLayoutEvents.map((e) => e.elapsedMs),
   );
+  const irReadyToLastMatchedLayoutMs =
+    irReadyMs != null && lastMatchedLayoutMs != null
+      ? Number((lastMatchedLayoutMs - irReadyMs).toFixed(2))
+      : null;
+  const totalPostMatchUpdates =
+    sumValid(flows.map((f) => f.postMatchUpdateCount)) ?? 0;
+
+  const matchedFlowsCount = flows.filter((f) => f.isMatched).length;
+  const mismatchedFlowsCount = flows.filter(
+    (f) => !f.isMatched || f.hasMismatchEvent,
+  ).length;
+
+  const isAllExpectedMatched =
+    expectedFlowCount != null
+      ? flows.length >= expectedFlowCount &&
+        matchedFlowsCount >= expectedFlowCount
+      : flows.length > 0 && flows.every((f) => f.isMatched);
 
   const isValid =
     documentReadyEvent != null &&
-    flows.length > 0 &&
-    flows.every((f) => f.layoutCount > 0);
+    isAllExpectedMatched &&
+    (expectedFlowCount == null || flows.length === expectedFlowCount);
   const invalidReason = !documentReadyEvent
     ? 'Document ready event not received (timeout)'
     : flows.length === 0
       ? 'No flows detected'
-      : !flows.every((f) => f.layoutCount > 0)
-        ? 'Some flows did not complete layout'
-        : undefined;
+      : expectedFlowCount != null && flows.length < expectedFlowCount
+        ? `预期 ${expectedFlowCount} 个 Flow，实际仅捕获 ${flows.length} 个`
+        : !flows.every((f) => f.isMatched) ||
+            (expectedFlowCount != null && matchedFlowsCount < expectedFlowCount)
+          ? `仅 ${matchedFlowsCount}/${expectedFlowCount ?? flows.length} 个 Flow 首次对齐有效`
+          : undefined;
 
   return {
     isValid,
@@ -485,6 +642,7 @@ function computeRunMetrics(events: readonly ZhihuNativePerformanceEvent[]) {
     lastHeightMs,
     firstLayoutMs: minValid(layoutEvents.map((e) => e.elapsedMs)),
     lastLayoutMs,
+    lastMatchedUpdateMs,
     firstMatchedLayoutMs,
     lastMatchedLayoutMs,
     firstRawLayoutMs,
@@ -494,11 +652,13 @@ function computeRunMetrics(events: readonly ZhihuNativePerformanceEvent[]) {
     firstMeasureMinMs: minValid(firstMeasureEvents.map((e) => e.elapsedMs)),
     firstMeasureMaxMs: maxValid(firstMeasureEvents.map((e) => e.elapsedMs)),
     firstNativeLayoutMinMs: minValid(firstLayoutEvents.map((e) => e.elapsedMs)),
+    totalPostMatchUpdates,
     // Timeline breakdown intervals
     irReadyToFirstRawLayoutMs:
       irReadyMs != null && firstRawLayoutMs != null
         ? Number((firstRawLayoutMs - irReadyMs).toFixed(2))
         : null,
+    irReadyToLastMatchedLayoutMs,
     firstRawLayoutToLastLayoutMs:
       firstRawLayoutMs != null && lastLayoutMs != null
         ? Number((lastLayoutMs - firstRawLayoutMs).toFixed(2))
@@ -532,6 +692,8 @@ function computeRunMetrics(events: readonly ZhihuNativePerformanceEvent[]) {
     heightPostWaitMaxMs: maxValid(flows.map((f) => f.heightPostWaitMs)),
     setViewSizeCountMax: maxValid(flows.map((f) => f.setViewSizeCount)),
     flowCount: flows.length,
+    matchedFlowsCount,
+    mismatchedFlowsCount,
     heightEventsCount: heightEvents.length,
     layoutEventsCount: layoutEvents.length,
     rawLayoutEventsCount: rawLayoutEvents.length,
@@ -560,6 +722,15 @@ function buildSummaryFromRuns(runs: ReturnType<typeof computeRunMetrics>[]) {
     lastHeightMs: computeStatsForMetric(source.map((r) => r.lastHeightMs)),
     firstLayoutMs: computeStatsForMetric(source.map((r) => r.firstLayoutMs)),
     lastLayoutMs: computeStatsForMetric(source.map((r) => r.lastLayoutMs)),
+    lastMatchedLayoutMs: computeStatsForMetric(
+      source.map((r) => r.lastMatchedLayoutMs),
+    ),
+    lastMatchedUpdateMs: computeStatsForMetric(
+      source.map((r) => r.lastMatchedUpdateMs ?? r.lastLayoutMs),
+    ),
+    totalPostMatchUpdates: computeStatsForMetric(
+      source.map((r) => r.totalPostMatchUpdates),
+    ),
     documentReadyMs: computeStatsForMetric(
       source.map((r) => r.documentReadyMs),
     ),
@@ -571,6 +742,9 @@ function buildSummaryFromRuns(runs: ReturnType<typeof computeRunMetrics>[]) {
       source.map((r) => r.firstMeasureMinMs),
     ),
     // Timeline intervals
+    irReadyToLastMatchedLayoutMs: computeStatsForMetric(
+      source.map((r) => r.irReadyToLastMatchedLayoutMs),
+    ),
     irReadyToFirstRawLayoutMs: computeStatsForMetric(
       source.map((r) => r.irReadyToFirstRawLayoutMs),
     ),
@@ -767,6 +941,35 @@ function PureRNTextContent({
   );
 }
 
+async function exportJsonToFile(
+  jsonString: string,
+  prefix = 'zhihu-fabric-benchmark',
+): Promise<string | null> {
+  try {
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/[:.]/g, '-')
+      .replace('T', '_');
+    const fileName = `${prefix}-${timestamp}.json`;
+    const dir = FileSystem.cacheDirectory || FileSystem.documentDirectory;
+    if (!dir) return null;
+    const fileUri = `${dir}${fileName}`;
+    await FileSystem.writeAsStringAsync(fileUri, jsonString, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(fileUri, {
+        mimeType: 'application/json',
+        dialogTitle: '导出测试数据 JSON 文件',
+        UTI: 'public.json',
+      });
+    }
+    return fileUri;
+  } catch {
+    return null;
+  }
+}
+
 export default function RichContentExperimentRoute() {
   if (!richContentExperimentEnabled) return <Redirect href="/" />;
   return <RichContentExperimentScreen />;
@@ -801,6 +1004,7 @@ function RichContentExperimentScreen() {
   const [rendererMode, setRendererMode] = useState<RendererMode>('rich-text');
   const [nativeAutoSize, setNativeAutoSize] = useState(false);
   const [exactHeightMode, setExactHeightMode] = useState(false);
+  const [inFlowRevealMode, setInFlowRevealMode] = useState(false);
   const [exactFlowHeights, setExactFlowHeights] = useState<
     Record<string, number>
   >({});
@@ -832,6 +1036,7 @@ function RichContentExperimentScreen() {
   const [exportedJsonResult, setExportedJsonResult] = useState<string | null>(
     null,
   );
+  const [exportedFileUri, setExportedFileUri] = useState<string | null>(null);
   const [interleavedSummary, setInterleavedSummary] = useState<{
     offSummary: MetricSummaryResult;
     onSummary: MetricSummaryResult;
@@ -897,6 +1102,7 @@ function RichContentExperimentScreen() {
     setError(null);
     setReady(false);
     setExportedJsonResult(null);
+    setExportedFileUri(null);
     setInterleavedSummary(null);
     setThreeModeSummary(null);
     setCopyToast(null);
@@ -927,6 +1133,7 @@ function RichContentExperimentScreen() {
     setError(null);
     setLoading(true);
     setExportedJsonResult(null);
+    setExportedFileUri(null);
     setInterleavedSummary(null);
     setThreeModeSummary(null);
     setCopyToast(null);
@@ -1015,14 +1222,48 @@ function RichContentExperimentScreen() {
   const contentWidth = Math.max(0, windowWidth - 32);
   const initialContentWidth = useInitialContentWidth ? contentWidth : undefined;
 
+  const currentCoverage = useMemo(() => {
+    const richMetrics = createRichContentMetrics(
+      fontSizeScale,
+      lineHeightScale,
+    );
+    return checkExactFlowHeightsCoverage(
+      activeDocument,
+      richMetrics.body.fontSize,
+      richMetrics.body.lineHeight,
+      exactFlowHeights,
+      contentWidth,
+    );
+  }, [
+    activeDocument,
+    fontSizeScale,
+    lineHeightScale,
+    exactFlowHeights,
+    contentWidth,
+  ]);
+
   const renderKey = visibleContent
-    ? `${visibleContent.type}:${visibleContent.id}:${rendererMode}:${flowCountMode}:${nativeAutoSize}:${exactHeightMode}:${usePreparedDocument}:${useInitialContentWidth}:${nativeAutoSizeCachedHeight}:${mountIndex}`
+    ? `${visibleContent.type}:${visibleContent.id}:${rendererMode}:${flowCountMode}:${nativeAutoSize}:${exactHeightMode}:${inFlowRevealMode}:${usePreparedDocument}:${useInitialContentWidth}:${nativeAutoSizeCachedHeight}:${mountIndex}`
     : null;
   activeRenderKey.current = renderKey;
 
+  const expectedFlowCount = useMemo(() => {
+    if (!activeDocument) return undefined;
+    const richMetrics = createRichContentMetrics(
+      fontSizeScale,
+      lineHeightScale,
+    );
+    const compiled = compileZhihuDocument(activeDocument, {
+      fontSize: richMetrics.body.fontSize,
+      lineHeight: richMetrics.body.lineHeight,
+      paragraphSpacing: RICH_CONTENT_PARAGRAPH_SPACING,
+    });
+    return compiled.parts.filter((p) => p.type === 'flow').length;
+  }, [activeDocument, fontSizeScale, lineHeightScale]);
+
   const singleRunMetrics = useMemo(
-    () => computeRunMetrics(traceEvents),
-    [traceEvents],
+    () => computeRunMetrics(traceEvents, expectedFlowCount),
+    [traceEvents, expectedFlowCount],
   );
   const flowSummaries = singleRunMetrics.flows;
 
@@ -1090,6 +1331,7 @@ function RichContentExperimentScreen() {
     setIsTesting(true);
     setTestProgress({ current: 0, total: 10, label: '单模式 10 轮测试' });
     setExportedJsonResult(null);
+    setExportedFileUri(null);
     setInterleavedSummary(null);
     setThreeModeSummary(null);
     setCopyToast(null);
@@ -1132,7 +1374,7 @@ function RichContentExperimentScreen() {
         if (!isTestingRef.current) break;
 
         const roundEvents = [...traceEventsRef.current];
-        runsData.push(computeRunMetrics(roundEvents));
+        runsData.push(computeRunMetrics(roundEvents, expectedFlowCount));
         await new Promise((r) => setTimeout(r, 120));
       }
 
@@ -1160,6 +1402,7 @@ function RichContentExperimentScreen() {
               usePreparedDocument,
               useInitialContentWidth,
               nativeAutoSizeCachedHeight,
+              inFlowRevealMode,
               fontSizeScale,
               lineHeightScale,
             },
@@ -1174,8 +1417,16 @@ function RichContentExperimentScreen() {
 
         const jsonString = JSON.stringify(exportPayload, null, 2);
         setExportedJsonResult(jsonString);
-        await Clipboard.setStringAsync(jsonString);
-        setCopyToast('10 次测试已完成，测试数据已自动复制到剪贴板！');
+        const fileUri = await exportJsonToFile(
+          jsonString,
+          'zhihu-benchmark-10runs',
+        );
+        setExportedFileUri(fileUri);
+        setCopyToast(
+          fileUri
+            ? '10 次测试已完成，测试数据已生成并调起文件导出！'
+            : '10 次测试已完成，测试数据已生成！',
+        );
       }
     } catch {
       setCopyToast('测试过程中发生异常');
@@ -1192,6 +1443,7 @@ function RichContentExperimentScreen() {
     setIsTesting(true);
     setTestProgress({ current: 0, total: 20, label: '交错测试 (ABBA 平衡)' });
     setExportedJsonResult(null);
+    setExportedFileUri(null);
     setInterleavedSummary(null);
     setThreeModeSummary(null);
     setCopyToast(null);
@@ -1261,7 +1513,7 @@ function RichContentExperimentScreen() {
         if (!isTestingRef.current) break;
 
         const roundEvents = [...traceEventsRef.current];
-        const metrics = computeRunMetrics(roundEvents);
+        const metrics = computeRunMetrics(roundEvents, expectedFlowCount);
         if (currentIsAutoSize) {
           runsB.push(metrics);
         } else {
@@ -1283,6 +1535,9 @@ function RichContentExperimentScreen() {
           irReadyToLastLayout: [] as number[],
           lastHeightToLastLayout: [] as number[],
           lastLayout: [] as number[],
+          lastMatchedLayout: [] as number[],
+          lastMatchedUpdate: [] as number[],
+          postMatchUpdates: [] as number[],
           documentReady: [] as number[],
           contentVisibleCommit: [] as number[],
           firstMatchedLayout: [] as number[],
@@ -1329,6 +1584,19 @@ function RichContentExperimentScreen() {
           if (b.lastLayoutMs != null && a.lastLayoutMs != null) {
             pairDiffs.lastLayout.push(b.lastLayoutMs - a.lastLayoutMs);
           }
+          if (b.lastMatchedLayoutMs != null && a.lastMatchedLayoutMs != null) {
+            pairDiffs.lastMatchedLayout.push(
+              b.lastMatchedLayoutMs - a.lastMatchedLayoutMs,
+            );
+          }
+          if (b.lastMatchedUpdateMs != null && a.lastMatchedUpdateMs != null) {
+            pairDiffs.lastMatchedUpdate.push(
+              b.lastMatchedUpdateMs - a.lastMatchedUpdateMs,
+            );
+          }
+          pairDiffs.postMatchUpdates.push(
+            b.totalPostMatchUpdates - a.totalPostMatchUpdates,
+          );
           if (b.documentReadyMs != null && a.documentReadyMs != null) {
             pairDiffs.documentReady.push(b.documentReadyMs - a.documentReadyMs);
           }
@@ -1370,6 +1638,9 @@ function RichContentExperimentScreen() {
             pairDiffs.lastHeightToLastLayout,
           ),
           lastLayout: computeStats(pairDiffs.lastLayout),
+          lastMatchedLayout: computeStats(pairDiffs.lastMatchedLayout),
+          lastMatchedUpdate: computeStats(pairDiffs.lastMatchedUpdate),
+          postMatchUpdates: computeStats(pairDiffs.postMatchUpdates),
           documentReady: computeStats(pairDiffs.documentReady),
           contentVisibleCommit: computeStats(pairDiffs.contentVisibleCommit),
           firstMatchedLayout: computeStats(pairDiffs.firstMatchedLayout),
@@ -1403,6 +1674,7 @@ function RichContentExperimentScreen() {
               usePreparedDocument,
               useInitialContentWidth,
               nativeAutoSizeCachedHeight,
+              inFlowRevealMode,
               fontSizeScale,
               lineHeightScale,
             },
@@ -1422,8 +1694,16 @@ function RichContentExperimentScreen() {
 
         const jsonString = JSON.stringify(exportPayload, null, 2);
         setExportedJsonResult(jsonString);
-        await Clipboard.setStringAsync(jsonString);
-        setCopyToast('20 次 ABBA 平衡交错测试已完成，数据已自动复制到剪贴板！');
+        const fileUri = await exportJsonToFile(
+          jsonString,
+          'zhihu-benchmark-20runs-abba',
+        );
+        setExportedFileUri(fileUri);
+        setCopyToast(
+          fileUri
+            ? '20 次 ABBA 平衡交错测试已完成，测试数据已生成并调起文件导出！'
+            : '20 次测试已完成，测试数据已生成！',
+        );
       }
     } catch {
       setCopyToast('交错测试过程中发生异常');
@@ -1440,57 +1720,84 @@ function RichContentExperimentScreen() {
     setIsTesting(true);
     setTestProgress({ current: 0, total: 30, label: '三模式平衡交错测试' });
     setExportedJsonResult(null);
+    setExportedFileUri(null);
     setInterleavedSummary(null);
     setThreeModeSummary(null);
     setCopyToast(null);
     isTestingRef.current = true;
 
-    // Check if exact flow heights are captured
-    let currentExactHeights = exactFlowHeights;
-    if (Object.keys(currentExactHeights).length === 0) {
-      setTestProgress({
-        current: 0,
-        total: 30,
-        label: '正在预热捕获各 Flow 精确高度...',
-      });
-      const primePromise = new Promise<void>((resolve) => {
-        let resolved = false;
-        const finish = () => {
-          if (resolved) return;
-          resolved = true;
-          roundLayoutReadyRef.current = null;
-          setTimeout(resolve, 200);
-        };
-        roundLayoutReadyRef.current = finish;
-        setTimeout(finish, 3500);
-      });
-      setNativeAutoSize(false);
-      setExactHeightMode(false);
-      activeRenderKey.current = null;
-      setReady(false);
-      startTrace();
-      setMountIndex((v) => v + 1);
-      await primePromise;
-      currentExactHeights = getMeasuredFlowHeightMap();
-      setExactFlowHeights(currentExactHeights);
-      setCacheSize(getMeasuredFlowHeightCacheSize());
-    }
-
-    const runsOff: ReturnType<typeof computeRunMetrics>[] = [];
-    const runsOn: ReturnType<typeof computeRunMetrics>[] = [];
-    const runsExact: ReturnType<typeof computeRunMetrics>[] = [];
-
-    // 5 palindromic blocks of 6 = 30 runs total (10 each)
-    const blockModes: Array<'off' | 'on' | 'exact'>[] = [
-      ['off', 'on', 'exact', 'exact', 'on', 'off'],
-      ['on', 'exact', 'off', 'off', 'exact', 'on'],
-      ['exact', 'off', 'on', 'on', 'off', 'exact'],
-      ['off', 'on', 'exact', 'exact', 'on', 'off'],
-      ['on', 'exact', 'off', 'off', 'exact', 'on'],
-    ];
-    const sequence = blockModes.flat();
-
     try {
+      // Check if exact flow heights are captured and cover 100% of flows
+      let currentExactHeights = exactFlowHeights;
+      const richMetrics = createRichContentMetrics(
+        fontSizeScale,
+        lineHeightScale,
+      );
+      let coverage = checkExactFlowHeightsCoverage(
+        activeDocument,
+        richMetrics.body.fontSize,
+        richMetrics.body.lineHeight,
+        currentExactHeights,
+        contentWidth,
+      );
+
+      if (!coverage.isFullyCovered) {
+        setTestProgress({
+          current: 0,
+          total: 30,
+          label: `正在预热捕获各 Flow 精确高度 (${coverage.coveredFlows}/${coverage.totalFlows})...`,
+        });
+        const primePromise = new Promise<void>((resolve) => {
+          let resolved = false;
+          const finish = () => {
+            if (resolved) return;
+            resolved = true;
+            roundLayoutReadyRef.current = null;
+            setTimeout(resolve, 200);
+          };
+          roundLayoutReadyRef.current = finish;
+          setTimeout(finish, 3500);
+        });
+        setNativeAutoSize(false);
+        setExactHeightMode(false);
+        activeRenderKey.current = null;
+        setReady(false);
+        startTrace();
+        setMountIndex((v) => v + 1);
+        await primePromise;
+        currentExactHeights = getMeasuredFlowHeightMap();
+        setExactFlowHeights(currentExactHeights);
+        setCacheSize(getMeasuredFlowHeightCacheSize());
+
+        coverage = checkExactFlowHeightsCoverage(
+          activeDocument,
+          richMetrics.body.fontSize,
+          richMetrics.body.lineHeight,
+          currentExactHeights,
+          contentWidth,
+        );
+        if (!coverage.isFullyCovered) {
+          setCopyToast(
+            `精确高度预热未完全覆盖：仅命中 ${coverage.coveredFlows}/${coverage.totalFlows} 个 Flow，测试已取消`,
+          );
+          return;
+        }
+      }
+
+      const runsOff: ReturnType<typeof computeRunMetrics>[] = [];
+      const runsOn: ReturnType<typeof computeRunMetrics>[] = [];
+      const runsExact: ReturnType<typeof computeRunMetrics>[] = [];
+
+      // 5 palindromic blocks of 6 = 30 runs total (10 each)
+      const blockModes: Array<'off' | 'on' | 'exact'>[] = [
+        ['off', 'on', 'exact', 'exact', 'on', 'off'],
+        ['on', 'exact', 'off', 'off', 'exact', 'on'],
+        ['exact', 'off', 'on', 'on', 'off', 'exact'],
+        ['off', 'on', 'exact', 'exact', 'on', 'off'],
+        ['on', 'exact', 'off', 'off', 'exact', 'on'],
+      ];
+      const sequence = blockModes.flat();
+
       for (let round = 1; round <= 30; round++) {
         if (!isTestingRef.current) break;
         const mode = sequence[round - 1];
@@ -1544,7 +1851,7 @@ function RichContentExperimentScreen() {
         if (!isTestingRef.current) break;
 
         const roundEvents = [...traceEventsRef.current];
-        const metrics = computeRunMetrics(roundEvents);
+        const metrics = computeRunMetrics(roundEvents, expectedFlowCount);
         if (mode === 'off') {
           runsOff.push(metrics);
         } else if (mode === 'on') {
@@ -1589,13 +1896,18 @@ function RichContentExperimentScreen() {
         };
 
         const diffKeys = {
-          lastLayout: (r: (typeof runsOff)[0]) => r.lastLayoutMs,
+          lastMatchedLayout: (r: (typeof runsOff)[0]) => r.lastMatchedLayoutMs,
           documentReady: (r: (typeof runsOff)[0]) => r.documentReadyMs,
           contentVisibleCommit: (r: (typeof runsOff)[0]) =>
             r.contentVisibleCommitMs,
+          lastMatchedUpdate: (r: (typeof runsOff)[0]) => r.lastMatchedUpdateMs,
+          postMatchUpdates: (r: (typeof runsOff)[0]) => r.totalPostMatchUpdates,
+          lastLayout: (r: (typeof runsOff)[0]) => r.lastLayoutMs,
           firstRawLayout: (r: (typeof runsOff)[0]) => r.firstRawLayoutMs,
           firstMatchedLayout: (r: (typeof runsOff)[0]) =>
             r.firstMatchedLayoutMs,
+          irReadyToLastMatchedLayout: (r: (typeof runsOff)[0]) =>
+            r.irReadyToLastMatchedLayoutMs,
           irReadyToLastLayout: (r: (typeof runsOff)[0]) =>
             r.irReadyToLastLayoutMs,
           irReadyToFirstRawLayout: (r: (typeof runsOff)[0]) =>
@@ -1651,6 +1963,7 @@ function RichContentExperimentScreen() {
               usePreparedDocument,
               useInitialContentWidth,
               nativeAutoSizeCachedHeight,
+              inFlowRevealMode,
               fontSizeScale,
               lineHeightScale,
             },
@@ -1665,8 +1978,16 @@ function RichContentExperimentScreen() {
 
         const jsonString = JSON.stringify(exportPayload, null, 2);
         setExportedJsonResult(jsonString);
-        await Clipboard.setStringAsync(jsonString);
-        setCopyToast('30 次三模式平衡测试已完成，测试数据已自动复制到剪贴板！');
+        const fileUri = await exportJsonToFile(
+          jsonString,
+          'zhihu-benchmark-30runs-threemode',
+        );
+        setExportedFileUri(fileUri);
+        setCopyToast(
+          fileUri
+            ? '30 次三模式平衡测试已完成，测试数据已生成并调起文件导出！'
+            : '30 次测试已完成，测试数据已生成！',
+        );
       }
     } catch {
       setCopyToast('三模式测试过程中发生异常');
@@ -1677,10 +1998,13 @@ function RichContentExperimentScreen() {
     }
   };
 
-  const copyExportedJson = useCallback(async () => {
+  const exportCurrentJsonFile = useCallback(async () => {
     if (!exportedJsonResult) return;
-    await Clipboard.setStringAsync(exportedJsonResult);
-    setCopyToast('已重新复制到剪贴板！');
+    const uri = await exportJsonToFile(exportedJsonResult);
+    if (uri) {
+      setExportedFileUri(uri);
+      setCopyToast('已重新调起文件导出分享！');
+    }
   }, [exportedJsonResult]);
 
   return (
@@ -1916,9 +2240,18 @@ function RichContentExperimentScreen() {
 
             {/* Exact Height Diagnostic Toggle */}
             <View style={styles.controlRow}>
-              <Text style={styles.controlLabel}>
-                诊断：精确高度直传模式（验证二阶段布局开销）
-              </Text>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Text style={styles.controlLabel}>
+                  诊断：精确高度直传模式（验证二阶段布局开销）
+                </Text>
+                <Text type="secondary" style={styles.hint}>
+                  缓存命中: {currentCoverage.coveredFlows}/
+                  {currentCoverage.totalFlows}{' '}
+                  {currentCoverage.isFullyCovered
+                    ? '✅ 全部就绪'
+                    : '⚠️ 缺值将致未决'}
+                </Text>
+              </View>
               <Switch
                 value={exactHeightMode}
                 onValueChange={(value) => {
@@ -1926,10 +2259,31 @@ function RichContentExperimentScreen() {
                   setReady(false);
                   if (visibleContent) startTrace();
                   setExactHeightMode(value);
-                  if (value && Object.keys(exactFlowHeights).length === 0) {
+                  if (value && !currentCoverage.isFullyCovered) {
                     const map = getMeasuredFlowHeightMap();
                     setExactFlowHeights(map);
                   }
+                }}
+              />
+            </View>
+
+            {/* Reveal Strategy Diagnostic Toggle */}
+            <View style={styles.controlRow}>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Text style={styles.controlLabel}>
+                  诊断：揭晓机制（保留正常文档流，仅切 Opacity，不换 Position）
+                </Text>
+                <Text type="secondary" style={styles.hint}>
+                  隔离容器定位策略对二次回流的影响
+                </Text>
+              </View>
+              <Switch
+                value={inFlowRevealMode}
+                onValueChange={(value) => {
+                  activeRenderKey.current = null;
+                  setReady(false);
+                  if (visibleContent) startTrace();
+                  setInFlowRevealMode(value);
                 }}
               />
             </View>
@@ -2047,8 +2401,21 @@ function RichContentExperimentScreen() {
                 onPress={() => {
                   const map = getMeasuredFlowHeightMap();
                   setExactFlowHeights(map);
+                  const richMetrics = createRichContentMetrics(
+                    fontSizeScale,
+                    lineHeightScale,
+                  );
+                  const cov = checkExactFlowHeightsCoverage(
+                    activeDocument,
+                    richMetrics.body.fontSize,
+                    richMetrics.body.lineHeight,
+                    map,
+                    contentWidth,
+                  );
                   setCopyToast(
-                    `已捕获 ${Object.keys(map).length} 个 Flow 的当前测得高度`,
+                    `已捕获精准高度：${cov.coveredFlows}/${cov.totalFlows} Flow ${
+                      cov.isFullyCovered ? '全部命中就绪 ✅' : '部分缺失 ⚠️'
+                    }`,
                   );
                 }}
                 style={[
@@ -2058,8 +2425,9 @@ function RichContentExperimentScreen() {
                 ]}
               >
                 <Text style={{ fontSize: 12 }}>
-                  捕获高度为精准值（已存 {Object.keys(exactFlowHeights).length}{' '}
-                  个）
+                  捕获精准高度（{currentCoverage.coveredFlows}/
+                  {currentCoverage.totalFlows}{' '}
+                  {currentCoverage.isFullyCovered ? '✅' : '⚠️'}）
                 </Text>
               </Pressable>
               <Pressable
@@ -2096,7 +2464,34 @@ function RichContentExperimentScreen() {
                 A/B 交错测试对比结果（各 10 轮交替运行，单位：ms 中位数）
               </Text>
               <Text type="secondary" style={styles.hint}>
-                【阶段耗时对比】
+                【核心指标对比】
+                {'\n'}★ 全 Flow 首次对齐 (Last Matched Layout)：
+                {interleavedSummary.offSummary.lastMatchedLayoutMs.median} vs{' '}
+                {interleavedSummary.onSummary.lastMatchedLayoutMs.median}
+                {'\n'}IR Ready → 全 Flow 首次对齐：
+                {
+                  interleavedSummary.offSummary.irReadyToLastMatchedLayoutMs
+                    .median
+                }{' '}
+                vs{' '}
+                {
+                  interleavedSummary.onSummary.irReadyToLastMatchedLayoutMs
+                    .median
+                }
+                {'\n'}文档整体就绪 (Document Ready)：
+                {interleavedSummary.offSummary.documentReadyMs.median} vs{' '}
+                {interleavedSummary.onSummary.documentReadyMs.median}
+                {'\n'}内容可见提交 (Content Visible Commit)：
+                {interleavedSummary.offSummary.contentVisibleCommitMs.median} vs{' '}
+                {interleavedSummary.onSummary.contentVisibleCommitMs.median}
+                {'\n'}────────────────────────
+                {'\n'}【诊断指标（布局震荡与后续更新）】
+                {'\n'}最后匹配更新 (Last Matched Update)：
+                {interleavedSummary.offSummary.lastMatchedUpdateMs.median} vs{' '}
+                {interleavedSummary.onSummary.lastMatchedUpdateMs.median}
+                {'\n'}匹配后额外更新次数合计：
+                {interleavedSummary.offSummary.totalPostMatchUpdates.median} vs{' '}
+                {interleavedSummary.onSummary.totalPostMatchUpdates.median}
                 {'\n'}IR Ready：
                 {interleavedSummary.offSummary.irReadyMs.median} vs{' '}
                 {interleavedSummary.onSummary.irReadyMs.median}
@@ -2109,57 +2504,33 @@ function RichContentExperimentScreen() {
                 {'\n'}Last Height：
                 {interleavedSummary.offSummary.lastHeightMs.median} vs{' '}
                 {interleavedSummary.onSummary.lastHeightMs.median}
-                {'\n'}First Layout：
-                {interleavedSummary.offSummary.firstLayoutMs.median} vs{' '}
-                {interleavedSummary.onSummary.firstLayoutMs.median}
-                {'\n'}Last Layout：
-                {interleavedSummary.offSummary.lastLayoutMs.median} vs{' '}
-                {interleavedSummary.onSummary.lastLayoutMs.median}
-                {'\n'}Document Ready：
-                {interleavedSummary.offSummary.documentReadyMs.median} vs{' '}
-                {interleavedSummary.onSummary.documentReadyMs.median}
-                {'\n'}────────────────────────
-                {'\n'}【核心阶段间隔对比（中位数）】
-                {'\n'}IR Ready → First Raw Layout：
-                {interleavedSummary.offSummary.irReadyToFirstRawLayoutMs.median}{' '}
-                vs{' '}
-                {interleavedSummary.onSummary.irReadyToFirstRawLayoutMs.median}
-                {'\n'}First Raw Layout → Last Layout：
-                {
-                  interleavedSummary.offSummary.firstRawLayoutToLastLayoutMs
-                    .median
-                }{' '}
-                vs{' '}
-                {
-                  interleavedSummary.onSummary.firstRawLayoutToLastLayoutMs
-                    .median
-                }
-                {'\n'}IR Ready → Last Layout（总布局用时）：
-                {interleavedSummary.offSummary.irReadyToLastLayoutMs.median} vs{' '}
-                {interleavedSummary.onSummary.irReadyToLastLayoutMs.median}
-                {'\n'}Last Height → Last Layout：
-                {interleavedSummary.offSummary.lastHeightToLastLayoutMs.median}{' '}
-                vs{' '}
-                {interleavedSummary.onSummary.lastHeightToLastLayoutMs.median}
                 {'\n'}────────────────────────
                 {'\n'}【逐对相减中位数（Pairwise B - A）】
-                {'\n'}IR Ready → First Raw Layout 差异：
+                {'\n'}★ 全 Flow 首次对齐差异：
+                {interleavedSummary.pairDiffSummary.lastMatchedLayout?.median ??
+                  '—'}{' '}
+                ms
+                {'\n'}Document Ready 差异：
+                {interleavedSummary.pairDiffSummary.documentReady?.median ??
+                  '—'}{' '}
+                ms
+                {'\n'}Content Visible Commit 差异：
+                {interleavedSummary.pairDiffSummary.contentVisibleCommit
+                  ?.median ?? '—'}{' '}
+                ms
+                {'\n'}最后匹配更新 (Last Matched Update) 差异：
+                {interleavedSummary.pairDiffSummary.lastMatchedUpdate?.median ??
+                  '—'}{' '}
+                ms
+                {'\n'}匹配后额外更新次数差异：
+                {interleavedSummary.pairDiffSummary.postMatchUpdates?.median ??
+                  '—'}{' '}
+                次{'\n'}IR Ready → First Raw Layout 差异：
                 {
                   interleavedSummary.pairDiffSummary.irReadyToFirstRawLayout
                     .median
                 }{' '}
                 ms
-                {'\n'}First Raw Layout → Last Layout 差异：
-                {
-                  interleavedSummary.pairDiffSummary.firstRawLayoutToLastLayout
-                    .median
-                }{' '}
-                ms
-                {'\n'}IR Ready → Last Layout 差异：
-                {interleavedSummary.pairDiffSummary.irReadyToLastLayout.median}{' '}
-                ms
-                {'\n'}最终 Last Layout 差异：
-                {interleavedSummary.pairDiffSummary.lastLayout.median} ms
               </Text>
             </View>
           ) : null}
@@ -2176,12 +2547,46 @@ function RichContentExperimentScreen() {
                 三模式平衡测试结果（Off / On / Exact 各 10 轮，单位：ms 中位数）
               </Text>
               <Text type="secondary" style={styles.hint}>
-                【有效样本率】
+                【有效样本率（要求全 17 Flow 首次对齐）】
                 {'\n'}AutoSize Off：{threeModeSummary.validRunsOff}/10 轮有效
                 {'\n'}AutoSize On：{threeModeSummary.validRunsOn}/10 轮有效
                 {'\n'}Exact Height：{threeModeSummary.validRunsExact}/10 轮有效
                 {'\n'}────────────────────────
                 {'\n'}【核心指标三组对比（Off vs On vs Exact）】
+                {'\n'}★ 全 Flow 首次对齐 (Last Matched Layout)：
+                {threeModeSummary.offSummary.lastMatchedLayoutMs.median} vs{' '}
+                {threeModeSummary.onSummary.lastMatchedLayoutMs.median} vs{' '}
+                {threeModeSummary.exactSummary.lastMatchedLayoutMs.median}
+                {'\n'}IR Ready → 全 Flow 首次对齐：
+                {
+                  threeModeSummary.offSummary.irReadyToLastMatchedLayoutMs
+                    .median
+                }{' '}
+                vs{' '}
+                {threeModeSummary.onSummary.irReadyToLastMatchedLayoutMs.median}{' '}
+                vs{' '}
+                {
+                  threeModeSummary.exactSummary.irReadyToLastMatchedLayoutMs
+                    .median
+                }
+                {'\n'}文档整体就绪 (Document Ready)：
+                {threeModeSummary.offSummary.documentReadyMs.median} vs{' '}
+                {threeModeSummary.onSummary.documentReadyMs.median} vs{' '}
+                {threeModeSummary.exactSummary.documentReadyMs.median}
+                {'\n'}内容可见提交 (Content Visible Commit)：
+                {threeModeSummary.offSummary.contentVisibleCommitMs.median} vs{' '}
+                {threeModeSummary.onSummary.contentVisibleCommitMs.median} vs{' '}
+                {threeModeSummary.exactSummary.contentVisibleCommitMs.median}
+                {'\n'}────────────────────────
+                {'\n'}【诊断指标（布局震荡与后续更新）】
+                {'\n'}最后匹配更新 (Last Matched Update)：
+                {threeModeSummary.offSummary.lastMatchedUpdateMs.median} vs{' '}
+                {threeModeSummary.onSummary.lastMatchedUpdateMs.median} vs{' '}
+                {threeModeSummary.exactSummary.lastMatchedUpdateMs.median}
+                {'\n'}匹配后额外更新次数合计 (Post-match Updates)：
+                {threeModeSummary.offSummary.totalPostMatchUpdates.median} vs{' '}
+                {threeModeSummary.onSummary.totalPostMatchUpdates.median} vs{' '}
+                {threeModeSummary.exactSummary.totalPostMatchUpdates.median}
                 {'\n'}IR Ready：
                 {threeModeSummary.offSummary.irReadyMs.median} vs{' '}
                 {threeModeSummary.onSummary.irReadyMs.median} vs{' '}
@@ -2190,58 +2595,69 @@ function RichContentExperimentScreen() {
                 {threeModeSummary.offSummary.firstRawLayoutMs.median} vs{' '}
                 {threeModeSummary.onSummary.firstRawLayoutMs.median} vs{' '}
                 {threeModeSummary.exactSummary.firstRawLayoutMs.median}
-                {'\n'}First Matched Layout：
-                {threeModeSummary.offSummary.firstMatchedLayoutMs.median} vs{' '}
-                {threeModeSummary.onSummary.firstMatchedLayoutMs.median} vs{' '}
-                {threeModeSummary.exactSummary.firstMatchedLayoutMs.median}
-                {'\n'}Last Layout：
-                {threeModeSummary.offSummary.lastLayoutMs.median} vs{' '}
-                {threeModeSummary.onSummary.lastLayoutMs.median} vs{' '}
-                {threeModeSummary.exactSummary.lastLayoutMs.median}
-                {'\n'}Document Ready：
-                {threeModeSummary.offSummary.documentReadyMs.median} vs{' '}
-                {threeModeSummary.onSummary.documentReadyMs.median} vs{' '}
-                {threeModeSummary.exactSummary.documentReadyMs.median}
-                {'\n'}Content Visible Commit：
-                {threeModeSummary.offSummary.contentVisibleCommitMs.median} vs{' '}
-                {threeModeSummary.onSummary.contentVisibleCommitMs.median} vs{' '}
-                {threeModeSummary.exactSummary.contentVisibleCommitMs.median}
-                {'\n'}IR Ready → Last Layout（总布局时间）：
-                {threeModeSummary.offSummary.irReadyToLastLayoutMs.median} vs{' '}
-                {threeModeSummary.onSummary.irReadyToLastLayoutMs.median} vs{' '}
-                {threeModeSummary.exactSummary.irReadyToLastLayoutMs.median}
                 {'\n'}────────────────────────
-                {'\n'}【配对差值中位数对比】
+                {'\n'}【配对差值中位数对比（Pairwise B - A）】
                 {'\n'}1. 二阶段布局开销 (Exact - Off)：
-                {'\n'} Last Layout 差异：
-                {threeModeSummary.diff_Exact_minus_Off.lastLayout.median} ms
-                {'\n'} Document Ready 差异：
-                {threeModeSummary.diff_Exact_minus_Off.documentReady.median} ms
-                {'\n'} 总布局时间差异：
-                {
-                  threeModeSummary.diff_Exact_minus_Off.irReadyToLastLayout
-                    .median
-                }{' '}
+                {'\n'} ★ 全 Flow 首次对齐差异：
+                {threeModeSummary.diff_Exact_minus_Off.lastMatchedLayout
+                  ?.median ?? '—'}{' '}
                 ms
-                {'\n'}2. Fabric 原生尺寸影响 (On - Off)：
-                {'\n'} Last Layout 差异：
-                {threeModeSummary.diff_On_minus_Off.lastLayout.median} ms
                 {'\n'} Document Ready 差异：
-                {threeModeSummary.diff_On_minus_Off.documentReady.median} ms
-                {'\n'} 总布局时间差异：
-                {threeModeSummary.diff_On_minus_Off.irReadyToLastLayout.median}{' '}
+                {threeModeSummary.diff_Exact_minus_Off.documentReady?.median ??
+                  '—'}{' '}
                 ms
-                {'\n'}3. 纯直传样式 vs Fabric 原生 (Exact - On)：
-                {'\n'} Last Layout 差异：
-                {threeModeSummary.diff_Exact_minus_On.lastLayout.median} ms
+                {'\n'} Content Visible Commit 差异：
+                {threeModeSummary.diff_Exact_minus_Off.contentVisibleCommit
+                  ?.median ?? '—'}{' '}
+                ms
+                {'\n'} 最后匹配更新 (Last Matched Update) 差异：
+                {threeModeSummary.diff_Exact_minus_Off.lastMatchedUpdate
+                  ?.median ?? '—'}{' '}
+                ms
+                {'\n'} 匹配后额外更新次数差异：
+                {threeModeSummary.diff_Exact_minus_Off.postMatchUpdates
+                  ?.median ?? '—'}{' '}
+                次{'\n'}2. Fabric 原生尺寸影响 (On - Off)：
+                {'\n'} ★ 全 Flow 首次对齐差异：
+                {threeModeSummary.diff_On_minus_Off.lastMatchedLayout?.median ??
+                  '—'}{' '}
+                ms
                 {'\n'} Document Ready 差异：
-                {threeModeSummary.diff_Exact_minus_On.documentReady.median} ms
-                {'\n'} 总布局时间差异：
-                {
-                  threeModeSummary.diff_Exact_minus_On.irReadyToLastLayout
-                    .median
-                }{' '}
+                {threeModeSummary.diff_On_minus_Off.documentReady?.median ??
+                  '—'}{' '}
                 ms
+                {'\n'} Content Visible Commit 差异：
+                {threeModeSummary.diff_On_minus_Off.contentVisibleCommit
+                  ?.median ?? '—'}{' '}
+                ms
+                {'\n'} 最后匹配更新 (Last Matched Update) 差异：
+                {threeModeSummary.diff_On_minus_Off.lastMatchedUpdate?.median ??
+                  '—'}{' '}
+                ms
+                {'\n'} 匹配后额外更新次数差异：
+                {threeModeSummary.diff_On_minus_Off.postMatchUpdates?.median ??
+                  '—'}{' '}
+                次{'\n'}3. 纯直传样式 vs Fabric 原生 (Exact - On)：
+                {'\n'} ★ 全 Flow 首次对齐差异：
+                {threeModeSummary.diff_Exact_minus_On.lastMatchedLayout
+                  ?.median ?? '—'}{' '}
+                ms
+                {'\n'} Document Ready 差异：
+                {threeModeSummary.diff_Exact_minus_On.documentReady?.median ??
+                  '—'}{' '}
+                ms
+                {'\n'} Content Visible Commit 差异：
+                {threeModeSummary.diff_Exact_minus_On.contentVisibleCommit
+                  ?.median ?? '—'}{' '}
+                ms
+                {'\n'} 最后匹配更新 (Last Matched Update) 差异：
+                {threeModeSummary.diff_Exact_minus_On.lastMatchedUpdate
+                  ?.median ?? '—'}{' '}
+                ms
+                {'\n'} 匹配后额外更新次数差异：
+                {threeModeSummary.diff_Exact_minus_On.postMatchUpdates
+                  ?.median ?? '—'}{' '}
+                次
               </Text>
             </View>
           ) : null}
@@ -2255,22 +2671,42 @@ function RichContentExperimentScreen() {
               ]}
             >
               <View style={styles.controlRow}>
-                <Text style={[styles.controlLabel, { fontWeight: '700' }]}>
-                  测试数据已就绪（已写入剪贴板）
-                </Text>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={[styles.controlLabel, { fontWeight: '700' }]}>
+                    测试数据已生成（JSON 文件）
+                  </Text>
+                  {exportedFileUri ? (
+                    <Text
+                      type="secondary"
+                      style={styles.hint}
+                      numberOfLines={1}
+                    >
+                      文件: {exportedFileUri.split('/').pop()}
+                    </Text>
+                  ) : null}
+                </View>
                 <Pressable
                   accessibilityRole="button"
-                  onPress={() => void copyExportedJson()}
+                  onPress={() => void exportCurrentJsonFile()}
                   style={[
                     styles.button,
                     {
                       minHeight: 32,
-                      paddingHorizontal: 10,
+                      paddingHorizontal: 12,
+                      backgroundColor: primary,
                       borderColor: primary,
                     },
                   ]}
                 >
-                  <Text style={{ fontSize: 12, color: primary }}>重新复制</Text>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: onPrimary,
+                      fontWeight: '600',
+                    }}
+                  >
+                    导出 / 分享文件
+                  </Text>
                 </Pressable>
               </View>
 
@@ -2281,8 +2717,8 @@ function RichContentExperimentScreen() {
               >
                 <Text style={styles.controlLabel}>
                   {showExportDetails
-                    ? '收起完整 JSON 数据 ▲'
-                    : '查看完整 JSON 数据 ▼'}
+                    ? '收起 JSON 文本预览 ▲'
+                    : '展开 JSON 文本预览 ▼'}
                 </Text>
               </Pressable>
 
@@ -2402,11 +2838,17 @@ function RichContentExperimentScreen() {
                       )}
                       {'\n'}首次匹配尺寸布局 (first-matched-layout)：
                       {formatMs(singleRunMetrics.firstMatchedLayoutMs)}
-                      {'\n'}文档整体就绪 (document-ready)：
+                      {'\n'}★ 全 Flow 首次对齐 (Last Matched Layout)：
+                      {formatMs(singleRunMetrics.lastMatchedLayoutMs)}
+                      {'\n'}文档整体就绪 (Document Ready)：
                       {formatMs(singleRunMetrics.documentReadyMs)}
-                      {'\n'}内容可见提交 (content-visible-commit)：
+                      {'\n'}内容可见提交 (Content Visible Commit)：
                       {formatMs(singleRunMetrics.contentVisibleCommitMs)}
-                      {'\n'}有效性判定：
+                      {'\n'}最后匹配更新 (Last Matched Update)：
+                      {formatMs(singleRunMetrics.lastMatchedUpdateMs)}
+                      {'\n'}匹配后额外更新次数合计：
+                      {singleRunMetrics.totalPostMatchUpdates} 次{'\n'}
+                      有效性判定：
                       {singleRunMetrics.isValid
                         ? '有效'
                         : `无效（${singleRunMetrics.invalidReason}）`}
@@ -2440,13 +2882,43 @@ function RichContentExperimentScreen() {
                               style={[styles.flowItem, { borderColor: border }]}
                             >
                               <Text style={styles.flowTitle}>
-                                {flow.flowId}（高度 {flow.heightCount} 次 / 布局{' '}
-                                {flow.layoutCount} 次 / setViewSize{' '}
+                                {flow.flowId}
+                                {flow.isMatched
+                                  ? ' (✅ 对齐)'
+                                  : flow.hasMismatchEvent
+                                    ? ' (❌ 错位)'
+                                    : ' (⏳ 未决)'}
+                                （高度 {flow.heightCount} 次 / 布局{' '}
+                                {flow.layoutCount} 次 / 匹配后额外更新{' '}
+                                {flow.postMatchUpdateCount} 次 / setViewSize{' '}
                                 {flow.setViewSizeCount ?? 0} 次）
                               </Text>
                               <Text type="secondary" style={styles.hint}>
-                                rebuild: {formatMs(flow.rebuildMs)} (parse:{' '}
-                                {formatMs(flow.parseMs)}, span:{' '}
+                                【尺寸核对】缓存Exact:{' '}
+                                {flow.cachedExactHeight != null
+                                  ? `${flow.cachedExactHeight} pt`
+                                  : '无'}{' '}
+                                | 原生Measure:{' '}
+                                {flow.nativeMeasuredHeight != null
+                                  ? `${flow.nativeMeasuredHeight} pt`
+                                  : '无'}{' '}
+                                | 实际Layout:{' '}
+                                {flow.actualLayoutHeight != null
+                                  ? `${flow.actualLayoutHeight} pt`
+                                  : '无'}
+                                {'\n'}【高度差值】原生-缓存:{' '}
+                                {flow.diffCachedVsNative != null
+                                  ? `${flow.diffCachedVsNative} pt`
+                                  : '—'}{' '}
+                                | 布局-原生:{' '}
+                                {flow.diffNativeVsLayout != null
+                                  ? `${flow.diffNativeVsLayout} pt`
+                                  : '—'}
+                                {'\n'}【排版基准】宽度:{' '}
+                                {flow.contentWidth ?? '—'} pt | key:{' '}
+                                {flow.measureKey ?? '—'}
+                                {'\n'}rebuild: {formatMs(flow.rebuildMs)}{' '}
+                                (parse: {formatMs(flow.parseMs)}, span:{' '}
                                 {formatMs(flow.spannableMs)}, setText:{' '}
                                 {formatMs(flow.setTextMs)}){'\n'}super.measure:{' '}
                                 {formatMs(flow.superMeasureMs)} | 二次 measure:{' '}
@@ -2503,6 +2975,7 @@ function RichContentExperimentScreen() {
                 nativeAutoSizeCachedHeight={nativeAutoSizeCachedHeight}
                 exactHeightMode={exactHeightMode}
                 exactFlowHeights={exactFlowHeights}
+                inFlowRevealMode={inFlowRevealMode}
                 initialContentWidth={initialContentWidth}
                 performanceTrace={trace}
                 fontSizeScale={fontSizeScale}
