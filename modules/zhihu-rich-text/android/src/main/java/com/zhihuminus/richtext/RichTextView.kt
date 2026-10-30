@@ -238,7 +238,7 @@ class RichTextView(context: Context, appContext: AppContext) : ExpoView(context,
     if (superStart != 0L) {
       lastSuperMeasureMs = (SystemClock.elapsedRealtimeNanos() - superStart) / 1_000_000.0
     }
-    measureText()
+    measureText(fromSuperMeasure = true)
   }
 
   override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
@@ -525,16 +525,21 @@ class RichTextView(context: Context, appContext: AppContext) : ExpoView(context,
     synchronizeAttachments()
   }
 
-  private fun measureText() {
+  private fun measureText(fromSuperMeasure: Boolean = false) {
     if (disposed || propBatch.hasPending) return
     val tracing = propBatch.current.performanceTracing
     val desiredWidth = if (contentWidthPx > 0) contentWidthPx else max(1, measuredWidth)
     val traceStart = if (tracing) SystemClock.elapsedRealtimeNanos() else 0L
-    if (tracing) Trace.beginSection("RichText.measureText")
-    textView.measure(View.MeasureSpec.makeMeasureSpec(desiredWidth, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
-    if (tracing) Trace.endSection()
+    if (fromSuperMeasure && textView.measuredWidth == desiredWidth && textView.measuredHeight > 0) {
+      // Re-use measurement already performed by super.onMeasure on child textView
+      measuredTextHeight = textView.measuredHeight
+    } else {
+      if (tracing) Trace.beginSection("RichText.measureText")
+      textView.measure(View.MeasureSpec.makeMeasureSpec(desiredWidth, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
+      if (tracing) Trace.endSection()
+      measuredTextHeight = textView.measuredHeight
+    }
     val traceMeasured = if (traceStart != 0L) SystemClock.elapsedRealtimeNanos() else 0L
-    measuredTextHeight = textView.measuredHeight
     val activeFlow = flow ?: return
     val currentLayoutKey = layoutKey
     val currentGeneration = generation

@@ -104,13 +104,15 @@ export interface ZhihuNativePerformanceEvent {
     | 'native-first-layout'
     | 'height'
     | 'layout'
+    | 'first-matched-layout'
     | 'raw-layout'
     | 'normalize'
     | 'compile'
     | 'flow-json'
     | 'first-flow-ready'
     | 'all-flows-ready'
-    | 'document-ready';
+    | 'document-ready'
+    | 'content-visible-commit';
   elapsedMs: number;
   nativeMeasureMs?: number | null;
   nativePropsToMeasureMs?: number | null;
@@ -154,6 +156,9 @@ export interface ZhihuNativeContentProps {
   nativeAutoSize?: boolean;
   /** In Fabric experiment, whether to also seed initial height from the flow height cache. */
   nativeAutoSizeCachedHeight?: boolean;
+  /** In diagnostic mode, seed exact measured heights directly to Yoga style to eliminate 2-stage layout. */
+  exactHeightMode?: boolean;
+  exactFlowHeights?: Readonly<Record<string, number>>;
   /** Optional local experiment; timestamps are never sent to telemetry. */
   performanceTrace?: ZhihuNativePerformanceTrace;
   suppressDoubleTapSelection?: boolean;
@@ -259,6 +264,8 @@ interface FlowViewProps {
   selectable: boolean;
   nativeAutoSize?: boolean;
   nativeAutoSizeCachedHeight?: boolean;
+  exactHeightMode?: boolean;
+  exactHeight?: number;
   performanceTrace?: ZhihuNativePerformanceTrace;
   suppressDoubleTapSelection?: boolean;
   options: ZhihuNativeTypographyOptions;
@@ -278,6 +285,14 @@ export function getMeasuredFlowHeightCacheSize(): number {
   return measuredFlowHeights.size;
 }
 
+export function getMeasuredFlowHeightMap(): Record<string, number> {
+  const map: Record<string, number> = {};
+  for (const [key, value] of measuredFlowHeights.entries()) {
+    map[key] = value;
+  }
+  return map;
+}
+
 function flowMeasureKey(
   flow: RichTextFlow,
   width: number,
@@ -295,6 +310,8 @@ const NativeFlow = React.memo(function NativeFlow({
   selectable,
   nativeAutoSize = false,
   nativeAutoSizeCachedHeight = false,
+  exactHeightMode = false,
+  exactHeight,
   performanceTrace,
   suppressDoubleTapSelection = false,
   options,
@@ -364,9 +381,11 @@ const NativeFlow = React.memo(function NativeFlow({
     null,
   );
   const notifiedNativeMeasurement = useRef<string | null>(null);
+  const firstMatchedLayoutReported = useRef(false);
   if (currentInput.current.measureKey !== measureKey) {
     nativeMeasurement.current = null;
     notifiedNativeMeasurement.current = null;
+    firstMatchedLayoutReported.current = false;
   }
   currentInput.current = { flow, measureKey };
   const mounted = useRef(true);
@@ -396,7 +415,6 @@ const NativeFlow = React.memo(function NativeFlow({
     const measurement = nativeMeasurement.current;
     const layout = nativeLayout.current;
     if (
-      (!nativeAutoSize && !performanceTrace) ||
       !measurement ||
       measurement.key !== measureKey ||
       !layout ||
@@ -408,13 +426,29 @@ const NativeFlow = React.memo(function NativeFlow({
     if (notifiedNativeMeasurement.current === notification) return;
     notifiedNativeMeasurement.current = notification;
     if (performanceTrace) {
+      if (!firstMatchedLayoutReported.current) {
+        firstMatchedLayoutReported.current = true;
+        performanceTrace.onEvent({
+          flowId: flow.id,
+          phase: 'first-matched-layout',
+          elapsedMs: performance.now() - performanceTrace.startedAt,
+          width: layout.width,
+          height: layout.height,
+        });
+      }
       performanceTrace.onEvent({
         flowId: flow.id,
         phase: 'layout',
         elapsedMs: performance.now() - performanceTrace.startedAt,
+        width: layout.width,
+        height: layout.height,
       });
     }
-    if (nativeAutoSize) onMeasured?.(flow);
+    // When tracing performance or running nativeAutoSize/exactHeightMode,
+    // flow readiness requires confirming that layout dimensions match native measurement.
+    if (nativeAutoSize || exactHeightMode || performanceTrace) {
+      onMeasured?.(flow);
+    }
   };
 
   return (
@@ -428,14 +462,19 @@ const NativeFlow = React.memo(function NativeFlow({
       performanceTracing={Boolean(performanceTrace)}
       suppressDoubleTapSelection={suppressDoubleTapSelection}
       style={
-        nativeAutoSize
-          ? nativeAutoSizeCachedHeight && measuredHeight?.height
-            ? {
-                width: contentWidth,
-                height: Math.max(minimumHeight, measuredHeight.height),
-              }
-            : { width: contentWidth, minHeight: minimumHeight }
-          : { width: contentWidth, height: Math.max(minimumHeight, height) }
+        exactHeightMode && exactHeight && exactHeight > 0
+          ? {
+              width: contentWidth,
+              height: Math.max(minimumHeight, exactHeight),
+            }
+          : nativeAutoSize
+            ? nativeAutoSizeCachedHeight && measuredHeight?.height
+              ? {
+                  width: contentWidth,
+                  height: Math.max(minimumHeight, measuredHeight.height),
+                }
+              : { width: contentWidth, minHeight: minimumHeight }
+            : { width: contentWidth, height: Math.max(minimumHeight, height) }
       }
       onLayout={(event) => {
         if (!mounted.current || currentInput.current.measureKey !== measureKey)
@@ -465,13 +504,11 @@ const NativeFlow = React.memo(function NativeFlow({
           Number.isFinite(event.height) &&
           event.height > 0
         ) {
-          if (nativeAutoSize || performanceTrace) {
-            nativeMeasurement.current = {
-              key: measureKey,
-              height: event.height,
-            };
-          }
-          if (!nativeAutoSize) {
+          nativeMeasurement.current = {
+            key: measureKey,
+            height: event.height,
+          };
+          if (!nativeAutoSize && !exactHeightMode) {
             setMeasuredHeight((previous) =>
               previous?.key === measureKey &&
               previous.geometryKey === geometryKey &&
@@ -549,8 +586,12 @@ const NativeFlow = React.memo(function NativeFlow({
               measuredFlowHeights.keys().next().value || '',
             );
           measuredFlowHeights.set(measureKey, event.height);
-          if (!nativeAutoSize) onMeasured?.(flow);
-          if (nativeAutoSize || performanceTrace) notifyNativeLayout();
+          // In standard non-traced production, call onMeasured on height event to preserve
+          // established single-pass display and unit test compatibility.
+          if (!nativeAutoSize && !performanceTrace) {
+            onMeasured?.(flow);
+          }
+          notifyNativeLayout();
         }
       }}
       onSelectionChange={(raw) => {
@@ -622,6 +663,9 @@ interface BlockViewProps {
   configJson: string;
   selectable: boolean;
   nativeAutoSize?: boolean;
+  nativeAutoSizeCachedHeight?: boolean;
+  exactHeightMode?: boolean;
+  exactFlowHeights?: Readonly<Record<string, number>>;
   suppressDoubleTapSelection?: boolean;
   options: ZhihuNativeTypographyOptions;
   onFlowAction: (event: ActionEvent, flow: RichTextFlow) => void;
@@ -681,6 +725,9 @@ function NativeParagraph(props: BlockViewProps) {
             lineHeight={lineHeight}
             selectable={props.selectable}
             nativeAutoSize={props.nativeAutoSize}
+            nativeAutoSizeCachedHeight={props.nativeAutoSizeCachedHeight}
+            exactHeightMode={props.exactHeightMode}
+            exactHeight={props.exactFlowHeights?.[part.flow.id]}
             suppressDoubleTapSelection={props.suppressDoubleTapSelection}
             options={props.options}
             linkColor={props.linkColor}
@@ -1250,6 +1297,8 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
   selectable = true,
   nativeAutoSize = false,
   nativeAutoSizeCachedHeight = false,
+  exactHeightMode = false,
+  exactFlowHeights,
   performanceTrace,
   suppressDoubleTapSelection = false,
   fontSizeScale,
@@ -1629,6 +1678,22 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
     measuredContainerWidth === availableWidth &&
     revealedGeometryRef.current === documentGeometryKey &&
     revealedLayout?.key === documentGeometryKey;
+  const visibleCommitReported = useRef<ZhihuNativePerformanceTrace | null>(
+    null,
+  );
+  useEffect(() => {
+    if (
+      initialLayoutReady &&
+      performanceTrace &&
+      visibleCommitReported.current !== performanceTrace
+    ) {
+      visibleCommitReported.current = performanceTrace;
+      performanceTrace.onEvent({
+        phase: 'content-visible-commit',
+        elapsedMs: performance.now() - performanceTrace.startedAt,
+      });
+    }
+  }, [initialLayoutReady, performanceTrace]);
   // A known width hint can start native layout, but still needs confirmation
   // from this container. Content-only layouts don't wait for media downloads.
   const loadingPhase: RichContentLoadingPhase =
@@ -1856,6 +1921,8 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
                 selectable={selectable}
                 nativeAutoSize={nativeAutoSize}
                 nativeAutoSizeCachedHeight={nativeAutoSizeCachedHeight}
+                exactHeightMode={exactHeightMode}
+                exactHeight={exactFlowHeights?.[part.flow.id]}
                 performanceTrace={performanceTrace}
                 suppressDoubleTapSelection={suppressDoubleTapSelection}
                 options={options}
@@ -1882,6 +1949,9 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
                 configJson={configJson}
                 selectable={selectable}
                 nativeAutoSize={nativeAutoSize}
+                nativeAutoSizeCachedHeight={nativeAutoSizeCachedHeight}
+                exactHeightMode={exactHeightMode}
+                exactFlowHeights={exactFlowHeights}
                 suppressDoubleTapSelection={suppressDoubleTapSelection}
                 options={options}
                 onFlowAction={handleAction}

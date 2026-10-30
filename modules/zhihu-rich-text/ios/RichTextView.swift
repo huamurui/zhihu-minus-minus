@@ -38,6 +38,7 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
   private var selectable = true
   private var needsRebuild = false
   private var lastWidth: CGFloat = 0
+  private var lastMeasuredWidth: CGFloat = 0
   private var generation = 0
   private var suppressSelection = false
   private var lastHeightKey = ""
@@ -151,6 +152,7 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
     flow = RichTextFlow.parse(value)
     if let parseStart { lastParseMs = (ProcessInfo.processInfo.systemUptime - parseStart) * 1000 }
     needsRebuild = true
+    lastMeasuredWidth = 0
     lastSelectionKey = ""
     lastHeightKey = ""
   }
@@ -160,6 +162,7 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
     previousConfigJson = value
     config = RichTextConfig.parse(value)
     needsRebuild = true
+    lastMeasuredWidth = 0
   }
 
   func setContentWidth(_ value: Double) {
@@ -167,6 +170,7 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
     guard contentWidth != width else { return }
     contentWidth = width
     needsRebuild = true
+    lastMeasuredWidth = 0
   }
 
   func setLayoutKey(_ value: String) {
@@ -222,6 +226,10 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
     let width = effectiveWidth
     guard width > 0 else { return }
     if needsRebuild || width != lastWidth { rebuild(width: width) }
+    if !needsRebuild && width == lastMeasuredWidth && !lastHeightKey.isEmpty && textView.frame.height > 0 {
+      textView.frame = CGRect(x: 0, y: 0, width: width, height: textView.frame.height)
+      return
+    }
     measureAndLayout(width: width)
   }
 
@@ -481,6 +489,7 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
     let pixelScale = max(1, traitCollection.displayScale)
     let height = ceil(rawHeight * pixelScale) / pixelScale
     textView.frame = CGRect(x: 0, y: 0, width: width, height: height)
+    lastMeasuredWidth = width
     synchronizeAttachments()
     let key = "\(flow.id)|\(flow.textVersion)|\(layoutKey)|\(height)"
     guard key != lastHeightKey else { return }

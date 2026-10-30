@@ -33,6 +33,7 @@ import {
   compileZhihuDocument,
   createRichContentMetrics,
   getMeasuredFlowHeightCacheSize,
+  getMeasuredFlowHeightMap,
   isRichTextNativeAvailable,
   normalizeZhihuDocument,
   RICH_CONTENT_PARAGRAPH_SPACING,
@@ -391,9 +392,15 @@ function computeRunMetrics(events: readonly ZhihuNativePerformanceEvent[]) {
   );
   const allFlowsReadyEvent = events.find((e) => e.phase === 'all-flows-ready');
   const documentReadyEvent = events.find((e) => e.phase === 'document-ready');
+  const contentVisibleCommitEvent = events.find(
+    (e) => e.phase === 'content-visible-commit',
+  );
   const heightEvents = events.filter((e) => e.phase === 'height');
   const layoutEvents = events.filter((e) => e.phase === 'layout');
   const rawLayoutEvents = events.filter((e) => e.phase === 'raw-layout');
+  const firstMatchedLayoutEvents = events.filter(
+    (e) => e.phase === 'first-matched-layout',
+  );
   const propsSetEvents = events.filter((e) => e.phase === 'native-props-set');
   const firstMeasureEvents = events.filter(
     (e) => e.phase === 'native-first-measure',
@@ -437,8 +444,32 @@ function computeRunMetrics(events: readonly ZhihuNativePerformanceEvent[]) {
   const lastHeightMs = maxValid(heightEvents.map((e) => e.elapsedMs));
   const layoutEffectMs = numOrNull(layoutEffectEvent?.elapsedMs);
   const propsSetMinMs = minValid(propsSetEvents.map((e) => e.elapsedMs));
+  const documentReadyMs = numOrNull(documentReadyEvent?.elapsedMs);
+  const contentVisibleCommitMs = numOrNull(
+    contentVisibleCommitEvent?.elapsedMs,
+  );
+  const firstMatchedLayoutMs = minValid(
+    firstMatchedLayoutEvents.map((e) => e.elapsedMs),
+  );
+  const lastMatchedLayoutMs = maxValid(
+    firstMatchedLayoutEvents.map((e) => e.elapsedMs),
+  );
+
+  const isValid =
+    documentReadyEvent != null &&
+    flows.length > 0 &&
+    flows.every((f) => f.layoutCount > 0);
+  const invalidReason = !documentReadyEvent
+    ? 'Document ready event not received (timeout)'
+    : flows.length === 0
+      ? 'No flows detected'
+      : !flows.every((f) => f.layoutCount > 0)
+        ? 'Some flows did not complete layout'
+        : undefined;
 
   return {
+    isValid,
+    invalidReason,
     renderEnterMs: numOrNull(renderEnterEvent?.elapsedMs),
     layoutEffectMs,
     effectMs: numOrNull(effectEvent?.elapsedMs),
@@ -448,11 +479,14 @@ function computeRunMetrics(events: readonly ZhihuNativePerformanceEvent[]) {
     irReadyMs,
     firstFlowReadyMs: numOrNull(firstFlowReadyEvent?.elapsedMs),
     allFlowsReadyMs: numOrNull(allFlowsReadyEvent?.elapsedMs),
-    documentReadyMs: numOrNull(documentReadyEvent?.elapsedMs),
+    documentReadyMs,
+    contentVisibleCommitMs,
     firstHeightMs: minValid(heightEvents.map((e) => e.elapsedMs)),
     lastHeightMs,
     firstLayoutMs: minValid(layoutEvents.map((e) => e.elapsedMs)),
     lastLayoutMs,
+    firstMatchedLayoutMs,
+    lastMatchedLayoutMs,
     firstRawLayoutMs,
     lastRawLayoutMs: maxValid(rawLayoutEvents.map((e) => e.elapsedMs)),
     propsSetMinMs,
@@ -503,6 +537,91 @@ function computeRunMetrics(events: readonly ZhihuNativePerformanceEvent[]) {
     rawLayoutEventsCount: rawLayoutEvents.length,
     flows,
   };
+}
+
+function buildSummaryFromRuns(runs: ReturnType<typeof computeRunMetrics>[]) {
+  const validRuns = runs.filter((r) => r.isValid);
+  const source = validRuns.length > 0 ? validRuns : runs;
+  return {
+    totalRuns: runs.length,
+    validRuns: validRuns.length,
+    normalizeMs: computeStatsForMetric(source.map((r) => r.normalizeMs)),
+    compileMs: computeStatsForMetric(source.map((r) => r.compileMs)),
+    flowJsonSumMs: computeStatsForMetric(source.map((r) => r.flowJsonSumMs)),
+    irReadyMs: computeStatsForMetric(source.map((r) => r.irReadyMs)),
+    layoutEffectMs: computeStatsForMetric(source.map((r) => r.layoutEffectMs)),
+    firstRawLayoutMs: computeStatsForMetric(
+      source.map((r) => r.firstRawLayoutMs),
+    ),
+    firstMatchedLayoutMs: computeStatsForMetric(
+      source.map((r) => r.firstMatchedLayoutMs),
+    ),
+    firstHeightMs: computeStatsForMetric(source.map((r) => r.firstHeightMs)),
+    lastHeightMs: computeStatsForMetric(source.map((r) => r.lastHeightMs)),
+    firstLayoutMs: computeStatsForMetric(source.map((r) => r.firstLayoutMs)),
+    lastLayoutMs: computeStatsForMetric(source.map((r) => r.lastLayoutMs)),
+    documentReadyMs: computeStatsForMetric(
+      source.map((r) => r.documentReadyMs),
+    ),
+    contentVisibleCommitMs: computeStatsForMetric(
+      source.map((r) => r.contentVisibleCommitMs),
+    ),
+    propsSetMinMs: computeStatsForMetric(source.map((r) => r.propsSetMinMs)),
+    firstMeasureMinMs: computeStatsForMetric(
+      source.map((r) => r.firstMeasureMinMs),
+    ),
+    // Timeline intervals
+    irReadyToFirstRawLayoutMs: computeStatsForMetric(
+      source.map((r) => r.irReadyToFirstRawLayoutMs),
+    ),
+    firstRawLayoutToLastLayoutMs: computeStatsForMetric(
+      source.map((r) => r.firstRawLayoutToLastLayoutMs),
+    ),
+    irReadyToLastLayoutMs: computeStatsForMetric(
+      source.map((r) => r.irReadyToLastLayoutMs),
+    ),
+    lastHeightToLastLayoutMs: computeStatsForMetric(
+      source.map((r) => r.lastHeightToLastLayoutMs),
+    ),
+    irReadyToLayoutEffectMs: computeStatsForMetric(
+      source.map((r) => r.irReadyToLayoutEffectMs),
+    ),
+    layoutEffectToPropsSetMs: computeStatsForMetric(
+      source.map((r) => r.layoutEffectToPropsSetMs),
+    ),
+    propsSetToFirstRawLayoutMs: computeStatsForMetric(
+      source.map((r) => r.propsSetToFirstRawLayoutMs),
+    ),
+    rebuildSumMs: computeStatsForMetric(source.map((r) => r.rebuildSumMs)),
+    superMeasureSumMs: computeStatsForMetric(
+      source.map((r) => r.superMeasureSumMs),
+    ),
+    measureMaxMs: computeStatsForMetric(source.map((r) => r.measureMaxMs)),
+    schedulePostWaitMaxMs: computeStatsForMetric(
+      source.map((r) => r.schedulePostWaitMaxMs),
+    ),
+    heightPostWaitMaxMs: computeStatsForMetric(
+      source.map((r) => r.heightPostWaitMaxMs),
+    ),
+    setViewSizeCountMax: computeStatsForMetric(
+      source.map((r) => r.setViewSizeCountMax),
+    ),
+  };
+}
+
+type MetricSummaryResult = ReturnType<typeof buildSummaryFromRuns>;
+
+interface ThreeModeSummaryData {
+  totalRuns: number;
+  validRunsOff: number;
+  validRunsOn: number;
+  validRunsExact: number;
+  offSummary: MetricSummaryResult;
+  onSummary: MetricSummaryResult;
+  exactSummary: MetricSummaryResult;
+  diff_On_minus_Off: Record<string, StatSummary>;
+  diff_Exact_minus_Off: Record<string, StatSummary>;
+  diff_Exact_minus_On: Record<string, StatSummary>;
 }
 
 function PureRNTextContent({
@@ -602,6 +721,13 @@ function PureRNTextContent({
         width,
         height,
       });
+      performanceTrace.onEvent({
+        flowId,
+        phase: 'first-matched-layout',
+        elapsedMs: now - performanceTrace.startedAt,
+        width,
+        height,
+      });
     }
     layoutCountRef.current += 1;
     if (layoutCountRef.current >= flowParts.length && !notifiedRef.current) {
@@ -609,6 +735,10 @@ function PureRNTextContent({
       if (performanceTrace) {
         performanceTrace.onEvent({
           phase: 'document-ready',
+          elapsedMs: performance.now() - performanceTrace.startedAt,
+        });
+        performanceTrace.onEvent({
+          phase: 'content-visible-commit',
           elapsedMs: performance.now() - performanceTrace.startedAt,
         });
       }
@@ -670,6 +800,10 @@ function RichContentExperimentScreen() {
   const [flowCountMode, setFlowCountMode] = useState<FlowCountMode>('default');
   const [rendererMode, setRendererMode] = useState<RendererMode>('rich-text');
   const [nativeAutoSize, setNativeAutoSize] = useState(false);
+  const [exactHeightMode, setExactHeightMode] = useState(false);
+  const [exactFlowHeights, setExactFlowHeights] = useState<
+    Record<string, number>
+  >({});
   const [clearCacheBeforeMount, setClearCacheBeforeMount] = useState(true);
   const [usePreparedDocument, setUsePreparedDocument] = useState(false);
   const [useInitialContentWidth, setUseInitialContentWidth] = useState(false);
@@ -699,10 +833,12 @@ function RichContentExperimentScreen() {
     null,
   );
   const [interleavedSummary, setInterleavedSummary] = useState<{
-    offSummary: Record<string, StatSummary>;
-    onSummary: Record<string, StatSummary>;
+    offSummary: MetricSummaryResult;
+    onSummary: MetricSummaryResult;
     pairDiffSummary: Record<string, StatSummary>;
   } | null>(null);
+  const [threeModeSummary, setThreeModeSummary] =
+    useState<ThreeModeSummaryData | null>(null);
   const [copyToast, setCopyToast] = useState<string | null>(null);
 
   const requestRef = useRef<AbortController | null>(null);
@@ -762,6 +898,7 @@ function RichContentExperimentScreen() {
     setReady(false);
     setExportedJsonResult(null);
     setInterleavedSummary(null);
+    setThreeModeSummary(null);
     setCopyToast(null);
     return () => {
       requestRef.current?.abort();
@@ -791,6 +928,7 @@ function RichContentExperimentScreen() {
     setLoading(true);
     setExportedJsonResult(null);
     setInterleavedSummary(null);
+    setThreeModeSummary(null);
     setCopyToast(null);
     try {
       let loaded: LoadedContent;
@@ -878,7 +1016,7 @@ function RichContentExperimentScreen() {
   const initialContentWidth = useInitialContentWidth ? contentWidth : undefined;
 
   const renderKey = visibleContent
-    ? `${visibleContent.type}:${visibleContent.id}:${rendererMode}:${flowCountMode}:${nativeAutoSize}:${usePreparedDocument}:${useInitialContentWidth}:${nativeAutoSizeCachedHeight}:${mountIndex}`
+    ? `${visibleContent.type}:${visibleContent.id}:${rendererMode}:${flowCountMode}:${nativeAutoSize}:${exactHeightMode}:${usePreparedDocument}:${useInitialContentWidth}:${nativeAutoSizeCachedHeight}:${mountIndex}`
     : null;
   activeRenderKey.current = renderKey;
 
@@ -946,64 +1084,6 @@ function RichContentExperimentScreen() {
     setCacheSize(getMeasuredFlowHeightCacheSize());
   };
 
-  const buildSummaryFromRuns = (
-    runs: ReturnType<typeof computeRunMetrics>[],
-  ) => ({
-    normalizeMs: computeStatsForMetric(runs.map((r) => r.normalizeMs)),
-    compileMs: computeStatsForMetric(runs.map((r) => r.compileMs)),
-    flowJsonSumMs: computeStatsForMetric(runs.map((r) => r.flowJsonSumMs)),
-    irReadyMs: computeStatsForMetric(runs.map((r) => r.irReadyMs)),
-    layoutEffectMs: computeStatsForMetric(runs.map((r) => r.layoutEffectMs)),
-    firstRawLayoutMs: computeStatsForMetric(
-      runs.map((r) => r.firstRawLayoutMs),
-    ),
-    firstHeightMs: computeStatsForMetric(runs.map((r) => r.firstHeightMs)),
-    lastHeightMs: computeStatsForMetric(runs.map((r) => r.lastHeightMs)),
-    firstLayoutMs: computeStatsForMetric(runs.map((r) => r.firstLayoutMs)),
-    lastLayoutMs: computeStatsForMetric(runs.map((r) => r.lastLayoutMs)),
-    documentReadyMs: computeStatsForMetric(runs.map((r) => r.documentReadyMs)),
-    propsSetMinMs: computeStatsForMetric(runs.map((r) => r.propsSetMinMs)),
-    firstMeasureMinMs: computeStatsForMetric(
-      runs.map((r) => r.firstMeasureMinMs),
-    ),
-    // Timeline intervals
-    irReadyToFirstRawLayoutMs: computeStatsForMetric(
-      runs.map((r) => r.irReadyToFirstRawLayoutMs),
-    ),
-    firstRawLayoutToLastLayoutMs: computeStatsForMetric(
-      runs.map((r) => r.firstRawLayoutToLastLayoutMs),
-    ),
-    irReadyToLastLayoutMs: computeStatsForMetric(
-      runs.map((r) => r.irReadyToLastLayoutMs),
-    ),
-    lastHeightToLastLayoutMs: computeStatsForMetric(
-      runs.map((r) => r.lastHeightToLastLayoutMs),
-    ),
-    irReadyToLayoutEffectMs: computeStatsForMetric(
-      runs.map((r) => r.irReadyToLayoutEffectMs),
-    ),
-    layoutEffectToPropsSetMs: computeStatsForMetric(
-      runs.map((r) => r.layoutEffectToPropsSetMs),
-    ),
-    propsSetToFirstRawLayoutMs: computeStatsForMetric(
-      runs.map((r) => r.propsSetToFirstRawLayoutMs),
-    ),
-    rebuildSumMs: computeStatsForMetric(runs.map((r) => r.rebuildSumMs)),
-    superMeasureSumMs: computeStatsForMetric(
-      runs.map((r) => r.superMeasureSumMs),
-    ),
-    measureMaxMs: computeStatsForMetric(runs.map((r) => r.measureMaxMs)),
-    schedulePostWaitMaxMs: computeStatsForMetric(
-      runs.map((r) => r.schedulePostWaitMaxMs),
-    ),
-    heightPostWaitMaxMs: computeStatsForMetric(
-      runs.map((r) => r.heightPostWaitMaxMs),
-    ),
-    setViewSizeCountMax: computeStatsForMetric(
-      runs.map((r) => r.setViewSizeCountMax),
-    ),
-  });
-
   // 10-run single-mode test
   const run10Tests = async () => {
     if (!visibleContent || isTesting) return;
@@ -1011,6 +1091,7 @@ function RichContentExperimentScreen() {
     setTestProgress({ current: 0, total: 10, label: '单模式 10 轮测试' });
     setExportedJsonResult(null);
     setInterleavedSummary(null);
+    setThreeModeSummary(null);
     setCopyToast(null);
     isTestingRef.current = true;
 
@@ -1062,6 +1143,9 @@ function RichContentExperimentScreen() {
           testMode: '10-runs-single-mode',
           environment: {
             platform: Platform.OS,
+            isDev: Boolean(__DEV__),
+            contentWidth,
+            flowCount: visibleContent ? flowSummaries.length : 0,
             target: {
               type: visibleContent.type,
               id: visibleContent.id,
@@ -1071,6 +1155,7 @@ function RichContentExperimentScreen() {
               flowCountMode,
               rendererMode,
               nativeAutoSize,
+              exactHeightMode,
               clearCacheBeforeMount,
               usePreparedDocument,
               useInitialContentWidth,
@@ -1081,6 +1166,7 @@ function RichContentExperimentScreen() {
           },
           summary: {
             runsCompleted: runsData.length,
+            validRunsCompleted: summary.validRuns,
             metrics: summary,
           },
           runs: runsData.map((run, idx) => ({ round: idx + 1, ...run })),
@@ -1100,24 +1186,49 @@ function RichContentExperimentScreen() {
     }
   };
 
-  // 20-run interleaved A/B test (10 pairs alternating off and on)
+  // 20-run interleaved A/B test (10 pairs alternating off and on with ABBA counterbalancing)
   const run20InterleavedTests = async () => {
     if (!visibleContent || isTesting) return;
     setIsTesting(true);
-    setTestProgress({ current: 0, total: 20, label: '交错测试 (A/B 交替)' });
+    setTestProgress({ current: 0, total: 20, label: '交错测试 (ABBA 平衡)' });
     setExportedJsonResult(null);
     setInterleavedSummary(null);
+    setThreeModeSummary(null);
     setCopyToast(null);
     isTestingRef.current = true;
 
     const runsA: ReturnType<typeof computeRunMetrics>[] = [];
     const runsB: ReturnType<typeof computeRunMetrics>[] = [];
 
+    const abbaSequence = [
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+    ];
+
     try {
       for (let round = 1; round <= 20; round++) {
         if (!isTestingRef.current) break;
-        const currentIsAutoSize = round % 2 === 0;
+        const currentIsAutoSize = abbaSequence[round - 1];
         setNativeAutoSize(currentIsAutoSize);
+        setExactHeightMode(false);
         setTestProgress({
           current: round,
           total: 20,
@@ -1164,7 +1275,7 @@ function RichContentExperimentScreen() {
         const offSummary = buildSummaryFromRuns(runsA);
         const onSummary = buildSummaryFromRuns(runsB);
 
-        // Compute pairwise differences (B - A for pair i)
+        // Compute pairwise differences (B - A for pair i, only valid pairs)
         const pairCount = Math.min(runsA.length, runsB.length);
         const pairDiffs = {
           irReadyToFirstRawLayout: [] as number[],
@@ -1173,6 +1284,8 @@ function RichContentExperimentScreen() {
           lastHeightToLastLayout: [] as number[],
           lastLayout: [] as number[],
           documentReady: [] as number[],
+          contentVisibleCommit: [] as number[],
+          firstMatchedLayout: [] as number[],
           rebuildSum: [] as number[],
           superMeasureSum: [] as number[],
         };
@@ -1180,6 +1293,7 @@ function RichContentExperimentScreen() {
         for (let i = 0; i < pairCount; i++) {
           const a = runsA[i];
           const b = runsB[i];
+          if (!a.isValid || !b.isValid) continue;
           if (
             b.irReadyToFirstRawLayoutMs != null &&
             a.irReadyToFirstRawLayoutMs != null
@@ -1218,6 +1332,22 @@ function RichContentExperimentScreen() {
           if (b.documentReadyMs != null && a.documentReadyMs != null) {
             pairDiffs.documentReady.push(b.documentReadyMs - a.documentReadyMs);
           }
+          if (
+            b.contentVisibleCommitMs != null &&
+            a.contentVisibleCommitMs != null
+          ) {
+            pairDiffs.contentVisibleCommit.push(
+              b.contentVisibleCommitMs - a.contentVisibleCommitMs,
+            );
+          }
+          if (
+            b.firstMatchedLayoutMs != null &&
+            a.firstMatchedLayoutMs != null
+          ) {
+            pairDiffs.firstMatchedLayout.push(
+              b.firstMatchedLayoutMs - a.firstMatchedLayoutMs,
+            );
+          }
           if (b.rebuildSumMs != null && a.rebuildSumMs != null) {
             pairDiffs.rebuildSum.push(b.rebuildSumMs - a.rebuildSumMs);
           }
@@ -1241,6 +1371,8 @@ function RichContentExperimentScreen() {
           ),
           lastLayout: computeStats(pairDiffs.lastLayout),
           documentReady: computeStats(pairDiffs.documentReady),
+          contentVisibleCommit: computeStats(pairDiffs.contentVisibleCommit),
+          firstMatchedLayout: computeStats(pairDiffs.firstMatchedLayout),
           rebuildSum: computeStats(pairDiffs.rebuildSum),
           superMeasureSum: computeStats(pairDiffs.superMeasureSum),
         };
@@ -1253,9 +1385,12 @@ function RichContentExperimentScreen() {
 
         const exportPayload = {
           exportTime: new Date().toISOString(),
-          testMode: '20-runs-interleaved-ab-mode',
+          testMode: '20-runs-interleaved-abba-mode',
           environment: {
             platform: Platform.OS,
+            isDev: Boolean(__DEV__),
+            contentWidth,
+            flowCount: visibleContent ? flowSummaries.length : 0,
             target: {
               type: visibleContent.type,
               id: visibleContent.id,
@@ -1274,6 +1409,7 @@ function RichContentExperimentScreen() {
           },
           summary: {
             pairsCompleted: pairCount,
+            validPairsCompleted: pairDiffs.lastLayout.length,
             autoSizeOff: offSummary,
             autoSizeOn: onSummary,
             pairwiseDifference_B_minus_A: pairDiffSummary,
@@ -1287,10 +1423,253 @@ function RichContentExperimentScreen() {
         const jsonString = JSON.stringify(exportPayload, null, 2);
         setExportedJsonResult(jsonString);
         await Clipboard.setStringAsync(jsonString);
-        setCopyToast('20 次交错测试已完成，A/B 对比数据已自动复制到剪贴板！');
+        setCopyToast('20 次 ABBA 平衡交错测试已完成，数据已自动复制到剪贴板！');
       }
     } catch {
       setCopyToast('交错测试过程中发生异常');
+    } finally {
+      setIsTesting(false);
+      isTestingRef.current = false;
+      setCacheSize(getMeasuredFlowHeightCacheSize());
+    }
+  };
+
+  // 30-run 3-mode balanced interleaved test (Off / On / Exact, 10 each)
+  const run30ThreeModeTests = async () => {
+    if (!visibleContent || isTesting) return;
+    setIsTesting(true);
+    setTestProgress({ current: 0, total: 30, label: '三模式平衡交错测试' });
+    setExportedJsonResult(null);
+    setInterleavedSummary(null);
+    setThreeModeSummary(null);
+    setCopyToast(null);
+    isTestingRef.current = true;
+
+    // Check if exact flow heights are captured
+    let currentExactHeights = exactFlowHeights;
+    if (Object.keys(currentExactHeights).length === 0) {
+      setTestProgress({
+        current: 0,
+        total: 30,
+        label: '正在预热捕获各 Flow 精确高度...',
+      });
+      const primePromise = new Promise<void>((resolve) => {
+        let resolved = false;
+        const finish = () => {
+          if (resolved) return;
+          resolved = true;
+          roundLayoutReadyRef.current = null;
+          setTimeout(resolve, 200);
+        };
+        roundLayoutReadyRef.current = finish;
+        setTimeout(finish, 3500);
+      });
+      setNativeAutoSize(false);
+      setExactHeightMode(false);
+      activeRenderKey.current = null;
+      setReady(false);
+      startTrace();
+      setMountIndex((v) => v + 1);
+      await primePromise;
+      currentExactHeights = getMeasuredFlowHeightMap();
+      setExactFlowHeights(currentExactHeights);
+      setCacheSize(getMeasuredFlowHeightCacheSize());
+    }
+
+    const runsOff: ReturnType<typeof computeRunMetrics>[] = [];
+    const runsOn: ReturnType<typeof computeRunMetrics>[] = [];
+    const runsExact: ReturnType<typeof computeRunMetrics>[] = [];
+
+    // 5 palindromic blocks of 6 = 30 runs total (10 each)
+    const blockModes: Array<'off' | 'on' | 'exact'>[] = [
+      ['off', 'on', 'exact', 'exact', 'on', 'off'],
+      ['on', 'exact', 'off', 'off', 'exact', 'on'],
+      ['exact', 'off', 'on', 'on', 'off', 'exact'],
+      ['off', 'on', 'exact', 'exact', 'on', 'off'],
+      ['on', 'exact', 'off', 'off', 'exact', 'on'],
+    ];
+    const sequence = blockModes.flat();
+
+    try {
+      for (let round = 1; round <= 30; round++) {
+        if (!isTestingRef.current) break;
+        const mode = sequence[round - 1];
+        const modeLabel =
+          mode === 'off'
+            ? 'AutoSize 关'
+            : mode === 'on'
+              ? 'AutoSize 开'
+              : 'Exact 精确尺寸';
+
+        setTestProgress({
+          current: round,
+          total: 30,
+          label: `第 ${round}/30 轮 (${modeLabel})`,
+        });
+
+        if (mode === 'off') {
+          setNativeAutoSize(false);
+          setExactHeightMode(false);
+        } else if (mode === 'on') {
+          setNativeAutoSize(true);
+          setExactHeightMode(false);
+        } else {
+          setNativeAutoSize(false);
+          setExactHeightMode(true);
+        }
+
+        if (clearCacheBeforeMount && mode !== 'exact') {
+          clearMeasuredFlowHeightCache();
+          setCacheSize(0);
+        }
+
+        const roundPromise = new Promise<void>((resolve) => {
+          let resolved = false;
+          const finish = () => {
+            if (resolved) return;
+            resolved = true;
+            roundLayoutReadyRef.current = null;
+            setTimeout(resolve, 200);
+          };
+          roundLayoutReadyRef.current = finish;
+          setTimeout(finish, 3500);
+        });
+
+        activeRenderKey.current = null;
+        setReady(false);
+        startTrace();
+        setMountIndex((v) => v + 1);
+
+        await roundPromise;
+        if (!isTestingRef.current) break;
+
+        const roundEvents = [...traceEventsRef.current];
+        const metrics = computeRunMetrics(roundEvents);
+        if (mode === 'off') {
+          runsOff.push(metrics);
+        } else if (mode === 'on') {
+          runsOn.push(metrics);
+        } else {
+          runsExact.push(metrics);
+        }
+
+        await new Promise((r) => setTimeout(r, 120));
+      }
+
+      if (
+        runsOff.length > 0 &&
+        runsOn.length > 0 &&
+        runsExact.length > 0 &&
+        isTestingRef.current
+      ) {
+        const offSummary = buildSummaryFromRuns(runsOff);
+        const onSummary = buildSummaryFromRuns(runsOn);
+        const exactSummary = buildSummaryFromRuns(runsExact);
+
+        const computePairDiff = (
+          runs1: typeof runsOff,
+          runs2: typeof runsOff,
+          getter: (r: (typeof runsOff)[0]) => number | null | undefined,
+        ) => {
+          const diffs: number[] = [];
+          const count = Math.min(runs1.length, runs2.length);
+          for (let i = 0; i < count; i++) {
+            const v1 = getter(runs1[i]);
+            const v2 = getter(runs2[i]);
+            if (
+              v1 != null &&
+              v2 != null &&
+              runs1[i].isValid &&
+              runs2[i].isValid
+            ) {
+              diffs.push(v1 - v2);
+            }
+          }
+          return computeStats(diffs);
+        };
+
+        const diffKeys = {
+          lastLayout: (r: (typeof runsOff)[0]) => r.lastLayoutMs,
+          documentReady: (r: (typeof runsOff)[0]) => r.documentReadyMs,
+          contentVisibleCommit: (r: (typeof runsOff)[0]) =>
+            r.contentVisibleCommitMs,
+          firstRawLayout: (r: (typeof runsOff)[0]) => r.firstRawLayoutMs,
+          firstMatchedLayout: (r: (typeof runsOff)[0]) =>
+            r.firstMatchedLayoutMs,
+          irReadyToLastLayout: (r: (typeof runsOff)[0]) =>
+            r.irReadyToLastLayoutMs,
+          irReadyToFirstRawLayout: (r: (typeof runsOff)[0]) =>
+            r.irReadyToFirstRawLayoutMs,
+          firstRawLayoutToLastLayout: (r: (typeof runsOff)[0]) =>
+            r.firstRawLayoutToLastLayoutMs,
+          rebuildSum: (r: (typeof runsOff)[0]) => r.rebuildSumMs,
+          superMeasureSum: (r: (typeof runsOff)[0]) => r.superMeasureSumMs,
+        };
+
+        const diff_On_minus_Off: Record<string, StatSummary> = {};
+        const diff_Exact_minus_Off: Record<string, StatSummary> = {};
+        const diff_Exact_minus_On: Record<string, StatSummary> = {};
+
+        for (const [k, getter] of Object.entries(diffKeys)) {
+          diff_On_minus_Off[k] = computePairDiff(runsOn, runsOff, getter);
+          diff_Exact_minus_Off[k] = computePairDiff(runsExact, runsOff, getter);
+          diff_Exact_minus_On[k] = computePairDiff(runsExact, runsOn, getter);
+        }
+
+        const summaryResult: ThreeModeSummaryData = {
+          totalRuns: runsOff.length + runsOn.length + runsExact.length,
+          validRunsOff: offSummary.validRuns,
+          validRunsOn: onSummary.validRuns,
+          validRunsExact: exactSummary.validRuns,
+          offSummary,
+          onSummary,
+          exactSummary,
+          diff_On_minus_Off,
+          diff_Exact_minus_Off,
+          diff_Exact_minus_On,
+        };
+
+        setThreeModeSummary(summaryResult);
+
+        const exportPayload = {
+          exportTime: new Date().toISOString(),
+          testMode: '30-runs-three-mode-balanced',
+          environment: {
+            platform: Platform.OS,
+            isDev: Boolean(__DEV__),
+            contentWidth,
+            flowCount: visibleContent ? flowSummaries.length : 0,
+            target: {
+              type: visibleContent.type,
+              id: visibleContent.id,
+              title: visibleContent.title,
+            },
+            settings: {
+              flowCountMode,
+              rendererMode,
+              clearCacheBeforeMount,
+              usePreparedDocument,
+              useInitialContentWidth,
+              nativeAutoSizeCachedHeight,
+              fontSizeScale,
+              lineHeightScale,
+            },
+          },
+          summary: summaryResult,
+          runs: {
+            autoSizeOff: runsOff.map((r, i) => ({ round: i + 1, ...r })),
+            autoSizeOn: runsOn.map((r, i) => ({ round: i + 1, ...r })),
+            exactHeight: runsExact.map((r, i) => ({ round: i + 1, ...r })),
+          },
+        };
+
+        const jsonString = JSON.stringify(exportPayload, null, 2);
+        setExportedJsonResult(jsonString);
+        await Clipboard.setStringAsync(jsonString);
+        setCopyToast('30 次三模式平衡测试已完成，测试数据已自动复制到剪贴板！');
+      }
+    } catch {
+      setCopyToast('三模式测试过程中发生异常');
     } finally {
       setIsTesting(false);
       isTestingRef.current = false;
@@ -1535,6 +1914,26 @@ function RichContentExperimentScreen() {
               />
             </View>
 
+            {/* Exact Height Diagnostic Toggle */}
+            <View style={styles.controlRow}>
+              <Text style={styles.controlLabel}>
+                诊断：精确高度直传模式（验证二阶段布局开销）
+              </Text>
+              <Switch
+                value={exactHeightMode}
+                onValueChange={(value) => {
+                  activeRenderKey.current = null;
+                  setReady(false);
+                  if (visibleContent) startTrace();
+                  setExactHeightMode(value);
+                  if (value && Object.keys(exactFlowHeights).length === 0) {
+                    const map = getMeasuredFlowHeightMap();
+                    setExactFlowHeights(map);
+                  }
+                }}
+              />
+            </View>
+
             {/* Action buttons */}
             <View style={styles.actionRow}>
               <Pressable
@@ -1605,13 +2004,64 @@ function RichContentExperimentScreen() {
                   </View>
                 ) : (
                   <Text style={{ color: onPrimary, fontSize: 13 }}>
-                    交错 20 次 (A/B)
+                    交错 20 次 (ABBA)
                   </Text>
                 )}
               </Pressable>
             </View>
 
             <View style={styles.actionRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !visibleContent || isTesting }}
+                disabled={!visibleContent || isTesting}
+                onPress={() => void run30ThreeModeTests()}
+                style={[
+                  styles.button,
+                  styles.flexButton,
+                  {
+                    backgroundColor: primary,
+                    borderColor: primary,
+                    opacity: visibleContent && !isTesting ? 1 : 0.5,
+                  },
+                ]}
+              >
+                {isTesting && testProgress.total === 30 ? (
+                  <View style={styles.inlineLoading}>
+                    <ActivityIndicator size="small" color={onPrimary} />
+                    <Text style={{ color: onPrimary, fontSize: 12 }}>
+                      {testProgress.current}/30
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={{ color: onPrimary, fontSize: 13 }}>
+                    三模式 30 次 (Off/On/Exact)
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+
+            <View style={styles.actionRow}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  const map = getMeasuredFlowHeightMap();
+                  setExactFlowHeights(map);
+                  setCopyToast(
+                    `已捕获 ${Object.keys(map).length} 个 Flow 的当前测得高度`,
+                  );
+                }}
+                style={[
+                  styles.button,
+                  styles.flexButton,
+                  { borderColor: border },
+                ]}
+              >
+                <Text style={{ fontSize: 12 }}>
+                  捕获高度为精准值（已存 {Object.keys(exactFlowHeights).length}{' '}
+                  个）
+                </Text>
+              </Pressable>
               <Pressable
                 accessibilityRole="button"
                 onPress={handleClearCache}
@@ -1621,9 +2071,7 @@ function RichContentExperimentScreen() {
                   { borderColor: border },
                 ]}
               >
-                <Text style={{ fontSize: 12 }}>
-                  手动清空缓存（当前 {cacheSize} 项）
-                </Text>
+                <Text style={{ fontSize: 12 }}>清空缓存（{cacheSize} 项）</Text>
               </Pressable>
             </View>
 
@@ -1712,6 +2160,88 @@ function RichContentExperimentScreen() {
                 ms
                 {'\n'}最终 Last Layout 差异：
                 {interleavedSummary.pairDiffSummary.lastLayout.median} ms
+              </Text>
+            </View>
+          ) : null}
+
+          {/* Three-Mode Comparison Card */}
+          {threeModeSummary ? (
+            <View
+              style={[
+                styles.controls,
+                { borderColor: primary, backgroundColor: surface },
+              ]}
+            >
+              <Text style={[styles.controlLabel, { fontWeight: '700' }]}>
+                三模式平衡测试结果（Off / On / Exact 各 10 轮，单位：ms 中位数）
+              </Text>
+              <Text type="secondary" style={styles.hint}>
+                【有效样本率】
+                {'\n'}AutoSize Off：{threeModeSummary.validRunsOff}/10 轮有效
+                {'\n'}AutoSize On：{threeModeSummary.validRunsOn}/10 轮有效
+                {'\n'}Exact Height：{threeModeSummary.validRunsExact}/10 轮有效
+                {'\n'}────────────────────────
+                {'\n'}【核心指标三组对比（Off vs On vs Exact）】
+                {'\n'}IR Ready：
+                {threeModeSummary.offSummary.irReadyMs.median} vs{' '}
+                {threeModeSummary.onSummary.irReadyMs.median} vs{' '}
+                {threeModeSummary.exactSummary.irReadyMs.median}
+                {'\n'}First Raw Layout：
+                {threeModeSummary.offSummary.firstRawLayoutMs.median} vs{' '}
+                {threeModeSummary.onSummary.firstRawLayoutMs.median} vs{' '}
+                {threeModeSummary.exactSummary.firstRawLayoutMs.median}
+                {'\n'}First Matched Layout：
+                {threeModeSummary.offSummary.firstMatchedLayoutMs.median} vs{' '}
+                {threeModeSummary.onSummary.firstMatchedLayoutMs.median} vs{' '}
+                {threeModeSummary.exactSummary.firstMatchedLayoutMs.median}
+                {'\n'}Last Layout：
+                {threeModeSummary.offSummary.lastLayoutMs.median} vs{' '}
+                {threeModeSummary.onSummary.lastLayoutMs.median} vs{' '}
+                {threeModeSummary.exactSummary.lastLayoutMs.median}
+                {'\n'}Document Ready：
+                {threeModeSummary.offSummary.documentReadyMs.median} vs{' '}
+                {threeModeSummary.onSummary.documentReadyMs.median} vs{' '}
+                {threeModeSummary.exactSummary.documentReadyMs.median}
+                {'\n'}Content Visible Commit：
+                {threeModeSummary.offSummary.contentVisibleCommitMs.median} vs{' '}
+                {threeModeSummary.onSummary.contentVisibleCommitMs.median} vs{' '}
+                {threeModeSummary.exactSummary.contentVisibleCommitMs.median}
+                {'\n'}IR Ready → Last Layout（总布局时间）：
+                {threeModeSummary.offSummary.irReadyToLastLayoutMs.median} vs{' '}
+                {threeModeSummary.onSummary.irReadyToLastLayoutMs.median} vs{' '}
+                {threeModeSummary.exactSummary.irReadyToLastLayoutMs.median}
+                {'\n'}────────────────────────
+                {'\n'}【配对差值中位数对比】
+                {'\n'}1. 二阶段布局开销 (Exact - Off)：
+                {'\n'} Last Layout 差异：
+                {threeModeSummary.diff_Exact_minus_Off.lastLayout.median} ms
+                {'\n'} Document Ready 差异：
+                {threeModeSummary.diff_Exact_minus_Off.documentReady.median} ms
+                {'\n'} 总布局时间差异：
+                {
+                  threeModeSummary.diff_Exact_minus_Off.irReadyToLastLayout
+                    .median
+                }{' '}
+                ms
+                {'\n'}2. Fabric 原生尺寸影响 (On - Off)：
+                {'\n'} Last Layout 差异：
+                {threeModeSummary.diff_On_minus_Off.lastLayout.median} ms
+                {'\n'} Document Ready 差异：
+                {threeModeSummary.diff_On_minus_Off.documentReady.median} ms
+                {'\n'} 总布局时间差异：
+                {threeModeSummary.diff_On_minus_Off.irReadyToLastLayout.median}{' '}
+                ms
+                {'\n'}3. 纯直传样式 vs Fabric 原生 (Exact - On)：
+                {'\n'} Last Layout 差异：
+                {threeModeSummary.diff_Exact_minus_On.lastLayout.median} ms
+                {'\n'} Document Ready 差异：
+                {threeModeSummary.diff_Exact_minus_On.documentReady.median} ms
+                {'\n'} 总布局时间差异：
+                {
+                  threeModeSummary.diff_Exact_minus_On.irReadyToLastLayout
+                    .median
+                }{' '}
+                ms
               </Text>
             </View>
           ) : null}
@@ -1870,8 +2400,16 @@ function RichContentExperimentScreen() {
                         singleRunMetrics.lastLayoutMs,
                         singleRunMetrics.layoutEventsCount,
                       )}
+                      {'\n'}首次匹配尺寸布局 (first-matched-layout)：
+                      {formatMs(singleRunMetrics.firstMatchedLayoutMs)}
                       {'\n'}文档整体就绪 (document-ready)：
                       {formatMs(singleRunMetrics.documentReadyMs)}
+                      {'\n'}内容可见提交 (content-visible-commit)：
+                      {formatMs(singleRunMetrics.contentVisibleCommitMs)}
+                      {'\n'}有效性判定：
+                      {singleRunMetrics.isValid
+                        ? '有效'
+                        : `无效（${singleRunMetrics.invalidReason}）`}
                     </Text>
                   </View>
                   {flowSummaries.length > 0 ? (
@@ -1963,6 +2501,8 @@ function RichContentExperimentScreen() {
                 linkCardInfo={visibleContent.linkCardInfo}
                 nativeAutoSize={nativeAutoSize}
                 nativeAutoSizeCachedHeight={nativeAutoSizeCachedHeight}
+                exactHeightMode={exactHeightMode}
+                exactFlowHeights={exactFlowHeights}
                 initialContentWidth={initialContentWidth}
                 performanceTrace={trace}
                 fontSizeScale={fontSizeScale}

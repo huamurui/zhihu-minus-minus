@@ -13,6 +13,7 @@ export type { ZhihuDOMContentProps } from './components/ZhihuDOMContent';
 export {
   clearMeasuredFlowHeightCache,
   getMeasuredFlowHeightCacheSize,
+  getMeasuredFlowHeightMap,
   isRichTextNativeAvailable,
   ZhihuNativeContent,
   type ZhihuNativeContentProps,
