@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Image,
   type ImageProps,
@@ -14,6 +14,11 @@ import { Text } from '@/components/Themed';
 import Colors from '@/constants/Colors';
 import { PaneModal } from '@/features/adaptive-layout/PaneModal';
 import { getCachedImageSource } from '@/utils/imageSource';
+import {
+  addNativeImageViewerListener,
+  isNativeImageViewerAvailable,
+  openNativeImageViewer,
+} from '@/utils/nativeImageViewer';
 import { saveImageToGallery } from '@/utils/saveImage';
 
 const MAX_CACHED_IMAGE_DIMENSIONS = 256;
@@ -64,17 +69,100 @@ function renderCachedImage(props: ImageProps) {
 
 export interface ImagePreviewModalProps {
   visible: boolean;
+  /** The URLs the page displays; the native viewer starts from these cached copies. */
   imageUrls: string[];
+  /** Full-size originals for `imageUrls`, by index; the native viewer loads these. */
+  originalUrls?: readonly (string | undefined)[];
   initialIndex?: number;
   onClose: () => void;
 }
 
-export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
+export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = (props) =>
+  isNativeImageViewerAvailable() ? (
+    <NativeImagePreview {...props} />
+  ) : (
+    <JsImagePreview {...props} />
+  );
+
+/**
+ * Android: the native viewer decodes long images in tiles, so they stay sharp
+ * when zoomed. It draws its own page count and save button; a long press
+ * closes it and shows the same action sheet as the JavaScript viewer.
+ */
+function NativeImagePreview({
+  visible,
+  imageUrls,
+  originalUrls,
+  initialIndex = 0,
+  onClose,
+}: ImagePreviewModalProps) {
+  const [sheetUrl, setSheetUrl] = useState<string | null>(null);
+  const session = useRef(0);
+  const latest = useRef({ imageUrls, originalUrls, initialIndex, onClose });
+  latest.current = { imageUrls, originalUrls, initialIndex, onClose };
+
+  useEffect(() => {
+    const subscriptions = [
+      addNativeImageViewerListener('onViewerSave', (event) => {
+        if (event.session === session.current && event.url)
+          void saveImageToGallery(event.url);
+      }),
+      addNativeImageViewerListener('onViewerLongPress', (event) => {
+        if (event.session === session.current && event.url)
+          setSheetUrl(event.url);
+      }),
+      addNativeImageViewerListener('onViewerDismiss', (event) => {
+        if (event.session !== session.current) return;
+        latest.current.onClose();
+      }),
+    ];
+    return () => {
+      for (const subscription of subscriptions) subscription.remove();
+    };
+  }, []);
+
+  // Opens once per showing; the props may be rebuilt while the viewer is up.
+  useEffect(() => {
+    if (!visible) return;
+    const { imageUrls: urls, originalUrls: originals } = latest.current;
+    if (urls.length === 0) return;
+    let current = true;
+    void openNativeImageViewer({
+      urls: urls.map((url, index) => originals?.[index] ?? url),
+      index: Math.min(
+        Math.max(latest.current.initialIndex, 0),
+        urls.length - 1,
+      ),
+      placeholders: urls,
+      saveLabel: '保存图片',
+    }).then(
+      (id) => {
+        if (!current) return;
+        if (id) session.current = id;
+        else latest.current.onClose();
+      },
+      () => current && latest.current.onClose(),
+    );
+    return () => {
+      current = false;
+    };
+  }, [visible]);
+
+  return (
+    <ImageActionBottomSheet
+      visible={Boolean(sheetUrl)}
+      imageUrl={sheetUrl}
+      onClose={() => setSheetUrl(null)}
+    />
+  );
+}
+
+function JsImagePreview({
   visible,
   imageUrls,
   initialIndex = 0,
   onClose,
-}) => {
+}: ImagePreviewModalProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [sheetUrl, setSheetUrl] = useState<string | null>(null);
 
@@ -161,7 +249,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
       </View>
     </PaneModal>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {

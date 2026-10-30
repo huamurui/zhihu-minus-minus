@@ -408,6 +408,9 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
     const [viewerVisible, setViewerVisible] = useState(false);
     const [viewerImage, setViewerImage] = useState<string | null>(null);
     const [viewerImages, setViewerImages] = useState<string[]>([]);
+    const [viewerOriginals, setViewerOriginals] = useState<
+      readonly (string | undefined)[] | undefined
+    >(undefined);
     const [actionSheetUrl, setActionSheetUrl] = useState<string | null>(null);
     const handleInternalLink = useCallback(
       (url: string) => {
@@ -556,9 +559,15 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
 
     const primaryColor = useThemeColor({}, 'primary');
     const onImagePressCallback = useCallback(
-      (src: string, gallery?: readonly string[]) => {
+      (
+        src: string,
+        gallery?: readonly string[],
+        originals?: readonly (string | undefined)[],
+      ) => {
+        const inGallery = Boolean(gallery?.includes(src));
         setViewerImage(src);
-        setViewerImages(gallery?.includes(src) ? [...gallery] : [src]);
+        setViewerImages(inGallery && gallery ? [...gallery] : [src]);
+        setViewerOriginals(inGallery ? originals : undefined);
         setViewerVisible(true);
       },
       [],
@@ -936,6 +945,11 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
                 ? viewerImages
                 : [viewerImage]
               : []
+          }
+          originalUrls={
+            viewerImage && viewerImages.includes(viewerImage)
+              ? viewerOriginals
+              : undefined
           }
           initialIndex={
             viewerImage ? Math.max(0, viewerImages.indexOf(viewerImage)) : 0
