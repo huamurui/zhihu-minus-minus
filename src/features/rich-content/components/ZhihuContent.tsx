@@ -383,12 +383,16 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
           : undefined,
       [document, selectedRenderer],
     );
+    const documentPreviewResources = useMemo(
+      () => (document ? getZhihuDocumentPreviewImages(document) : undefined),
+      [document],
+    );
     const documentImages = useMemo(
       () =>
-        document
-          ? getZhihuDocumentPreviewImages(document).map((image) => image.url)
+        documentPreviewResources
+          ? documentPreviewResources.map((image) => image.url)
           : undefined,
-      [document],
+      [documentPreviewResources],
     );
     const themeColors = useRuntimeThemeColors();
     const textSecondaryColor = useThemeColor({}, 'textSecondary');
@@ -408,9 +412,6 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
     const [viewerVisible, setViewerVisible] = useState(false);
     const [viewerImage, setViewerImage] = useState<string | null>(null);
     const [viewerImages, setViewerImages] = useState<string[]>([]);
-    const [viewerOriginals, setViewerOriginals] = useState<
-      readonly (string | undefined)[] | undefined
-    >(undefined);
     const [actionSheetUrl, setActionSheetUrl] = useState<string | null>(null);
     const handleInternalLink = useCallback(
       (url: string) => {
@@ -559,15 +560,9 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
 
     const primaryColor = useThemeColor({}, 'primary');
     const onImagePressCallback = useCallback(
-      (
-        src: string,
-        gallery?: readonly string[],
-        originals?: readonly (string | undefined)[],
-      ) => {
-        const inGallery = Boolean(gallery?.includes(src));
+      (src: string, gallery?: readonly string[]) => {
         setViewerImage(src);
-        setViewerImages(inGallery && gallery ? [...gallery] : [src]);
-        setViewerOriginals(inGallery ? originals : undefined);
+        setViewerImages(gallery?.includes(src) ? [...gallery] : [src]);
         setViewerVisible(true);
       },
       [],
@@ -946,11 +941,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
                 : [viewerImage]
               : []
           }
-          originalUrls={
-            viewerImage && viewerImages.includes(viewerImage)
-              ? viewerOriginals
-              : undefined
-          }
+          imageItems={documentPreviewResources}
           initialIndex={
             viewerImage ? Math.max(0, viewerImages.indexOf(viewerImage)) : 0
           }

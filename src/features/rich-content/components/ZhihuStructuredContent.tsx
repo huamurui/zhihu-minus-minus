@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
-  PixelRatio,
   Pressable,
   Text,
   type TextStyle,
@@ -13,7 +12,6 @@ import { ContentActionButton } from '@/components/ContentActionButton';
 import { useRuntimeThemeColors } from '@/components/Themed';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ZhihuStructuredContent as ZhihuStructuredContentData } from '@/types/zhihu';
-import { getImageResizeMethod, getServedImageSize } from '@/utils/imageDecode';
 import { getCachedImageSource } from '@/utils/imageSource';
 import type {
   ZhihuBlock,
@@ -302,15 +300,7 @@ export const ZhihuStructuredContent = React.memo(
                     )}
                     accessibilityLabel={block.alt || '正文图片'}
                     resizeMode="contain"
-                    resizeMethod={getImageResizeMethod({
-                      ...getServedImageSize(
-                        block.resource.url,
-                        block.resource.width,
-                        block.resource.height,
-                      ),
-                      displayPixels:
-                        PixelRatio.getPixelSizeForLayoutSize(imageWidth),
-                    })}
+                    resizeMethod="scale"
                     style={{
                       width: imageWidth,
                       height: rawHeight * (imageWidth / rawWidth),

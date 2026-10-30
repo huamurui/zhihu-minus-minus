@@ -1,136 +1,266 @@
-import { act, render } from '@testing-library/react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
+import type React from 'react';
+import { Image } from 'react-native';
 import { ImagePreviewModal } from '../src/components/ImagePreviewModal';
-import type { NativeImageViewerEvent } from '../src/utils/nativeImageViewer';
 import { saveImageToGallery } from '../src/utils/saveImage';
 
-type Listener = (event: NativeImageViewerEvent) => void;
-const mockListeners = new Map<string, Set<Listener>>();
-const mockOpen = jest.fn();
+jest.mock('react-native-webview', () => {
+  const native =
+    jest.requireActual<typeof import('react-native')>('react-native');
+  return { WebView: native.View };
+});
 
-jest.mock('../src/utils/nativeImageViewer', () => ({
-  isNativeImageViewerAvailable: () => true,
-  openNativeImageViewer: (options: unknown) => mockOpen(options),
-  addNativeImageViewerListener: (name: string, listener: Listener) => {
-    const listeners = mockListeners.get(name) ?? new Set<Listener>();
-    listeners.add(listener);
-    mockListeners.set(name, listeners);
-    return { remove: () => listeners.delete(listener) };
-  },
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 44, bottom: 34, left: 0, right: 0 }),
 }));
+
+jest.mock('react-native-reanimated', () => {
+  const react = jest.requireActual<typeof import('react')>('react');
+  const native =
+    jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    __esModule: true,
+    default: { View: native.View },
+    useSharedValue: <T,>(value: T) => react.useRef({ value }).current,
+    useAnimatedStyle: (callback: () => unknown) => callback(),
+    withSpring: (value: number) => value,
+    withTiming: (value: number) => value,
+    runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
+  };
+});
+
+let mockLastLongPressCallback: (() => void) | undefined;
+jest.mock('react-native-gesture-handler', () => {
+  const native =
+    jest.requireActual<typeof import('react-native')>('react-native');
+  const gestureChain = () => {
+    const self: Record<string, unknown> = {};
+    const proxy: Record<string, unknown> = new Proxy(self, {
+      get(_target, prop) {
+        if (prop === 'onStart') {
+          return (cb: () => void) => {
+            mockLastLongPressCallback = cb;
+            return proxy;
+          };
+        }
+        return () => proxy;
+      },
+    });
+    return proxy;
+  };
+  return {
+    GestureDetector: ({ children }: { children: React.ReactNode }) => children,
+    GestureHandlerRootView: native.View,
+    Gesture: {
+      Tap: gestureChain,
+      Pan: gestureChain,
+      Pinch: gestureChain,
+      LongPress: gestureChain,
+      Simultaneous: (..._args: unknown[]) => gestureChain(),
+      Exclusive: (..._args: unknown[]) => gestureChain(),
+    },
+  };
+});
+
 jest.mock('../src/components/ImageActionBottomSheet', () => ({
   ImageActionBottomSheet: ({
     visible,
     imageUrl,
+    onClose,
   }: {
     visible: boolean;
     imageUrl: string | null;
+    onClose?: () => void;
   }) => {
-    const { Text: MockText } =
+    const { Text: MockText, Pressable } =
       jest.requireActual<typeof import('react-native')>('react-native');
     return visible ? (
-      <MockText testID="image-action-sheet">{imageUrl}</MockText>
+      <Pressable testID="image-action-sheet" onPress={onClose}>
+        <MockText>{imageUrl}</MockText>
+      </Pressable>
     ) : null;
   },
 }));
-jest.mock('react-native-image-zoom-viewer', () => () => {
-  throw new Error('Android must not mount the JavaScript viewer');
-});
-jest.mock('../src/utils/saveImage', () => ({ saveImageToGallery: jest.fn() }));
+
+jest.mock('../src/utils/saveImage', () => ({
+  saveImageToGallery: jest.fn(),
+  copyImageUrl: jest.fn(),
+}));
+
 jest.mock('../src/components/BouncyButton', () => ({
-  BouncyButton: jest.requireActual('react-native').Pressable,
+  BouncyButton: ({
+    children,
+    onPress,
+    testID,
+  }: {
+    children: React.ReactNode;
+    onPress?: () => void;
+    testID?: string;
+  }) => {
+    const { Pressable } =
+      jest.requireActual<typeof import('react-native')>('react-native');
+    return (
+      <Pressable onPress={onPress} testID={testID}>
+        {children}
+      </Pressable>
+    );
+  },
 }));
-jest.mock('../src/components/Themed', () => ({
-  Text: jest.requireActual('react-native').Text,
+
+jest.mock('../src/utils/saveImage', () => ({
+  saveImageToGallery: jest.fn(),
+  copyImageUrl: jest.fn(),
 }));
+
+jest.mock('../src/components/Themed', () => {
+  const native =
+    jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    Text: native.Text,
+    View: native.View,
+    useThemeColor: () => '#0066FF',
+    useRuntimeThemeColors: () => ({
+      imageActionSave: '#0066FF',
+      imageActionSaveBackground: 'rgba(0,102,255,0.1)',
+      imageActionCopy: '#0066FF',
+      imageActionCopyBackground: 'rgba(0,102,255,0.1)',
+      background: '#FFFFFF',
+      surface: '#F5F5F5',
+      text: '#000000',
+      textSecondary: '#666666',
+    }),
+  };
+});
+
 jest.mock('@expo/vector-icons/Ionicons', () => () => null);
 
 const SHOWN = [
   'https://pic1.zhimg.com/a_720w.jpg',
   'https://pic1.zhimg.com/b_720w.jpg',
 ];
-const ORIGINALS = ['https://pic1.zhimg.com/a_r.jpg', undefined];
+const ORIGINALS = [
+  'https://pic1.zhimg.com/a_r.jpg',
+  'https://pic1.zhimg.com/b_r.jpg',
+];
 
-function emit(name: string, event: NativeImageViewerEvent) {
-  for (const listener of mockListeners.get(name) ?? []) listener(event);
-}
-
-beforeEach(() => {
-  mockListeners.clear();
-  mockOpen.mockReset().mockResolvedValue(7);
-  jest.mocked(saveImageToGallery).mockClear();
-});
-
-async function show(onClose = jest.fn()) {
-  const view = await render(
-    <ImagePreviewModal
-      visible
-      imageUrls={SHOWN}
-      originalUrls={ORIGINALS}
-      initialIndex={1}
-      onClose={onClose}
-    />,
-  );
-  await act(async () => {});
-  return { ...view, onClose };
-}
-
-test('opens the native viewer once, on originals, from the shown copies', async () => {
-  const { rerender, onClose } = await show();
-  expect(mockOpen).toHaveBeenCalledTimes(1);
-  expect(mockOpen).toHaveBeenCalledWith({
-    urls: ['https://pic1.zhimg.com/a_r.jpg', SHOWN[1]],
-    index: 1,
-    placeholders: SHOWN,
-    saveLabel: '保存图片',
+describe('ImagePreviewModal', () => {
+  beforeAll(() => {
+    jest.spyOn(Image, 'getSize').mockImplementation((_uri, success) => {
+      success?.(320, 240);
+      return Promise.resolve({ width: 320, height: 240 });
+    });
   });
-  // Callers rebuild the URL arrays on every render; that must not reopen.
-  await rerender(
-    <ImagePreviewModal
-      visible
-      imageUrls={[...SHOWN]}
-      originalUrls={[...ORIGINALS]}
-      initialIndex={1}
-      onClose={onClose}
-    />,
-  );
-  await act(async () => {});
-  expect(mockOpen).toHaveBeenCalledTimes(1);
-});
 
-test('the save button saves the page the viewer reports', async () => {
-  await show();
-  await act(async () =>
-    emit('onViewerSave', { session: 7, url: 'https://pic1.zhimg.com/a_r.jpg' }),
-  );
-  expect(saveImageToGallery).toHaveBeenCalledWith(
-    'https://pic1.zhimg.com/a_r.jpg',
-  );
-});
-
-test('a long press shows the action sheet, and closing the viewer closes the preview', async () => {
-  const { getByTestId, onClose } = await show();
-  await act(async () => {
-    emit('onViewerLongPress', { session: 7, url: SHOWN[1] });
-    emit('onViewerDismiss', { session: 7 });
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
-  expect(getByTestId('image-action-sheet')).toHaveTextContent(SHOWN[1]);
-  expect(onClose).toHaveBeenCalledTimes(1);
-});
 
-test('events from another viewer session are ignored', async () => {
-  const { queryByTestId, onClose } = await show();
-  await act(async () => {
-    emit('onViewerSave', { session: 6, url: SHOWN[0] });
-    emit('onViewerLongPress', { session: 6, url: SHOWN[0] });
-    emit('onViewerDismiss', { session: 6 });
+  test('does not render when visible is false', async () => {
+    const host = await render(
+      <ImagePreviewModal
+        visible={false}
+        imageUrls={SHOWN}
+        onClose={jest.fn()}
+      />,
+    );
+    expect(host.queryByTestId('image-preview-modal')).toBeNull();
   });
-  expect(saveImageToGallery).not.toHaveBeenCalled();
-  expect(queryByTestId('image-action-sheet')).toBeNull();
-  expect(onClose).not.toHaveBeenCalled();
-});
 
-test('the preview closes when the viewer cannot open', async () => {
-  mockOpen.mockResolvedValue(0);
-  const { onClose } = await show();
-  expect(onClose).toHaveBeenCalledTimes(1);
+  test('renders image and controls when visible is true', async () => {
+    const host = await render(
+      <ImagePreviewModal
+        visible={true}
+        imageUrls={SHOWN}
+        originalUrls={ORIGINALS}
+        initialIndex={0}
+        onClose={jest.fn()}
+      />,
+    );
+    expect(host.getByTestId('image-preview-modal')).toBeTruthy();
+    expect(host.getByTestId('preview-close-button')).toBeTruthy();
+    expect(host.getByTestId('preview-download-button')).toBeTruthy();
+    expect(host.getByTestId('preview-page-indicator')).toBeTruthy();
+    expect(host.getByTestId('preview-page-indicator').props.children).toEqual([
+      1,
+      ' / ',
+      2,
+    ]);
+  });
+
+  test('calls onClose when close button is pressed', async () => {
+    const onClose = jest.fn();
+    const host = await render(
+      <ImagePreviewModal visible={true} imageUrls={SHOWN} onClose={onClose} />,
+    );
+    fireEvent.press(host.getByTestId('preview-close-button'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  test('calls saveImageToGallery when download button is pressed', async () => {
+    const host = await render(
+      <ImagePreviewModal
+        visible={true}
+        imageUrls={SHOWN}
+        originalUrls={ORIGINALS}
+        initialIndex={0}
+        onClose={jest.fn()}
+      />,
+    );
+    fireEvent.press(host.getByTestId('preview-download-button'));
+    expect(saveImageToGallery).toHaveBeenCalledWith(ORIGINALS[0]);
+  });
+
+  test('renders single image without page indicator', async () => {
+    const host = await render(
+      <ImagePreviewModal
+        visible={true}
+        imageUrls={[SHOWN[0]]}
+        onClose={jest.fn()}
+      />,
+    );
+    expect(host.getByTestId('image-preview-modal')).toBeTruthy();
+    expect(host.queryByTestId('preview-page-indicator')).toBeNull();
+  });
+
+  test('long press opens action sheet without closing modal', async () => {
+    const onClose = jest.fn();
+    const host = await render(
+      <ImagePreviewModal
+        visible={true}
+        imageUrls={[SHOWN[0]]}
+        onClose={onClose}
+      />,
+    );
+    expect(host.getByTestId('image-preview-modal')).toBeTruthy();
+
+    // Trigger long press gesture
+    await act(async () => {
+      mockLastLongPressCallback?.();
+    });
+
+    // The modal must still be visible and onClose must NOT have been called!
+    expect(host.getByTestId('image-preview-modal')).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  test('renders LongImageWebView when image is an extreme aspect ratio long image', async () => {
+    const host = await render(
+      <ImagePreviewModal
+        visible={true}
+        imageUrls={['https://pic1.zhimg.com/long_image.jpg']}
+        imageItems={[
+          {
+            url: 'https://pic1.zhimg.com/long_image.jpg',
+            width: 200,
+            height: 8000,
+          },
+        ]}
+        onClose={jest.fn()}
+      />,
+    );
+    expect(host.getByTestId('image-preview-modal')).toBeTruthy();
+    expect(host.getByTestId('long-image-container')).toBeTruthy();
+    expect(host.getByTestId('long-image-webview')).toBeTruthy();
+    expect(host.queryByTestId('preview-image')).toBeNull();
+  });
 });
