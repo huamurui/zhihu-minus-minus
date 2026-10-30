@@ -66,3 +66,20 @@ test('each double-tap chip applies immediately without a save step', async () =>
   await fireEvent.press(host.getByRole('radio', { name: '关闭' }));
   expect(useSettingsStore.getState().doubleTapAction).toBe('off');
 });
+
+test.each([
+  ['列表预加载', '提前加载下一页，会略微增加流量和耗电。'],
+  [
+    '多页同时加载',
+    '同时请求后面几页，会略微增加流量和耗电，也可能更容易触发知乎验证。',
+  ],
+])('the %s question mark shows and hides its note', async (label, note) => {
+  const host = await render(<FeatureSettings />);
+  const help = host.getByRole('button', { name: `${label}说明` });
+  expect(host.queryByText(note)).toBeNull();
+  await fireEvent.press(help);
+  expect(host.getByText(note)).toBeTruthy();
+  expect(help).toBeExpanded();
+  await fireEvent.press(help);
+  expect(host.queryByText(note)).toBeNull();
+});

@@ -18,6 +18,7 @@ import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
+import { useListPreload } from '@/hooks/useListPreload';
 import { useUserCreations } from '@/hooks/useUserCreations';
 import {
   type AnswerReadingContext,
@@ -62,6 +63,7 @@ export function UserPublishedStream({
   navigation,
 }: UserPublishedStreamProps) {
   const router = useRouter();
+  const listPreload = useListPreload(0.5);
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const primaryColor = useThemeColor({}, 'primary');
@@ -249,7 +251,7 @@ export function UserPublishedStream({
             )
               void fetchNextPage();
           }}
-          onEndReachedThreshold={0.5}
+          {...listPreload}
           ListEmptyComponent={
             isLoading ? (
               <ActivityIndicator

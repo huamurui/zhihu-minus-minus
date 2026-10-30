@@ -170,6 +170,10 @@ export interface AppSettings {
   largeScreenListRatio: number;
   /** 是否开启浏览历史记录 */
   enableBrowseHistory: boolean;
+  /** 列表预加载：提前请求下一页并多渲染一段屏外内容 */
+  enableListPreload: boolean;
+  /** 多页同时加载：可预知下一页地址的列表一次请求多页 */
+  enableParallelPaging: boolean;
   /** 是否在本地记录并过滤近期看过的推荐内容 */
   enableLocalFeedDedup: boolean;
   /** 是否在冷启动时保留上次的推荐流内容 */
@@ -248,6 +252,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   enableLargeScreenLayout: false,
   largeScreenListRatio: DEFAULT_LARGE_SCREEN_LIST_RATIO,
   enableBrowseHistory: true,
+  enableListPreload: false,
+  enableParallelPaging: false,
   enableLocalFeedDedup: false,
   enableFeedCacheOnLaunch: false,
   recommendRequestIncludeDesktop: true,
@@ -330,6 +336,12 @@ export const useSettingsStore = create<SettingsState>()(
           if (!isValidUnreadBadgeStyle(nextSettings.unreadBadgeStyle)) {
             nextSettings.unreadBadgeStyle = 'count';
           }
+          if (typeof nextSettings.enableListPreload !== 'boolean') {
+            nextSettings.enableListPreload = false;
+          }
+          if (typeof nextSettings.enableParallelPaging !== 'boolean') {
+            nextSettings.enableParallelPaging = false;
+          }
           if (
             typeof nextSettings.recommendRequestIncludeDesktop !== 'boolean'
           ) {
@@ -374,7 +386,7 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'zhihu-settings-storage',
       storage: createJSONStorage(() => settingsStorage),
-      version: 21,
+      version: 23,
       migrate: (rawPersistedState: unknown, version: number) => {
         const persistedState =
           normalizePersistedSettingsState(rawPersistedState);
@@ -553,6 +565,12 @@ export const useSettingsStore = create<SettingsState>()(
           typeof persistedState.removeImageWatermark === 'boolean'
             ? persistedState.removeImageWatermark
             : true;
+        // v22 adds list preloading, off unless chosen.
+        persistedState.enableListPreload =
+          persistedState.enableListPreload === true;
+        // v23 adds parallel paging, off unless chosen.
+        persistedState.enableParallelPaging =
+          persistedState.enableParallelPaging === true;
 
         return persistedState as unknown as SettingsState;
       },

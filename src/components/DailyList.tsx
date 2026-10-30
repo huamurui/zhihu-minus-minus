@@ -21,6 +21,7 @@ import {
   type CollapsibleChromeScrollOptions,
   useCollapsibleChromeScroll,
 } from '@/hooks/useCollapsibleChromeScroll';
+import { useListPreload } from '@/hooks/useListPreload';
 import {
   type DailyListItem,
   flattenDailyPages,
@@ -113,6 +114,7 @@ export const DailyList = React.forwardRef<
 >(({ insets, chrome, onRefreshStateChange }, ref) => {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const listPreload = useListPreload(0.5);
   const colorScheme = useColorScheme();
   const primaryColor = useThemeColor({}, 'primary');
   const onPrimary = useThemeColor({}, 'onPrimary');
@@ -259,7 +261,7 @@ export const DailyList = React.forwardRef<
             void fetchNextPage({ cancelRefetch: false });
           }
         }}
-        onEndReachedThreshold={0.5}
+        {...listPreload}
         onScroll={scrollHandler}
         scrollEventThrottle={16}
         contentContainerStyle={{

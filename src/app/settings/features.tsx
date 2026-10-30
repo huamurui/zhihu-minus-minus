@@ -26,6 +26,8 @@ export default function FeatureSettings() {
   const mutedColor = useThemeColor({}, 'textSecondary');
   const {
     enableBrowseHistory,
+    enableListPreload,
+    enableParallelPaging,
     enablePrivateMessaging,
     doubleTapAction,
     updateSettings,
@@ -59,6 +61,34 @@ export default function FeatureSettings() {
               value={enableBrowseHistory}
               onValueChange={(value) =>
                 updateSettings({ enableBrowseHistory: value })
+              }
+            />
+          </SettingItem>
+          <SettingItem
+            label="列表预加载"
+            icon="download-outline"
+            colorScheme={colorScheme}
+            help="提前加载下一页，会略微增加流量和耗电。"
+          >
+            <ThemedSwitch
+              accessibilityLabel="列表预加载"
+              value={enableListPreload}
+              onValueChange={(value) =>
+                updateSettings({ enableListPreload: value })
+              }
+            />
+          </SettingItem>
+          <SettingItem
+            label="多页同时加载"
+            icon="layers-outline"
+            colorScheme={colorScheme}
+            help="同时请求后面几页，会略微增加流量和耗电，也可能更容易触发知乎验证。"
+          >
+            <ThemedSwitch
+              accessibilityLabel="多页同时加载"
+              value={enableParallelPaging}
+              onValueChange={(value) =>
+                updateSettings({ enableParallelPaging: value })
               }
             />
           </SettingItem>

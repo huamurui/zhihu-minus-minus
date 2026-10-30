@@ -20,6 +20,7 @@ import Reanimated, {
 } from 'react-native-reanimated';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { Text, useThemeColor, View } from '@/components/Themed';
+import { useListPreload, useLoadMoreNearEnd } from '@/hooks/useListPreload';
 import { useRefreshAction } from '@/hooks/useRefreshAction';
 import {
   getProfileMinContentHeight,
@@ -60,6 +61,8 @@ export interface ProfileTabListProps {
   keyExtractor: (item: unknown) => string;
   listHeader?: ReactNode;
   emptyState?: ReactNode;
+  /** Reports when the user drags or flings this list vertically. */
+  onScrollActivityChange?: (active: boolean) => void;
   /** Keep initial profile placeholders still while the member details load. */
   hideInitialLoadingIndicator?: boolean;
 }
@@ -88,11 +91,13 @@ export const ProfileTabList = forwardRef<
     keyExtractor,
     listHeader,
     emptyState,
+    onScrollActivityChange,
     hideInitialLoadingIndicator = false,
   },
   ref,
 ) {
   const primaryColor = useThemeColor({}, 'primary');
+  const listPreload = useListPreload(0.4);
   const listRef = useRef<FlashListRef<unknown> | null>(null);
   const contentRef = useRef<NativeView>(null);
   const loadedRef = useRef(false);
@@ -122,6 +127,11 @@ export const ProfileTabList = forwardRef<
     pendingRef.current = null;
   }, []);
 
+  const reportScrollActivity = useCallback(
+    (active: boolean) => onScrollActivityChange?.(active),
+    [onScrollActivityChange],
+  );
+
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
       const offset = Math.max(0, event.contentOffset.y);
@@ -137,6 +147,16 @@ export const ProfileTabList = forwardRef<
     onBeginDrag: () => {
       requestedScroll.value = null;
       runOnJS(cancelPendingScroll)();
+      runOnJS(reportScrollActivity)(true);
+    },
+    onEndDrag: () => {
+      runOnJS(reportScrollActivity)(false);
+    },
+    onMomentumBegin: () => {
+      runOnJS(reportScrollActivity)(true);
+    },
+    onMomentumEnd: () => {
+      runOnJS(reportScrollActivity)(false);
     },
   });
 
@@ -275,6 +295,13 @@ export const ProfileTabList = forwardRef<
       });
   };
 
+  useLoadMoreNearEnd({
+    listRef,
+    threshold: listPreload.onEndReachedThreshold,
+    loading: query.isFetching,
+    loadMore: loadNextPage,
+  });
+
   const handleRefresh = () => {
     if (!active || refreshPending.current) return;
     refreshPending.current = true;
@@ -318,7 +345,7 @@ export const ProfileTabList = forwardRef<
         applyPendingScroll();
       }}
       onEndReached={() => loadNextPage()}
-      onEndReachedThreshold={0.4}
+      {...listPreload}
       onRefresh={handleRefresh}
       refreshing={refreshing}
       progressViewOffset={headerHeight}

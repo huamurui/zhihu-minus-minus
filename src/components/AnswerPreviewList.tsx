@@ -51,6 +51,7 @@ import { useAnswerPreviewFloatingBar } from '@/hooks/useAnswerPreviewFloatingBar
 import { useAnswerPreviewQuery } from '@/hooks/useAnswerPreviewQuery';
 import { useAnswerReadTouch } from '@/hooks/useAnswerReadTouch';
 import { useDetailHeaderState } from '@/hooks/useDetailHeaderState';
+import { useListPreload } from '@/hooks/useListPreload';
 import { getAuthSessionVersion } from '@/store/useAuthStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ZhihuStructuredContent as StructuredContent } from '@/types/zhihu';
@@ -314,6 +315,7 @@ export function AnswerPreviewList({
   answerContext = DEFAULT_ANSWER_CONTEXT,
 }: AnswerPreviewListProps) {
   const router = useRouter();
+  const listPreload = useListPreload(0.5);
   const colors = useRuntimeThemeColors();
   const insets = useSafeAreaInsets();
   const actionBarBottom = getContentActionBarBottom(insets.bottom);
@@ -666,7 +668,7 @@ export function AnswerPreviewList({
             if (query.hasNextPage && !query.isFetching && !query.isError)
               void query.fetchNextPage({ cancelRefetch: false });
           }}
-          onEndReachedThreshold={0.5}
+          {...listPreload}
           refreshControl={
             <RefreshControl
               refreshing={refreshingScope === scope}

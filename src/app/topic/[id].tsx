@@ -24,6 +24,7 @@ import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
+import { useListPreload } from '@/hooks/useListPreload';
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
 import { useRefreshAction } from '@/hooks/useRefreshAction';
 import { useZhihuInfiniteQuery } from '@/hooks/useZhihuInfiniteQuery';
@@ -38,6 +39,7 @@ import { refreshInfiniteQuery } from '@/utils/query';
 
 export default function TopicDetail() {
   const queryClient = useQueryClient();
+  const listPreload = useListPreload(0.5);
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -299,7 +301,7 @@ export default function TopicDetail() {
           !isFetchNextPageError &&
           fetchNextPage()
         }
-        onEndReachedThreshold={0.5}
+        {...listPreload}
         onRefresh={handleRefresh}
         refreshing={refreshing}
         ListFooterComponent={() =>

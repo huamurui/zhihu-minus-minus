@@ -156,12 +156,6 @@ const FeedCardComponent = ({
   currentIdentityRef.current = identity;
   const pendingVotesRef = useRef(new Set<string>());
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: FlashList identity changes must reset local reactions even when initial values match the previous item.
-  useEffect(() => {
-    setVoted(item.voted || 0);
-    setVoteCount(item.voteCount || 0);
-  }, [item.id, item.type, item.voted, item.voteCount]);
-
   const itemIdStr = item.id != null ? item.id.toString() : '';
   const storeCollected = useCollectionStore((state) =>
     itemIdStr ? state.collectedStatusMap[itemIdStr] : undefined,
@@ -264,6 +258,31 @@ const FeedCardComponent = ({
     width: number;
     height: number;
   } | null>(null);
+
+  // A recycled FlashList cell gets another item: reset local reactions and
+  // overlays while rendering, not in an effect. An effect commits the old
+  // item first and schedules one more update per recycled card; during a
+  // large page append those updates chain with FlashList's layout updates
+  // until React aborts with "Maximum update depth exceeded".
+  const [syncedItem, setSyncedItem] = useState({
+    identity,
+    voted: item.voted,
+    voteCount: item.voteCount,
+  });
+  if (
+    syncedItem.identity !== identity ||
+    syncedItem.voted !== item.voted ||
+    syncedItem.voteCount !== item.voteCount
+  ) {
+    setSyncedItem({ identity, voted: item.voted, voteCount: item.voteCount });
+    setVoted(item.voted || 0);
+    setVoteCount(item.voteCount || 0);
+    if (syncedItem.identity !== identity) {
+      setMenuVisible(false);
+      setPreviewVisible(false);
+      setOriginLayout(null);
+    }
+  }
   const shareType: ShareContentType =
     item.type === 'answers'
       ? 'answer'
@@ -301,14 +320,6 @@ const FeedCardComponent = ({
       additionalOptions: feedbackOptions,
     }),
   });
-
-  // Recycled cells must not retain another item's preview or share sheet.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: resetting overlays is keyed to the recycled content identity.
-  useEffect(() => {
-    setMenuVisible(false);
-    setPreviewVisible(false);
-    setOriginLayout(null);
-  }, [identity]);
 
   const menuOptions: MenuOption[] = [
     ...(engagementType

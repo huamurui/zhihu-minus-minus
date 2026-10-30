@@ -5,7 +5,14 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   Alert,
   Animated,
@@ -38,6 +45,8 @@ import {
   getMemberRelations,
   getMemberWithFallback,
   MEMBER_ANSWERS_INCLUDE,
+  MEMBER_ARTICLES_INCLUDE,
+  MEMBER_PINS_INCLUDE,
   unfollowMember,
   type ZhihuMember,
 } from '@/api/zhihu';
@@ -64,13 +73,15 @@ import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { useProfileEntryProgress } from '@/features/adaptive-layout/PaneContext';
+import { useMemberCreations } from '@/hooks/useMemberCreations';
 import { useUserAnswersVotedByMe } from '@/hooks/useUserAnswersVotedByMe';
 import { useUserColumns } from '@/hooks/useUserColumns';
-import { useUserCreations } from '@/hooks/useUserCreations';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ZhihuAuthor, ZhihuColumnSummary } from '@/types/zhihu';
 import { getProfileAnswerReadingContext } from '@/utils/answerReadingContext';
+import type { MemberCreation } from '@/utils/memberCreations';
+import { fetchOffsetPages } from '@/utils/parallelPaging';
 import {
   getProfileCoverState,
   getProfileHeaderOffset,
@@ -80,7 +91,6 @@ import { refreshInfiniteQuery } from '@/utils/query';
 import { parseZhihuUrl } from '@/utils/url';
 import {
   getNextPageOffset,
-  getRecentActivityTargetId,
   isOwnMemberProfile,
   normalizeUserFeedType,
   type UserFeedType,
@@ -165,6 +175,10 @@ function getProfileListItemKey(item: unknown) {
 }
 
 const AnimatedPagerView = Reanimated.createAnimatedComponent(PagerView);
+/** Items per request on the offset-paged profile tabs. */
+const PROFILE_PAGE_LIMIT = 20;
+/** Keep page swipes off this long after a list stops scrolling. */
+const PAGER_UNLOCK_DELAY_MS = 250;
 
 type ProfileRouteParams = {
   id: string;
@@ -356,6 +370,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
 
   const syncLists = (sourceIndex: number) => {
     const offsets = scrollOffsets.value;
+    const synced = [...offsets];
     for (let index = 0; index < PROFILE_TABS.length; index += 1) {
       if (index === sourceIndex) continue;
       const offset = getProfileSyncedOffset(
@@ -363,9 +378,35 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
         offsets[index],
         collapseDistance,
       );
+      synced[index] = offset;
       listRefs.current[index]?.scrollToOffset(offset);
     }
+    // Offscreen or still-empty pages apply their scroll only once shown. Record
+    // the target now so the header holds its place during the swipe instead of
+    // easing toward a neighbour still at the top.
+    scrollOffsets.value = synced;
   };
+
+  // A diagonal flick in a list must not turn the page: hold the pager while
+  // the list is dragged or still flinging, and briefly after it stops.
+  const [pagerLocked, setPagerLocked] = useState(false);
+  const pagerUnlockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleListScrollActivity = useCallback((active: boolean) => {
+    if (pagerUnlockTimer.current) clearTimeout(pagerUnlockTimer.current);
+    pagerUnlockTimer.current = null;
+    if (active) setPagerLocked(true);
+    else
+      pagerUnlockTimer.current = setTimeout(
+        () => setPagerLocked(false),
+        PAGER_UNLOCK_DELAY_MS,
+      );
+  }, []);
+  useEffect(
+    () => () => {
+      if (pagerUnlockTimer.current) clearTimeout(pagerUnlockTimer.current);
+    },
+    [],
+  );
 
   const handleTabPress = (index: number) => {
     syncLists(activeIndexRef.current);
@@ -399,6 +440,15 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
   const isMe = isOwnMemberProfile(id, me, user);
 
   const enableBrowseHistory = useSettingsStore((s) => s.enableBrowseHistory);
+  const parallelPaging = useSettingsStore((s) => s.enableParallelPaging);
+  // 多页同时加载: offset-paged tabs request several pages per page load.
+  const fetchRelationPages = <P extends { data: unknown[] }>(
+    offset: number,
+    fetchPage: (offset: number) => Promise<P>,
+  ) =>
+    parallelPaging
+      ? fetchOffsetPages(fetchPage, offset, PROFILE_PAGE_LIMIT)
+      : fetchPage(offset);
 
   useEffect(() => {
     if (cookies && enableBrowseHistory && user?.id) {
@@ -426,23 +476,9 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
     enabled: !!user && (visitedTabs.activities || activeTab === 'activities'),
   });
 
-  const creationsQuery = useUserCreations(
+  const creationsQuery = useMemberCreations(
     user,
     Boolean(visitedTabs.creations || activeTab === 'creations'),
-  );
-  const creationTargets = useMemo(
-    () =>
-      new Map(
-        creationsQuery.activities.flatMap((activity) => {
-          const target = activity.target;
-          const targetId = target && getRecentActivityTargetId(target);
-          const type = normalizeUserFeedType(target?.type);
-          return target && targetId !== undefined && type
-            ? [[`${type}:${targetId}`, target] as const]
-            : [];
-        }),
-      ),
-    [creationsQuery.activities],
   );
 
   const answersVotedByMeQuery = useUserAnswersVotedByMe(
@@ -455,13 +491,15 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
     queryKey: ['user-answers', id, sortBy],
     queryFn: ({ pageParam = 0 }) => {
       const targetId = (user?.url_token || id) as string;
-      return getMemberRelations(targetId, 'answers', {
-        include: MEMBER_ANSWERS_INCLUDE,
-        offset: pageParam,
-        limit: 20,
-        sort_by: sortBy,
-        ws_qiangzhisafe: 0,
-      });
+      return fetchRelationPages(pageParam, (offset) =>
+        getMemberRelations(targetId, 'answers', {
+          include: MEMBER_ANSWERS_INCLUDE,
+          offset,
+          limit: PROFILE_PAGE_LIMIT,
+          sort_by: sortBy,
+          ws_qiangzhisafe: 0,
+        }),
+      );
     },
     initialPageParam: 0,
     getNextPageParam: (lastPage) => {
@@ -478,11 +516,13 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
       const targetId = (user?.url_token || id) as string;
       const include =
         'data[*].created,answer_count,follower_count,admin_closed_comment,title,reaction,relationship.is_following;data[*].author';
-      return getMemberRelations(targetId, 'questions', {
-        limit: 20,
-        offset: pageParam,
-        include,
-      });
+      return fetchRelationPages(pageParam, (offset) =>
+        getMemberRelations(targetId, 'questions', {
+          limit: PROFILE_PAGE_LIMIT,
+          offset,
+          include,
+        }),
+      );
     },
     initialPageParam: 0,
     getNextPageParam: (lastPage) => {
@@ -497,13 +537,13 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
     queryKey: ['user-articles', id],
     queryFn: ({ pageParam = 0 }) => {
       const targetId = (user?.url_token || id) as string;
-      const include =
-        'data[*].comment_count,content,voteup_count,favlists_count,created,updated,title,excerpt,reaction,relationship.voting,is_favorited;data[*].author';
-      return getMemberRelations(targetId, 'articles', {
-        limit: 20,
-        offset: pageParam,
-        include,
-      });
+      return fetchRelationPages(pageParam, (offset) =>
+        getMemberRelations(targetId, 'articles', {
+          limit: PROFILE_PAGE_LIMIT,
+          offset,
+          include: MEMBER_ARTICLES_INCLUDE,
+        }),
+      );
     },
     initialPageParam: 0,
     getNextPageParam: (lastPage) => {
@@ -523,13 +563,13 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
     queryKey: ['user-pins', id],
     queryFn: ({ pageParam = 0 }) => {
       const targetId = (user?.url_token || id) as string;
-      const include =
-        'data[*].content,reaction_count,comment_count,created,reaction,relationship.voting;data[*].author';
-      return getMemberRelations(targetId, 'pins', {
-        limit: 20,
-        offset: pageParam,
-        include,
-      });
+      return fetchRelationPages(pageParam, (offset) =>
+        getMemberRelations(targetId, 'pins', {
+          limit: PROFILE_PAGE_LIMIT,
+          offset,
+          include: MEMBER_PINS_INCLUDE,
+        }),
+      );
     },
     initialPageParam: 0,
     getNextPageParam: (lastPage) => {
@@ -559,7 +599,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
       case 'creations':
         return {
           queryKey: creationsQuery.queryKey,
-          data: creationsQuery.feedItems,
+          data: creationsQuery.items,
           isLoading: creationsQuery.isLoading,
           isError: creationsQuery.isError,
           isFetchingNextPage: creationsQuery.isFetchingNextPage,
@@ -889,22 +929,17 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
     );
   };
 
-  const renderItemContent = (item: unknown, tabKey: ProfileTabKey) => {
+  const renderItemContent = (
+    item: unknown,
+    tabKey: ProfileTabKey,
+    // 创作 lists answers by publish time, whatever the 回答 tab's sort.
+    answerSort: 'created' | 'voteups' = sortBy,
+  ): ReactNode => {
     if (tabKey === 'columns')
       return <ProfileColumnCard column={item as ZhihuColumnSummary} />;
     if (tabKey === 'creations') {
-      const feedItem = item as FeedItem;
-      const target = creationTargets.get(`${feedItem.type}:${feedItem.id}`);
-      return (
-        <FeedCard
-          item={{ ...feedItem, ...getProfileFeedBody(target) }}
-          answerContext={getProfileAnswerReadingContext(
-            target?.author ?? {},
-            user ?? {},
-            id,
-          )}
-        />
-      );
+      const creation = item as MemberCreation;
+      return renderItemContent(creation.item, creation.kind, 'created');
     }
     const displayItem = getProfileContentItem(item, tabKey);
     if (!displayItem) return null;
@@ -996,6 +1031,11 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
           : (getContentVoteState(mappedType, displayItem) ?? 0),
       type: mappedType,
       videoSource: getZhihuVideoSource(rawType),
+      // Every card on a member's page is theirs unless it names someone else.
+      hideAuthor:
+        tabKey !== 'votes' &&
+        tabKey !== 'activities' &&
+        (!displayItem.author?.id || displayItem.author.id === user?.id),
     };
 
     return (
@@ -1007,12 +1047,12 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
           tabKey === 'answers' &&
           !displayItem.author?.id &&
           !displayItem.author?.url_token
-            ? { scene: 'profile_answer', memberId: id, memberSort: sortBy }
+            ? { scene: 'profile_answer', memberId: id, memberSort: answerSort }
             : getProfileAnswerReadingContext(
                 displayItem.author ?? {},
                 user ?? {},
                 id,
-                tabKey === 'answers' ? sortBy : 'created',
+                tabKey === 'answers' ? answerSort : 'created',
               )
         }
       />
@@ -1058,6 +1098,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
               ref={pagerRef}
               style={{ flex: 1 }}
               initialPage={initialTabIndex}
+              scrollEnabled={!pagerLocked}
               onPageScroll={pageScrollHandler}
               onPageScrollStateChanged={(event) => {
                 if (event.nativeEvent.pageScrollState === 'dragging')
@@ -1112,10 +1153,11 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
                       bottomInset={insets.bottom}
                       offsets={scrollOffsets}
                       active={activeTab === tab.key}
+                      onScrollActivityChange={handleListScrollActivity}
                       keyExtractor={(item) => {
                         if (tab.key === 'creations') {
-                          const content = item as FeedItem;
-                          return `user-creation-${content.type}-${content.id}`;
+                          const creation = item as MemberCreation;
+                          return `user-creation-${creation.kind}-${getProfileListItemKey(creation.item)}`;
                         }
                         return `user-item-${tab.key}-${getProfileListItemKey(item)}`;
                       }}

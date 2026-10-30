@@ -15,6 +15,12 @@ export const MEMBER_INCLUDE =
 export const MEMBER_ANSWERS_INCLUDE =
   'data[*].is_normal,admin_closed_comment,reward_info,is_collapsed,annotation_action,annotation_detail,collapse_reason,collapsed_by,suggest_edit,comment_count,can_comment,content,editable_content,attachment,voteup_count,favlists_count,reshipment_settings,comment_permission,created_time,updated_time,review_info,excerpt,endorsements,paid_info,reaction_instruction,is_labeled,label_info,relationship.is_authorized,voting,is_author,is_thanked,is_nothelp,is_favorited,reaction,vessay_info;data[*].author.badge[?(type=best_answerer)].topics;data[*].author.kvip_info;data[*].author.vip_info;data[*].question.has_publishing_draft,relationship';
 
+export const MEMBER_ARTICLES_INCLUDE =
+  'data[*].comment_count,content,voteup_count,favlists_count,created,updated,title,excerpt,reaction,relationship.voting,is_favorited;data[*].author';
+
+export const MEMBER_PINS_INCLUDE =
+  'data[*].content,reaction_count,comment_count,created,reaction,relationship.voting;data[*].author';
+
 const MEMBER_COLUMNS_INCLUDE =
   'data[*].column.intro,followers,articles_count,voteup_count,items_count';
 

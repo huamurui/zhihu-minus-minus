@@ -48,6 +48,11 @@ jest.mock('@shopify/flash-list', () => {
       mockListProps = props;
       react.useImperativeHandle(ref, () => ({
         scrollToOffset: mockScrollToOffset,
+        // A list far from its end: follow-up page loads stay out of these tests.
+        getAbsoluteLastScrollOffset: () => 0,
+        getWindowSize: () => ({ width: 400, height: 800 }),
+        getChildContainerDimensions: () => ({ width: 400, height: 100_000 }),
+        getFirstItemOffset: () => 0,
       }));
       react.useImperativeHandle(props.innerViewRef, () => ({
         measure: mockMeasureContent,

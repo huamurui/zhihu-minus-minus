@@ -12,6 +12,7 @@ import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { usePaneRouter as useRouter } from '@/features/adaptive-layout/usePaneRouter';
+import { useListPreload } from '@/hooks/useListPreload';
 import {
   READ_HISTORY_QUERY_KEY,
   useReadHistoryActions,
@@ -30,6 +31,7 @@ import {
 
 export default function HistoryScreen() {
   const router = useRouter();
+  const listPreload = useListPreload(0.5);
   const colorScheme = useColorScheme();
   const primaryColor = useThemeColor({}, 'primary');
   const onPrimary = useThemeColor({}, 'onPrimary');
@@ -253,7 +255,7 @@ export default function HistoryScreen() {
         onEndReached={() => {
           if (hasNextPage && !isFetching && !isDeleting) void fetchNextPage();
         }}
-        onEndReachedThreshold={0.5}
+        {...listPreload}
         ListFooterComponent={() =>
           isFetchingNextPage ? (
             <ActivityIndicator style={{ margin: 20 }} color={primaryColor} />

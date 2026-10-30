@@ -30,7 +30,7 @@ beforeEach(() => {
   jest.mocked(SecureStore.getItemAsync).mockResolvedValue(null);
 });
 
-test('defaults to tiqian-super-mini with visual feedback and filtering enabled in settings version 21', () => {
+test('defaults to tiqian-super-mini with visual feedback and filtering enabled in settings version 23', () => {
   expect(useSettingsStore.getState().richContentRenderer).toBe('native-v2');
   expect(useSettingsStore.getState().enablePressFeedback).toBe(true);
   expect(useSettingsStore.getState().enableLocalFeedFilter).toBe(true);
@@ -39,7 +39,7 @@ test('defaults to tiqian-super-mini with visual feedback and filtering enabled i
   expect(useSettingsStore.getState().filterEnableQuality).toBe(false);
   expect(useSettingsStore.getState().filterBlockLabeled).toBe(false);
   expect(useSettingsStore.getState().filterRegexPatterns).toEqual([]);
-  expect(useSettingsStore.persist.getOptions().version).toBe(21);
+  expect(useSettingsStore.persist.getOptions().version).toBe(23);
 });
 
 test('leaves the double-tap action unset until the user picks one', () => {
@@ -78,6 +78,32 @@ test('keeps red unread counts for existing installs and accepts quieter badge st
     unreadBadgeStyle: 'loud',
   } as unknown as Partial<AppSettings>);
   expect(useSettingsStore.getState().unreadBadgeStyle).toBe('count');
+});
+
+test('keeps parallel paging off for existing installs until chosen', async () => {
+  expect(useSettingsStore.getState().enableParallelPaging).toBe(false);
+  expect((await migrate({}, 22)).enableParallelPaging).toBe(false);
+  expect(
+    (await migrate({ enableParallelPaging: true }, 23)).enableParallelPaging,
+  ).toBe(true);
+  useSettingsStore.getState().updateSettings({
+    enableParallelPaging: 'yes',
+  } as unknown as Partial<AppSettings>);
+  expect(useSettingsStore.getState().enableParallelPaging).toBe(false);
+});
+
+test('keeps list preloading off for existing installs until chosen', async () => {
+  expect(useSettingsStore.getState().enableListPreload).toBe(false);
+  expect((await migrate({}, 21)).enableListPreload).toBe(false);
+  expect(
+    (await migrate({ enableListPreload: true }, 22)).enableListPreload,
+  ).toBe(true);
+  useSettingsStore.getState().updateSettings({ enableListPreload: true });
+  expect(useSettingsStore.getState().enableListPreload).toBe(true);
+  useSettingsStore.getState().updateSettings({
+    enableListPreload: 'yes',
+  } as unknown as Partial<AppSettings>);
+  expect(useSettingsStore.getState().enableListPreload).toBe(false);
 });
 
 test.each([
@@ -169,7 +195,7 @@ test('hydrates legacy settings and writes back only the new renderer field', asy
       fontSizeScale: 1.3,
       enablePressFeedback: true,
     },
-    version: 21,
+    version: 23,
   });
   expect(JSON.parse(persistedJson).state).not.toHaveProperty('useWebView');
 });
@@ -322,7 +348,7 @@ test('persists and restores sanitized custom regex rules together with a disable
       enableLocalFeedFilter: false,
       filterRegexPatterns: expectedPatterns,
     },
-    version: 21,
+    version: 23,
   });
   useSettingsStore.setState({
     enableLocalFeedFilter: true,

@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import React from 'react';
-import { View as RNView, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { Pressable, View as RNView, StyleSheet } from 'react-native';
 import { BouncyButton } from '@/components/BouncyButton';
 import { Text, useThemeColor } from '@/components/Themed';
 
@@ -56,6 +56,7 @@ export function SettingItem({
   children,
   colorScheme,
   stacked = false,
+  help,
 }: {
   label: string;
   icon?: keyof typeof Ionicons.glyphMap;
@@ -63,12 +64,16 @@ export function SettingItem({
   colorScheme: 'light' | 'dark';
   /** 控件放到标签下方整行，用于放不下一行的选项组。 */
   stacked?: boolean;
+  /** 标签旁显示问号，点按在行下方展开这句说明。 */
+  help?: string;
 }) {
   void colorScheme;
   const controlBackground = useThemeColor({}, 'controlBackground');
   const textColor = useThemeColor({}, 'text');
+  const mutedColor = useThemeColor({}, 'textTertiary');
+  const [helpVisible, setHelpVisible] = useState(false);
 
-  return (
+  const row = (
     <RNView style={[styles.settingItem, stacked && styles.stackedItem]}>
       <RNView style={styles.settingLabelContainer}>
         {icon && (
@@ -84,8 +89,38 @@ export function SettingItem({
           </RNView>
         )}
         <Text style={styles.settingLabel}>{label}</Text>
+        {help && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${label}说明`}
+            accessibilityState={{ expanded: helpVisible }}
+            hitSlop={10}
+            onPress={() => setHelpVisible((visible) => !visible)}
+            style={styles.helpButton}
+          >
+            <Ionicons name="help-circle-outline" size={17} color={mutedColor} />
+          </Pressable>
+        )}
       </RNView>
       {children}
+    </RNView>
+  );
+
+  if (!help) return row;
+  return (
+    <RNView>
+      {row}
+      {helpVisible && (
+        <Pressable
+          accessibilityRole="text"
+          onPress={() => setHelpVisible(false)}
+          style={[styles.helpBubble, { backgroundColor: controlBackground }]}
+        >
+          <Text type="secondary" style={styles.helpText}>
+            {help}
+          </Text>
+        </Pressable>
+      )}
     </RNView>
   );
 }
@@ -202,6 +237,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   settingLabel: { fontSize: 16 },
+  helpButton: { marginLeft: -6 },
+  helpBubble: {
+    marginHorizontal: 16,
+    marginTop: -6,
+    marginBottom: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  helpText: { fontSize: 13, lineHeight: 19 },
   optionsTrack: {
     flexDirection: 'row',
     alignItems: 'center',

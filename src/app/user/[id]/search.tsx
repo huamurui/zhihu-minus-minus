@@ -18,6 +18,7 @@ import { toProfileSearchFeedItem } from '@/components/profile/profileSearchResul
 import { useProfileSearch } from '@/components/profile/useProfileSearch';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { Text, useRuntimeThemeColors, View } from '@/components/Themed';
+import { useListPreload } from '@/hooks/useListPreload';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import {
   type AnswerReadingContext,
@@ -31,6 +32,7 @@ export default function UserSearchScreen() {
 
 function ProfileSearchScreen({ id }: { id: string }) {
   const router = useRouter();
+  const listPreload = useListPreload(0.5);
   const insets = useSafeAreaInsets();
   const colors = useRuntimeThemeColors();
   const fontSizeScale = useSettingsStore((state) => state.fontSizeScale);
@@ -198,7 +200,7 @@ function ProfileSearchScreen({ id }: { id: string }) {
           keyboardDismissMode="on-drag"
           contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
           onEndReached={() => loadMore()}
-          onEndReachedThreshold={0.5}
+          {...listPreload}
           refreshing={search.refreshing}
           onRefresh={() => {
             if (search.pending || refreshPending.current) return;

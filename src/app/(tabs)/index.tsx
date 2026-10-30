@@ -43,6 +43,7 @@ import {
   getFeed,
   type RawFeedItem,
   type RawFeedTarget,
+  type ZhihuFeedResponse,
 } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
 import { DailyList } from '@/components/DailyList';
@@ -67,6 +68,8 @@ import { hasReusableAnswerDetail } from '@/features/rich-content';
 import { useCollapsibleChromeScroll } from '@/hooks/useCollapsibleChromeScroll';
 import { useFeedPageReadTouch } from '@/hooks/useFeedPageReadTouch';
 import { useGuestBootstrap } from '@/hooks/useGuestBootstrap';
+import { useListPreload, useLoadMoreNearEnd } from '@/hooks/useListPreload';
+import { usePageQueue } from '@/hooks/usePageQueue';
 import { useRecommendFeedback } from '@/hooks/useRecommendFeedback';
 import { useScopedAsyncValue } from '@/hooks/useScopedAsyncValue';
 import {
@@ -107,6 +110,13 @@ import {
   type FeedReadTouchBatch,
 } from '@/utils/feedReadTouch';
 import { resolveLocalAccountKey } from '@/utils/localAccount';
+import type { PageQueue } from '@/utils/pageQueue';
+import {
+  predictRecommendUrls,
+  RECOMMEND_PAGE_SIZE,
+  RECOMMEND_QUEUE_DEPTH,
+  recommendPageKey,
+} from '@/utils/parallelPaging';
 import { refreshInfiniteQuery, shouldRetryQuery } from '@/utils/query';
 import { normalizeAnswerType, parseRecommendData } from '@/utils/recommendFeed';
 import { getZhihuErrorMessage } from '@/utils/zhihuError';
@@ -1120,6 +1130,13 @@ const FeedList = React.forwardRef<
       [queryAccountKey, recommendationRequestKey, tab],
     );
     const isGuestRecommend = tab === 'recommend' && !cookies;
+    const parallelPaging = useSettingsStore(
+      (state) => state.enableParallelPaging,
+    );
+    // 多页同时加载: recommendation pages are requested ahead of the list and
+    // handed over when the list asks for them.
+    const queueRecommendations =
+      parallelPaging && tab === 'recommend' && !isGuestRecommend;
     const {
       data,
       fetchNextPage: fetchNextFeedPage,
@@ -1144,7 +1161,9 @@ const FeedList = React.forwardRef<
           refreshInFlightRef.current,
         );
         const isInitialUrl = pageParam === FEED_URLS[tab];
-        const data = await getFeed(requestUrl, { signal });
+        const data = queueRecommendations
+          ? await recommendQueue.take(requestUrl, signal)
+          : await getFeed(requestUrl, { signal });
         if (sessionVersion !== getAuthSessionVersion())
           throw new Error('登录状态已改变');
         const rawItems = data.data || [];
@@ -1201,6 +1220,30 @@ const FeedList = React.forwardRef<
         (!localDedupEnabled || exposureReady) &&
         (!launchCacheContext || isCacheCheckDone),
     });
+    // The queue follows the list's data, so a first page restored from the
+    // launch cache starts the relay too. The query function above only runs
+    // after this render, once the queue exists.
+    // Annotated: the query function's type would otherwise depend on itself.
+    const recommendQueue: PageQueue<ZhihuFeedResponse> = usePageQueue(
+      {
+        fetchPage: (url, signal) => getFeed(url, { signal }),
+        predict: (url, count) =>
+          predictRecommendUrls(url, count, RECOMMEND_PAGE_SIZE) ?? [],
+        // A page queued under another account session is never handed over.
+        key: (url) => `${getAuthSessionVersion()}|${recommendPageKey(url)}`,
+        depth: RECOMMEND_QUEUE_DEPTH,
+      },
+      {
+        // Only the list on screen prefetches; a copy kept mounted under
+        // another screen would double every request.
+        enabled: queueRecommendations && isActive,
+        nextUrl:
+          getNextUnvisitedFeedPage(
+            data?.pages.at(-1)?.nextUrl ?? null,
+            data?.pageParams ?? [],
+          ) ?? null,
+      },
+    );
     const isLoading =
       isFeedLoading ||
       (isPending && isPaused) ||
@@ -1215,6 +1258,8 @@ const FeedList = React.forwardRef<
       if (refreshInFlightRef.current) return;
 
       refreshInFlightRef.current = true;
+      // Queued pages continue the session this refresh replaces.
+      recommendQueue.clear();
       const startedAt = Date.now();
       setIsRefreshing(true);
       onRefreshStateChange?.(true);
@@ -1259,6 +1304,7 @@ const FeedList = React.forwardRef<
       onRefreshStateChange,
       queryClient,
       feedQueryKey,
+      recommendQueue,
       refetch,
       setRecentExposureKeys,
       tab,
@@ -1329,6 +1375,7 @@ const FeedList = React.forwardRef<
     );
 
     const flashListRef = useRef<FlashListRef<FeedListItem>>(null);
+    const listPreload = useListPreload(0.5);
 
     const scrollHandler = useCollapsibleChromeScroll({
       enabled: isActive && AUTO_HIDE_NAV_TABS.includes(tab),
@@ -1376,6 +1423,25 @@ const FeedList = React.forwardRef<
       return () => cancelAnimationFrame(frame);
     }, [isActive, localDedupEnabled, recentExposureKeys]);
 
+    const loadNextPage = () => {
+      if (
+        isActive &&
+        hasNextPage &&
+        !isFetching &&
+        !refreshInFlightRef.current &&
+        !isFetchNextPageError &&
+        (!(filterEnabled || localDedupEnabled) ||
+          flattenedData.length >= MIN_RENDERABLE_ITEMS)
+      )
+        void fetchNextPage();
+    };
+    useLoadMoreNearEnd({
+      listRef: flashListRef,
+      threshold: listPreload.onEndReachedThreshold,
+      loading: isFetching,
+      loadMore: loadNextPage,
+    });
+
     React.useImperativeHandle(ref, () => ({
       scrollToOffset: (args) => flashListRef.current?.scrollToOffset(args),
       refresh: handleRefresh,
@@ -1404,19 +1470,8 @@ const FeedList = React.forwardRef<
             const key = getInMemoryFeedKey(item);
             return `feed-${key || index}`;
           }}
-          onEndReached={() => {
-            if (
-              isActive &&
-              hasNextPage &&
-              !isFetching &&
-              !refreshInFlightRef.current &&
-              !isFetchNextPageError &&
-              (!(filterEnabled || localDedupEnabled) ||
-                flattenedData.length >= MIN_RENDERABLE_ITEMS)
-            )
-              void fetchNextPage();
-          }}
-          onEndReachedThreshold={0.5}
+          onEndReached={loadNextPage}
+          {...listPreload}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
           onScroll={scrollHandler}
