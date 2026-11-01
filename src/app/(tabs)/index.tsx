@@ -355,8 +355,9 @@ export default function HomeScreen() {
     }
   }, [currentPage, homeTabsCount, scrolledTabs]);
 
-  // 监听底栏 tabPress 事件：在首页点击底部 Tab 时触发滚动置顶或刷新
+  // 监听原生底栏 tabPress 事件：在首页处于激活状态时重复点击底部 Tab 触发滚动置顶或刷新
   useEffect(() => {
+    if (!nativeIOSBottomTabs) return;
     const nav = navigation as unknown as {
       addListener: (
         event: 'tabPress',
@@ -364,10 +365,13 @@ export default function HomeScreen() {
       ) => () => void;
     };
     const unsubscribe = nav.addListener?.('tabPress', () => {
+      // 仅在首页处于当前焦点状态时（即重复点击当前已处于前台的“首页”Tab）才触发滚动置顶或刷新；
+      // 从底栏其他 Tab（如“我的”）切换回首页时，isFocused 为 false，保持既有阅读位置不变。
+      if (!isFocused) return;
       handleHomeTabPress();
     });
     return unsubscribe;
-  }, [navigation, handleHomeTabPress]);
+  }, [navigation, nativeIOSBottomTabs, isFocused, handleHomeTabPress]);
 
   const handleTabPress = (index: number) => {
     if (currentPage === index) {
