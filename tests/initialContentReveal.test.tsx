@@ -1,7 +1,8 @@
-import { act, render } from '@testing-library/react-native';
+import { act, cleanup, render } from '@testing-library/react-native';
 import { AccessibilityInfo, Animated, Platform, Text } from 'react-native';
 import {
   InitialContentReveal,
+  resetReduceMotionSubscriptionForTest,
   setCachedReduceMotionForTest,
 } from '../src/components/InitialContentReveal';
 
@@ -10,10 +11,13 @@ beforeEach(() => {
   jest
     .spyOn(AccessibilityInfo, 'isReduceMotionEnabled')
     .mockResolvedValue(false);
+  resetReduceMotionSubscriptionForTest();
   setCachedReduceMotionForTest(false);
 });
 afterEach(() => {
+  cleanup();
   jest.restoreAllMocks();
+  resetReduceMotionSubscriptionForTest();
   setCachedReduceMotionForTest(false);
 });
 
@@ -122,4 +126,26 @@ test('reveals content on iOS with fade animation', async () => {
   );
   expect(host.getByText('iOS 正文')).toBeTruthy();
   expect(timing).toHaveBeenCalledTimes(1);
+});
+
+test('cleans up shared reduce motion listener when all instances unmount', async () => {
+  const removeMock = jest.fn();
+  const addListenerSpy = jest
+    .spyOn(AccessibilityInfo, 'addEventListener')
+    .mockReturnValue({ remove: removeMock } as ReturnType<
+      typeof AccessibilityInfo.addEventListener
+    >);
+
+  const host = await render(
+    <InitialContentReveal ready={false}>
+      <Text>监听测试</Text>
+    </InitialContentReveal>,
+  );
+  expect(addListenerSpy).toHaveBeenCalledWith(
+    'reduceMotionChanged',
+    expect.any(Function),
+  );
+
+  await host.unmount();
+  expect(removeMock).toHaveBeenCalledTimes(1);
 });

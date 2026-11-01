@@ -2,16 +2,54 @@ import { type ReactNode, useEffect, useLayoutEffect, useRef } from 'react';
 import { AccessibilityInfo, Animated } from 'react-native';
 
 let cachedReduceMotion = false;
+let subscriptionCount = 0;
+let removeNativeListener: (() => void) | null = null;
+const listeners = new Set<(enabled: boolean) => void>();
 
-void AccessibilityInfo.isReduceMotionEnabled?.()?.then?.((enabled) => {
-  cachedReduceMotion = enabled;
-});
-AccessibilityInfo.addEventListener?.('reduceMotionChanged', (enabled) => {
-  cachedReduceMotion = enabled;
-});
+function subscribeReduceMotion(
+  callback: (enabled: boolean) => void,
+): () => void {
+  listeners.add(callback);
+  callback(cachedReduceMotion);
+
+  if (subscriptionCount === 0) {
+    void AccessibilityInfo.isReduceMotionEnabled?.()?.then?.((enabled) => {
+      cachedReduceMotion = Boolean(enabled);
+      for (const listener of listeners) listener(cachedReduceMotion);
+    });
+    const subscription = AccessibilityInfo.addEventListener?.(
+      'reduceMotionChanged',
+      (enabled) => {
+        cachedReduceMotion = Boolean(enabled);
+        for (const listener of listeners) listener(cachedReduceMotion);
+      },
+    );
+    removeNativeListener = () => {
+      subscription?.remove?.();
+    };
+  }
+  subscriptionCount++;
+
+  return () => {
+    listeners.delete(callback);
+    subscriptionCount--;
+    if (subscriptionCount === 0) {
+      removeNativeListener?.();
+      removeNativeListener = null;
+    }
+  };
+}
 
 export function setCachedReduceMotionForTest(value: boolean) {
   cachedReduceMotion = value;
+  for (const listener of listeners) listener(value);
+}
+
+export function resetReduceMotionSubscriptionForTest() {
+  removeNativeListener?.();
+  removeNativeListener = null;
+  subscriptionCount = 0;
+  listeners.clear();
 }
 
 /** Fade the first measured body in without changing its measured height. */
@@ -28,30 +66,15 @@ export function InitialContentReveal({
   const hasRevealed = useRef(false);
 
   useEffect(() => {
-    let mounted = true;
-    void AccessibilityInfo.isReduceMotionEnabled?.()?.then?.((enabled) => {
-      cachedReduceMotion = enabled;
-      if (!mounted) return;
+    const unsubscribe = subscribeReduceMotion((enabled) => {
       reduceMotion.current = enabled;
       if (enabled) {
         opacity.stopAnimation();
         opacity.setValue(1);
       }
     });
-    const subscription = AccessibilityInfo.addEventListener?.(
-      'reduceMotionChanged',
-      (enabled) => {
-        cachedReduceMotion = enabled;
-        reduceMotion.current = enabled;
-        if (enabled) {
-          opacity.stopAnimation();
-          opacity.setValue(1);
-        }
-      },
-    );
     return () => {
-      mounted = false;
-      subscription?.remove?.();
+      unsubscribe();
       opacity.stopAnimation();
     };
   }, [opacity]);
