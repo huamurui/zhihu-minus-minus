@@ -15,7 +15,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { ActivityIndicator, Platform, StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import PagerView, {
   type PagerViewOnPageScrollEvent,
@@ -57,6 +57,7 @@ import { PullToRefresh } from '@/components/PullToRefresh';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { RecentMoments } from '@/components/RecentMoments';
 import { Text, useThemeColor, View } from '@/components/Themed';
+import { ThemedLoadingIndicator } from '@/components/ThemedLoadingIndicator';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import {
@@ -65,6 +66,7 @@ import {
 } from '@/features/adaptive-layout/PaneContext';
 import { hasReusableAnswerDetail } from '@/features/rich-content';
 import { useCollapsibleChromeScroll } from '@/hooks/useCollapsibleChromeScroll';
+import { useEndReachedPagination } from '@/hooks/useEndReachedPagination';
 import { useFeedPageReadTouch } from '@/hooks/useFeedPageReadTouch';
 import { useGuestBootstrap } from '@/hooks/useGuestBootstrap';
 import { useRecommendFeedback } from '@/hooks/useRecommendFeedback';
@@ -1134,10 +1136,12 @@ const FeedList = React.forwardRef<
       fetchNextFeedPage,
       isActive && !isRefreshing,
     );
+    const cancelPendingIntentRef = useRef<() => void>(() => {});
 
     const handleRefresh = useCallback(async () => {
       if (refreshInFlightRef.current) return;
 
+      cancelPendingIntentRef.current();
       refreshInFlightRef.current = true;
       const startedAt = Date.now();
       setIsRefreshing(true);
@@ -1254,6 +1258,26 @@ const FeedList = React.forwardRef<
 
     const flashListRef = useRef<FlashListRef<FeedListItem>>(null);
 
+    const currentCursor =
+      data?.pages.at(-1)?.nextUrl ?? (data?.pages.length || 0);
+    const isBusy = isFetching || isRefreshing || refreshInFlightRef.current;
+    const { handleEndReached, isPendingIntent, cancelPendingIntent } =
+      useEndReachedPagination({
+        isActive,
+        hasNextPage: Boolean(hasNextPage),
+        isFetchNextPageError,
+        isBusy,
+        cursor: currentCursor,
+        onFetchNextPage: fetchNextPage,
+        itemCount: flattenedData.length,
+        isAutoFetching:
+          (filterEnabled || localDedupEnabled) &&
+          flattenedData.length < MIN_RENDERABLE_ITEMS,
+        listRef: flashListRef,
+        endReachedThreshold: 0.5,
+      });
+    cancelPendingIntentRef.current = cancelPendingIntent;
+
     const scrollHandler = useCollapsibleChromeScroll({
       enabled: isActive && AUTO_HIDE_NAV_TABS.includes(tab),
       topOffset: topNavOffset,
@@ -1328,25 +1352,14 @@ const FeedList = React.forwardRef<
             const key = getInMemoryFeedKey(item);
             return `feed-${key || index}`;
           }}
-          onEndReached={() => {
-            if (
-              isActive &&
-              hasNextPage &&
-              !isFetching &&
-              !refreshInFlightRef.current &&
-              !isFetchNextPageError &&
-              (!(filterEnabled || localDedupEnabled) ||
-                flattenedData.length >= MIN_RENDERABLE_ITEMS)
-            )
-              void fetchNextPage();
-          }}
+          onEndReached={handleEndReached}
           onEndReachedThreshold={0.5}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
           onScroll={scrollHandler}
           scrollEventThrottle={16}
           contentContainerStyle={{
-            paddingTop: insets.top + 70,
+            paddingTop: insets.top + 60,
             paddingBottom: 120,
           }}
           renderItem={({ item }: { item: FeedListItem }) => {
@@ -1401,14 +1414,24 @@ const FeedList = React.forwardRef<
             ) : null
           }
           ListFooterComponent={
-            isFetchingNextPage ? (
-              <ActivityIndicator style={{ margin: 20 }} />
-            ) : isFetchNextPageError ? (
+            isFetchNextPageError ? (
               <QueryErrorView
                 compact
                 message="更多内容加载失败"
-                onRetry={() => void fetchNextPage()}
+                error={feedError}
+                onRetry={() => {
+                  cancelPendingIntent();
+                  void fetchNextPage();
+                }}
               />
+            ) : isFetchingNextPage || isPendingIntent ? (
+              <View style={styles.footerContainer}>
+                <ThemedLoadingIndicator
+                  size={22}
+                  color={tintColor}
+                  trackColor={indicatorTrackColor}
+                />
+              </View>
             ) : (filterEnabled || localDedupEnabled) &&
               !isError &&
               !isRefreshing &&
@@ -1418,7 +1441,10 @@ const FeedList = React.forwardRef<
               (!hasNextPage || autoFetchExhausted) ? (
               hasNextPage ? (
                 <BouncyButton
-                  onPress={() => void fetchNextPage()}
+                  onPress={() => {
+                    cancelPendingIntent();
+                    void fetchNextPage();
+                  }}
                   className="items-center p-5"
                 >
                   <Text type="primary">过滤后内容偏少，点击继续加载</Text>
@@ -1431,12 +1457,27 @@ const FeedList = React.forwardRef<
                   过滤后内容偏少，已无更多可加载
                 </Text>
               )
+            ) : isError ||
+              (isLoading && flattenedData.length === 0) ||
+              (flattenedData.length === 0 &&
+                !(filterEnabled || localDedupEnabled)) ? null : !hasNextPage ? (
+              <View style={styles.footerContainer}>
+                <Text type="secondary" style={styles.footerText}>
+                  暂时没有更多内容
+                </Text>
+              </View>
+            ) : hasNextPage ? (
+              <View style={styles.footerContainer}>
+                <Text type="secondary" style={styles.footerText}>
+                  继续上滑加载
+                </Text>
+              </View>
             ) : null
           }
           ListEmptyComponent={
             isRefreshing ? null : isLoading || isRefetching ? (
               <View className="flex-1 items-center justify-center mt-[100px] bg-transparent">
-                <ActivityIndicator size="large" color={tintColor} />
+                <ThemedLoadingIndicator size={36} color={tintColor} />
               </View>
             ) : isError ? (
               <QueryErrorView
@@ -1611,5 +1652,19 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     left: 10,
+  },
+  footerContainer: {
+    height: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerText: {
+    marginLeft: 8,
+    fontSize: 13,
+  },
+  footerActionText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
 });

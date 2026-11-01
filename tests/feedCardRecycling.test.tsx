@@ -1,5 +1,6 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
 import type React from 'react';
+import { Profiler } from 'react';
 import { type FeedItem, voteContent } from '../src/api/zhihu';
 import type { CollectionButton } from '../src/components/CollectionButton';
 import { CreationCard } from '../src/components/CreationCard';
@@ -304,6 +305,30 @@ test('opening an author passes the known avatar, name and headline to the profil
       headline: '合成简介',
     },
   });
+});
+
+test('a recycled card shows the new item in the same commit', async () => {
+  // A follow-up update after each recycle commit chains with FlashList's own
+  // layout updates; a large page append then exceeds React's update depth.
+  let commits = 0;
+  const onRender = () => {
+    commits += 1;
+  };
+  const host = await render(
+    <Profiler id="card" onRender={onRender}>
+      <FeedCard item={baseItem} />
+    </Profiler>,
+  );
+  commits = 0;
+  await host.rerender(
+    <Profiler id="card" onRender={onRender}>
+      <FeedCard
+        item={{ ...baseItem, id: 'recycled', voteCount: 42, voted: 1 }}
+      />
+    </Profiler>,
+  );
+  expect(host.getByText('vote:1/42')).toBeTruthy();
+  expect(commits).toBe(1);
 });
 
 test('a context-menu vote remains attached to its original item after recycling and ignores duplicate taps', async () => {

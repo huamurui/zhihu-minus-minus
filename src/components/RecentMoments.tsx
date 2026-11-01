@@ -50,12 +50,12 @@ function RecentMomentsComponent({
   }
 
   return (
-    <View className="bg-transparent border-b-[0.5px] border-black/5 dark:border-white/5">
+    <View className="bg-transparent">
       <GestureDetector gesture={scrollGesture}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerClassName="px-4 py-4"
+          contentContainerClassName="px-4 py-4 pt-2"
         >
           {items.map((item) => (
             <Pressable

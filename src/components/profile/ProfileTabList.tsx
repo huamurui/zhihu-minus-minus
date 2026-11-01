@@ -8,18 +8,18 @@ import {
   useLayoutEffect,
   useRef,
 } from 'react';
-import {
-  ActivityIndicator,
-  type ViewInstance as NativeView,
-} from 'react-native';
+import { type ViewInstance as NativeView, StyleSheet } from 'react-native';
 import Reanimated, {
   runOnJS,
   type SharedValue,
   useAnimatedScrollHandler,
   useSharedValue,
 } from 'react-native-reanimated';
+import { BouncyButton } from '@/components/BouncyButton';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { Text, useThemeColor, View } from '@/components/Themed';
+import { ThemedLoadingIndicator } from '@/components/ThemedLoadingIndicator';
+import { useEndReachedPagination } from '@/hooks/useEndReachedPagination';
 import { useRefreshAction } from '@/hooks/useRefreshAction';
 import {
   getProfileMinContentHeight,
@@ -31,6 +31,8 @@ const OFFSET_TOLERANCE = 1;
 
 export interface ProfileListQuery {
   data: unknown[];
+  pageCount?: number;
+  cursor?: string | number | null;
   isLoading: boolean;
   isError: boolean;
   isFetching: boolean;
@@ -93,6 +95,7 @@ export const ProfileTabList = forwardRef<
   ref,
 ) {
   const primaryColor = useThemeColor({}, 'primary');
+  const indicatorTrackColor = useThemeColor({}, 'border');
   const listRef = useRef<FlashListRef<unknown> | null>(null);
   const contentRef = useRef<NativeView>(null);
   const loadedRef = useRef(false);
@@ -254,29 +257,50 @@ export const ProfileTabList = forwardRef<
     if (active) measureContent();
   }, [active, measureContent]);
 
-  const loadNextPage = (retry = false) => {
-    if (
-      !active ||
-      !query.hasNextPage ||
-      query.isFetching ||
-      refreshing ||
-      refreshPending.current ||
-      paginationPending.current ||
-      (!retry && query.isFetchNextPageError)
-    ) {
-      return;
+  const isBusy =
+    query.isFetching ||
+    query.isFetchingNextPage ||
+    refreshing ||
+    refreshPending.current;
+
+  const fetchNextPageRef = useRef(query.fetchNextPage);
+  fetchNextPageRef.current = query.fetchNextPage;
+
+  const onFetchNextPage = useCallback(async () => {
+    if (refreshPending.current || paginationPending.current) {
+      return { status: 'blocked', reason: 'busy' };
     }
     paginationPending.current = true;
-    void query
-      .fetchNextPage()
-      .catch(() => undefined)
-      .finally(() => {
-        paginationPending.current = false;
-      });
-  };
+    try {
+      return await fetchNextPageRef.current();
+    } finally {
+      paginationPending.current = false;
+    }
+  }, []);
+
+  const currentCursor =
+    query.cursor !== undefined
+      ? query.cursor
+      : query.pageCount !== undefined
+        ? query.pageCount
+        : query.data.length;
+
+  const { handleEndReached, isPendingIntent, cancelPendingIntent } =
+    useEndReachedPagination({
+      isActive: active,
+      hasNextPage: Boolean(query.hasNextPage),
+      isFetchNextPageError: query.isFetchNextPageError,
+      isBusy,
+      cursor: currentCursor,
+      onFetchNextPage,
+      itemCount: query.data.length,
+      listRef,
+      endReachedThreshold: 0.4,
+    });
 
   const handleRefresh = () => {
     if (!active || refreshPending.current) return;
+    cancelPendingIntent();
     refreshPending.current = true;
     void refresh()
       .catch(() => undefined)
@@ -304,6 +328,7 @@ export const ProfileTabList = forwardRef<
         minHeight: getProfileMinContentHeight(viewportHeight, collapseDistance),
         paddingBottom: bottomInset + 24,
       }}
+      directionalLockEnabled
       maintainVisibleContentPosition={{ disabled: true }}
       scrollEventThrottle={16}
       onScroll={scrollHandler}
@@ -317,7 +342,7 @@ export const ProfileTabList = forwardRef<
         contentHeightRef.current = height;
         applyPendingScroll();
       }}
-      onEndReached={() => loadNextPage()}
+      onEndReached={handleEndReached}
       onEndReachedThreshold={0.4}
       onRefresh={handleRefresh}
       refreshing={refreshing}
@@ -330,7 +355,13 @@ export const ProfileTabList = forwardRef<
       ListEmptyComponent={
         query.isLoading ? (
           hideInitialLoadingIndicator ? null : (
-            <ActivityIndicator style={{ margin: 32 }} color={primaryColor} />
+            <View style={styles.emptyLoadingContainer}>
+              <ThemedLoadingIndicator
+                size={28}
+                color={primaryColor}
+                trackColor={indicatorTrackColor}
+              />
+            </View>
           )
         ) : query.isError ? (
           <QueryErrorView
@@ -340,6 +371,37 @@ export const ProfileTabList = forwardRef<
         ) : emptyState ? (
           // biome-ignore lint/complexity/noUselessFragments: FlashList requires a ReactElement while emptyState accepts ReactNode.
           <>{emptyState}</>
+        ) : query.hasNextPage &&
+          ((query.pageCount ?? 0) > 0 ||
+            (query.cursor !== undefined &&
+              query.cursor !== 0 &&
+              query.cursor !== '')) ? (
+          <View className="items-center py-20 bg-transparent">
+            <Text type="secondary" style={styles.emptyNextPageText}>
+              暂无已解析内容，但仍有后续数据
+            </Text>
+            {query.isFetchingNextPage ? (
+              <ThemedLoadingIndicator
+                size={24}
+                color={primaryColor}
+                trackColor={indicatorTrackColor}
+              />
+            ) : (
+              <BouncyButton
+                accessibilityRole="button"
+                accessibilityLabel="继续加载下一页"
+                onPress={() => {
+                  void onFetchNextPage().catch(() => undefined);
+                }}
+                style={[
+                  styles.loadMoreButton,
+                  { backgroundColor: primaryColor },
+                ]}
+              >
+                <Text style={styles.loadMoreButtonText}>继续加载下一页</Text>
+              </BouncyButton>
+            )}
+          </View>
         ) : (
           <View className="items-center py-20 bg-transparent">
             <Text type="secondary">暂无{label}内容</Text>
@@ -347,13 +409,21 @@ export const ProfileTabList = forwardRef<
         )
       }
       ListFooterComponent={
-        query.isFetchingNextPage ? (
-          <ActivityIndicator style={{ margin: 24 }} color={primaryColor} />
+        query.isFetchingNextPage || isPendingIntent ? (
+          <View style={styles.footerContainer}>
+            <ThemedLoadingIndicator
+              size={22}
+              color={primaryColor}
+              trackColor={indicatorTrackColor}
+            />
+          </View>
         ) : query.isFetchNextPageError && query.data.length > 0 ? (
           <QueryErrorView
             compact
             message="更多内容加载失败"
-            onRetry={() => loadNextPage(true)}
+            onRetry={() => {
+              void onFetchNextPage().catch(() => undefined);
+            }}
           />
         ) : query.isError && query.data.length > 0 ? (
           <QueryErrorView
@@ -362,11 +432,43 @@ export const ProfileTabList = forwardRef<
             onRetry={handleRefresh}
           />
         ) : query.data.length > 0 && !query.hasNextPage ? (
-          <Text type="secondary" className="text-center p-5 text-xs">
-            已显示全部内容
-          </Text>
+          <View style={styles.footerContainer}>
+            <Text type="secondary" style={styles.footerText}>
+              已显示全部内容
+            </Text>
+          </View>
         ) : null
       }
     />
   );
+});
+
+const styles = StyleSheet.create({
+  emptyLoadingContainer: {
+    paddingVertical: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyNextPageText: {
+    marginBottom: 16,
+  },
+  loadMoreButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  loadMoreButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  footerContainer: {
+    height: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerText: {
+    fontSize: 13,
+  },
 });

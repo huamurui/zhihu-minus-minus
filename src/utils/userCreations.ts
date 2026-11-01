@@ -9,6 +9,7 @@ import {
   getContentVoteCount,
   getContentVoteState,
 } from '@/api/zhihu/votePayload';
+import { formatFeedActionText } from './feedActionText';
 import {
   getNextRecentActivityCursor,
   getRecentActivityTargetId,
@@ -89,10 +90,42 @@ export function toUserCreationFeedItem(
     : undefined;
   const author = target.author;
 
+  const rawActionTime =
+    activity.source?.action_time ??
+    activity.action_time ??
+    activity.created_time ??
+    target.created ??
+    target.created_time ??
+    (typeof target.updated_time === 'number' ? target.updated_time : undefined);
+  const actionTime =
+    typeof rawActionTime === 'number' && Number.isFinite(rawActionTime)
+      ? rawActionTime > 1e11
+        ? Math.floor(rawActionTime / 1000)
+        : rawActionTime
+      : undefined;
+
+  const actorName = activity.source?.actor?.name || member.name;
+  const rawActionText = activity.source?.action_text || activity.action_text;
+  const defaultActionText =
+    type === 'answers'
+      ? '回答了问题'
+      : type === 'articles'
+        ? '发表了文章'
+        : type === 'pins'
+          ? '发布了想法'
+          : undefined;
+  const actionText = formatFeedActionText(
+    rawActionText || (actionTime ? defaultActionText : undefined),
+    actorName,
+    actionTime,
+  );
+
   return {
     id: String(id),
     title: target.question?.title || target.title || '',
-    actionText: activity.source?.action_text,
+    actionText,
+    created_time: actionTime,
+    updated_time: actionTime,
     // Every card on a member's page names them; only show other authors.
     hideAuthor: !author?.id || author.id === member.id,
     questionId:

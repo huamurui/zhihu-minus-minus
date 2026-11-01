@@ -15,6 +15,7 @@
 | 相关内容 | `GET /questions/{id}/related-objects` | `is_search` | `3.0.93` / `172` |
 | 动态流 | `GET /moments_v3` | `action`、`feed_type`、`moment_start_offset`、`offset`、`page_num`、`session_id` 等 | `3.0.93` / `43` |
 | 聚合动态来源 | `GET /moments/{id}/origin` | `limit` | `3.0.93` / `172` |
+| 个人主页「创作」 | `GET /moments/{用户 ID}/origin` | 首页 `limit`；翻页使用 `paging.next`（`offset` 为「时间戳:类型」游标，另带 `page_num`） | `3.0.93` / `10164`；Web 会话返回 `moments_feed` 条目，`target` 为完整的回答、文章或想法，官方客户端返回排版好的 `ComponentCard`；游客请求返回 `40353` |
 
 已接入接口的参数类型、URL 构造器和稳定请求头定义集中在 `src/api/zhihu/appApi.ts`。初始请求只填入可安全推导的默认值；翻页时直接使用服务端下发的 URL，保留 `session_token`、cursor、offset 和频控状态。
 
