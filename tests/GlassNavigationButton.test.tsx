@@ -154,7 +154,7 @@ describe('GlassNavigationButton', () => {
     // Disable liquid glass so fallback BouncyButton is used on iOS
     const { useSettingsStore } = require('../src/store/useSettingsStore');
     await act(async () => {
-      useSettingsStore.setState({ useIOSLiquidGlass: false });
+      useSettingsStore.setState({ useNativeIOSBottomTabs: false });
     });
 
     const hostTransparent = await render(
@@ -185,7 +185,7 @@ describe('GlassNavigationButton', () => {
     );
 
     await act(async () => {
-      useSettingsStore.setState({ useIOSLiquidGlass: true });
+      useSettingsStore.setState({ useNativeIOSBottomTabs: true });
     });
   });
 });

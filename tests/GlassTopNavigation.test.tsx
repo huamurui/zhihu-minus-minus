@@ -45,6 +45,9 @@ jest.mock('expo-blur', () => {
 jest.mock('expo-glass-effect', () => {
   const native = jest.requireActual('react-native');
   return {
+    GlassContainer: (props: Record<string, unknown>) => (
+      <native.View {...props} testID={props.testID || 'glass-container'} />
+    ),
     GlassView: (props: {
       glassEffectStyle?: string;
       [key: string]: unknown;
@@ -181,7 +184,7 @@ describe('GlassTopNavigation', () => {
       expect(onSearchPress).toHaveBeenCalledTimes(1);
     });
 
-    test('renders with clear outer track and composite indicator on supported devices', async () => {
+    test('renders with regular outer track, search button, and GlassContainer on supported devices', async () => {
       Platform.OS = 'ios';
       setPlatformVersion('26.0');
 
@@ -205,16 +208,18 @@ describe('GlassTopNavigation', () => {
       expect(host.getByRole('tab', { name: '关注' })).toBeTruthy();
       expect(host.getByRole('button', { name: '搜索' })).toBeTruthy();
 
-      // Outer track must strictly be clear Liquid Glass
-      const clearTrack = host.getByTestId('glass-surface-clear');
-      expect(clearTrack).toBeTruthy();
-      expect(clearTrack.props.glassEffectStyle).toBe('clear');
+      // GlassContainer wraps with spacing 8 for metaball fusion
+      const container = host.getByTestId('glass-container');
+      expect(container).toBeTruthy();
+      expect(container.props.spacing).toBe(8);
 
-      // Search button must be regular Liquid Glass with isInteractive
-      const regularSearch = host.getByTestId('glass-surface-regular');
-      expect(regularSearch).toBeTruthy();
-      expect(regularSearch.props.glassEffectStyle).toBe('regular');
-      expect(regularSearch.props.isInteractive).toBe(true);
+      // Both outer track and search button use regular Liquid Glass
+      const regularSurfaces = host.getAllByTestId('glass-surface-regular');
+      expect(regularSurfaces.length).toBe(2);
+
+      // Search button must have isInteractive
+      const searchSurface = regularSurfaces[1];
+      expect(searchSurface.props.isInteractive).toBe(true);
 
       // No BlurView rendered in liquid glass mode
       expect(host.queryByTestId('blur-surface')).toBeNull();

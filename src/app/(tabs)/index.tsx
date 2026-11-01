@@ -7,7 +7,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { BlurView } from 'expo-blur';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import React, {
   useCallback,
   useEffect,
@@ -175,6 +175,7 @@ export default function HomeScreen() {
   const isFocused = usePaneActive();
   const colorScheme = useColorScheme();
   const router = useRouter();
+  const navigation = useNavigation();
   const params = useLocalSearchParams<{ tab?: string }>();
   const { visibleTabs, defaultTab, localCityName, useNativeIOSBottomTabs } =
     useSettingsStore();
@@ -329,7 +330,7 @@ export default function HomeScreen() {
     [],
   );
 
-  const handleHomeTabPress = () => {
+  const handleHomeTabPress = useCallback(() => {
     const isAtHome = currentPage < homeTabsCount;
 
     if (isAtHome) {
@@ -352,9 +353,27 @@ export default function HomeScreen() {
       );
       pagerRef.current?.setPage(targetPage);
     }
-  };
+  }, [currentPage, homeTabsCount, scrolledTabs]);
+
+  // 监听底栏 tabPress 事件：在首页点击底部 Tab 时触发滚动置顶或刷新
+  useEffect(() => {
+    const nav = navigation as unknown as {
+      addListener: (
+        event: 'tabPress',
+        callback: (e: { preventDefault: () => void }) => void,
+      ) => () => void;
+    };
+    const unsubscribe = nav.addListener?.('tabPress', () => {
+      handleHomeTabPress();
+    });
+    return unsubscribe;
+  }, [navigation, handleHomeTabPress]);
 
   const handleTabPress = (index: number) => {
+    if (currentPage === index) {
+      handleHomeTabPress();
+      return;
+    }
     pagerRef.current?.setPage(index);
   };
 

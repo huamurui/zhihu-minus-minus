@@ -3,6 +3,7 @@ import { AccessibilityInfo, Platform, Text } from 'react-native';
 import {
   FloatingSurface,
   isLiquidGlassSupported,
+  resetReduceTransparencyForTesting,
 } from '../src/components/surfaces/FloatingSurface';
 import { useSettingsStore } from '../src/store/useSettingsStore';
 
@@ -40,6 +41,7 @@ describe('FloatingSurface', () => {
   beforeEach(() => {
     Platform.OS = 'ios';
     jest.clearAllMocks();
+    resetReduceTransparencyForTesting();
     reduceTransparencyHandler = null;
 
     if (!AccessibilityInfo.addEventListener) {
@@ -140,7 +142,7 @@ describe('FloatingSurface', () => {
     });
 
     test('falls back to BlurView when user disabled Liquid Glass in settings', async () => {
-      useSettingsStore.setState({ useIOSLiquidGlass: false });
+      useSettingsStore.setState({ useNativeIOSBottomTabs: false });
 
       const host = await render(
         <FloatingSurface testID="surface">
@@ -153,7 +155,7 @@ describe('FloatingSurface', () => {
       expect(host.queryByTestId('surface-glass')).toBeNull();
 
       await act(async () => {
-        useSettingsStore.setState({ useIOSLiquidGlass: true });
+        useSettingsStore.setState({ useNativeIOSBottomTabs: true });
       });
     });
 

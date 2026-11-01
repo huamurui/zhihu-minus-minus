@@ -28,7 +28,6 @@ export function NavigationInteractionSettings() {
     pressOpacity,
     pressScale,
     updateSettings,
-    useIOSLiquidGlass,
     useNativeIOSBottomTabs,
     visibleTabs,
   } = useSettingsStore();
@@ -77,6 +76,29 @@ export function NavigationInteractionSettings() {
         </Text>
       </Section>
 
+      {Platform.OS === 'ios' ? (
+        <Section title="界面材质" colorScheme={colorScheme}>
+          <SettingItem
+            label="iOS 26+ 液态玻璃"
+            icon="sparkles-outline"
+            colorScheme={colorScheme}
+          >
+            <ThemedSwitch
+              accessibilityLabel="iOS 26+ 液态玻璃"
+              accessibilityHint="开启后，在支持的设备上为导航栏、悬浮操作栏、返回控件及底部标签栏启用系统原生液态玻璃材质"
+              value={useNativeIOSBottomTabs}
+              onValueChange={(value) =>
+                updateSettings({ useNativeIOSBottomTabs: value })
+              }
+            />
+          </SettingItem>
+          <Text type="secondary" style={styles.feedbackHint}>
+            在 iOS 26+ 设备上启用系统原生 Liquid Glass
+            液态玻璃材质与原生标签栏；关闭后使用经典自绘界面与磨砂毛玻璃。
+          </Text>
+        </Section>
+      ) : null}
+
       <Section title="底部导航栏" colorScheme={colorScheme}>
         {(Object.keys(tabLabels) as TabKey[]).map((tab) => (
           <SettingItem
@@ -92,38 +114,6 @@ export function NavigationInteractionSettings() {
             />
           </SettingItem>
         ))}
-        {Platform.OS === 'ios' ? (
-          <>
-            <SettingItem
-              label="iOS 26+ 液态玻璃"
-              icon="sparkles-outline"
-              colorScheme={colorScheme}
-            >
-              <ThemedSwitch
-                accessibilityLabel="iOS 26+ 液态玻璃"
-                accessibilityHint="开启后，为导航栏、悬浮操作栏及返回控件等启用系统原生液态玻璃材质"
-                value={useIOSLiquidGlass}
-                onValueChange={(value) =>
-                  updateSettings({ useIOSLiquidGlass: value })
-                }
-              />
-            </SettingItem>
-            <SettingItem
-              label="原生底部标签栏"
-              icon="phone-portrait-outline"
-              colorScheme={colorScheme}
-            >
-              <ThemedSwitch
-                accessibilityLabel="原生底部标签栏"
-                accessibilityHint="使用 iOS 系统原生底部 Tab 栏；关闭后使用应用自绘底部栏"
-                value={useNativeIOSBottomTabs}
-                onValueChange={(value) =>
-                  updateSettings({ useNativeIOSBottomTabs: value })
-                }
-              />
-            </SettingItem>
-          </>
-        ) : null}
       </Section>
 
       <Section title="默认启动页" colorScheme={colorScheme}>

@@ -17,6 +17,11 @@ jest.mock('react-native-gesture-handler', () => ({
   ...jest.requireActual('react-native-gesture-handler'),
   GestureDetector: ({ children }: { children: ReactNode }) => children,
 }));
+
+jest.mock('../src/components/BouncyButton', () => ({
+  BouncyButton:
+    jest.requireActual<typeof import('react-native')>('react-native').Pressable,
+}));
 jest.mock('../src/components/Themed', () => ({
   useRuntimeThemeColors: () => ({
     background: '#fff',

@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { BlurView } from 'expo-blur';
-import { GlassView } from 'expo-glass-effect';
+import { GlassContainer, GlassView } from 'expo-glass-effect';
 import {
   Pressable,
   type StyleProp,
@@ -96,6 +96,9 @@ export function GlassTopNavigation({
     };
   });
 
+  // 当处于原生 Liquid Glass 模式时使用 GlassContainer 协调相邻玻璃元件（触发按压融球联动）
+  const ContainerView = liquidGlassActive ? GlassContainer : View;
+
   return (
     <Animated.View
       style={[
@@ -104,8 +107,11 @@ export function GlassTopNavigation({
         animStyle,
       ]}
     >
-      <View style={styles.navRow}>
-        {/* 1. 左侧内容分区 Tab 轨道 (原生 Liquid Glass clear 或普通 BlurView 圆角胶囊) */}
+      <ContainerView
+        {...(liquidGlassActive ? { spacing: 8 } : {})}
+        style={styles.navRow}
+      >
+        {/* 1. 左侧内容分区 Tab 轨道 (原生 Liquid Glass regular 或普通 BlurView 圆角胶囊) */}
         <View
           style={[
             styles.tabsTrackWrapper,
@@ -116,7 +122,7 @@ export function GlassTopNavigation({
         >
           {liquidGlassActive ? (
             <GlassView
-              glassEffectStyle="clear"
+              glassEffectStyle="regular"
               colorScheme={colorScheme === 'dark' ? 'dark' : 'light'}
               pointerEvents="none"
               style={styles.tabsTrackGlass}
@@ -241,7 +247,7 @@ export function GlassTopNavigation({
             </BlurView>
           </BouncyButton>
         )}
-      </View>
+      </ContainerView>
     </Animated.View>
   );
 }
