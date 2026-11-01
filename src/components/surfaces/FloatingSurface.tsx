@@ -27,6 +27,40 @@ export function isLiquidGlassSupported(): boolean {
   }
 }
 
+// 模块级单例缓存系统无障碍“减少透明度”状态，避免初次异步加载闪烁以及多个组件重复创建事件监听器
+let cachedReduceTransparency = false;
+let isReduceTransparencyInitialized = false;
+const reduceTransparencyListeners = new Set<(enabled: boolean) => void>();
+
+export function resetReduceTransparencyForTesting() {
+  cachedReduceTransparency = false;
+  isReduceTransparencyInitialized = false;
+  reduceTransparencyListeners.clear();
+}
+
+function initReduceTransparency() {
+  if (isReduceTransparencyInitialized || Platform.OS !== 'ios') return;
+  isReduceTransparencyInitialized = true;
+  AccessibilityInfo.isReduceTransparencyEnabled?.()
+    ?.then((enabled) => {
+      cachedReduceTransparency = enabled;
+      for (const listener of reduceTransparencyListeners) {
+        listener(enabled);
+      }
+    })
+    ?.catch(() => {});
+
+  AccessibilityInfo.addEventListener?.(
+    'reduceTransparencyChanged',
+    (enabled) => {
+      cachedReduceTransparency = enabled;
+      for (const listener of reduceTransparencyListeners) {
+        listener(enabled);
+      }
+    },
+  );
+}
+
 /**
  * Hook: 监听系统无障碍“减少透明度 (Reduce Transparency)”设置，
  * 并结合 iOS Liquid Glass 支持状态判断当前是否应启用原生液态玻璃。
@@ -35,26 +69,15 @@ export function useIsLiquidGlassActive(preferred = true): boolean {
   const userSettingEnabled = useSettingsStore(
     (state) => state?.useNativeIOSBottomTabs ?? true,
   );
-  const [reduceTransparency, setReduceTransparency] = useState(false);
+  const [reduceTransparency, setReduceTransparency] = useState(
+    cachedReduceTransparency,
+  );
 
   useEffect(() => {
-    let isMounted = true;
-    AccessibilityInfo.isReduceTransparencyEnabled?.()
-      ?.then((enabled) => {
-        if (isMounted) setReduceTransparency(enabled);
-      })
-      ?.catch(() => {});
-
-    const subscription = AccessibilityInfo.addEventListener?.(
-      'reduceTransparencyChanged',
-      (enabled) => {
-        setReduceTransparency(enabled);
-      },
-    );
-
+    initReduceTransparency();
+    reduceTransparencyListeners.add(setReduceTransparency);
     return () => {
-      isMounted = false;
-      subscription?.remove?.();
+      reduceTransparencyListeners.delete(setReduceTransparency);
     };
   }, []);
 

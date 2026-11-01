@@ -145,8 +145,16 @@ npm run android
 
 4. **运行 iOS**（需要 Mac 且安装 Xcode）
 
+这样会尝试打开模拟器
+
 ```bash
 npm run ios
+```
+
+⬇️ 在真实的 iOS 物理设备（iPhone / iPad）上编译并运行。
+
+```
+npx expo run:ios --device
 ```
 
 ### 提交前验证

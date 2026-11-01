@@ -278,6 +278,7 @@ function RoutePane({
   transitionSequence: number;
   children: ReactNode;
 }) {
+  const useGlass = useIsLiquidGlassActive();
   const focused = useRef(false);
   const isEntering = visible && active && transitionSequence > 0;
   const progress = useRef(new Animated.Value(isEntering ? 0 : 1)).current;
@@ -376,12 +377,13 @@ function RoutePane({
         style={[
           StyleSheet.absoluteFill,
           {
-            opacity: hasTitleTransition
-              ? 1
-              : progress.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.15, 1],
-                }),
+            opacity:
+              hasTitleTransition || useGlass
+                ? 1
+                : progress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.15, 1],
+                  }),
             ...(expand && !hasTitleTransition
               ? {
                   transform: [

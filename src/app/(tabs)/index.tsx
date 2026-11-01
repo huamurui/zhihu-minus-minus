@@ -7,7 +7,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { BlurView } from 'expo-blur';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import React, {
   useCallback,
   useEffect,
@@ -175,6 +175,7 @@ export default function HomeScreen() {
   const isFocused = usePaneActive();
   const colorScheme = useColorScheme();
   const router = useRouter();
+  const navigation = useNavigation();
   const params = useLocalSearchParams<{ tab?: string }>();
   const { visibleTabs, defaultTab, localCityName, useNativeIOSBottomTabs } =
     useSettingsStore();
@@ -329,7 +330,7 @@ export default function HomeScreen() {
     [],
   );
 
-  const handleHomeTabPress = () => {
+  const handleHomeTabPress = useCallback(() => {
     const isAtHome = currentPage < homeTabsCount;
 
     if (isAtHome) {
@@ -352,9 +353,31 @@ export default function HomeScreen() {
       );
       pagerRef.current?.setPage(targetPage);
     }
-  };
+  }, [currentPage, homeTabsCount, scrolledTabs]);
+
+  // 监听原生底栏 tabPress 事件：在首页处于激活状态时重复点击底部 Tab 触发滚动置顶或刷新
+  useEffect(() => {
+    if (!nativeIOSBottomTabs) return;
+    const nav = navigation as unknown as {
+      addListener: (
+        event: 'tabPress',
+        callback: (e: { preventDefault: () => void }) => void,
+      ) => () => void;
+    };
+    const unsubscribe = nav.addListener?.('tabPress', () => {
+      // 仅在首页处于当前焦点状态时（即重复点击当前已处于前台的“首页”Tab）才触发滚动置顶或刷新；
+      // 从底栏其他 Tab（如“我的”）切换回首页时，isFocused 为 false，保持既有阅读位置不变。
+      if (!isFocused) return;
+      handleHomeTabPress();
+    });
+    return unsubscribe;
+  }, [navigation, nativeIOSBottomTabs, isFocused, handleHomeTabPress]);
 
   const handleTabPress = (index: number) => {
+    if (currentPage === index) {
+      handleHomeTabPress();
+      return;
+    }
     pagerRef.current?.setPage(index);
   };
 

@@ -85,7 +85,7 @@ export function NavigationInteractionSettings() {
           >
             <ThemedSwitch
               accessibilityLabel="iOS 26+ 液态玻璃"
-              accessibilityHint="开启后，为导航栏、悬浮操作栏及返回控件等启用系统原生液态玻璃材质"
+              accessibilityHint="开启后，在支持的设备上为导航栏、悬浮操作栏、返回控件及底部标签栏启用系统原生液态玻璃材质"
               value={useNativeIOSBottomTabs}
               onValueChange={(value) =>
                 updateSettings({ useNativeIOSBottomTabs: value })
@@ -93,8 +93,8 @@ export function NavigationInteractionSettings() {
             />
           </SettingItem>
           <Text type="secondary" style={styles.feedbackHint}>
-            为顶部导航、悬浮操作栏、返回与关闭按钮等控件启用系统原生 Liquid
-            Glass 液态玻璃材质；关闭后回退为经典磨砂毛玻璃。
+            在 iOS 26+ 设备上启用系统原生 Liquid Glass
+            液态玻璃材质与原生标签栏；关闭后使用经典自绘界面与磨砂毛玻璃。
           </Text>
         </Section>
       ) : null}

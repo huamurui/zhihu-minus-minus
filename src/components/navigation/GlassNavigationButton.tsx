@@ -9,6 +9,7 @@ import {
   StyleSheet,
   type ViewStyle,
 } from 'react-native';
+import { BouncyButton } from '@/components/BouncyButton';
 import {
   FloatingSurface,
   useIsLiquidGlassActive,
@@ -111,10 +112,6 @@ export function GlassNavigationButton({
 
   const defaultTextColor =
     resolvedColorScheme === 'dark' ? '#FFFFFF' : '#111111';
-  const defaultBorderColor =
-    resolvedColorScheme === 'dark'
-      ? 'rgba(255, 255, 255, 0.15)'
-      : 'rgba(0, 0, 0, 0.1)';
 
   const iconColor = color ?? defaultTextColor;
   const resolvedIconSize = iconSize ?? (icon === 'back' ? 26 : 24);
@@ -160,35 +157,27 @@ export function GlassNavigationButton({
     );
   }
 
-  const fallbackBg =
-    backgroundColor ??
-    (resolvedColorScheme === 'dark'
-      ? 'rgba(30, 30, 30, 0.75)'
-      : 'rgba(255, 255, 255, 0.85)');
-
   return (
-    <Pressable
+    <BouncyButton
       testID={testID}
       accessibilityRole={accessibilityRole}
       accessibilityLabel={accessibilityLabel}
       onPress={onPress}
       disabled={disabled}
       hitSlop={hitSlop}
-      style={({ pressed }) => [
+      style={[
         styles.fallbackButton,
         {
           width: size,
           height: size,
           borderRadius,
-          backgroundColor: fallbackBg,
-          borderColor: defaultBorderColor,
-          opacity: pressed ? 0.65 : 1,
+          backgroundColor: backgroundColor ?? 'transparent',
         },
         style,
       ]}
     >
       {content}
-    </Pressable>
+    </BouncyButton>
   );
 }
 
@@ -205,7 +194,6 @@ const styles = StyleSheet.create({
   fallbackButton: {
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
   },
   iosBackShift: {
     marginLeft: -1,

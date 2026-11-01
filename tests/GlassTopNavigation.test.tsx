@@ -36,16 +36,28 @@ jest.mock('@expo/vector-icons/Ionicons', () => {
 jest.mock('expo-blur', () => {
   const native = jest.requireActual('react-native');
   return {
-    BlurView: (props: Record<string, unknown>) => <native.View {...props} />,
+    BlurView: (props: Record<string, unknown>) => (
+      <native.View {...props} testID={props.testID || 'blur-surface'} />
+    ),
   };
 });
 
 jest.mock('expo-glass-effect', () => {
   const native = jest.requireActual('react-native');
   return {
-    GlassView: (props: Record<string, unknown>) => <native.View {...props} />,
     GlassContainer: (props: Record<string, unknown>) => (
-      <native.View {...props} />
+      <native.View {...props} testID={props.testID || 'glass-container'} />
+    ),
+    GlassView: (props: {
+      glassEffectStyle?: string;
+      [key: string]: unknown;
+    }) => (
+      <native.View
+        {...props}
+        testID={
+          props.testID || `glass-surface-${props.glassEffectStyle || 'unknown'}`
+        }
+      />
     ),
     isGlassEffectAPIAvailable: jest.fn(() => true),
     isLiquidGlassAvailable: jest.fn(() => true),
@@ -172,7 +184,7 @@ describe('GlassTopNavigation', () => {
       expect(onSearchPress).toHaveBeenCalledTimes(1);
     });
 
-    test('renders with clear outer track and composite indicator on supported devices', async () => {
+    test('renders with regular outer track, search button, and GlassContainer on supported devices', async () => {
       Platform.OS = 'ios';
       setPlatformVersion('26.0');
 
@@ -195,6 +207,22 @@ describe('GlassTopNavigation', () => {
 
       expect(host.getByRole('tab', { name: '关注' })).toBeTruthy();
       expect(host.getByRole('button', { name: '搜索' })).toBeTruthy();
+
+      // GlassContainer wraps with spacing 8 for metaball fusion
+      const container = host.getByTestId('glass-container');
+      expect(container).toBeTruthy();
+      expect(container.props.spacing).toBe(8);
+
+      // Both outer track and search button use regular Liquid Glass
+      const regularSurfaces = host.getAllByTestId('glass-surface-regular');
+      expect(regularSurfaces.length).toBe(2);
+
+      // Search button must have isInteractive
+      const searchSurface = regularSurfaces[1];
+      expect(searchSurface.props.isInteractive).toBe(true);
+
+      // No BlurView rendered in liquid glass mode
+      expect(host.queryByTestId('blur-surface')).toBeNull();
     });
 
     test('renders separated tab track and search button in normal BlurView mode', async () => {
@@ -221,6 +249,12 @@ describe('GlassTopNavigation', () => {
 
       expect(host.getByRole('tab', { name: '关注' })).toBeTruthy();
       expect(host.getByRole('button', { name: '搜索' })).toBeTruthy();
+
+      // BlurViews rendered, no GlassViews
+      const blurViews = host.getAllByTestId('blur-surface');
+      expect(blurViews.length).toBe(2);
+      expect(host.queryByTestId('glass-surface-clear')).toBeNull();
+      expect(host.queryByTestId('glass-surface-regular')).toBeNull();
 
       await fireEvent.press(host.getByRole('button', { name: '搜索' }));
       expect(onSearchPress).toHaveBeenCalledTimes(1);

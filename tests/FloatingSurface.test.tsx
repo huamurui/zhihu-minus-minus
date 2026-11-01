@@ -3,6 +3,7 @@ import { AccessibilityInfo, Platform, Text } from 'react-native';
 import {
   FloatingSurface,
   isLiquidGlassSupported,
+  resetReduceTransparencyForTesting,
 } from '../src/components/surfaces/FloatingSurface';
 import { useSettingsStore } from '../src/store/useSettingsStore';
 
@@ -10,7 +11,10 @@ jest.mock('expo-blur', () => {
   const native = jest.requireActual('react-native');
   return {
     BlurView: (props: Record<string, unknown>) => (
-      <native.View {...props} testID={props.testID || 'blur-view'} />
+      <native.View
+        {...props}
+        testID={props.testID ? `${props.testID}-blur` : 'blur-view'}
+      />
     ),
   };
 });
@@ -19,7 +23,10 @@ jest.mock('expo-glass-effect', () => {
   const native = jest.requireActual('react-native');
   return {
     GlassView: (props: Record<string, unknown>) => (
-      <native.View {...props} testID={props.testID || 'glass-view'} />
+      <native.View
+        {...props}
+        testID={props.testID ? `${props.testID}-glass` : 'glass-view'}
+      />
     ),
     isGlassEffectAPIAvailable: jest.fn(() => true),
     isLiquidGlassAvailable: jest.fn(() => true),
@@ -34,6 +41,7 @@ describe('FloatingSurface', () => {
   beforeEach(() => {
     Platform.OS = 'ios';
     jest.clearAllMocks();
+    resetReduceTransparencyForTesting();
     reduceTransparencyHandler = null;
 
     if (!AccessibilityInfo.addEventListener) {
@@ -94,17 +102,18 @@ describe('FloatingSurface', () => {
   });
 
   describe('useIsLiquidGlassActive & FloatingSurface rendering', () => {
-    test('renders GlassView on iOS when supported and transparency is normal', async () => {
+    test('renders GlassView on iOS when supported and transparency is normal with correct glassEffectStyle', async () => {
       const host = await render(
-        <FloatingSurface testID="surface" glassStyle="regular">
+        <FloatingSurface testID="surface" glassStyle="clear">
           <Text>Content</Text>
         </FloatingSurface>,
       );
       await act(async () => {});
 
-      const surface = host.getByTestId('surface');
-      expect(surface).toBeTruthy();
-      expect(host.queryByTestId('blur-view')).toBeNull();
+      const glass = host.getByTestId('surface-glass');
+      expect(glass).toBeTruthy();
+      expect(glass.props.glassEffectStyle).toBe('clear');
+      expect(host.queryByTestId('surface-blur')).toBeNull();
     });
 
     test('renders BlurView when platform is Android', async () => {
@@ -116,8 +125,8 @@ describe('FloatingSurface', () => {
       );
       await act(async () => {});
 
-      const surface = host.getByTestId('surface');
-      expect(surface).toBeTruthy();
+      expect(host.getByTestId('surface-blur')).toBeTruthy();
+      expect(host.queryByTestId('surface-glass')).toBeNull();
     });
 
     test('renders BlurView when forceBlur is true', async () => {
@@ -128,8 +137,8 @@ describe('FloatingSurface', () => {
       );
       await act(async () => {});
 
-      const surface = host.getByTestId('surface');
-      expect(surface).toBeTruthy();
+      expect(host.getByTestId('surface-blur')).toBeTruthy();
+      expect(host.queryByTestId('surface-glass')).toBeNull();
     });
 
     test('falls back to BlurView when user disabled Liquid Glass in settings', async () => {
@@ -142,9 +151,8 @@ describe('FloatingSurface', () => {
       );
       await act(async () => {});
 
-      const surface = host.getByTestId('surface');
-      expect(surface).toBeTruthy();
-      expect(host.queryByTestId('glass-view')).toBeNull();
+      expect(host.getByTestId('surface-blur')).toBeTruthy();
+      expect(host.queryByTestId('surface-glass')).toBeNull();
 
       await act(async () => {
         useSettingsStore.setState({ useNativeIOSBottomTabs: true });
@@ -163,8 +171,8 @@ describe('FloatingSurface', () => {
       );
       await act(async () => {});
 
-      const surface = host.getByTestId('surface');
-      expect(surface).toBeTruthy();
+      expect(host.getByTestId('surface-blur')).toBeTruthy();
+      expect(host.queryByTestId('surface-glass')).toBeNull();
     });
 
     test('responds to reduceTransparencyChanged events dynamically', async () => {
@@ -176,20 +184,24 @@ describe('FloatingSurface', () => {
       await act(async () => {});
 
       expect(reduceTransparencyHandler).not.toBeNull();
+      expect(host.getByTestId('surface-glass')).toBeTruthy();
+      expect(host.queryByTestId('surface-blur')).toBeNull();
 
       // Trigger change to reduceTransparency = true
       await act(async () => {
         reduceTransparencyHandler?.(true);
       });
 
-      expect(host.getByTestId('surface')).toBeTruthy();
+      expect(host.getByTestId('surface-blur')).toBeTruthy();
+      expect(host.queryByTestId('surface-glass')).toBeNull();
 
       // Trigger change back to reduceTransparency = false
       await act(async () => {
         reduceTransparencyHandler?.(false);
       });
 
-      expect(host.getByTestId('surface')).toBeTruthy();
+      expect(host.getByTestId('surface-glass')).toBeTruthy();
+      expect(host.queryByTestId('surface-blur')).toBeNull();
     });
   });
 });
