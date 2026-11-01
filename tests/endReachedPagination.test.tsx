@@ -555,5 +555,148 @@ describe('useEndReachedPagination state machine', () => {
       });
       expect(onFetchNextPage).toHaveBeenCalledTimes(5);
     });
+
+    it('does not cancel scheduled resting follow-up when parent re-renders before frame fires', async () => {
+      const offset = 1200;
+      const listRef = {
+        current: {
+          getAbsoluteLastScrollOffset: () => offset,
+          getWindowSize: () => ({ height: 800 }),
+          getChildContainerDimensions: () => ({ height: 1600 }),
+          getFirstItemOffset: () => 0,
+        },
+      };
+
+      const onFetchNextPage = jest
+        .fn()
+        .mockResolvedValue({ status: 'started' });
+      const host = await renderHook(
+        ({
+          busy,
+          itemCount,
+          fetchFn,
+        }: {
+          busy: boolean;
+          itemCount: number;
+          fetchFn: () => Promise<unknown>;
+        }) =>
+          useEndReachedPagination({
+            isActive: true,
+            hasNextPage: true,
+            isFetchNextPageError: false,
+            isBusy: busy,
+            cursor: 'cursor-1',
+            onFetchNextPage: fetchFn,
+            itemCount,
+            listRef,
+            endReachedThreshold: 0.5,
+          }),
+        {
+          initialProps: {
+            busy: false,
+            itemCount: 10,
+            fetchFn: onFetchNextPage,
+          },
+        },
+      );
+
+      // 1. User reaches end
+      await act(async () => {
+        host.result.current.handleEndReached();
+      });
+      expect(onFetchNextPage).toHaveBeenCalledTimes(1);
+
+      // 2. Fetch becomes busy then finishes (busy -> false)
+      await act(async () => {
+        host.rerender({
+          busy: true,
+          itemCount: 10,
+          fetchFn: onFetchNextPage,
+        });
+      });
+      await act(async () => {
+        host.rerender({
+          busy: false,
+          itemCount: 10,
+          fetchFn: onFetchNextPage,
+        });
+      });
+
+      // 3. Parent re-renders with a newly allocated fetch function before the animation frame runs!
+      const newFetchFn = jest.fn().mockResolvedValue({ status: 'started' });
+      await act(async () => {
+        host.rerender({
+          busy: false,
+          itemCount: 10,
+          fetchFn: newFetchFn,
+        });
+      });
+
+      // 4. Animation frame runs now
+      await act(async () => {
+        jest.runOnlyPendingTimers();
+      });
+
+      // The follow-up request was NOT cancelled and used the latest fetch function!
+      expect(newFetchFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('cancels scheduled resting follow-up when cancelPendingIntent or deactivate is called before frame fires', async () => {
+      const offset = 1200;
+      const listRef = {
+        current: {
+          getAbsoluteLastScrollOffset: () => offset,
+          getWindowSize: () => ({ height: 800 }),
+          getChildContainerDimensions: () => ({ height: 1600 }),
+          getFirstItemOffset: () => 0,
+        },
+      };
+
+      const onFetchNextPage = jest
+        .fn()
+        .mockResolvedValue({ status: 'started' });
+      const host = await renderHook(
+        ({ busy, active }: { busy: boolean; active: boolean }) =>
+          useEndReachedPagination({
+            isActive: active,
+            hasNextPage: true,
+            isFetchNextPageError: false,
+            isBusy: busy,
+            cursor: 'cursor-1',
+            onFetchNextPage,
+            itemCount: 10,
+            listRef,
+            endReachedThreshold: 0.5,
+          }),
+        { initialProps: { busy: false, active: true } },
+      );
+
+      // User reaches end
+      await act(async () => {
+        host.result.current.handleEndReached();
+      });
+      expect(onFetchNextPage).toHaveBeenCalledTimes(1);
+
+      // Busy finishes
+      await act(async () => {
+        host.rerender({ busy: true, active: true });
+      });
+      await act(async () => {
+        host.rerender({ busy: false, active: true });
+      });
+
+      // Before frame fires, user refreshes / cancels intent
+      await act(async () => {
+        host.result.current.cancelPendingIntent();
+      });
+
+      // Animation frame fires
+      await act(async () => {
+        jest.runOnlyPendingTimers();
+      });
+
+      // Did not fire follow-up because it was cancelled!
+      expect(onFetchNextPage).toHaveBeenCalledTimes(1);
+    });
   });
 });

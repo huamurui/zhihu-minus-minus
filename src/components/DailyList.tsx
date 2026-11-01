@@ -188,6 +188,10 @@ export const DailyList = React.forwardRef<
     isRefreshing ||
     isFetchingNextPage ||
     refreshInFlightRef.current;
+  const handleFetchNextPage = useCallback(
+    () => fetchNextPage({ cancelRefetch: false }),
+    [fetchNextPage],
+  );
   const { handleEndReached, isPendingIntent, cancelPendingIntent } =
     useEndReachedPagination({
       isActive: chrome.enabled,
@@ -195,7 +199,7 @@ export const DailyList = React.forwardRef<
       isFetchNextPageError,
       isBusy,
       cursor: currentCursor,
-      onFetchNextPage: () => fetchNextPage({ cancelRefetch: false }),
+      onFetchNextPage: handleFetchNextPage,
       itemCount: flattenedData.length,
       listRef: flashListRef,
       endReachedThreshold: 0.5,

@@ -330,10 +330,12 @@ function creationCard(
   id: string,
   title: string,
   authorId = member.id,
+  extra: { action_text?: string; created_time?: number } = {},
 ) {
   const author = { ...member, id: authorId, url_token: `${authorId}-token` };
   return {
     type: 'moments_feed',
+    ...extra,
     target:
       contentType === 'answer'
         ? { id, type: 'answer', author, question: { id: `q-${id}`, title } }
@@ -753,23 +755,10 @@ test('search opens a separate route without altering the active tab or list offs
   await host.unmount();
 });
 
-test('holds page swipes while a list scrolls vertically and briefly after', async () => {
+test('pager retains horizontal swiping capability without dynamic scroll locking', async () => {
   mockRoute.tab = 'answers';
   const host = await render(screen());
   await flushQueries();
-  expect(mockPagerProps.scrollEnabled).toBe(true);
-  const reportActivity = mockListProps.get('回答')?.onScrollActivityChange;
-  await act(async () => reportActivity?.(true));
-  expect(mockPagerProps.scrollEnabled).toBe(false);
-  // The fling that follows a drag keeps the pager held.
-  await act(async () => {
-    reportActivity?.(false);
-    reportActivity?.(true);
-  });
-  expect(mockPagerProps.scrollEnabled).toBe(false);
-  await act(async () => reportActivity?.(false));
-  expect(mockPagerProps.scrollEnabled).toBe(false);
-  await flushQueries(300);
   expect(mockPagerProps.scrollEnabled).toBe(true);
   await host.unmount();
 });
@@ -907,6 +896,52 @@ test('creation cards of different types retain distinct list keys when their IDs
   });
   expect(host.queryByText('无法确认的回答链接')).toBeNull();
   await host.unmount();
+});
+
+test('populates actionText and action time for creations and activities tab cards', () => {
+  const now = 1770156705 * 1000 + 10 * 60 * 1000;
+  jest.spyOn(Date, 'now').mockReturnValue(now);
+
+  mockCreations([
+    creationCard('pin', 'creation-pin-id', '创作想法', member.id, {
+      action_text: '发布了想法',
+      created_time: 1770156705,
+    }),
+  ]);
+  jest.mocked(getMemberActivities).mockResolvedValue({
+    ...emptyPage,
+    data: [
+      {
+        id: 'activity-pin-event',
+        action_text: '发布了想法',
+        created_time: 1770156705,
+        target: {
+          id: 'activity-pin-id',
+          type: 'pin',
+          author: { ...member, type: 'people' },
+          content: '动态想法正文',
+        },
+      },
+    ],
+  });
+
+  return render(screen()).then(async (host) => {
+    await flushQueries();
+    expect(mockFeedItems.get('creation-pin-id')).toMatchObject({
+      actionText: '发布了想法 · 10分钟前',
+      created_time: 1770156705,
+    });
+
+    await fireEvent.press(host.getByRole('tab', { name: '动态' }));
+    await flushQueries();
+    expect(mockFeedItems.get('activity-pin-id')).toMatchObject({
+      actionText: '发布了想法 · 10分钟前',
+      created_time: 1770156705,
+    });
+
+    await host.unmount();
+    jest.restoreAllMocks();
+  });
 });
 
 test.each([true, false])(

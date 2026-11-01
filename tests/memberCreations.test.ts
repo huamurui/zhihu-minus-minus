@@ -74,3 +74,34 @@ test('the first page asks the App profile endpoint, later pages the cursor', asy
     expect.anything(),
   );
 });
+
+test('extracts actionText and actionTime from creation entries', () => {
+  const target = { id: '42', type: 'pin', content: '内容' };
+  const direct = toMemberCreation({
+    type: 'moments_feed',
+    action_text: '发布了想法',
+    created_time: 1770156705,
+    target,
+  });
+  expect(direct).toEqual({
+    kind: 'pins',
+    item: target,
+    actionText: '发布了想法',
+    actionTime: 1770156705,
+  });
+
+  const fromSource = toMemberCreation({
+    type: 'moments_feed',
+    source: {
+      action_text: '发表了文章',
+      action_time: 1770156705000,
+    },
+    target: { id: '43', type: 'article' },
+  });
+  expect(fromSource).toEqual({
+    kind: 'articles',
+    item: { id: '43', type: 'article' },
+    actionText: '发表了文章',
+    actionTime: 1770156705,
+  });
+});

@@ -97,9 +97,39 @@ export function useEndReachedPagination({
   // Resting follow-ups should ONLY trigger if the user reached bottom, not on initial load/refresh.
   const pagingInitiatedRef = useRef(false);
   const itemCountAtPagingRef = useRef<number | undefined>(undefined);
+  const followUpFrameRef = useRef<number | null>(null);
+
+  const latestOptionsRef = useRef({
+    isActive,
+    hasNextPage,
+    isFetchNextPageError,
+    isBusy,
+    cursor,
+    onFetchNextPage,
+    itemCount,
+    isAutoFetching,
+    listRef,
+    endReachedThreshold,
+  });
+  latestOptionsRef.current = {
+    isActive,
+    hasNextPage,
+    isFetchNextPageError,
+    isBusy,
+    cursor,
+    onFetchNextPage,
+    itemCount,
+    isAutoFetching,
+    listRef,
+    endReachedThreshold,
+  };
 
   const cancelPendingIntent = useCallback(() => {
     generationRef.current += 1;
+    if (followUpFrameRef.current !== null) {
+      cancelAnimationFrame(followUpFrameRef.current);
+      followUpFrameRef.current = null;
+    }
     pendingIntentRef.current = null;
     setIsPendingIntent(false);
     inFlightCursorRef.current = null;
@@ -108,32 +138,38 @@ export function useEndReachedPagination({
   }, []);
 
   const dispatchFetch = useCallback(async () => {
-    if (!isActive || !hasNextPage || isFetchNextPageError || isAutoFetching) {
+    const opts = latestOptionsRef.current;
+    if (
+      !opts.isActive ||
+      !opts.hasNextPage ||
+      opts.isFetchNextPageError ||
+      opts.isAutoFetching
+    ) {
       return;
     }
-    if (cursor === undefined || cursor === null) {
+    if (opts.cursor === undefined || opts.cursor === null) {
       return;
     }
 
-    if (isBusy) {
-      pendingIntentRef.current = { cursor };
+    if (opts.isBusy) {
+      pendingIntentRef.current = { cursor: opts.cursor };
       setIsPendingIntent(true);
       pagingInitiatedRef.current = true;
-      itemCountAtPagingRef.current = itemCount;
+      itemCountAtPagingRef.current = opts.itemCount;
       return;
     }
 
-    if (inFlightCursorRef.current === cursor) {
+    if (inFlightCursorRef.current === opts.cursor) {
       return;
     }
 
-    inFlightCursorRef.current = cursor;
+    inFlightCursorRef.current = opts.cursor;
     pagingInitiatedRef.current = true;
-    itemCountAtPagingRef.current = itemCount;
+    itemCountAtPagingRef.current = opts.itemCount;
     const currentGen = ++generationRef.current;
 
     try {
-      const result = await onFetchNextPage();
+      const result = await opts.onFetchNextPage();
       if (generationRef.current !== currentGen) return;
 
       if (
@@ -142,8 +178,8 @@ export function useEndReachedPagination({
         'status' in result &&
         result.status === 'blocked'
       ) {
-        if (isActive && hasNextPage && !isFetchNextPageError) {
-          pendingIntentRef.current = { cursor };
+        if (opts.isActive && opts.hasNextPage && !opts.isFetchNextPageError) {
+          pendingIntentRef.current = { cursor: opts.cursor };
           setIsPendingIntent(true);
         } else {
           pendingIntentRef.current = null;
@@ -165,19 +201,11 @@ export function useEndReachedPagination({
         inFlightCursorRef.current = null;
       }
     }
-  }, [
-    cursor,
-    hasNextPage,
-    isActive,
-    isAutoFetching,
-    isBusy,
-    isFetchNextPageError,
-    itemCount,
-    onFetchNextPage,
-  ]);
+  }, []);
 
   const handleEndReached = useCallback(() => {
-    const list = listRef?.current;
+    const opts = latestOptionsRef.current;
+    const list = opts.listRef?.current;
     const currentOffset = list?.getAbsoluteLastScrollOffset?.() ?? Number.NaN;
     if (!Number.isNaN(currentOffset)) {
       if (currentOffset !== restingRef.current.offset) {
@@ -187,7 +215,7 @@ export function useEndReachedPagination({
       }
     }
     void dispatchFetch();
-  }, [dispatchFetch, listRef]);
+  }, [dispatchFetch]);
 
   // When new visible items arrive, reset the resting follow-up budget.
   useEffect(() => {
@@ -205,6 +233,10 @@ export function useEndReachedPagination({
     if (!isActive) {
       generationRef.current += 1;
       pagingInitiatedRef.current = false;
+      if (followUpFrameRef.current !== null) {
+        cancelAnimationFrame(followUpFrameRef.current);
+        followUpFrameRef.current = null;
+      }
       if (pendingIntentRef.current !== null) {
         pendingIntentRef.current = null;
         setIsPendingIntent(false);
@@ -220,6 +252,10 @@ export function useEndReachedPagination({
     if (pending.cursor !== cursor) {
       generationRef.current += 1;
       pagingInitiatedRef.current = false;
+      if (followUpFrameRef.current !== null) {
+        cancelAnimationFrame(followUpFrameRef.current);
+        followUpFrameRef.current = null;
+      }
       pendingIntentRef.current = null;
       setIsPendingIntent(false);
       inFlightCursorRef.current = null;
@@ -263,46 +299,77 @@ export function useEndReachedPagination({
 
     // Only follow up if this load originated from an end-reached attempt.
     if (!pagingInitiatedRef.current) return;
-    pagingInitiatedRef.current = false;
 
-    if (!isActive || !hasNextPage || isFetchNextPageError || isAutoFetching) {
-      return;
-    }
-    if (!listRef?.current) return;
-
-    // If visible items increased, new content was loaded; user should scroll to reach bottom again.
+    const opts = latestOptionsRef.current;
     if (
-      itemCount !== undefined &&
-      itemCountAtPagingRef.current !== undefined &&
-      itemCount > itemCountAtPagingRef.current
+      !opts.isActive ||
+      !opts.hasNextPage ||
+      opts.isFetchNextPageError ||
+      opts.isAutoFetching
     ) {
       return;
     }
 
-    const frame = requestAnimationFrame(() => {
-      const list = listRef.current;
-      if (!list || !isNearEnd(list, endReachedThreshold)) return;
+    if (
+      opts.itemCount !== undefined &&
+      itemCountAtPagingRef.current !== undefined &&
+      opts.itemCount > itemCountAtPagingRef.current
+    ) {
+      return;
+    }
+
+    if (followUpFrameRef.current !== null) {
+      cancelAnimationFrame(followUpFrameRef.current);
+    }
+
+    const currentGen = generationRef.current;
+    followUpFrameRef.current = requestAnimationFrame(() => {
+      followUpFrameRef.current = null;
+      if (generationRef.current !== currentGen) return;
+      if (!pagingInitiatedRef.current) return;
+
+      const currentOpts = latestOptionsRef.current;
+      if (
+        !currentOpts.isActive ||
+        !currentOpts.hasNextPage ||
+        currentOpts.isFetchNextPageError ||
+        currentOpts.isAutoFetching
+      ) {
+        return;
+      }
+
+      if (
+        currentOpts.itemCount !== undefined &&
+        itemCountAtPagingRef.current !== undefined &&
+        currentOpts.itemCount > itemCountAtPagingRef.current
+      ) {
+        pagingInitiatedRef.current = false;
+        return;
+      }
+
+      const list = currentOpts.listRef?.current;
+      if (!list || !isNearEnd(list, currentOpts.endReachedThreshold)) return;
       const offset = list.getAbsoluteLastScrollOffset?.() ?? 0;
       if (offset !== restingRef.current.offset) {
         restingRef.current = { offset, followUps: 0 };
       }
       if (restingRef.current.followUps >= MAX_RESTING_FOLLOW_UPS) return;
+
+      pagingInitiatedRef.current = false;
       restingRef.current.followUps += 1;
       void dispatchFetch();
     });
+  }, [dispatchFetch, isBusy]);
 
-    return () => cancelAnimationFrame(frame);
-  }, [
-    dispatchFetch,
-    endReachedThreshold,
-    hasNextPage,
-    isActive,
-    isAutoFetching,
-    isBusy,
-    isFetchNextPageError,
-    itemCount,
-    listRef,
-  ]);
+  useEffect(() => {
+    return () => {
+      generationRef.current += 1;
+      if (followUpFrameRef.current !== null) {
+        cancelAnimationFrame(followUpFrameRef.current);
+        followUpFrameRef.current = null;
+      }
+    };
+  }, []);
 
   return {
     handleEndReached,

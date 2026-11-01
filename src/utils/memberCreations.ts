@@ -6,6 +6,8 @@ export type CreationKind = 'answers' | 'articles' | 'pins';
 export interface MemberCreation {
   kind: CreationKind;
   item: ZhihuMemberRelation;
+  actionText?: string;
+  actionTime?: number;
 }
 
 /**
@@ -15,7 +17,25 @@ export interface MemberCreation {
  */
 export interface ZhihuCreationEntry {
   type?: string;
-  target?: { type?: string; id?: unknown };
+  action_text?: string;
+  action_time?: number;
+  created_time?: number;
+  updated_time?: number;
+  source?: {
+    action_text?: string;
+    action_time?: number;
+    action_type?: string;
+    created_time?: number;
+  };
+  target?: {
+    type?: string;
+    id?: unknown;
+    action_text?: string;
+    created_time?: number;
+    created?: number;
+    updated_time?: number;
+    [key: string]: unknown;
+  };
 }
 
 const KIND_BY_TARGET_TYPE: Record<string, CreationKind> = {
@@ -31,5 +51,40 @@ export function toMemberCreation(
   const target = entry.target;
   const kind = target?.type ? KIND_BY_TARGET_TYPE[target.type] : undefined;
   if (!kind || target?.id === undefined || target.id === null) return null;
-  return { kind, item: target as unknown as ZhihuMemberRelation };
+
+  const actionText =
+    entry.action_text ||
+    entry.source?.action_text ||
+    (typeof target.action_text === 'string' ? target.action_text : undefined);
+
+  const rawTime =
+    entry.created_time ??
+    entry.action_time ??
+    entry.source?.action_time ??
+    entry.source?.created_time ??
+    entry.updated_time ??
+    (typeof target.created === 'number' ? target.created : undefined) ??
+    (typeof target.created_time === 'number'
+      ? target.created_time
+      : undefined) ??
+    (typeof target.updated_time === 'number' ? target.updated_time : undefined);
+
+  const actionTime =
+    typeof rawTime === 'number' && Number.isFinite(rawTime)
+      ? rawTime > 1e11
+        ? Math.floor(rawTime / 1000)
+        : rawTime
+      : undefined;
+
+  const result: MemberCreation = {
+    kind,
+    item: target as unknown as ZhihuMemberRelation,
+  };
+  if (actionText !== undefined) {
+    result.actionText = actionText;
+  }
+  if (actionTime !== undefined) {
+    result.actionTime = actionTime;
+  }
+  return result;
 }

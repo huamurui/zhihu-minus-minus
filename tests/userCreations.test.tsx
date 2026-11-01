@@ -297,3 +297,66 @@ test.each([
     ).toMatchObject({ id: '2088306465639604943', type: 'videos', videoSource });
   },
 );
+
+test('formats actionText and timestamps for recent published activities', () => {
+  const now = 1793513195 * 1000 + 10 * 60 * 1000;
+  jest.spyOn(Date, 'now').mockReturnValue(now);
+
+  const itemWithTime = toUserCreationFeedItem(
+    {
+      source: {
+        action_text: '发布了想法',
+        action_time: 1793513195,
+      },
+      target: {
+        id: 'pin-1',
+        type: 'pin',
+        content: [{ type: 'text', own_text: '测试想法' }],
+      },
+    },
+    member,
+  );
+  expect(itemWithTime).toMatchObject({
+    actionText: '发布了想法 · 10分钟前',
+    created_time: 1793513195,
+    updated_time: 1793513195,
+  });
+
+  const itemWithoutText = toUserCreationFeedItem(
+    {
+      source: {
+        action_time: 1793513195,
+      },
+      target: {
+        id: 'answer-1',
+        type: 'answer',
+        title: '回答标题',
+      },
+    },
+    member,
+  );
+  expect(itemWithoutText).toMatchObject({
+    actionText: '回答了问题 · 10分钟前',
+    created_time: 1793513195,
+  });
+
+  const itemWithActorName = toUserCreationFeedItem(
+    {
+      source: {
+        action_text: '合成作者发布了想法',
+        action_time: 1793513195,
+        actor: { name: '合成作者' },
+      },
+      target: {
+        id: 'pin-2',
+        type: 'pin',
+      },
+    },
+    member,
+  );
+  expect(itemWithActorName).toMatchObject({
+    actionText: '合成作者 发布了想法 · 10分钟前',
+  });
+
+  jest.restoreAllMocks();
+});

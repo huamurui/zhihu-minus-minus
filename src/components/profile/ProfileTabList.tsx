@@ -15,6 +15,7 @@ import Reanimated, {
   useAnimatedScrollHandler,
   useSharedValue,
 } from 'react-native-reanimated';
+import { BouncyButton } from '@/components/BouncyButton';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { ThemedLoadingIndicator } from '@/components/ThemedLoadingIndicator';
@@ -30,6 +31,8 @@ const OFFSET_TOLERANCE = 1;
 
 export interface ProfileListQuery {
   data: unknown[];
+  pageCount?: number;
+  cursor?: string | number | null;
   isLoading: boolean;
   isError: boolean;
   isFetching: boolean;
@@ -61,8 +64,6 @@ export interface ProfileTabListProps {
   emptyState?: ReactNode;
   /** Keep initial profile placeholders still while the member details load. */
   hideInitialLoadingIndicator?: boolean;
-  /** Reports when the user drags or flings this list vertically. */
-  onScrollActivityChange?: (active: boolean) => void;
 }
 
 interface PendingScroll {
@@ -90,7 +91,6 @@ export const ProfileTabList = forwardRef<
     listHeader,
     emptyState,
     hideInitialLoadingIndicator = false,
-    onScrollActivityChange,
   },
   ref,
 ) {
@@ -125,11 +125,6 @@ export const ProfileTabList = forwardRef<
     pendingRef.current = null;
   }, []);
 
-  const reportScrollActivity = useCallback(
-    (active: boolean) => onScrollActivityChange?.(active),
-    [onScrollActivityChange],
-  );
-
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
       const offset = Math.max(0, event.contentOffset.y);
@@ -145,16 +140,6 @@ export const ProfileTabList = forwardRef<
     onBeginDrag: () => {
       requestedScroll.value = null;
       runOnJS(cancelPendingScroll)();
-      runOnJS(reportScrollActivity)(true);
-    },
-    onEndDrag: () => {
-      runOnJS(reportScrollActivity)(false);
-    },
-    onMomentumBegin: () => {
-      runOnJS(reportScrollActivity)(true);
-    },
-    onMomentumEnd: () => {
-      runOnJS(reportScrollActivity)(false);
     },
   });
 
@@ -278,19 +263,28 @@ export const ProfileTabList = forwardRef<
     refreshing ||
     refreshPending.current;
 
+  const fetchNextPageRef = useRef(query.fetchNextPage);
+  fetchNextPageRef.current = query.fetchNextPage;
+
   const onFetchNextPage = useCallback(async () => {
     if (refreshPending.current || paginationPending.current) {
       return { status: 'blocked', reason: 'busy' };
     }
     paginationPending.current = true;
     try {
-      return await query.fetchNextPage();
+      return await fetchNextPageRef.current();
     } finally {
       paginationPending.current = false;
     }
-  }, [query]);
+  }, []);
 
-  const currentCursor = query.data.length;
+  const currentCursor =
+    query.cursor !== undefined
+      ? query.cursor
+      : query.pageCount !== undefined
+        ? query.pageCount
+        : query.data.length;
+
   const { handleEndReached, isPendingIntent, cancelPendingIntent } =
     useEndReachedPagination({
       isActive: active,
@@ -334,6 +328,7 @@ export const ProfileTabList = forwardRef<
         minHeight: getProfileMinContentHeight(viewportHeight, collapseDistance),
         paddingBottom: bottomInset + 24,
       }}
+      directionalLockEnabled
       maintainVisibleContentPosition={{ disabled: true }}
       scrollEventThrottle={16}
       onScroll={scrollHandler}
@@ -376,6 +371,70 @@ export const ProfileTabList = forwardRef<
         ) : emptyState ? (
           // biome-ignore lint/complexity/noUselessFragments: FlashList requires a ReactElement while emptyState accepts ReactNode.
           <>{emptyState}</>
+        ) : query.hasNextPage &&
+          ((query.pageCount ?? 0) > 0 ||
+            (query.cursor !== undefined &&
+              query.cursor !== 0 &&
+              query.cursor !== '')) ? (
+          <View className="items-center py-20 bg-transparent">
+            <Text type="secondary" style={styles.emptyNextPageText}>
+              暂无已解析内容，但仍有后续数据
+            </Text>
+            {query.isFetchingNextPage ? (
+              <ThemedLoadingIndicator
+                size={24}
+                color={primaryColor}
+                trackColor={indicatorTrackColor}
+              />
+            ) : (
+              <BouncyButton
+                accessibilityRole="button"
+                accessibilityLabel="继续加载下一页"
+                onPress={() => {
+                  void onFetchNextPage().catch(() => undefined);
+                }}
+                style={[
+                  styles.loadMoreButton,
+                  { backgroundColor: primaryColor },
+                ]}
+              >
+                <Text style={styles.loadMoreButtonText}>继续加载下一页</Text>
+              </BouncyButton>
+            )}
+          </View>
+        ) : query.hasNextPage &&
+          ((query.pageCount ?? 0) > 0 ||
+            (query.cursor !== undefined &&
+              query.cursor !== 0 &&
+              query.cursor !== '')) ? (
+          <View className="items-center py-20 bg-transparent">
+            <Text type="secondary" style={styles.emptyNextPageText}>
+              暂无已解析内容，但仍有后续数据
+            </Text>
+            {query.isFetchingNextPage ? (
+              <ThemedLoadingIndicator
+                size={24}
+                color={primaryColor}
+                trackColor={indicatorTrackColor}
+              />
+            ) : (
+              <BouncyButton
+                accessibilityRole="button"
+                accessibilityLabel="继续加载下一页"
+                onPress={() => {
+                  void onFetchNextPage().catch(() => undefined);
+                }}
+                style={[
+                  styles.loadMoreButton,
+                  { backgroundColor: primaryColor },
+                ]}
+              >
+                <Text style={styles.loadMoreButtonText}>
+                  继续加载下一页
+                </Text>
+              </BouncyButton>
+            )}
+          </View>
         ) : (
           <View className="items-center py-20 bg-transparent">
             <Text type="secondary">暂无{label}内容</Text>
@@ -422,6 +481,19 @@ const styles = StyleSheet.create({
     paddingVertical: 48,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  emptyNextPageText: {
+    marginBottom: 16,
+  },
+  loadMoreButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  loadMoreButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 14,
   },
   footerContainer: {
     height: 64,

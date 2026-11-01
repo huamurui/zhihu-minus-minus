@@ -4,14 +4,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -79,6 +72,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ZhihuAuthor, ZhihuColumnSummary } from '@/types/zhihu';
 import { getProfileAnswerReadingContext } from '@/utils/answerReadingContext';
+import { formatFeedActionText } from '@/utils/feedActionText';
 import type { MemberCreation } from '@/utils/memberCreations';
 import {
   getProfileCoverState,
@@ -108,6 +102,10 @@ interface ProfileContentItem {
   title?: string;
   excerpt?: string;
   content?: string | ProfileContentSegment[];
+  created?: number;
+  created_time?: number;
+  updated_time?: number;
+  action_text?: string;
   answer_type?: unknown;
   paid_info?: unknown;
   content_need_truncated?: unknown;
@@ -144,6 +142,17 @@ interface ProfileContentItem {
 interface ProfileActivityItem {
   id?: string | number;
   url?: string;
+  action_text?: string;
+  created_time?: number;
+  action_time?: number;
+  updated_time?: number;
+  actor?: Partial<ZhihuAuthor>;
+  source?: {
+    action_text?: string;
+    action_time?: number;
+    created_time?: number;
+    actor?: Partial<ZhihuAuthor>;
+  };
   target?: ProfileContentItem;
 }
 
@@ -173,8 +182,6 @@ function getProfileListItemKey(item: unknown) {
 }
 
 const AnimatedPagerView = Reanimated.createAnimatedComponent(PagerView);
-/** Keep page swipes off this long after a list stops scrolling. */
-const PAGER_UNLOCK_DELAY_MS = 250;
 
 type ProfileRouteParams = {
   id: string;
@@ -386,27 +393,6 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
     scrollOffsets.value = synced;
   };
 
-  // A diagonal flick in a list must not turn the page: hold the pager while
-  // the list is dragged or still flinging, and briefly after it stops.
-  const [pagerLocked, setPagerLocked] = useState(false);
-  const pagerUnlockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const handleListScrollActivity = useCallback((active: boolean) => {
-    if (pagerUnlockTimer.current) clearTimeout(pagerUnlockTimer.current);
-    pagerUnlockTimer.current = null;
-    if (active) setPagerLocked(true);
-    else
-      pagerUnlockTimer.current = setTimeout(
-        () => setPagerLocked(false),
-        PAGER_UNLOCK_DELAY_MS,
-      );
-  }, []);
-  useEffect(
-    () => () => {
-      if (pagerUnlockTimer.current) clearTimeout(pagerUnlockTimer.current);
-    },
-    [],
-  );
-
   const handleTabPress = (index: number) => {
     syncLists(activeIndexRef.current);
     const tab = PROFILE_TABS[index].key;
@@ -573,6 +559,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
           data:
             activitiesQuery.data?.pages.flatMap((page) => page.data || []) ||
             [],
+          pageCount: activitiesQuery.data?.pages.length ?? 0,
           isLoading: activitiesQuery.isLoading,
           isError: activitiesQuery.isError,
           isFetchingNextPage: activitiesQuery.isFetchingNextPage,
@@ -586,6 +573,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
         return {
           queryKey: creationsQuery.queryKey,
           data: creationsQuery.items,
+          pageCount: creationsQuery.data?.pages.length ?? 0,
           isLoading: creationsQuery.isLoading,
           isError: creationsQuery.isError,
           isFetchingNextPage: creationsQuery.isFetchingNextPage,
@@ -600,6 +588,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
           queryKey: ['user-answers', id, sortBy] as const,
           data:
             answersQuery.data?.pages.flatMap((page) => page.data || []) || [],
+          pageCount: answersQuery.data?.pages.length ?? 0,
           isLoading: answersQuery.isLoading,
           isError: answersQuery.isError,
           isFetchingNextPage: answersQuery.isFetchingNextPage,
@@ -614,6 +603,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
           queryKey: ['user-articles', id] as const,
           data:
             articlesQuery.data?.pages.flatMap((page) => page.data || []) || [],
+          pageCount: articlesQuery.data?.pages.length ?? 0,
           isLoading: articlesQuery.isLoading,
           isError: articlesQuery.isError,
           isFetchingNextPage: articlesQuery.isFetchingNextPage,
@@ -628,6 +618,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
           queryKey: ['user-questions', id] as const,
           data:
             questionsQuery.data?.pages.flatMap((page) => page.data || []) || [],
+          pageCount: questionsQuery.data?.pages.length ?? 0,
           isLoading: questionsQuery.isLoading,
           isError: questionsQuery.isError,
           isFetchingNextPage: questionsQuery.isFetchingNextPage,
@@ -641,6 +632,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
         return {
           queryKey: columnsQuery.queryKey,
           data: columnsQuery.columns,
+          pageCount: columnsQuery.data?.pages.length ?? 0,
           isLoading: columnsQuery.isLoading,
           isError: columnsQuery.isError,
           isFetchingNextPage: columnsQuery.isFetchingNextPage,
@@ -654,6 +646,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
         return {
           queryKey: ['user-pins', id] as const,
           data: pinsQuery.data?.pages.flatMap((page) => page.data || []) || [],
+          pageCount: pinsQuery.data?.pages.length ?? 0,
           isLoading: pinsQuery.isLoading,
           isError: pinsQuery.isError,
           isFetchingNextPage: pinsQuery.isFetchingNextPage,
@@ -667,6 +660,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
         return {
           queryKey: answersVotedByMeQuery.queryKey,
           data: answersVotedByMeQuery.answers,
+          pageCount: answersVotedByMeQuery.data?.pages.length ?? 0,
           isLoading:
             answersVotedByMeQuery.isAuthenticated &&
             answersVotedByMeQuery.isLoading,
@@ -920,12 +914,25 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
     tabKey: ProfileTabKey,
     // 创作 lists answers by publish time, whatever the 回答 tab's sort.
     answerSort: 'created' | 'voteups' = sortBy,
+    actionInfo?: { text?: string; time?: number },
   ): ReactNode => {
     if (tabKey === 'columns')
       return <ProfileColumnCard column={item as ZhihuColumnSummary} />;
     if (tabKey === 'creations') {
       const creation = item as MemberCreation;
-      return renderItemContent(creation.item, creation.kind, 'created');
+      const defaultActionText =
+        creation.kind === 'answers'
+          ? '回答了问题'
+          : creation.kind === 'articles'
+            ? '发表了文章'
+            : '发布了想法';
+      const text =
+        creation.actionText ||
+        (creation.actionTime ? defaultActionText : undefined);
+      return renderItemContent(creation.item, creation.kind, 'created', {
+        text,
+        time: creation.actionTime,
+      });
     }
     const displayItem = getProfileContentItem(item, tabKey);
     if (!displayItem) return null;
@@ -950,6 +957,63 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
         : undefined;
     const contentId = itemId || answerIdFromUrl;
     if (mappedType === 'answers' && !contentId) return null;
+
+    const rawActionTime =
+      actionInfo?.time ??
+      (tabKey === 'activities'
+        ? ((item as ProfileActivityItem)?.action_time ??
+          (item as ProfileActivityItem)?.source?.action_time ??
+          (item as ProfileActivityItem)?.created_time ??
+          (item as ProfileActivityItem)?.source?.created_time ??
+          (item as ProfileActivityItem)?.updated_time)
+        : undefined) ??
+      (typeof displayItem.created === 'number'
+        ? displayItem.created
+        : undefined) ??
+      (typeof displayItem.created_time === 'number'
+        ? displayItem.created_time
+        : undefined) ??
+      (typeof displayItem.updated_time === 'number'
+        ? displayItem.updated_time
+        : undefined);
+
+    const actionTime =
+      typeof rawActionTime === 'number' && Number.isFinite(rawActionTime)
+        ? rawActionTime > 1e11
+          ? Math.floor(rawActionTime / 1000)
+          : rawActionTime
+        : undefined;
+
+    const defaultActivitiesActionText =
+      tabKey === 'activities' && actionTime
+        ? mappedType === 'answers'
+          ? '回答了问题'
+          : mappedType === 'articles'
+            ? '发表了文章'
+            : mappedType === 'pins'
+              ? '发布了想法'
+              : undefined
+        : undefined;
+
+    const itemActionText =
+      actionInfo?.text ??
+      (tabKey === 'activities'
+        ? (item as ProfileActivityItem)?.action_text ||
+          (item as ProfileActivityItem)?.source?.action_text ||
+          (displayItem as { action_text?: string })?.action_text ||
+          defaultActivitiesActionText
+        : undefined);
+
+    const actorName =
+      (item as ProfileActivityItem)?.actor?.name ||
+      (item as ProfileActivityItem)?.source?.actor?.name ||
+      user?.name;
+
+    const formattedActionText = formatFeedActionText(
+      itemActionText,
+      actorName,
+      actionTime,
+    );
 
     const getExcerptText = () => {
       if (rawType === 'pin') {
@@ -984,6 +1048,9 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
     const feedItem: FeedItem = {
       id: contentId || String(displayItem.url),
       title: displayItem.question?.title || displayItem.title || '',
+      actionText: formattedActionText,
+      created_time: actionTime,
+      updated_time: actionTime,
       questionId:
         displayItem.question?.id?.toString() ||
         (rawType === 'question' ? displayItem.id?.toString() : undefined),
@@ -1020,7 +1087,6 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
       // Every card on a member's page is theirs unless it names someone else.
       hideAuthor:
         tabKey !== 'votes' &&
-        tabKey !== 'activities' &&
         (!displayItem.author?.id || displayItem.author.id === user?.id),
     };
 
@@ -1084,7 +1150,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
               ref={pagerRef}
               style={{ flex: 1 }}
               initialPage={initialTabIndex}
-              scrollEnabled={!pagerLocked}
+              scrollEnabled
               onPageScroll={pageScrollHandler}
               onPageScrollStateChanged={(event) => {
                 if (event.nativeEvent.pageScrollState === 'dragging')
@@ -1139,7 +1205,6 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
                       bottomInset={insets.bottom}
                       offsets={scrollOffsets}
                       active={activeTab === tab.key}
-                      onScrollActivityChange={handleListScrollActivity}
                       keyExtractor={(item) => {
                         if (tab.key === 'creations') {
                           const creation = item as MemberCreation;
