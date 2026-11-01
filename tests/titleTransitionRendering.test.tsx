@@ -7,6 +7,7 @@ import {
   View,
   type ViewInstance,
 } from 'react-native';
+import { PaneContext } from '../src/features/adaptive-layout/PaneContext';
 import {
   TitleTransitionProvider,
   TitleTransitionTarget,
@@ -435,12 +436,20 @@ test('target measures successfully even if onLayout fired before the route becam
       </TitleTransitionProvider>,
     );
     await fireEvent.press(host.getByText('打开'));
+    const destinationPane = {
+      width: 375,
+      height: 812,
+      visible: true,
+      routeKey: 'destination',
+    };
     // Render destination while route is still "source" (early native mount)
     await host.rerender(
       <TitleTransitionProvider activeRouteKey="source">
-        <TitleTransitionTarget id="question-1">
-          <Text>提前布局标题</Text>
-        </TitleTransitionTarget>
+        <PaneContext.Provider value={destinationPane}>
+          <TitleTransitionTarget id="question-1">
+            <Text>提前布局标题</Text>
+          </TitleTransitionTarget>
+        </PaneContext.Provider>
       </TitleTransitionProvider>,
     );
     const target = host.getByText('提前布局标题').parent;
@@ -452,16 +461,21 @@ test('target measures successfully even if onLayout fired before the route becam
           nativeEvent: { layout: { x: 0, y: 0, width: 180, height: 24 } },
         });
     });
+    // Target route was inactive when onLayout fired, so animation must not start yet
+    expect(timing).not.toHaveBeenCalled();
+
     // Now route updates to destination
     await host.rerender(
       <TitleTransitionProvider activeRouteKey="destination">
-        <TitleTransitionTarget id="question-1">
-          <Text>提前布局标题</Text>
-        </TitleTransitionTarget>
+        <PaneContext.Provider value={destinationPane}>
+          <TitleTransitionTarget id="question-1">
+            <Text>提前布局标题</Text>
+          </TitleTransitionTarget>
+        </PaneContext.Provider>
       </TitleTransitionProvider>,
     );
-    // Should have recovered and started the transition timing!
-    expect(timing).toHaveBeenCalled();
+    // Should have recovered via useLayoutEffect and started the transition timing!
+    expect(timing).toHaveBeenCalledTimes(1);
   } finally {
     timing.mockRestore();
   }

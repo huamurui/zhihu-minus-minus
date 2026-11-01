@@ -245,7 +245,9 @@ export const AnswerDetailView = ({
     typeof contentLayoutSource | null
   >(null);
   const latestLayoutSource = useRef(contentLayoutSource);
-  latestLayoutSource.current = contentLayoutSource;
+  React.useLayoutEffect(() => {
+    latestLayoutSource.current = contentLayoutSource;
+  }, [contentLayoutSource]);
   const handleContentLayoutReady = React.useCallback(() => {
     if (latestLayoutSource.current === contentLayoutSource)
       setReadyLayoutSource(contentLayoutSource);

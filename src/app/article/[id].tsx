@@ -1,7 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -144,7 +151,9 @@ export default function ArticleDetail() {
     typeof contentLayoutSource | null
   >(null);
   const latestLayoutSource = useRef(contentLayoutSource);
-  latestLayoutSource.current = contentLayoutSource;
+  useLayoutEffect(() => {
+    latestLayoutSource.current = contentLayoutSource;
+  }, [contentLayoutSource]);
 
   const handleContentLayoutReady = useCallback(() => {
     if (latestLayoutSource.current === contentLayoutSource) {

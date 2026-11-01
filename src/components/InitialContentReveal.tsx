@@ -2,26 +2,49 @@ import { type ReactNode, useEffect, useLayoutEffect, useRef } from 'react';
 import { AccessibilityInfo, Animated } from 'react-native';
 
 let cachedReduceMotion = false;
+let isReduceMotionResolved = false;
+let subscriptionEpoch = 0;
 let subscriptionCount = 0;
 let removeNativeListener: (() => void) | null = null;
-const listeners = new Set<(enabled: boolean) => void>();
+const listeners = new Set<(enabled: boolean, resolved: boolean) => void>();
 
 function subscribeReduceMotion(
-  callback: (enabled: boolean) => void,
+  callback: (enabled: boolean, resolved: boolean) => void,
 ): () => void {
   listeners.add(callback);
-  callback(cachedReduceMotion);
+  callback(cachedReduceMotion, isReduceMotionResolved);
 
   if (subscriptionCount === 0) {
-    void AccessibilityInfo.isReduceMotionEnabled?.()?.then?.((enabled) => {
-      cachedReduceMotion = Boolean(enabled);
-      for (const listener of listeners) listener(cachedReduceMotion);
-    });
+    const currentEpoch = ++subscriptionEpoch;
+    let hasEventUpdate = false;
+
+    void AccessibilityInfo.isReduceMotionEnabled?.()
+      ?.then?.((enabled) => {
+        if (currentEpoch !== subscriptionEpoch || hasEventUpdate) return;
+        cachedReduceMotion = Boolean(enabled);
+        isReduceMotionResolved = true;
+        for (const listener of listeners) {
+          listener(cachedReduceMotion, isReduceMotionResolved);
+        }
+      })
+      ?.catch?.(() => {
+        if (currentEpoch !== subscriptionEpoch || hasEventUpdate) return;
+        isReduceMotionResolved = true;
+        for (const listener of listeners) {
+          listener(cachedReduceMotion, isReduceMotionResolved);
+        }
+      });
+
     const subscription = AccessibilityInfo.addEventListener?.(
       'reduceMotionChanged',
       (enabled) => {
+        if (currentEpoch !== subscriptionEpoch) return;
+        hasEventUpdate = true;
         cachedReduceMotion = Boolean(enabled);
-        for (const listener of listeners) listener(cachedReduceMotion);
+        isReduceMotionResolved = true;
+        for (const listener of listeners) {
+          listener(cachedReduceMotion, isReduceMotionResolved);
+        }
       },
     );
     removeNativeListener = () => {
@@ -40,15 +63,21 @@ function subscribeReduceMotion(
   };
 }
 
-export function setCachedReduceMotionForTest(value: boolean) {
+export function setCachedReduceMotionForTest(value: boolean, resolved = true) {
   cachedReduceMotion = value;
-  for (const listener of listeners) listener(value);
+  isReduceMotionResolved = resolved;
+  for (const listener of listeners) {
+    listener(value, resolved);
+  }
 }
 
 export function resetReduceMotionSubscriptionForTest() {
   removeNativeListener?.();
   removeNativeListener = null;
+  subscriptionEpoch++;
   subscriptionCount = 0;
+  isReduceMotionResolved = false;
+  cachedReduceMotion = false;
   listeners.clear();
 }
 
@@ -61,13 +90,16 @@ export function InitialContentReveal({
   children: ReactNode;
 }) {
   const reduceMotion = useRef(cachedReduceMotion);
-  const initialOpacity = ready && !reduceMotion.current ? 0 : 1;
+  const isResolved = useRef(isReduceMotionResolved);
+  const shouldAnimate = isResolved.current && !reduceMotion.current;
+  const initialOpacity = ready && shouldAnimate ? 0 : 1;
   const opacity = useRef(new Animated.Value(initialOpacity)).current;
-  const hasRevealed = useRef(false);
+  const hasRevealed = useRef(ready && !shouldAnimate);
 
   useEffect(() => {
-    const unsubscribe = subscribeReduceMotion((enabled) => {
+    const unsubscribe = subscribeReduceMotion((enabled, resolved) => {
       reduceMotion.current = enabled;
+      isResolved.current = resolved;
       if (enabled) {
         opacity.stopAnimation();
         opacity.setValue(1);
@@ -83,7 +115,7 @@ export function InitialContentReveal({
     if (hasRevealed.current) return;
     if (!ready) return;
     hasRevealed.current = true;
-    if (reduceMotion.current) {
+    if (!isResolved.current || reduceMotion.current) {
       opacity.setValue(1);
       return;
     }

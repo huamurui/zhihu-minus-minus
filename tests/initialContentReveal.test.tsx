@@ -149,3 +149,78 @@ test('cleans up shared reduce motion listener when all instances unmount', async
   await host.unmount();
   expect(removeMock).toHaveBeenCalledTimes(1);
 });
+
+test('displays content directly without fade when reduce motion setting is not yet resolved', async () => {
+  let resolveQuery!: (value: boolean) => void;
+  jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockImplementation(
+    () =>
+      new Promise<boolean>((resolve) => {
+        resolveQuery = resolve;
+      }),
+  );
+  resetReduceMotionSubscriptionForTest();
+
+  const timing = jest.spyOn(Animated, 'timing');
+  const host = await render(
+    <InitialContentReveal ready>
+      <Text>未解析设置正文</Text>
+    </InitialContentReveal>,
+  );
+  expect(host.getByText('未解析设置正文')).toBeVisible();
+  expect(timing).not.toHaveBeenCalled();
+
+  await act(async () => {
+    resolveQuery(false);
+  });
+  expect(timing).not.toHaveBeenCalled();
+  expect(host.getByText('未解析设置正文')).toBeVisible();
+});
+
+test('reduceMotionChanged event is not overwritten by a late resolving isReduceMotionEnabled query', async () => {
+  let resolveQuery!: (value: boolean) => void;
+  let eventCallback!: (enabled: boolean) => void;
+  jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockImplementation(
+    () =>
+      new Promise<boolean>((resolve) => {
+        resolveQuery = resolve;
+      }),
+  );
+  jest
+    .spyOn(AccessibilityInfo, 'addEventListener')
+    .mockImplementation((_event, cb) => {
+      eventCallback = cb;
+      return { remove: jest.fn() } as unknown as ReturnType<
+        typeof AccessibilityInfo.addEventListener
+      >;
+    });
+  resetReduceMotionSubscriptionForTest();
+
+  const timing = jest.spyOn(Animated, 'timing').mockReturnValue({
+    start: jest.fn(),
+    stop: jest.fn(),
+    reset: jest.fn(),
+  });
+
+  const host = await render(
+    <InitialContentReveal ready={false}>
+      <Text>竞态测试正文</Text>
+    </InitialContentReveal>,
+  );
+
+  await act(async () => {
+    eventCallback(true);
+  });
+
+  await act(async () => {
+    resolveQuery(false);
+  });
+
+  await host.rerender(
+    <InitialContentReveal ready>
+      <Text>竞态测试正文</Text>
+    </InitialContentReveal>,
+  );
+
+  expect(timing).not.toHaveBeenCalled();
+  expect(host.getByText('竞态测试正文')).toBeVisible();
+});
