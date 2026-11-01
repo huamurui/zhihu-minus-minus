@@ -105,3 +105,22 @@ test('extracts actionText and actionTime from creation entries', () => {
     actionTime: 1770156705,
   });
 });
+
+test('recovers exact pin id from url when target id exceeds safe integer range', () => {
+  const pin = toMemberCreation({
+    type: 'moments_feed',
+    target: {
+      id: 2077095966344327700,
+      url: 'https://www.zhihu.com/pin/2077095966344327531',
+      type: 'pin',
+    },
+  });
+  expect(pin).toEqual({
+    kind: 'pins',
+    item: {
+      id: '2077095966344327531',
+      url: 'https://www.zhihu.com/pin/2077095966344327531',
+      type: 'pin',
+    },
+  });
+});

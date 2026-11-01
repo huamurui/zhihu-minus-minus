@@ -99,6 +99,48 @@ describe('useEndReachedPagination state machine', () => {
     expect(host.result.current.isPendingIntent).toBe(false);
   });
 
+  it('does not record pending intent if cursor changes while blocked fetch is in flight', async () => {
+    let resolveFetch!: (value: unknown) => void;
+    const onFetchNextPage = jest.fn().mockImplementation(() => {
+      return new Promise((resolve) => {
+        resolveFetch = resolve;
+      });
+    });
+
+    let cursor = 'cursor-1';
+    const host = await renderHook(
+      ({ currentCursor }: { currentCursor: string }) =>
+        useEndReachedPagination({
+          isActive: true,
+          hasNextPage: true,
+          isFetchNextPageError: false,
+          isBusy: false,
+          cursor: currentCursor,
+          onFetchNextPage,
+        }),
+      { initialProps: { currentCursor: cursor } },
+    );
+
+    await act(async () => {
+      host.result.current.handleEndReached();
+    });
+    expect(onFetchNextPage).toHaveBeenCalledTimes(1);
+
+    // While fetch is in flight, cursor advances / resets (e.g. refresh)
+    cursor = 'cursor-2';
+    await act(async () => {
+      host.rerender({ currentCursor: cursor });
+    });
+
+    // Old fetch returns blocked
+    await act(async () => {
+      resolveFetch({ status: 'blocked', reason: 'busy' });
+    });
+
+    // Stale blocked response does NOT record pending intent on cursor-1
+    expect(host.result.current.isPendingIntent).toBe(false);
+  });
+
   it('cancels pending intent and does not duplicate request when app enters background', async () => {
     const onFetchNextPage = jest.fn().mockResolvedValue({ status: 'started' });
     let isActive = true;

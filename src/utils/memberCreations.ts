@@ -1,4 +1,5 @@
 import type { ZhihuMemberRelation } from '@/types/zhihu';
+import { getRecentActivityTargetId } from '@/utils/userProfile';
 
 /** 「创作」里的三类内容，与个人主页同名 tab 一致。 */
 export type CreationKind = 'answers' | 'articles' | 'pins';
@@ -76,9 +77,23 @@ export function toMemberCreation(
         : rawTime
       : undefined;
 
+  const resolvedId =
+    kind === 'pins'
+      ? getRecentActivityTargetId({
+          id: target.id as string | number,
+          type: target.type,
+          url: typeof target.url === 'string' ? target.url : undefined,
+        })
+      : target.id;
+
+  const item =
+    resolvedId !== undefined && resolvedId !== target.id
+      ? ({ ...target, id: resolvedId } as unknown as ZhihuMemberRelation)
+      : (target as unknown as ZhihuMemberRelation);
+
   const result: MemberCreation = {
     kind,
-    item: target as unknown as ZhihuMemberRelation,
+    item,
   };
   if (actionText !== undefined) {
     result.actionText = actionText;

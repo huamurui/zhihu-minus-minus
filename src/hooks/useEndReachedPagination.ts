@@ -2,6 +2,7 @@ import {
   type RefObject,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react';
@@ -111,18 +112,20 @@ export function useEndReachedPagination({
     listRef,
     endReachedThreshold,
   });
-  latestOptionsRef.current = {
-    isActive,
-    hasNextPage,
-    isFetchNextPageError,
-    isBusy,
-    cursor,
-    onFetchNextPage,
-    itemCount,
-    isAutoFetching,
-    listRef,
-    endReachedThreshold,
-  };
+  useLayoutEffect(() => {
+    latestOptionsRef.current = {
+      isActive,
+      hasNextPage,
+      isFetchNextPageError,
+      isBusy,
+      cursor,
+      onFetchNextPage,
+      itemCount,
+      isAutoFetching,
+      listRef,
+      endReachedThreshold,
+    };
+  });
 
   const cancelPendingIntent = useCallback(() => {
     generationRef.current += 1;
@@ -163,7 +166,8 @@ export function useEndReachedPagination({
       return;
     }
 
-    inFlightCursorRef.current = opts.cursor;
+    const inFlightCursor = opts.cursor;
+    inFlightCursorRef.current = inFlightCursor;
     pagingInitiatedRef.current = true;
     itemCountAtPagingRef.current = opts.itemCount;
     const currentGen = ++generationRef.current;
@@ -178,8 +182,14 @@ export function useEndReachedPagination({
         'status' in result &&
         result.status === 'blocked'
       ) {
-        if (opts.isActive && opts.hasNextPage && !opts.isFetchNextPageError) {
-          pendingIntentRef.current = { cursor: opts.cursor };
+        const latestOpts = latestOptionsRef.current;
+        if (
+          latestOpts.isActive &&
+          latestOpts.hasNextPage &&
+          !latestOpts.isFetchNextPageError &&
+          latestOpts.cursor === inFlightCursor
+        ) {
+          pendingIntentRef.current = { cursor: inFlightCursor };
           setIsPendingIntent(true);
         } else {
           pendingIntentRef.current = null;

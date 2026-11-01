@@ -402,39 +402,6 @@ export const ProfileTabList = forwardRef<
               </BouncyButton>
             )}
           </View>
-        ) : query.hasNextPage &&
-          ((query.pageCount ?? 0) > 0 ||
-            (query.cursor !== undefined &&
-              query.cursor !== 0 &&
-              query.cursor !== '')) ? (
-          <View className="items-center py-20 bg-transparent">
-            <Text type="secondary" style={styles.emptyNextPageText}>
-              暂无已解析内容，但仍有后续数据
-            </Text>
-            {query.isFetchingNextPage ? (
-              <ThemedLoadingIndicator
-                size={24}
-                color={primaryColor}
-                trackColor={indicatorTrackColor}
-              />
-            ) : (
-              <BouncyButton
-                accessibilityRole="button"
-                accessibilityLabel="继续加载下一页"
-                onPress={() => {
-                  void onFetchNextPage().catch(() => undefined);
-                }}
-                style={[
-                  styles.loadMoreButton,
-                  { backgroundColor: primaryColor },
-                ]}
-              >
-                <Text style={styles.loadMoreButtonText}>
-                  继续加载下一页
-                </Text>
-              </BouncyButton>
-            )}
-          </View>
         ) : (
           <View className="items-center py-20 bg-transparent">
             <Text type="secondary">暂无{label}内容</Text>
