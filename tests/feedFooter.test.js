@@ -36,9 +36,17 @@ function renderFooter(overrides = {}) {
   return runInNewContext(outputText, {
     React,
     ActivityIndicator: 'ActivityIndicator',
+    ThemedLoadingIndicator: 'ThemedLoadingIndicator',
+    View: 'View',
     QueryErrorView: 'QueryErrorView',
     BouncyButton: 'BouncyButton',
     Text: 'Text',
+    styles: { footerContainer: {}, footerText: {}, footerActionText: {} },
+    tintColor: '#0084ff',
+    indicatorTrackColor: '#e0e0e0',
+    feedError: null,
+    isPendingIntent: false,
+    cancelPendingIntent: jest.fn(),
     isFetchingNextPage: false,
     isFetchNextPageError: false,
     isError: false,
@@ -80,4 +88,40 @@ test('a pagination failure retains its retry action instead of a filtering messa
   expect(footer.props.message).toBe('更多内容加载失败');
   footer.props.onRetry();
   expect(fetchNextPage).toHaveBeenCalledTimes(1);
+});
+
+test('footer renders loading indicator and "正在加载更多..." while fetching next page', () => {
+  const footer = renderFooter({
+    isFetchingNextPage: true,
+    flattenedData: ['item-1'],
+  });
+  expect(footer.props.children[0].type).toBe('ThemedLoadingIndicator');
+  expect(footer.props.children[1].props.children).toBe('正在加载更多...');
+});
+
+test('footer renders loading indicator and "正在更新内容，随后继续" when pagination intent is blocked', () => {
+  const footer = renderFooter({
+    isPendingIntent: true,
+    flattenedData: ['item-1'],
+  });
+  expect(footer.props.children[0].type).toBe('ThemedLoadingIndicator');
+  expect(footer.props.children[1].props.children).toBe(
+    '正在更新内容，随后继续',
+  );
+});
+
+test('footer renders "继续上滑加载" when there is a next page and query is idle', () => {
+  const footer = renderFooter({
+    hasNextPage: true,
+    flattenedData: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'],
+  });
+  expect(footer.props.children.props.children).toBe('继续上滑加载');
+});
+
+test('footer renders "暂时没有更多内容" when server has reached the end', () => {
+  const footer = renderFooter({
+    hasNextPage: false,
+    flattenedData: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'],
+  });
+  expect(footer.props.children.props.children).toBe('暂时没有更多内容');
 });

@@ -418,3 +418,24 @@ test('a pending refresh cannot be canceled by pagination or report the obsolete 
     sessionVersion: 1,
   });
 });
+
+test('returns descriptive status for started, blocked, and ended pagination outcomes', async () => {
+  const { fetchPage, host } = await setup();
+  // 1. Successful trigger -> started
+  const nextResult = await act(() => host.result.current.next());
+  expect(nextResult.status).toBe('started');
+  await waitFor(() => expect(host.result.current.isFetching).toBe(false));
+
+  // 2. In-flight operation -> blocked (busy)
+  const pending = deferred<ApiPage>();
+  fetchPage.mockReturnValueOnce(pending.promise);
+  void host.result.current.next();
+  const busyResult = await act(() => host.result.current.next());
+  expect(busyResult).toEqual({ status: 'blocked', reason: 'busy' });
+  await act(() => pending.resolve(apiPage(['301'], null)));
+  await waitFor(() => expect(host.result.current.isFetching).toBe(false));
+
+  // 3. Reached end of feed (nextUrl: null) -> ended (exhausted)
+  const exhaustedResult = await act(() => host.result.current.next());
+  expect(exhaustedResult).toEqual({ status: 'ended', reason: 'exhausted' });
+});

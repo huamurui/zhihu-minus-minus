@@ -17,12 +17,20 @@ interface FeedTouchPage {
   readTouchBatch?: FeedReadTouchBatch | null;
 }
 
+export type FeedPageReadTouchResult =
+  | { status: 'started'; promise: Promise<unknown> }
+  | { status: 'blocked'; reason: 'busy' | 'inactive' | 'disabled' }
+  | {
+      status: 'ended';
+      reason: 'exhausted' | 'duplicate_cursor' | 'session_mismatch';
+    };
+
 /** Only explicit forward pagination reports the preceding API response batch. */
 export function useFeedPageReadTouch(
   queryKey: QueryKey,
   fetchNextPage: (options: { cancelRefetch: false }) => Promise<unknown>,
   enabled: boolean,
-): () => Promise<unknown> {
+): () => Promise<FeedPageReadTouchResult> {
   const queryClient = useQueryClient();
   const active = useActiveScreen();
   const sessionVersion = useAuthStore(() => getAuthSessionVersion());
@@ -38,25 +46,43 @@ export function useFeedPageReadTouch(
   const current = useRef({ enabled, active, recorded });
   current.current = { enabled, active, recorded };
 
-  return useCallback(async () => {
+  return useCallback(async (): Promise<FeedPageReadTouchResult> => {
+    if (!current.current.enabled) {
+      return { status: 'blocked', reason: 'disabled' };
+    }
+    if (!current.current.active) {
+      return { status: 'blocked', reason: 'inactive' };
+    }
     if (
-      !current.current.enabled ||
-      !current.current.active ||
       current.current.recorded !== recorded ||
-      sessionVersion !== getAuthSessionVersion() ||
-      queryClient.getQueryState(queryKey)?.fetchStatus !== 'idle'
-    )
-      return;
+      sessionVersion !== getAuthSessionVersion()
+    ) {
+      return { status: 'ended', reason: 'session_mismatch' };
+    }
+    if (queryClient.getQueryState(queryKey)?.fetchStatus !== 'idle') {
+      return { status: 'blocked', reason: 'busy' };
+    }
 
     // Read the live cache so repeated callbacks cannot report an older page.
     const data =
       queryClient.getQueryData<InfiniteData<FeedTouchPage, string>>(queryKey);
     const lastPage = data?.pages.at(-1);
-    if (
-      !lastPage ||
-      !getNextUnvisitedFeedPage(lastPage.nextUrl, data?.pageParams ?? [])
-    )
-      return;
+    if (!lastPage?.nextUrl) {
+      return { status: 'ended', reason: 'exhausted' };
+    }
+
+    const nextUnvisited = getNextUnvisitedFeedPage(
+      lastPage.nextUrl,
+      data?.pageParams ?? [],
+    );
+    if (!nextUnvisited) {
+      if (__DEV__) {
+        console.warn(
+          `[FeedPagination] Duplicate cursor detected and halted: ${lastPage.nextUrl}`,
+        );
+      }
+      return { status: 'ended', reason: 'duplicate_cursor' };
+    }
 
     const batch = lastPage.readTouchBatch;
     if (
@@ -73,6 +99,7 @@ export function useFeedPageReadTouch(
       });
     }
     // Feedback is optional and must never delay or fail forward pagination.
-    return fetchNextPage({ cancelRefetch: false });
+    const promise = fetchNextPage({ cancelRefetch: false });
+    return { status: 'started', promise };
   }, [fetchNextPage, queryClient, queryKey, recorded, sessionVersion]);
 }

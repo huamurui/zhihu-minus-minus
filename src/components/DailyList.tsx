@@ -3,7 +3,7 @@ import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import type { Href } from 'expo-router';
 import React, { useCallback, useMemo } from 'react';
-import { Image } from 'react-native';
+import { Image, StyleSheet } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -21,6 +21,7 @@ import {
   type CollapsibleChromeScrollOptions,
   useCollapsibleChromeScroll,
 } from '@/hooks/useCollapsibleChromeScroll';
+import { useEndReachedPagination } from '@/hooks/useEndReachedPagination';
 import {
   type DailyListItem,
   flattenDailyPages,
@@ -31,6 +32,7 @@ import { refreshInfiniteQuery, shouldRetryQuery } from '@/utils/query';
 import { BouncyButton } from './BouncyButton';
 import { PullToRefresh } from './PullToRefresh';
 import { QueryErrorView } from './QueryErrorView';
+import { ThemedLoadingIndicator } from './ThemedLoadingIndicator';
 
 const AnimatedFlashList = Animated.createAnimatedComponent(
   FlashList,
@@ -123,6 +125,7 @@ export const DailyList = React.forwardRef<
 
   const {
     data,
+    error: dailyError,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -148,9 +151,12 @@ export const DailyList = React.forwardRef<
   });
   const isLoading = isQueryLoading || (isPending && isPaused);
 
+  const cancelPendingIntentRef = React.useRef<() => void>(() => {});
+
   const handleRefresh = useCallback(async () => {
     if (refreshInFlightRef.current) return;
 
+    cancelPendingIntentRef.current();
     refreshInFlightRef.current = true;
     const startedAt = Date.now();
     setIsRefreshing(true);
@@ -168,6 +174,23 @@ export const DailyList = React.forwardRef<
       refreshInFlightRef.current = false;
     }
   }, [queryClient, refetch, onRefreshStateChange]);
+
+  const currentCursor = data?.pages.at(-1)?.date ?? (data?.pages.length || 0);
+  const isBusy =
+    isFetching ||
+    isRefreshing ||
+    isFetchingNextPage ||
+    refreshInFlightRef.current;
+  const { handleEndReached, isPendingIntent, cancelPendingIntent } =
+    useEndReachedPagination({
+      isActive: chrome.enabled,
+      hasNextPage: Boolean(hasNextPage),
+      isFetchNextPageError,
+      isBusy,
+      cursor: currentCursor,
+      onFetchNextPage: () => fetchNextPage({ cancelRefetch: false }),
+    });
+  cancelPendingIntentRef.current = cancelPendingIntent;
 
   const flattenedData = useMemo(
     () => flattenDailyPages(data?.pages ?? []),
@@ -248,17 +271,7 @@ export const DailyList = React.forwardRef<
           item.type === 'date' ? `date:${item.date}` : `story:${item.data.id}`
         }
         getItemType={(item) => item.type}
-        onEndReached={() => {
-          if (
-            chrome.enabled &&
-            hasNextPage &&
-            !isFetching &&
-            !refreshInFlightRef.current &&
-            !isFetchNextPageError
-          ) {
-            void fetchNextPage({ cancelRefetch: false });
-          }
-        }}
+        onEndReached={handleEndReached}
         onEndReachedThreshold={0.5}
         onScroll={scrollHandler}
         scrollEventThrottle={16}
@@ -309,19 +322,66 @@ export const DailyList = React.forwardRef<
           );
         }}
         ListFooterComponent={
-          isFetchingNextPage ? (
-            <Text type="secondary" className="text-center p-5">
-              加载中...
-            </Text>
-          ) : isFetchNextPageError ? (
+          flattenedData.length === 0 ? null : isFetchNextPageError ? (
             <QueryErrorView
               compact
               message="更多日报加载失败"
-              onRetry={() => void fetchNextPage({ cancelRefetch: false })}
+              error={dailyError}
+              onRetry={() => {
+                cancelPendingIntent();
+                void fetchNextPage({ cancelRefetch: false });
+              }}
             />
+          ) : isFetchingNextPage ? (
+            <View style={styles.footerContainer}>
+              <ThemedLoadingIndicator
+                size={22}
+                color={primaryColor}
+                trackColor={indicatorTrackColor}
+              />
+              <Text type="secondary" style={styles.footerText}>
+                正在加载更多...
+              </Text>
+            </View>
+          ) : isPendingIntent ? (
+            <View style={styles.footerContainer}>
+              <ThemedLoadingIndicator
+                size={22}
+                color={primaryColor}
+                trackColor={indicatorTrackColor}
+              />
+              <Text type="secondary" style={styles.footerText}>
+                正在更新内容，随后继续
+              </Text>
+            </View>
+          ) : !hasNextPage ? (
+            <View style={styles.footerContainer}>
+              <Text type="secondary" style={styles.footerText}>
+                暂时没有更多内容
+              </Text>
+            </View>
+          ) : hasNextPage ? (
+            <View style={styles.footerContainer}>
+              <Text type="secondary" style={styles.footerText}>
+                继续上滑加载
+              </Text>
+            </View>
           ) : null
         }
       />
     </PullToRefresh>
   );
+});
+
+const styles = StyleSheet.create({
+  footerContainer: {
+    height: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerText: {
+    marginLeft: 8,
+    fontSize: 13,
+  },
 });
