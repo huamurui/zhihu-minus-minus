@@ -1,19 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { BlurView } from 'expo-blur';
-import {
-  GlassContainer,
-  GlassView,
-  isGlassEffectAPIAvailable,
-  isLiquidGlassAvailable,
-} from 'expo-glass-effect';
-import { useMemo } from 'react';
-import {
-  Platform,
-  type StyleProp,
-  StyleSheet,
-  View,
-  type ViewStyle,
-} from 'react-native';
+import { GlassContainer, GlassView } from 'expo-glass-effect';
+import { type StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
 import Animated, {
   type AnimatedStyle,
   type SharedValue,
@@ -23,22 +11,16 @@ import type { EdgeInsets } from 'react-native-safe-area-context';
 import { BouncyButton } from '@/components/BouncyButton';
 import { ScrollableNavigationRow } from '@/components/home/ScrollableNavigationRow';
 import { TopTabLabel } from '@/components/home/TopTabLabel';
+import {
+  isLiquidGlassSupported,
+  useIsLiquidGlassActive,
+} from '@/components/surfaces/FloatingSurface';
+
+export { isLiquidGlassSupported };
 
 const TAB_WIDTH = 54;
 const TAB_GAP = 4;
 const TAB_STRIDE = TAB_WIDTH + TAB_GAP; // 58
-
-/**
- * 校验当前设备及系统是否支持 iOS 原生 Liquid Glass 特效。
- */
-export function isLiquidGlassSupported(): boolean {
-  if (Platform.OS !== 'ios') return false;
-  try {
-    return isGlassEffectAPIAvailable() && isLiquidGlassAvailable();
-  } catch {
-    return false;
-  }
-}
 
 export interface GlassTopNavigationProps {
   tabs: string[];
@@ -81,9 +63,7 @@ export function GlassTopNavigation({
   onTabPress,
   onSearchPress,
 }: GlassTopNavigationProps) {
-  const isSupported = useMemo(() => isLiquidGlassSupported(), []);
-  const liquidGlassActive =
-    useLiquidGlass !== undefined ? useLiquidGlass && isSupported : isSupported;
+  const liquidGlassActive = useIsLiquidGlassActive(useLiquidGlass ?? true);
 
   const labels: Record<string, string> = {
     following: '关注',

@@ -1,6 +1,5 @@
 import { FlashList } from '@shopify/flash-list';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { BlurView } from 'expo-blur';
 import {
   Stack,
   useLocalSearchParams,
@@ -35,6 +34,7 @@ import { CommentIdentityBadges } from '@/components/CommentIdentityBadges';
 import { LikeButton } from '@/components/LikeButton';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { StableAvatar } from '@/components/StableAvatar';
+import { FloatingSurface } from '@/components/surfaces/FloatingSurface';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -539,7 +539,9 @@ export default function ReplyDetailScreen() {
         ]}
         pointerEvents="box-none"
       >
-        <BlurView
+        <FloatingSurface
+          glassStyle="regular"
+          colorScheme={colorScheme === 'dark' ? 'dark' : 'light'}
           intensity={100}
           tint={colorScheme === 'dark' ? 'dark' : 'light'}
           style={{
@@ -561,7 +563,7 @@ export default function ReplyDetailScreen() {
             textColor={textColor}
             tintColor={tintColor}
           />
-        </BlurView>
+        </FloatingSurface>
       </Reanimated.View>
 
       <CommentActionSheet

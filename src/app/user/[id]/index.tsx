@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import {
   useInfiniteQuery,
   useQuery,
@@ -46,6 +45,7 @@ import { addReadHistory } from '@/api/zhihu/history';
 import { BouncyButton } from '@/components/BouncyButton';
 import { FeedCard } from '@/components/FeedCard';
 import { FollowButton } from '@/components/FollowButton';
+import { GlassNavigationButton } from '@/components/navigation/GlassNavigationButton';
 import { ProfileColumnCard } from '@/components/profile/ProfileColumnCard';
 import { ProfileToolbarBackground } from '@/components/profile/ProfileCover';
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
@@ -1261,27 +1261,16 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
             gap: 10,
           }}
         >
-          <BouncyButton
-            accessibilityRole="button"
+          <GlassNavigationButton
+            icon="back"
             accessibilityLabel="返回"
             onPress={() =>
               router.canGoBack() ? router.back() : router.replace('/(tabs)')
             }
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: `${Colors[colorScheme].backgroundSecondary}E8`,
-            }}
-          >
-            <Ionicons
-              name="arrow-back"
-              size={23}
-              color={Colors[colorScheme].text}
-            />
-          </BouncyButton>
+            size={40}
+            color={Colors[colorScheme].text}
+            backgroundColor={`${Colors[colorScheme].backgroundSecondary}E8`}
+          />
           <Reanimated.View
             pointerEvents="none"
             accessibilityElementsHidden={!compactHeader}
@@ -1324,28 +1313,17 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
               onPress={() => void handleFollow()}
             />
           )}
-          <BouncyButton
-            accessibilityRole="button"
+          <GlassNavigationButton
+            icon="search"
             accessibilityLabel="搜索此用户的创作"
             disabled={!user}
             onPress={() =>
               router.push({ pathname: '/user/[id]/search', params: { id } })
             }
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: `${Colors[colorScheme].backgroundSecondary}E8`,
-            }}
-          >
-            <Ionicons
-              name="search"
-              size={20}
-              color={Colors[colorScheme].text}
-            />
-          </BouncyButton>
+            size={40}
+            color={Colors[colorScheme].text}
+            backgroundColor={`${Colors[colorScheme].backgroundSecondary}E8`}
+          />
         </NativeView>
       </NativeView>
     </NativeView>

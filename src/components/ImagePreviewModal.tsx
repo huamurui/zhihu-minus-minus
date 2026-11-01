@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useState } from 'react';
 import {
   Image,
@@ -8,8 +7,8 @@ import {
   View,
 } from 'react-native';
 import ImageViewer from 'react-native-image-zoom-viewer';
-import { BouncyButton } from '@/components/BouncyButton';
 import { ImageActionBottomSheet } from '@/components/ImageActionBottomSheet';
+import { GlassNavigationButton } from '@/components/navigation/GlassNavigationButton';
 import { Text } from '@/components/Themed';
 import Colors from '@/constants/Colors';
 import { PaneModal } from '@/features/adaptive-layout/PaneModal';
@@ -130,9 +129,17 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
         {/* 顶栏控制条 */}
         <SafeAreaView style={styles.headerSafeArea} pointerEvents="box-none">
           <View style={styles.headerBar}>
-            <BouncyButton onPress={onClose} style={styles.iconBtn} hitSlop={12}>
-              <Ionicons name="close" size={24} color="#FFFFFF" />
-            </BouncyButton>
+            <GlassNavigationButton
+              icon="close"
+              accessibilityLabel="关闭"
+              onPress={onClose}
+              size={36}
+              color="#FFFFFF"
+              colorScheme="dark"
+              glassStyle="regular"
+              backgroundColor="rgba(0, 0, 0, 0.4)"
+              hitSlop={12}
+            />
 
             {imageUrls.length > 1 && (
               <Text style={styles.pageIndicator}>
@@ -141,13 +148,17 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
             )}
 
             <View style={styles.rightActions}>
-              <BouncyButton
+              <GlassNavigationButton
+                icon="download"
+                accessibilityLabel="保存图片"
                 onPress={() => saveImageToGallery(currentUrl)}
-                style={styles.iconBtn}
+                size={36}
+                color="#FFFFFF"
+                colorScheme="dark"
+                glassStyle="regular"
+                backgroundColor="rgba(0, 0, 0, 0.4)"
                 hitSlop={12}
-              >
-                <Ionicons name="download-outline" size={22} color="#FFFFFF" />
-              </BouncyButton>
+              />
             </View>
           </View>
         </SafeAreaView>
@@ -181,15 +192,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 10,
-  },
-  iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
   },
   rightActions: {
     flexDirection: 'row',

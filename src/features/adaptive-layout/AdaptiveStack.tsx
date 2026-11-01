@@ -45,6 +45,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GlassNavigationButton } from '@/components/navigation/GlassNavigationButton';
+import { useIsLiquidGlassActive } from '@/components/surfaces/FloatingSurface';
 import { useRuntimeThemeColors } from '@/components/Themed';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import {
@@ -412,9 +414,13 @@ function AdaptiveScreen({
   const insets = useSafeAreaInsets();
   const dimensions = usePaneDimensions();
   const colors = useRuntimeThemeColors();
+  const useGlass = useIsLiquidGlassActive();
   const [headerHeight, setHeaderHeight] = useState(56 + insets.top);
   const shown = options.headerShown !== false;
-  const tintColor = options.headerTintColor ?? colors.primary;
+  const tintColor =
+    typeof options.headerTintColor === 'string'
+      ? options.headerTintColor
+      : colors.primary;
   const itemProps = { tintColor, canGoBack };
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -435,14 +441,23 @@ function AdaptiveScreen({
                 ? () =>
                     options.headerLeft?.({ ...itemProps, label: previousTitle })
                 : canGoBack
-                  ? () => (
-                      <HeaderBackButton
-                        onPress={onBack}
-                        tintColor={tintColor}
-                        displayMode="minimal"
-                        accessibilityLabel="返回"
-                      />
-                    )
+                  ? () =>
+                      useGlass ? (
+                        <GlassNavigationButton
+                          icon="back"
+                          onPress={onBack}
+                          color={tintColor}
+                          accessibilityLabel="返回"
+                          style={styles.headerBackBtn}
+                        />
+                      ) : (
+                        <HeaderBackButton
+                          onPress={onBack}
+                          tintColor={tintColor}
+                          displayMode="minimal"
+                          accessibilityLabel="返回"
+                        />
+                      )
                   : undefined
             }
             headerRight={
@@ -503,6 +518,7 @@ export const AdaptiveStack = Object.assign(AdaptiveStackHost, {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  headerBackBtn: { marginLeft: 8 },
   route: { position: 'absolute', top: 0, overflow: 'hidden' },
   empty: {
     position: 'absolute',

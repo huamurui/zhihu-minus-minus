@@ -17,6 +17,7 @@ import { getSearchSuggest, searchContent } from '@/api/zhihu';
 import type { FeedItem } from '@/api/zhihu/feed';
 import { BouncyButton } from '@/components/BouncyButton';
 import { FeedCard } from '@/components/FeedCard';
+import { GlassNavigationButton } from '@/components/navigation/GlassNavigationButton';
 import { BottomSheet } from '@/components/overlays/BottomSheet';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { Text, useThemeColor, View } from '@/components/Themed';
@@ -456,14 +457,14 @@ export default function SearchScreen() {
         className="pb-2.5 px-[5px]"
         style={{ backgroundColor, paddingTop: insets.top + 8 }}
       >
-        <View className="flex-row items-center">
-          <BouncyButton
+        <View className="flex-row items-center gap-1.5">
+          <GlassNavigationButton
+            icon="back"
+            accessibilityLabel="返回"
             onPress={() => router.back()}
-            className="p-2 rounded-full"
-            hitSlop={15}
-          >
-            <Ionicons name="chevron-back" size={28} color={textColor} />
-          </BouncyButton>
+            size={40}
+            color={textColor}
+          />
           <Pressable
             onPress={() => inputRef.current?.focus()}
             className="flex-row items-center rounded-full px-3 h-9 flex-1"
