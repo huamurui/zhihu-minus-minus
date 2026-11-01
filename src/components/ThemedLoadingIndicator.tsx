@@ -50,29 +50,33 @@ export function ThemedLoadingIndicator({
   const actualStrokeWidth = strokeWidth ?? (size <= 24 ? 2.5 : 3);
   const radius = (size - actualStrokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const arcOffset = circumference * 0.25;
+  const dashLength = circumference * 0.25;
+  const gapLength = circumference * 0.75;
 
   const [reduceMotion, setReduceMotion] = useState(false);
   const rotation = useSharedValue(0);
 
   useEffect(() => {
     let isMounted = true;
-    void AccessibilityInfo.isReduceMotionEnabled?.()
-      ?.then?.((enabled) => {
-        if (isMounted) {
-          setReduceMotion(Boolean(enabled));
-        }
-      })
-      ?.catch?.(() => {});
+    let receivedSystemEvent = false;
 
     const subscription = AccessibilityInfo.addEventListener?.(
       'reduceMotionChanged',
       (enabled) => {
+        receivedSystemEvent = true;
         if (isMounted) {
           setReduceMotion(Boolean(enabled));
         }
       },
     );
+
+    void AccessibilityInfo.isReduceMotionEnabled?.()
+      ?.then?.((enabled) => {
+        if (isMounted && !receivedSystemEvent) {
+          setReduceMotion(Boolean(enabled));
+        }
+      })
+      ?.catch?.(() => {});
 
     return () => {
       isMounted = false;
@@ -93,7 +97,9 @@ export function ThemedLoadingIndicator({
         -1,
         false,
       );
-      return;
+      return () => {
+        cancelAnimation(rotation);
+      };
     }
     cancelAnimation(rotation);
     rotation.value = 0;
@@ -128,8 +134,8 @@ export function ThemedLoadingIndicator({
           r={radius}
           fill="none"
           stroke={spinnerColor}
-          strokeDasharray={[circumference, circumference]}
-          strokeDashoffset={arcOffset}
+          strokeDasharray={[dashLength, gapLength]}
+          strokeDashoffset={0}
           strokeLinecap="round"
           strokeWidth={actualStrokeWidth}
         />

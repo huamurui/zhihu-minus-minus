@@ -178,6 +178,11 @@ export const DailyList = React.forwardRef<
   const currentCursor = data?.pages.at(-1)?.date ?? (data?.pages.length || 0);
   const flashListRef = React.useRef<FlashListRef<DailyListItem>>(null);
 
+  const flattenedData = useMemo(
+    () => flattenDailyPages(data?.pages ?? []),
+    [data],
+  );
+
   const isBusy =
     isFetching ||
     isRefreshing ||
@@ -191,15 +196,11 @@ export const DailyList = React.forwardRef<
       isBusy,
       cursor: currentCursor,
       onFetchNextPage: () => fetchNextPage({ cancelRefetch: false }),
+      itemCount: flattenedData.length,
       listRef: flashListRef,
       endReachedThreshold: 0.5,
     });
   cancelPendingIntentRef.current = cancelPendingIntent;
-
-  const flattenedData = useMemo(
-    () => flattenDailyPages(data?.pages ?? []),
-    [data],
-  );
 
   const scrollHandler = useCollapsibleChromeScroll(chrome);
 
@@ -335,24 +336,13 @@ export const DailyList = React.forwardRef<
                 void fetchNextPage({ cancelRefetch: false });
               }}
             />
-          ) : isFetchingNextPage ? (
+          ) : isFetchingNextPage || isPendingIntent ? (
             <View style={styles.footerContainer}>
               <ThemedLoadingIndicator
                 size={22}
                 color={primaryColor}
                 trackColor={indicatorTrackColor}
               />
-            </View>
-          ) : isPendingIntent ? (
-            <View style={styles.footerContainer}>
-              <ThemedLoadingIndicator
-                size={22}
-                color={primaryColor}
-                trackColor={indicatorTrackColor}
-              />
-              <Text type="secondary" style={styles.footerText}>
-                正在更新内容，随后继续
-              </Text>
             </View>
           ) : !hasNextPage ? (
             <View style={styles.footerContainer}>

@@ -61,8 +61,10 @@ describe('ThemedLoadingIndicator', () => {
   });
 
   it('can be unmounted cleanly while animating', async () => {
+    const reanimated = jest.requireMock('react-native-reanimated');
     const host = await render(<ThemedLoadingIndicator animating={true} />);
     expect(() => host.unmount()).not.toThrow();
+    expect(reanimated.cancelAnimation).toHaveBeenCalled();
   });
 
   it('stops animation when animating is false', async () => {

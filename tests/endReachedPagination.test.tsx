@@ -291,6 +291,46 @@ describe('useEndReachedPagination state machine', () => {
     expect(onFetchNextPage).toHaveBeenCalledTimes(1);
   });
 
+  it('cancelling pending intent invalidates pending async callbacks and prevents resurrection', async () => {
+    let resolveBlocked: ((value: unknown) => void) | undefined;
+    const onFetchNextPage = jest.fn().mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveBlocked = resolve;
+        }),
+    );
+    const host = await renderHook(() =>
+      useEndReachedPagination({
+        isActive: true,
+        hasNextPage: true,
+        isFetchNextPageError: false,
+        isBusy: false,
+        cursor: 'cursor-1',
+        onFetchNextPage,
+      }),
+    );
+
+    // 1. User reaches end
+    await act(async () => {
+      host.result.current.handleEndReached();
+    });
+    expect(onFetchNextPage).toHaveBeenCalledTimes(1);
+
+    // 2. User refreshes or cancels intent before fetch resolves
+    await act(async () => {
+      host.result.current.cancelPendingIntent();
+    });
+    expect(host.result.current.isPendingIntent).toBe(false);
+
+    // 3. Stale async fetch resolves with blocked status
+    await act(async () => {
+      resolveBlocked?.({ status: 'blocked', reason: 'busy' });
+    });
+
+    // Should NOT resurrect pending intent because generation was invalidated
+    expect(host.result.current.isPendingIntent).toBe(false);
+  });
+
   describe('resting near end zone', () => {
     beforeEach(() => {
       jest.useFakeTimers();
@@ -299,14 +339,13 @@ describe('useEndReachedPagination state machine', () => {
       jest.useRealTimers();
     });
 
-    it('triggers limited resting follow-up loads when list remains near end after fetch settles', async () => {
+    it('does not trigger follow-up loads on initial load settling while near end', async () => {
       const onFetchNextPage = jest
         .fn()
         .mockResolvedValue({ status: 'started' });
-      let offset = 1000;
       const listRef = {
         current: {
-          getAbsoluteLastScrollOffset: () => offset,
+          getAbsoluteLastScrollOffset: () => 1000,
           getWindowSize: () => ({ height: 800 }),
           getChildContainerDimensions: () => ({ height: 1200 }),
           getFirstItemOffset: () => 0,
@@ -322,44 +361,199 @@ describe('useEndReachedPagination state machine', () => {
             isBusy: busy,
             cursor: 'cursor-1',
             onFetchNextPage,
+            itemCount: 10,
             listRef,
             endReachedThreshold: 0.5,
           }),
         { initialProps: { busy: true } },
       );
 
-      const finishLoad = async () => {
+      // Initial load finishes (busy -> false) without user touching end
+      await act(async () => {
+        host.rerender({ busy: false });
+      });
+      await act(async () => {
+        jest.runOnlyPendingTimers();
+      });
+
+      expect(onFetchNextPage).not.toHaveBeenCalled();
+    });
+
+    it('does not trigger follow-up loads when pull-to-refresh settles near end', async () => {
+      const onFetchNextPage = jest
+        .fn()
+        .mockResolvedValue({ status: 'started' });
+      const listRef = {
+        current: {
+          getAbsoluteLastScrollOffset: () => 1000,
+          getWindowSize: () => ({ height: 800 }),
+          getChildContainerDimensions: () => ({ height: 1200 }),
+          getFirstItemOffset: () => 0,
+        },
+      };
+
+      const host = await renderHook(
+        ({ busy }: { busy: boolean }) =>
+          useEndReachedPagination({
+            isActive: true,
+            hasNextPage: true,
+            isFetchNextPageError: false,
+            isBusy: busy,
+            cursor: 'cursor-1',
+            onFetchNextPage,
+            itemCount: 10,
+            listRef,
+            endReachedThreshold: 0.5,
+          }),
+        { initialProps: { busy: false } },
+      );
+
+      // Refresh starts
+      await act(async () => {
+        host.result.current.cancelPendingIntent();
+        host.rerender({ busy: true });
+      });
+
+      // Refresh ends
+      await act(async () => {
+        host.rerender({ busy: false });
+      });
+      await act(async () => {
+        jest.runOnlyPendingTimers();
+      });
+
+      expect(onFetchNextPage).not.toHaveBeenCalled();
+    });
+
+    it('does not trigger follow-up loads when end-reached fetch successfully yields new items', async () => {
+      const onFetchNextPage = jest
+        .fn()
+        .mockResolvedValue({ status: 'started' });
+      const listRef = {
+        current: {
+          getAbsoluteLastScrollOffset: () => 1000,
+          getWindowSize: () => ({ height: 800 }),
+          getChildContainerDimensions: () => ({ height: 1200 }),
+          getFirstItemOffset: () => 0,
+        },
+      };
+
+      const host = await renderHook(
+        ({ busy, itemCount }: { busy: boolean; itemCount: number }) =>
+          useEndReachedPagination({
+            isActive: true,
+            hasNextPage: true,
+            isFetchNextPageError: false,
+            isBusy: busy,
+            cursor: 'cursor-1',
+            onFetchNextPage,
+            itemCount,
+            listRef,
+            endReachedThreshold: 0.5,
+          }),
+        { initialProps: { busy: false, itemCount: 10 } },
+      );
+
+      // User reaches end
+      await act(async () => {
+        host.result.current.handleEndReached();
+      });
+      expect(onFetchNextPage).toHaveBeenCalledTimes(1);
+
+      // Fetch in flight
+      await act(async () => {
+        host.rerender({ busy: true, itemCount: 10 });
+      });
+
+      // Fetch finished with more items (10 -> 20)
+      await act(async () => {
+        host.rerender({ busy: false, itemCount: 20 });
+      });
+      await act(async () => {
+        jest.runOnlyPendingTimers();
+      });
+
+      // No auto follow-up because new items were added!
+      expect(onFetchNextPage).toHaveBeenCalledTimes(1);
+    });
+
+    it('triggers limited resting follow-up loads up to max 3 when end-reached fetch yields no new items', async () => {
+      const onFetchNextPage = jest
+        .fn()
+        .mockResolvedValue({ status: 'started' });
+      let offset = 1000;
+      const listRef = {
+        current: {
+          getAbsoluteLastScrollOffset: () => offset,
+          getWindowSize: () => ({ height: 800 }),
+          getChildContainerDimensions: () => ({ height: 1200 }),
+          getFirstItemOffset: () => 0,
+        },
+      };
+
+      const host = await renderHook(
+        ({ busy, itemCount }: { busy: boolean; itemCount: number }) =>
+          useEndReachedPagination({
+            isActive: true,
+            hasNextPage: true,
+            isFetchNextPageError: false,
+            isBusy: busy,
+            cursor: 'cursor-1',
+            onFetchNextPage,
+            itemCount,
+            listRef,
+            endReachedThreshold: 0.5,
+          }),
+        { initialProps: { busy: false, itemCount: 10 } },
+      );
+
+      // 1. User reaches end
+      await act(async () => {
+        host.result.current.handleEndReached();
+      });
+      expect(onFetchNextPage).toHaveBeenCalledTimes(1);
+
+      const finishPagingWithoutNewItems = async () => {
         await act(async () => {
-          host.rerender({ busy: true });
+          host.rerender({ busy: true, itemCount: 10 });
         });
         await act(async () => {
-          host.rerender({ busy: false });
+          host.rerender({ busy: false, itemCount: 10 });
         });
         await act(async () => {
           jest.runOnlyPendingTimers();
         });
       };
 
-      // Initial load finishes
-      await finishLoad();
-      expect(onFetchNextPage).toHaveBeenCalledTimes(1);
-
-      // Follow-up 2
-      await finishLoad();
+      // Paging 1 finishes without new items -> triggers resting follow-up 1
+      await finishPagingWithoutNewItems();
       expect(onFetchNextPage).toHaveBeenCalledTimes(2);
 
-      // Follow-up 3
-      await finishLoad();
+      // Follow-up 1 finishes without new items -> triggers resting follow-up 2
+      await finishPagingWithoutNewItems();
       expect(onFetchNextPage).toHaveBeenCalledTimes(3);
 
-      // Exceeds max resting follow-ups (3) without moving scroll offset -> should not fetch again
-      await finishLoad();
-      expect(onFetchNextPage).toHaveBeenCalledTimes(3);
-
-      // Moving scroll offset resets resting follow-up count
-      offset = 1200;
-      await finishLoad();
+      // Follow-up 2 finishes without new items -> triggers resting follow-up 3
+      await finishPagingWithoutNewItems();
       expect(onFetchNextPage).toHaveBeenCalledTimes(4);
+
+      // Follow-up 3 finishes without new items -> MAX_RESTING_FOLLOW_UPS (3) reached, stops!
+      await finishPagingWithoutNewItems();
+      expect(onFetchNextPage).toHaveBeenCalledTimes(4);
+
+      // Subsequent handleEndReached at the exact same scroll offset does not reset budget
+      await act(async () => {
+        host.result.current.handleEndReached();
+      });
+      await finishPagingWithoutNewItems();
+      expect(onFetchNextPage).toHaveBeenCalledTimes(4);
+
+      // Moving scroll offset resets resting follow-up budget
+      offset = 1250;
+      await act(async () => {
+        host.result.current.handleEndReached();
+      });
+      expect(onFetchNextPage).toHaveBeenCalledTimes(5);
     });
   });
 });

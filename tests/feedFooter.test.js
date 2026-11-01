@@ -90,24 +90,20 @@ test('a pagination failure retains its retry action instead of a filtering messa
   expect(fetchNextPage).toHaveBeenCalledTimes(1);
 });
 
-test('footer renders loading indicator and "正在加载更多..." while fetching next page', () => {
+test('footer renders centered loading indicator without prompt text while fetching next page', () => {
   const footer = renderFooter({
     isFetchingNextPage: true,
     flattenedData: ['item-1'],
   });
-  expect(footer.props.children[0].type).toBe('ThemedLoadingIndicator');
-  expect(footer.props.children[1].props.children).toBe('正在加载更多...');
+  expect(footer.props.children.type).toBe('ThemedLoadingIndicator');
 });
 
-test('footer renders loading indicator and "正在更新内容，随后继续" when pagination intent is blocked', () => {
+test('footer renders centered loading indicator without prompt text when pagination intent is blocked', () => {
   const footer = renderFooter({
     isPendingIntent: true,
     flattenedData: ['item-1'],
   });
-  expect(footer.props.children[0].type).toBe('ThemedLoadingIndicator');
-  expect(footer.props.children[1].props.children).toBe(
-    '正在更新内容，随后继续',
-  );
+  expect(footer.props.children.type).toBe('ThemedLoadingIndicator');
 });
 
 test('footer renders "继续上滑加载" when there is a next page and query is idle', () => {

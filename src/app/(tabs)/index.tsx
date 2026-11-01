@@ -1269,6 +1269,7 @@ const FeedList = React.forwardRef<
         isBusy,
         cursor: currentCursor,
         onFetchNextPage: fetchNextPage,
+        itemCount: flattenedData.length,
         isAutoFetching:
           (filterEnabled || localDedupEnabled) &&
           flattenedData.length < MIN_RENDERABLE_ITEMS,
@@ -1423,27 +1424,13 @@ const FeedList = React.forwardRef<
                   void fetchNextPage();
                 }}
               />
-            ) : isFetchingNextPage ? (
+            ) : isFetchingNextPage || isPendingIntent ? (
               <View style={styles.footerContainer}>
                 <ThemedLoadingIndicator
                   size={22}
                   color={tintColor}
                   trackColor={indicatorTrackColor}
                 />
-                <Text type="secondary" style={styles.footerText}>
-                  正在加载更多...
-                </Text>
-              </View>
-            ) : isPendingIntent ? (
-              <View style={styles.footerContainer}>
-                <ThemedLoadingIndicator
-                  size={22}
-                  color={tintColor}
-                  trackColor={indicatorTrackColor}
-                />
-                <Text type="secondary" style={styles.footerText}>
-                  正在更新内容，随后继续
-                </Text>
               </View>
             ) : (filterEnabled || localDedupEnabled) &&
               !isError &&

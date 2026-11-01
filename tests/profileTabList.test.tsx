@@ -477,6 +477,23 @@ test('refresh stays visible through query reset and blocks pagination until sett
   expect(mockListProps.refreshing).toBe(false);
 });
 
+test('end-reached while busy records pending intent and resumes when idle', async () => {
+  const fetchNextPage = jest.fn().mockResolvedValue(undefined);
+  const query = createQuery({ data: ['one'], isFetching: true, fetchNextPage });
+  const props = createProps({ query });
+  const host = await render(<ProfileTabList {...props} />);
+
+  await act(() => {
+    mockListProps.onEndReached();
+  });
+  expect(fetchNextPage).not.toHaveBeenCalled();
+
+  await host.rerender(
+    <ProfileTabList {...props} query={{ ...query, isFetching: false }} />,
+  );
+  expect(fetchNextPage).toHaveBeenCalledTimes(1);
+});
+
 test('custom empty state is shown only after loading and errors are handled', async () => {
   const props = createProps({
     emptyState: <Text>登录后查看我赞同过的回答</Text>,

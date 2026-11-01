@@ -18,6 +18,7 @@ import Reanimated, {
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { ThemedLoadingIndicator } from '@/components/ThemedLoadingIndicator';
+import { useEndReachedPagination } from '@/hooks/useEndReachedPagination';
 import { useRefreshAction } from '@/hooks/useRefreshAction';
 import {
   getProfileMinContentHeight,
@@ -271,29 +272,41 @@ export const ProfileTabList = forwardRef<
     if (active) measureContent();
   }, [active, measureContent]);
 
-  const loadNextPage = (retry = false) => {
-    if (
-      !active ||
-      !query.hasNextPage ||
-      query.isFetching ||
-      refreshing ||
-      refreshPending.current ||
-      paginationPending.current ||
-      (!retry && query.isFetchNextPageError)
-    ) {
-      return;
+  const isBusy =
+    query.isFetching ||
+    query.isFetchingNextPage ||
+    refreshing ||
+    refreshPending.current;
+
+  const onFetchNextPage = useCallback(async () => {
+    if (refreshPending.current || paginationPending.current) {
+      return { status: 'blocked', reason: 'busy' };
     }
     paginationPending.current = true;
-    void query
-      .fetchNextPage()
-      .catch(() => undefined)
-      .finally(() => {
-        paginationPending.current = false;
-      });
-  };
+    try {
+      return await query.fetchNextPage();
+    } finally {
+      paginationPending.current = false;
+    }
+  }, [query]);
+
+  const currentCursor = query.data.length;
+  const { handleEndReached, isPendingIntent, cancelPendingIntent } =
+    useEndReachedPagination({
+      isActive: active,
+      hasNextPage: Boolean(query.hasNextPage),
+      isFetchNextPageError: query.isFetchNextPageError,
+      isBusy,
+      cursor: currentCursor,
+      onFetchNextPage,
+      itemCount: query.data.length,
+      listRef,
+      endReachedThreshold: 0.4,
+    });
 
   const handleRefresh = () => {
     if (!active || refreshPending.current) return;
+    cancelPendingIntent();
     refreshPending.current = true;
     void refresh()
       .catch(() => undefined)
@@ -334,7 +347,7 @@ export const ProfileTabList = forwardRef<
         contentHeightRef.current = height;
         applyPendingScroll();
       }}
-      onEndReached={() => loadNextPage()}
+      onEndReached={handleEndReached}
       onEndReachedThreshold={0.4}
       onRefresh={handleRefresh}
       refreshing={refreshing}
@@ -347,12 +360,13 @@ export const ProfileTabList = forwardRef<
       ListEmptyComponent={
         query.isLoading ? (
           hideInitialLoadingIndicator ? null : (
-            <ThemedLoadingIndicator
-              size={28}
-              color={primaryColor}
-              trackColor={indicatorTrackColor}
-              style={{ margin: 32 }}
-            />
+            <View style={styles.emptyLoadingContainer}>
+              <ThemedLoadingIndicator
+                size={28}
+                color={primaryColor}
+                trackColor={indicatorTrackColor}
+              />
+            </View>
           )
         ) : query.isError ? (
           <QueryErrorView
@@ -369,22 +383,21 @@ export const ProfileTabList = forwardRef<
         )
       }
       ListFooterComponent={
-        query.isFetchingNextPage ? (
+        query.isFetchingNextPage || isPendingIntent ? (
           <View style={styles.footerContainer}>
             <ThemedLoadingIndicator
               size={22}
               color={primaryColor}
               trackColor={indicatorTrackColor}
             />
-            <Text type="secondary" style={styles.footerText}>
-              正在加载更多...
-            </Text>
           </View>
         ) : query.isFetchNextPageError && query.data.length > 0 ? (
           <QueryErrorView
             compact
             message="更多内容加载失败"
-            onRetry={() => loadNextPage(true)}
+            onRetry={() => {
+              void onFetchNextPage().catch(() => undefined);
+            }}
           />
         ) : query.isError && query.data.length > 0 ? (
           <QueryErrorView
@@ -405,6 +418,11 @@ export const ProfileTabList = forwardRef<
 });
 
 const styles = StyleSheet.create({
+  emptyLoadingContainer: {
+    paddingVertical: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   footerContainer: {
     height: 64,
     flexDirection: 'row',
@@ -412,7 +430,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   footerText: {
-    marginLeft: 8,
     fontSize: 13,
   },
 });
