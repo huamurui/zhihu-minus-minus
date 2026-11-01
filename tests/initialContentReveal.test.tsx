@@ -101,3 +101,25 @@ test('reduced motion shows content directly when mounted with ready=true', async
   expect(host.getByText('无动画正文')).toBeVisible();
   expect(timing).not.toHaveBeenCalled();
 });
+
+test('reveals content on iOS with fade animation', async () => {
+  jest.replaceProperty(Platform, 'OS', 'ios');
+  const timing = jest.spyOn(Animated, 'timing').mockReturnValue({
+    start: jest.fn(),
+    stop: jest.fn(),
+    reset: jest.fn(),
+  });
+  const host = await render(
+    <InitialContentReveal ready={false}>
+      <Text>iOS 加载中</Text>
+    </InitialContentReveal>,
+  );
+  expect(host.getByText('iOS 加载中')).toBeVisible();
+  await host.rerender(
+    <InitialContentReveal ready>
+      <Text>iOS 正文</Text>
+    </InitialContentReveal>,
+  );
+  expect(host.getByText('iOS 正文')).toBeTruthy();
+  expect(timing).toHaveBeenCalledTimes(1);
+});

@@ -14,14 +14,23 @@ import {
   useTitleTransitionSource,
 } from '../src/features/adaptive-layout/TitleTransition';
 
+let mockMeasureInWindow:
+  | ((callback: (...args: number[]) => void) => void)
+  | null = null;
+
 jest.mock('react-native', () => {
   const native = jest.requireActual('react-native');
   const react = jest.requireActual('react');
   const ViewWithMeasurement = react.forwardRef(
     (props: object, ref: unknown) => {
       react.useImperativeHandle(ref, () => ({
-        measureInWindow: (callback: (...args: number[]) => void) =>
-          callback(20, 80, 180, 24),
+        measureInWindow: (callback: (...args: number[]) => void) => {
+          if (mockMeasureInWindow) {
+            mockMeasureInWindow(callback);
+            return;
+          }
+          callback(20, 80, 180, 24);
+        },
       }));
       return react.createElement(native.View, props);
     },
@@ -499,6 +508,19 @@ test('target retries measurement if initial destination frame is invalid', async
     stop: jest.fn(),
     reset: jest.fn(),
   });
+  let measureCalls = 0;
+  mockMeasureInWindow = (callback) => {
+    measureCalls++;
+    // Call 1: source measurement
+    // Call 2: root measurement for source
+    // Call 3: destination measurement on target -> return invalid frame (0, 0, 0, 0)
+    // Call 4+: retry destination measurement -> return valid frame (20, 80, 180, 24)
+    if (measureCalls === 3) {
+      callback(0, 0, 0, 0);
+    } else {
+      callback(20, 80, 180, 24);
+    }
+  };
   try {
     const host = await render(
       <TitleTransitionProvider activeRouteKey="source">
@@ -521,10 +543,18 @@ test('target retries measurement if initial destination frame is invalid', async
           nativeEvent: { layout: { x: 0, y: 0, width: 180, height: 24 } },
         });
     });
-    // Advance timers to allow next-frame retry
+    // First measurement returned invalid (0, 0, 0, 0), so animation should NOT have started yet
+    expect(timing).not.toHaveBeenCalled();
+    expect(measureCalls).toBe(3);
+
+    // Advance timers by 20ms to allow next-frame retry (16ms setTimeout)
     await act(() => jest.advanceTimersByTime(20));
-    expect(timing).toHaveBeenCalled();
+
+    // Retry succeeded and started animation
+    expect(measureCalls).toBeGreaterThanOrEqual(4);
+    expect(timing).toHaveBeenCalledTimes(1);
   } finally {
+    mockMeasureInWindow = null;
     timing.mockRestore();
     jest.useRealTimers();
   }

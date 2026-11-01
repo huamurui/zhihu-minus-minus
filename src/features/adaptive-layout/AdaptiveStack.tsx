@@ -278,6 +278,7 @@ function RoutePane({
   transitionSequence: number;
   children: ReactNode;
 }) {
+  const hasTitleTransition = useTitleTransitionActiveForRoute(routeKey);
   const useGlass = useIsLiquidGlassActive();
   const focused = useRef(false);
   const isEntering = visible && active && transitionSequence > 0;
@@ -354,7 +355,6 @@ function RoutePane({
     }),
     [frame.width, frame.height, visible, routeKey, twoPane, expand, progress],
   );
-  const hasTitleTransition = useTitleTransitionActiveForRoute(routeKey);
   const webProps = Platform.OS === 'web' ? { inert: !visible } : {};
   // Keep visibility independent of native-driven opacity on retained routes.
   return (

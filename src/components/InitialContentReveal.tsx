@@ -1,16 +1,14 @@
 import { type ReactNode, useEffect, useLayoutEffect, useRef } from 'react';
-import { AccessibilityInfo, Animated, Platform } from 'react-native';
+import { AccessibilityInfo, Animated } from 'react-native';
 
 let cachedReduceMotion = false;
 
-if (Platform.OS === 'android') {
-  void AccessibilityInfo.isReduceMotionEnabled?.()?.then?.((enabled) => {
-    cachedReduceMotion = enabled;
-  });
-  AccessibilityInfo.addEventListener?.('reduceMotionChanged', (enabled) => {
-    cachedReduceMotion = enabled;
-  });
-}
+void AccessibilityInfo.isReduceMotionEnabled?.()?.then?.((enabled) => {
+  cachedReduceMotion = enabled;
+});
+AccessibilityInfo.addEventListener?.('reduceMotionChanged', (enabled) => {
+  cachedReduceMotion = enabled;
+});
 
 export function setCachedReduceMotionForTest(value: boolean) {
   cachedReduceMotion = value;
@@ -30,7 +28,6 @@ export function InitialContentReveal({
   const hasRevealed = useRef(false);
 
   useEffect(() => {
-    if (Platform.OS !== 'android') return;
     let mounted = true;
     void AccessibilityInfo.isReduceMotionEnabled?.()?.then?.((enabled) => {
       cachedReduceMotion = enabled;
@@ -60,7 +57,7 @@ export function InitialContentReveal({
   }, [opacity]);
 
   useLayoutEffect(() => {
-    if (Platform.OS !== 'android' || hasRevealed.current) return;
+    if (hasRevealed.current) return;
     if (!ready) return;
     hasRevealed.current = true;
     if (reduceMotion.current) {
@@ -79,10 +76,6 @@ export function InitialContentReveal({
       opacity.setValue(1);
     };
   }, [ready, opacity]);
-
-  if (Platform.OS !== 'android') {
-    return children;
-  }
 
   return (
     <Animated.View pointerEvents="box-none" style={{ opacity }}>

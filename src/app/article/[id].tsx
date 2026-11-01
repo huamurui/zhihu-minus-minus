@@ -37,6 +37,7 @@ import {
 } from '@/components/ContentActionBar';
 import { ContentActionButton } from '@/components/ContentActionButton';
 import { FollowButton } from '@/components/FollowButton';
+import { InitialContentReveal } from '@/components/InitialContentReveal';
 import { MoreActionsButton } from '@/components/MoreActionsButton';
 import { GlassNavigationButton } from '@/components/navigation/GlassNavigationButton';
 import { QueryErrorView } from '@/components/QueryErrorView';
@@ -472,13 +473,18 @@ export default function ArticleDetail() {
               {!isDaily && (
                 <AnswerEndorsements endorsements={zhihuData?.endorsements} />
               )}
-              <ZhihuContent
-                suppressDoubleTapSelection={isDoubleTapEnabled}
-                content={isDaily ? dailyData?.body : zhihuData?.content}
-                objectId={id as string}
-                type="article"
-                variant={isDaily ? 'daily' : 'default'}
-              />
+              <InitialContentReveal
+                key={String(id)}
+                ready={Boolean(isDaily ? dailyData?.body : zhihuData?.content)}
+              >
+                <ZhihuContent
+                  suppressDoubleTapSelection={isDoubleTapEnabled}
+                  content={isDaily ? dailyData?.body : zhihuData?.content}
+                  objectId={id as string}
+                  type="article"
+                  variant={isDaily ? 'daily' : 'default'}
+                />
+              </InitialContentReveal>
             </View>
 
             {/* Column Card section */}
