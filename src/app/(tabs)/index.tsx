@@ -1358,7 +1358,7 @@ const FeedList = React.forwardRef<
           onScroll={scrollHandler}
           scrollEventThrottle={16}
           contentContainerStyle={{
-            paddingTop: insets.top + 70,
+            paddingTop: insets.top + 60,
             paddingBottom: 120,
           }}
           renderItem={({ item }: { item: FeedListItem }) => {

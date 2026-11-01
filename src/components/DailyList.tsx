@@ -151,7 +151,7 @@ export const DailyList = React.forwardRef<
   });
   const isLoading = isQueryLoading || (isPending && isPaused);
 
-  const cancelPendingIntentRef = React.useRef<() => void>(() => {});
+  const cancelPendingIntentRef = React.useRef<() => void>(() => { });
 
   const handleRefresh = useCallback(async () => {
     if (refreshInFlightRef.current) return;
@@ -210,7 +210,7 @@ export const DailyList = React.forwardRef<
 
   if (isLoading && !isRefreshing) {
     return (
-      <View className="flex-1" style={{ paddingTop: insets.top + 70 }}>
+      <View className="flex-1" style={{ paddingTop: insets.top + 60 }}>
         {[1, 2, 3, 4, 5].map((i) => (
           <SkeletonCard key={i} />
         ))}
@@ -279,7 +279,7 @@ export const DailyList = React.forwardRef<
         onScroll={scrollHandler}
         scrollEventThrottle={16}
         contentContainerStyle={{
-          paddingTop: insets.top + 70,
+          paddingTop: insets.top + 60,
           paddingBottom: 110,
         }}
         renderItem={({ item }: { item: DailyListItem }) => {
@@ -342,9 +342,6 @@ export const DailyList = React.forwardRef<
                 color={primaryColor}
                 trackColor={indicatorTrackColor}
               />
-              <Text type="secondary" style={styles.footerText}>
-                正在加载更多...
-              </Text>
             </View>
           ) : isPendingIntent ? (
             <View style={styles.footerContainer}>
