@@ -7,6 +7,7 @@ import {
   View,
   type ViewInstance,
 } from 'react-native';
+import { PaneContext } from '../src/features/adaptive-layout/PaneContext';
 import {
   TitleTransitionProvider,
   TitleTransitionTarget,
@@ -14,14 +15,23 @@ import {
   useTitleTransitionSource,
 } from '../src/features/adaptive-layout/TitleTransition';
 
+let mockMeasureInWindow:
+  | ((callback: (...args: number[]) => void) => void)
+  | null = null;
+
 jest.mock('react-native', () => {
   const native = jest.requireActual('react-native');
   const react = jest.requireActual('react');
   const ViewWithMeasurement = react.forwardRef(
     (props: object, ref: unknown) => {
       react.useImperativeHandle(ref, () => ({
-        measureInWindow: (callback: (...args: number[]) => void) =>
-          callback(20, 80, 180, 24),
+        measureInWindow: (callback: (...args: number[]) => void) => {
+          if (mockMeasureInWindow) {
+            mockMeasureInWindow(callback);
+            return;
+          }
+          callback(20, 80, 180, 24);
+        },
       }));
       return react.createElement(native.View, props);
     },
@@ -410,5 +420,156 @@ test('reduced motion opens the destination without hiding its title', async () =
     ).toBeNull();
   } finally {
     reducedMotion.mockRestore();
+  }
+});
+
+test('target measures successfully even if onLayout fired before the route became active', async () => {
+  const timing = jest.spyOn(Animated, 'timing').mockReturnValue({
+    start: jest.fn(),
+    stop: jest.fn(),
+    reset: jest.fn(),
+  });
+  try {
+    const host = await render(
+      <TitleTransitionProvider activeRouteKey="source">
+        <Example />
+      </TitleTransitionProvider>,
+    );
+    await fireEvent.press(host.getByText('打开'));
+    const destinationPane = {
+      width: 375,
+      height: 812,
+      visible: true,
+      routeKey: 'destination',
+    };
+    // Render destination while route is still "source" (early native mount)
+    await host.rerender(
+      <TitleTransitionProvider activeRouteKey="source">
+        <PaneContext.Provider value={destinationPane}>
+          <TitleTransitionTarget id="question-1">
+            <Text>提前布局标题</Text>
+          </TitleTransitionTarget>
+        </PaneContext.Provider>
+      </TitleTransitionProvider>,
+    );
+    const target = host.getByText('提前布局标题').parent;
+    expect(target).not.toBeNull();
+    // Native onLayout fires while activeRouteKey is still "source"
+    await act(() => {
+      if (target)
+        fireEvent(target, 'layout', {
+          nativeEvent: { layout: { x: 0, y: 0, width: 180, height: 24 } },
+        });
+    });
+    // Target route was inactive when onLayout fired, so animation must not start yet
+    expect(timing).not.toHaveBeenCalled();
+
+    // Now route updates to destination
+    await host.rerender(
+      <TitleTransitionProvider activeRouteKey="destination">
+        <PaneContext.Provider value={destinationPane}>
+          <TitleTransitionTarget id="question-1">
+            <Text>提前布局标题</Text>
+          </TitleTransitionTarget>
+        </PaneContext.Provider>
+      </TitleTransitionProvider>,
+    );
+    // Should have recovered via useLayoutEffect and started the transition timing!
+    expect(timing).toHaveBeenCalledTimes(1);
+  } finally {
+    timing.mockRestore();
+  }
+});
+
+test('target with enabled=false does not intercept title transition', async () => {
+  const timing = jest.spyOn(Animated, 'timing').mockReturnValue({
+    start: jest.fn(),
+    stop: jest.fn(),
+    reset: jest.fn(),
+  });
+  try {
+    const host = await render(
+      <TitleTransitionProvider activeRouteKey="source">
+        <Example />
+      </TitleTransitionProvider>,
+    );
+    await fireEvent.press(host.getByText('打开'));
+    await host.rerender(
+      <TitleTransitionProvider activeRouteKey="destination">
+        <View>
+          <TitleTransitionTarget id="question-1" enabled={false}>
+            <Text testID="inactive-target">相邻回答标题</Text>
+          </TitleTransitionTarget>
+          <TitleTransitionTarget id="question-1" enabled={true}>
+            <Text testID="active-target">当前回答标题</Text>
+          </TitleTransitionTarget>
+        </View>
+      </TitleTransitionProvider>,
+    );
+    // Inactive target should remain visible directly (not hidden)
+    expect(host.getByTestId('inactive-target')).toBeVisible();
+    // Active target waiting for layout should be hidden
+    expect(host.getByTestId('active-target')).not.toBeVisible();
+  } finally {
+    timing.mockRestore();
+  }
+});
+
+test('target retries measurement if initial destination frame is invalid', async () => {
+  jest.useFakeTimers();
+  const timing = jest.spyOn(Animated, 'timing').mockReturnValue({
+    start: jest.fn(),
+    stop: jest.fn(),
+    reset: jest.fn(),
+  });
+  let measureCalls = 0;
+  mockMeasureInWindow = (callback) => {
+    measureCalls++;
+    // Call 1: source measurement
+    // Call 2: root measurement for source
+    // Call 3: destination measurement on target -> return invalid frame (0, 0, 0, 0)
+    // Call 4+: retry destination measurement -> return valid frame (20, 80, 180, 24)
+    if (measureCalls === 3) {
+      callback(0, 0, 0, 0);
+    } else {
+      callback(20, 80, 180, 24);
+    }
+  };
+  try {
+    const host = await render(
+      <TitleTransitionProvider activeRouteKey="source">
+        <Example />
+      </TitleTransitionProvider>,
+    );
+    await fireEvent.press(host.getByText('打开'));
+    await host.rerender(
+      <TitleTransitionProvider activeRouteKey="destination">
+        <TitleTransitionTarget id="question-1">
+          <Text>重试标题</Text>
+        </TitleTransitionTarget>
+      </TitleTransitionProvider>,
+    );
+    const target = host.getByText('重试标题').parent;
+    expect(target).not.toBeNull();
+    await act(() => {
+      if (target)
+        fireEvent(target, 'layout', {
+          nativeEvent: { layout: { x: 0, y: 0, width: 180, height: 24 } },
+        });
+    });
+    // First measurement returned invalid (0, 0, 0, 0), so animation should NOT have started yet
+    expect(timing).not.toHaveBeenCalled();
+    expect(measureCalls).toBe(3);
+
+    // Advance timers by 20ms to allow next-frame retry (16ms setTimeout)
+    await act(() => jest.advanceTimersByTime(20));
+
+    // Retry succeeded and started animation
+    expect(measureCalls).toBeGreaterThanOrEqual(4);
+    expect(timing).toHaveBeenCalledTimes(1);
+  } finally {
+    mockMeasureInWindow = null;
+    timing.mockRestore();
+    jest.useRealTimers();
   }
 });

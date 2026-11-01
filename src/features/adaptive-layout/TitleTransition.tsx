@@ -15,6 +15,7 @@ import {
   Animated,
   Easing,
   type LayoutChangeEvent,
+  Platform,
   StyleSheet,
   Text,
   View,
@@ -36,6 +37,9 @@ type PendingTitle = {
   rootX: number;
   rootY: number;
   measuring: boolean;
+  pressTime?: number;
+  sourceMeasuredTime?: number;
+  retries?: number;
 };
 type Flight = {
   text: string;
@@ -66,7 +70,7 @@ const VisibilityContext = createContext<{
   flight: Flight | null;
   progress: Animated.Value;
 } | null>(null);
-const TARGET_WAIT_MS = 200;
+export const TARGET_WAIT_MS = Platform.OS === 'android' ? 500 : 200;
 const validFrame = (frame: Frame) =>
   Number.isFinite(frame.x) &&
   Number.isFinite(frame.y) &&
@@ -147,10 +151,10 @@ export function TitleTransitionProvider({
         setWaiting(null);
       }
     };
-    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+    void AccessibilityInfo.isReduceMotionEnabled?.()?.then?.((enabled) => {
       if (mounted) updateReducedMotion(enabled);
     });
-    const subscription = AccessibilityInfo.addEventListener(
+    const subscription = AccessibilityInfo.addEventListener?.(
       'reduceMotionChanged',
       updateReducedMotion,
     );
@@ -159,13 +163,14 @@ export function TitleTransitionProvider({
       sequence.current += 1;
       if (targetTimer.current) clearTimeout(targetTimer.current);
       restoreSource();
-      subscription.remove();
+      subscription?.remove?.();
     };
   }, [progress, restoreSource]);
 
   const navigate = useCallback<TitleTransition['navigate']>(
     (ref, id, text, open, isValid, onSourceHiddenChange, sourceTitle) => {
       const token = ++sequence.current;
+      const pressTime = Date.now();
       pending.current = null;
       if (targetTimer.current) clearTimeout(targetTimer.current);
       targetTimer.current = null;
@@ -180,6 +185,20 @@ export function TitleTransitionProvider({
         !ref.current ||
         !root.current
       ) {
+        if (__DEV__) {
+          const reason = !id
+            ? 'missing-id'
+            : !text
+              ? 'missing-text'
+              : reducedMotion.current
+                ? 'reduced-motion'
+                : !ref.current
+                  ? 'missing-ref'
+                  : 'missing-root';
+          console.debug(
+            `[TitleTransition] navigate skipped (${reason}) for id: ${id}`,
+          );
+        }
         open();
         return;
       }
@@ -194,16 +213,19 @@ export function TitleTransitionProvider({
           !reducedMotion.current &&
           (!isValid || isValid())
         ) {
+          const now = Date.now();
           pending.current = {
             id,
             text,
             source,
-            expires: Date.now() + TARGET_WAIT_MS,
+            expires: now + TARGET_WAIT_MS,
             isValid,
             sourceRouteKey: currentRoute.current,
             rootX,
             rootY,
             measuring: false,
+            pressTime,
+            sourceMeasuredTime: now,
           };
           const relative = {
             ...source,
@@ -226,16 +248,36 @@ export function TitleTransitionProvider({
           });
           targetTimer.current = setTimeout(() => {
             if (token !== sequence.current) return;
+            if (__DEV__) {
+              console.debug(
+                `[TitleTransition] target wait timed out (${TARGET_WAIT_MS}ms) for id: ${id}`,
+              );
+            }
             pending.current = null;
             targetTimer.current = null;
             restoreSource();
             setWaiting(null);
             setFlight(null);
           }, TARGET_WAIT_MS);
+        } else {
+          if (__DEV__) {
+            const reason = !source
+              ? 'timeout-or-failed-measure'
+              : !validFrame(source)
+                ? 'invalid-source-frame'
+                : reducedMotion.current
+                  ? 'reduced-motion'
+                  : 'invalid-callback';
+            console.debug(
+              `[TitleTransition] source measurement failed (${reason}) for id: ${id}`,
+              { elapsedMs: Date.now() - pressTime },
+            );
+          }
         }
         open();
       };
-      const timeout = setTimeout(() => finish(), 100);
+      const SOURCE_WAIT_MS = Platform.OS === 'android' ? 200 : 100;
+      const timeout = setTimeout(() => finish(), SOURCE_WAIT_MS);
       ref.current.measureInWindow((x, y, width, height) => {
         root.current?.measureInWindow((rootX, rootY) => {
           if (!Number.isFinite(rootX) || !Number.isFinite(rootY)) finish();
@@ -255,6 +297,17 @@ export function TitleTransitionProvider({
         reducedMotion.current ||
         (current.isValid && !current.isValid())
       ) {
+        if (__DEV__) {
+          const reason =
+            Date.now() > current.expires
+              ? 'expired'
+              : reducedMotion.current
+                ? 'reduced-motion'
+                : 'invalid-callback';
+          console.debug(
+            `[TitleTransition] target rejected (${reason}) for id: ${id}`,
+          );
+        }
         pending.current = null;
         if (targetTimer.current) clearTimeout(targetTimer.current);
         targetTimer.current = null;
@@ -273,10 +326,38 @@ export function TitleTransitionProvider({
           pending.current !== current ||
           Date.now() > current.expires ||
           (current.isValid && !current.isValid())
-        )
+        ) {
+          if (pending.current === current && token === sequence.current) {
+            current.measuring = false;
+            const retries = (current.retries ?? 0) + 1;
+            current.retries = retries;
+            if (retries <= 3 && Date.now() <= current.expires) {
+              setTimeout(() => {
+                if (
+                  pending.current === current &&
+                  token === sequence.current &&
+                  !current.measuring &&
+                  Date.now() <= current.expires
+                ) {
+                  target(id, ref);
+                }
+              }, 16);
+            }
+          }
           return;
+        }
         if (targetTimer.current) clearTimeout(targetTimer.current);
         targetTimer.current = null;
+        const now = Date.now();
+        if (__DEV__) {
+          console.debug('[TitleTransition] target flight started', {
+            id,
+            sourceMeasureMs:
+              (current.sourceMeasuredTime ?? now) - (current.pressTime ?? now),
+            targetWaitMs: now - (current.sourceMeasuredTime ?? now),
+            totalMs: now - (current.pressTime ?? now),
+          });
+        }
         setFlight({
           text: current.text,
           source: {
@@ -406,18 +487,22 @@ export function TitleTransitionTarget({
   id,
   children,
   onLayout,
+  enabled = true,
 }: {
   id: string;
   children: ReactNode;
   onLayout?: (event: LayoutChangeEvent) => void;
+  enabled?: boolean;
 }) {
   const context = useContext(Context);
   const transition = useContext(VisibilityContext);
   const routeKey = useContext(PaneContext)?.routeKey;
   const visible = usePaneVisible();
   const ref = useRef<ViewInstance>(null);
+  const laidOutId = useRef<string | null>(null);
   const isTarget = Boolean(
-    transition?.id === id &&
+    enabled &&
+      transition?.id === id &&
       transition.sourceRouteKey !== transition.activeRouteKey &&
       (!routeKey || routeKey === transition.activeRouteKey) &&
       visible,
@@ -425,6 +510,13 @@ export function TitleTransitionTarget({
   const flight =
     isTarget && transition?.flight?.moving ? transition.flight : null;
   const progress = transition?.progress;
+
+  useLayoutEffect(() => {
+    if (isTarget && laidOutId.current === id && ref.current) {
+      context?.target(id, ref.current);
+    }
+  }, [context, id, isTarget]);
+
   const motion = useMemo(() => {
     if (!flight || !progress) return undefined;
     // Move the real destination title, so the last frame is its actual layout.
@@ -468,13 +560,27 @@ export function TitleTransitionTarget({
       collapsable={false}
       style={isTarget && !flight ? { opacity: 0 } : motion}
       onLayout={(event) => {
+        laidOutId.current = id;
         onLayout?.(event);
-        if (visible && (!routeKey || routeKey === transition?.activeRouteKey))
+        if (
+          enabled &&
+          visible &&
+          (!routeKey || routeKey === transition?.activeRouteKey)
+        )
           context?.target(id, ref.current);
       }}
     >
       {children}
     </Animated.View>
+  );
+}
+
+export function useTitleTransitionActiveForRoute(routeKey?: string): boolean {
+  const transition = useContext(VisibilityContext);
+  if (!transition || !routeKey) return false;
+  return (
+    transition.activeRouteKey === routeKey &&
+    transition.sourceRouteKey !== transition.activeRouteKey
   );
 }
 

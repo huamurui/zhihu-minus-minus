@@ -58,7 +58,10 @@ import { PaneContext, usePaneDimensions } from './PaneContext';
 import { PaneDivider } from './PaneDivider';
 import { PaneStackRouter } from './PaneStackRouter';
 import { resolvePaneDetailHref } from './selection';
-import { TitleTransitionProvider } from './TitleTransition';
+import {
+  TitleTransitionProvider,
+  useTitleTransitionActiveForRoute,
+} from './TitleTransition';
 import { PaneSelectionContext } from './usePaneRouter';
 
 type StackEvents = {
@@ -275,9 +278,11 @@ function RoutePane({
   transitionSequence: number;
   children: ReactNode;
 }) {
+  const hasTitleTransition = useTitleTransitionActiveForRoute(routeKey);
   const useGlass = useIsLiquidGlassActive();
   const focused = useRef(false);
-  const progress = useRef(new Animated.Value(1)).current;
+  const isEntering = visible && active && transitionSequence > 0;
+  const progress = useRef(new Animated.Value(isEntering ? 0 : 1)).current;
   const lastTransition = useRef(0);
   const reduceMotion = useRef(false);
   useEffect(() => {
@@ -372,13 +377,14 @@ function RoutePane({
         style={[
           StyleSheet.absoluteFill,
           {
-            opacity: useGlass
-              ? 1
-              : progress.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.15, 1],
-                }),
-            ...(expand
+            opacity:
+              hasTitleTransition || useGlass
+                ? 1
+                : progress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.15, 1],
+                  }),
+            ...(expand && !hasTitleTransition
               ? {
                   transform: [
                     {

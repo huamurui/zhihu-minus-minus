@@ -13,10 +13,7 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert } from 'react-native';
 import { RefreshControl } from 'react-native-gesture-handler';
-import Reanimated, {
-  SharedTransition,
-  useSharedValue,
-} from 'react-native-reanimated';
+import Reanimated, { useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { hasAuthenticationCookie } from '@/api/client';
 import { getContentCollectionMetadata } from '@/api/zhihu';
@@ -277,8 +274,6 @@ const QuestionAnswerCard = React.memo(function QuestionAnswerCard({
   );
 });
 
-const slowTransition = SharedTransition.duration(600);
-
 export default function QuestionDetail() {
   const { id, title: initialTitle } = useLocalSearchParams<{
     id: string;
@@ -493,10 +488,7 @@ export default function QuestionDetail() {
               onHeaderLayout(Math.max(1, y + height - navigationHeight));
             }}
           >
-            <Reanimated.View
-              sharedTransitionTag={`title-${id}`}
-              sharedTransitionStyle={slowTransition}
-            >
+            <View>
               <Text
                 style={{
                   fontSize: 22,
@@ -506,7 +498,7 @@ export default function QuestionDetail() {
               >
                 {question?.title || initialTitle || '加载中...'}
               </Text>
-            </Reanimated.View>
+            </View>
           </TitleTransitionTarget>
           {qLoading && !question ? (
             <View className="h-[100px] justify-center">

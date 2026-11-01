@@ -1,7 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -37,6 +44,7 @@ import {
 } from '@/components/ContentActionBar';
 import { ContentActionButton } from '@/components/ContentActionButton';
 import { FollowButton } from '@/components/FollowButton';
+import { InitialContentReveal } from '@/components/InitialContentReveal';
 import { MoreActionsButton } from '@/components/MoreActionsButton';
 import { GlassNavigationButton } from '@/components/navigation/GlassNavigationButton';
 import { QueryErrorView } from '@/components/QueryErrorView';
@@ -129,10 +137,37 @@ export default function ArticleDetail() {
   const refetchContent = isDaily ? refetchDaily : refetchZhihu;
   const author = !isDaily ? zhihuData?.author : undefined;
   const authorAvatarUrl = author?.avatar_url;
+
+  const articleContent = isDaily ? dailyData?.body : zhihuData?.content;
+  const contentLayoutSource = useMemo(
+    () => ({
+      id: String(id ?? ''),
+      isDaily,
+      content: articleContent ?? '',
+    }),
+    [id, isDaily, articleContent],
+  );
+  const [readyLayoutSource, setReadyLayoutSource] = useState<
+    typeof contentLayoutSource | null
+  >(null);
+  const latestLayoutSource = useRef(contentLayoutSource);
+  useLayoutEffect(() => {
+    latestLayoutSource.current = contentLayoutSource;
+  }, [contentLayoutSource]);
+
+  const handleContentLayoutReady = useCallback(() => {
+    if (latestLayoutSource.current === contentLayoutSource) {
+      setReadyLayoutSource(contentLayoutSource);
+    }
+  }, [contentLayoutSource]);
+
+  const contentLayoutReady =
+    Boolean(articleContent) && readyLayoutSource === contentLayoutSource;
+
   const readingProgress = useReadingProgress({
     contentKey: `${isDaily ? 'daily' : 'article'}:${String(id ?? '')}`,
     enabled: Boolean(id),
-    ready: Boolean(data),
+    ready: contentLayoutReady,
     scrollRef: scrollViewRef,
   });
 
@@ -472,13 +507,16 @@ export default function ArticleDetail() {
               {!isDaily && (
                 <AnswerEndorsements endorsements={zhihuData?.endorsements} />
               )}
-              <ZhihuContent
-                suppressDoubleTapSelection={isDoubleTapEnabled}
-                content={isDaily ? dailyData?.body : zhihuData?.content}
-                objectId={id as string}
-                type="article"
-                variant={isDaily ? 'daily' : 'default'}
-              />
+              <InitialContentReveal key={String(id)} ready={contentLayoutReady}>
+                <ZhihuContent
+                  suppressDoubleTapSelection={isDoubleTapEnabled}
+                  content={articleContent}
+                  objectId={id as string}
+                  type="article"
+                  variant={isDaily ? 'daily' : 'default'}
+                  onLayoutReady={handleContentLayoutReady}
+                />
+              </InitialContentReveal>
             </View>
 
             {/* Column Card section */}

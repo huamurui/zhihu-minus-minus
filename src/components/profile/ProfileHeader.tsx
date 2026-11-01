@@ -28,6 +28,13 @@ interface ProfileHeaderProps {
 }
 
 /** The caller measures this whole header, including any expanded biography. */
+const ProfileContentReveal =
+  Platform.OS === 'android'
+    ? InitialContentReveal
+    : ({ children }: { children: React.ReactNode; ready?: boolean }) => (
+        <>{children}</>
+      );
+
 export function ProfileHeader({
   user,
   initialAvatar,
@@ -120,7 +127,7 @@ export function ProfileHeader({
         >
           {name}
         </Text>
-        <InitialContentReveal ready={!isLoading}>
+        <ProfileContentReveal ready={!isLoading}>
           {user.url_token ? (
             <Text
               pointerEvents="none"
@@ -297,7 +304,7 @@ export function ProfileHeader({
               />
             </BouncyButton>
           )}
-        </InitialContentReveal>
+        </ProfileContentReveal>
       </View>
     </View>
   );

@@ -1,5 +1,85 @@
 import { type ReactNode, useEffect, useLayoutEffect, useRef } from 'react';
-import { AccessibilityInfo, Animated, Platform } from 'react-native';
+import { AccessibilityInfo, Animated } from 'react-native';
+
+let cachedReduceMotion = false;
+let isReduceMotionResolved = false;
+let subscriptionEpoch = 0;
+let subscriptionCount = 0;
+let removeNativeListener: (() => void) | null = null;
+const listeners = new Set<(enabled: boolean, resolved: boolean) => void>();
+
+function subscribeReduceMotion(
+  callback: (enabled: boolean, resolved: boolean) => void,
+): () => void {
+  listeners.add(callback);
+  callback(cachedReduceMotion, isReduceMotionResolved);
+
+  if (subscriptionCount === 0) {
+    const currentEpoch = ++subscriptionEpoch;
+    let hasEventUpdate = false;
+
+    void AccessibilityInfo.isReduceMotionEnabled?.()
+      ?.then?.((enabled) => {
+        if (currentEpoch !== subscriptionEpoch || hasEventUpdate) return;
+        cachedReduceMotion = Boolean(enabled);
+        isReduceMotionResolved = true;
+        for (const listener of listeners) {
+          listener(cachedReduceMotion, isReduceMotionResolved);
+        }
+      })
+      ?.catch?.(() => {
+        if (currentEpoch !== subscriptionEpoch || hasEventUpdate) return;
+        isReduceMotionResolved = true;
+        for (const listener of listeners) {
+          listener(cachedReduceMotion, isReduceMotionResolved);
+        }
+      });
+
+    const subscription = AccessibilityInfo.addEventListener?.(
+      'reduceMotionChanged',
+      (enabled) => {
+        if (currentEpoch !== subscriptionEpoch) return;
+        hasEventUpdate = true;
+        cachedReduceMotion = Boolean(enabled);
+        isReduceMotionResolved = true;
+        for (const listener of listeners) {
+          listener(cachedReduceMotion, isReduceMotionResolved);
+        }
+      },
+    );
+    removeNativeListener = () => {
+      subscription?.remove?.();
+    };
+  }
+  subscriptionCount++;
+
+  return () => {
+    listeners.delete(callback);
+    subscriptionCount--;
+    if (subscriptionCount === 0) {
+      removeNativeListener?.();
+      removeNativeListener = null;
+    }
+  };
+}
+
+export function setCachedReduceMotionForTest(value: boolean, resolved = true) {
+  cachedReduceMotion = value;
+  isReduceMotionResolved = resolved;
+  for (const listener of listeners) {
+    listener(value, resolved);
+  }
+}
+
+export function resetReduceMotionSubscriptionForTest() {
+  removeNativeListener?.();
+  removeNativeListener = null;
+  subscriptionEpoch++;
+  subscriptionCount = 0;
+  isReduceMotionResolved = false;
+  cachedReduceMotion = false;
+  listeners.clear();
+}
 
 /** Fade the first measured body in without changing its measured height. */
 export function InitialContentReveal({
@@ -9,42 +89,36 @@ export function InitialContentReveal({
   ready: boolean;
   children: ReactNode;
 }) {
-  const opacity = useRef(new Animated.Value(1)).current;
-  const hasWaited = useRef(!ready);
-  const hasRevealed = useRef(ready);
-  const reduceMotion = useRef(true);
+  const reduceMotion = useRef(cachedReduceMotion);
+  const isResolved = useRef(isReduceMotionResolved);
+  const shouldAnimate = isResolved.current && !reduceMotion.current;
+  const initialOpacity = ready && shouldAnimate ? 0 : 1;
+  const opacity = useRef(new Animated.Value(initialOpacity)).current;
+  const hasRevealed = useRef(ready && !shouldAnimate);
 
   useEffect(() => {
-    if (Platform.OS !== 'android') return;
-    let mounted = true;
-    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (mounted) reduceMotion.current = enabled;
+    const unsubscribe = subscribeReduceMotion((enabled, resolved) => {
+      reduceMotion.current = enabled;
+      isResolved.current = resolved;
+      if (enabled) {
+        opacity.stopAnimation();
+        opacity.setValue(1);
+      }
     });
-    const subscription = AccessibilityInfo.addEventListener(
-      'reduceMotionChanged',
-      (enabled) => {
-        reduceMotion.current = enabled;
-        if (enabled) {
-          opacity.stopAnimation();
-          opacity.setValue(1);
-        }
-      },
-    );
     return () => {
-      mounted = false;
-      subscription.remove();
+      unsubscribe();
       opacity.stopAnimation();
     };
   }, [opacity]);
 
   useLayoutEffect(() => {
-    if (Platform.OS !== 'android' || hasRevealed.current) return;
-    if (!ready) {
-      hasWaited.current = true;
+    if (hasRevealed.current) return;
+    if (!ready) return;
+    hasRevealed.current = true;
+    if (!isResolved.current || reduceMotion.current) {
+      opacity.setValue(1);
       return;
     }
-    hasRevealed.current = true;
-    if (!hasWaited.current || reduceMotion.current) return;
     opacity.setValue(0);
     const animation = Animated.timing(opacity, {
       toValue: 1,
@@ -56,13 +130,11 @@ export function InitialContentReveal({
       animation.stop();
       opacity.setValue(1);
     };
-  }, [opacity, ready]);
+  }, [ready, opacity]);
 
-  return Platform.OS === 'android' ? (
+  return (
     <Animated.View pointerEvents="box-none" style={{ opacity }}>
       {children}
     </Animated.View>
-  ) : (
-    children
   );
 }
