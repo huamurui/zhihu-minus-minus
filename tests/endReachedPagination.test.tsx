@@ -251,4 +251,115 @@ describe('useEndReachedPagination state machine', () => {
     });
     expect(onFetchNextPage).not.toHaveBeenCalled();
   });
+
+  it('synchronously locks cursor during in-flight fetch preventing parallel dispatch', async () => {
+    let resolveFetch: (() => void) | undefined;
+    const onFetchNextPage = jest.fn().mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveFetch = () => resolve({ status: 'started' });
+        }),
+    );
+
+    const host = await renderHook(() =>
+      useEndReachedPagination({
+        isActive: true,
+        hasNextPage: true,
+        isFetchNextPageError: false,
+        isBusy: false,
+        cursor: 'cursor-1',
+        onFetchNextPage,
+      }),
+    );
+
+    // First call triggers dispatch
+    await act(async () => {
+      host.result.current.handleEndReached();
+    });
+    expect(onFetchNextPage).toHaveBeenCalledTimes(1);
+
+    // Immediate second call before promise resolves
+    await act(async () => {
+      host.result.current.handleEndReached();
+    });
+    expect(onFetchNextPage).toHaveBeenCalledTimes(1);
+
+    // Complete the fetch
+    await act(async () => {
+      resolveFetch?.();
+    });
+    expect(onFetchNextPage).toHaveBeenCalledTimes(1);
+  });
+
+  describe('resting near end zone', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('triggers limited resting follow-up loads when list remains near end after fetch settles', async () => {
+      const onFetchNextPage = jest
+        .fn()
+        .mockResolvedValue({ status: 'started' });
+      let offset = 1000;
+      const listRef = {
+        current: {
+          getAbsoluteLastScrollOffset: () => offset,
+          getWindowSize: () => ({ height: 800 }),
+          getChildContainerDimensions: () => ({ height: 1200 }),
+          getFirstItemOffset: () => 0,
+        },
+      };
+
+      const host = await renderHook(
+        ({ busy }: { busy: boolean }) =>
+          useEndReachedPagination({
+            isActive: true,
+            hasNextPage: true,
+            isFetchNextPageError: false,
+            isBusy: busy,
+            cursor: 'cursor-1',
+            onFetchNextPage,
+            listRef,
+            endReachedThreshold: 0.5,
+          }),
+        { initialProps: { busy: true } },
+      );
+
+      const finishLoad = async () => {
+        await act(async () => {
+          host.rerender({ busy: true });
+        });
+        await act(async () => {
+          host.rerender({ busy: false });
+        });
+        await act(async () => {
+          jest.runOnlyPendingTimers();
+        });
+      };
+
+      // Initial load finishes
+      await finishLoad();
+      expect(onFetchNextPage).toHaveBeenCalledTimes(1);
+
+      // Follow-up 2
+      await finishLoad();
+      expect(onFetchNextPage).toHaveBeenCalledTimes(2);
+
+      // Follow-up 3
+      await finishLoad();
+      expect(onFetchNextPage).toHaveBeenCalledTimes(3);
+
+      // Exceeds max resting follow-ups (3) without moving scroll offset -> should not fetch again
+      await finishLoad();
+      expect(onFetchNextPage).toHaveBeenCalledTimes(3);
+
+      // Moving scroll offset resets resting follow-up count
+      offset = 1200;
+      await finishLoad();
+      expect(onFetchNextPage).toHaveBeenCalledTimes(4);
+    });
+  });
 });

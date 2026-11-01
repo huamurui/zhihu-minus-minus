@@ -1,5 +1,10 @@
-import { useEffect } from 'react';
-import { type StyleProp, StyleSheet, type ViewStyle } from 'react-native';
+import { useEffect, useState } from 'react';
+import {
+  AccessibilityInfo,
+  type StyleProp,
+  StyleSheet,
+  type ViewStyle,
+} from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -47,10 +52,38 @@ export function ThemedLoadingIndicator({
   const circumference = 2 * Math.PI * radius;
   const arcOffset = circumference * 0.25;
 
+  const [reduceMotion, setReduceMotion] = useState(false);
   const rotation = useSharedValue(0);
 
   useEffect(() => {
-    if (animating) {
+    let isMounted = true;
+    void AccessibilityInfo.isReduceMotionEnabled?.()
+      ?.then?.((enabled) => {
+        if (isMounted) {
+          setReduceMotion(Boolean(enabled));
+        }
+      })
+      ?.catch?.(() => {});
+
+    const subscription = AccessibilityInfo.addEventListener?.(
+      'reduceMotionChanged',
+      (enabled) => {
+        if (isMounted) {
+          setReduceMotion(Boolean(enabled));
+        }
+      },
+    );
+
+    return () => {
+      isMounted = false;
+      subscription?.remove?.();
+    };
+  }, []);
+
+  const shouldAnimate = animating && !reduceMotion;
+
+  useEffect(() => {
+    if (shouldAnimate) {
       rotation.value = 0;
       rotation.value = withRepeat(
         withTiming(360, {
@@ -64,7 +97,7 @@ export function ThemedLoadingIndicator({
     }
     cancelAnimation(rotation);
     rotation.value = 0;
-  }, [animating, rotation]);
+  }, [shouldAnimate, rotation]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotation.value}deg` }],

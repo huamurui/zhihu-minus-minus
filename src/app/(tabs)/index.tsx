@@ -1256,6 +1256,8 @@ const FeedList = React.forwardRef<
       [expandedCollapsedKeys, filterMode, filterRules],
     );
 
+    const flashListRef = useRef<FlashListRef<FeedListItem>>(null);
+
     const currentCursor =
       data?.pages.at(-1)?.nextUrl ?? (data?.pages.length || 0);
     const isBusy = isFetching || isRefreshing || refreshInFlightRef.current;
@@ -1270,10 +1272,10 @@ const FeedList = React.forwardRef<
         isAutoFetching:
           (filterEnabled || localDedupEnabled) &&
           flattenedData.length < MIN_RENDERABLE_ITEMS,
+        listRef: flashListRef,
+        endReachedThreshold: 0.5,
       });
     cancelPendingIntentRef.current = cancelPendingIntent;
-
-    const flashListRef = useRef<FlashListRef<FeedListItem>>(null);
 
     const scrollHandler = useCollapsibleChromeScroll({
       enabled: isActive && AUTO_HIDE_NAV_TABS.includes(tab),

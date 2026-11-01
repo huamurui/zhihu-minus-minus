@@ -1,4 +1,34 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  type RefObject,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+
+/** Follow-up loads allowed while the list rests at one scroll offset in end zone. */
+export const MAX_RESTING_FOLLOW_UPS = 3;
+
+export interface EndGeometry {
+  getAbsoluteLastScrollOffset?: () => number;
+  getWindowSize?: () => { height: number; width?: number };
+  getChildContainerDimensions?: () => { height: number; width?: number };
+  getFirstItemOffset?: () => number;
+}
+
+/**
+ * FlashList's onEndReached condition evaluated against current layout geometry.
+ */
+export function isNearEnd(list: EndGeometry, threshold = 0.5): boolean {
+  const offset = list.getAbsoluteLastScrollOffset?.() ?? 0;
+  const windowSize = list.getWindowSize?.();
+  const visible = windowSize?.height ?? 0;
+  const childContainer = list.getChildContainerDimensions?.();
+  const firstItemOffset = list.getFirstItemOffset?.() ?? 0;
+  const content = (childContainer?.height ?? 0) + firstItemOffset;
+  if (visible <= 0 || content <= 0) return false;
+  return Math.ceil(offset + visible) >= content - threshold * visible;
+}
 
 export interface UseEndReachedPaginationOptions {
   /** Whether the list or host screen is currently active. */
@@ -21,6 +51,10 @@ export interface UseEndReachedPaginationOptions {
   onFetchNextPage: () => Promise<unknown> | unknown;
   /** Whether custom auto-filling (e.g. low card count under filter) is active. */
   isAutoFetching?: boolean;
+  /** Optional FlashList ref to inspect geometry when settling at end. */
+  listRef?: RefObject<EndGeometry | null>;
+  /** Threshold for near-end calculation. Defaults to 0.5. */
+  endReachedThreshold?: number;
 }
 
 export interface UseEndReachedPaginationResult {
@@ -43,18 +77,27 @@ export function useEndReachedPagination({
   cursor,
   onFetchNextPage,
   isAutoFetching = false,
+  listRef,
+  endReachedThreshold = 0.5,
 }: UseEndReachedPaginationOptions): UseEndReachedPaginationResult {
   const pendingIntentRef = useRef<{
     cursor: string | number | null | undefined;
   } | null>(null);
   const [isPendingIntent, setIsPendingIntent] = useState(false);
 
+  const inFlightCursorRef = useRef<string | number | null | undefined>(null);
+  const generationRef = useRef(0);
+  const restingRef = useRef({ offset: Number.NaN, followUps: 0 });
+  const prevBusyRef = useRef(isBusy);
+
   const cancelPendingIntent = useCallback(() => {
     pendingIntentRef.current = null;
     setIsPendingIntent(false);
+    inFlightCursorRef.current = null;
+    restingRef.current = { offset: Number.NaN, followUps: 0 };
   }, []);
 
-  const handleEndReached = useCallback(() => {
+  const dispatchFetch = useCallback(async () => {
     if (!isActive || !hasNextPage || isFetchNextPageError || isAutoFetching) {
       return;
     }
@@ -68,26 +111,39 @@ export function useEndReachedPagination({
       return;
     }
 
-    void (async () => {
-      try {
-        const result = await onFetchNextPage();
-        if (
-          result &&
-          typeof result === 'object' &&
-          'status' in result &&
-          result.status === 'blocked'
-        ) {
-          pendingIntentRef.current = { cursor };
-          setIsPendingIntent(true);
-        } else {
-          pendingIntentRef.current = null;
-          setIsPendingIntent(false);
-        }
-      } catch {
+    if (inFlightCursorRef.current === cursor) {
+      return;
+    }
+
+    inFlightCursorRef.current = cursor;
+    const currentGen = ++generationRef.current;
+
+    try {
+      const result = await onFetchNextPage();
+      if (generationRef.current !== currentGen) return;
+
+      if (
+        result &&
+        typeof result === 'object' &&
+        'status' in result &&
+        result.status === 'blocked'
+      ) {
+        pendingIntentRef.current = { cursor };
+        setIsPendingIntent(true);
+      } else {
         pendingIntentRef.current = null;
         setIsPendingIntent(false);
       }
-    })();
+    } catch {
+      if (generationRef.current === currentGen) {
+        pendingIntentRef.current = null;
+        setIsPendingIntent(false);
+      }
+    } finally {
+      if (generationRef.current === currentGen) {
+        inFlightCursorRef.current = null;
+      }
+    }
   }, [
     cursor,
     hasNextPage,
@@ -98,6 +154,11 @@ export function useEndReachedPagination({
     onFetchNextPage,
   ]);
 
+  const handleEndReached = useCallback(() => {
+    restingRef.current = { offset: Number.NaN, followUps: 0 };
+    void dispatchFetch();
+  }, [dispatchFetch]);
+
   // When blocking conditions recover, dispatch the pending intent at most once.
   useEffect(() => {
     if (!isActive) {
@@ -105,6 +166,7 @@ export function useEndReachedPagination({
         pendingIntentRef.current = null;
         setIsPendingIntent(false);
       }
+      inFlightCursorRef.current = null;
       return;
     }
 
@@ -115,6 +177,8 @@ export function useEndReachedPagination({
     if (pending.cursor !== cursor) {
       pendingIntentRef.current = null;
       setIsPendingIntent(false);
+      inFlightCursorRef.current = null;
+      restingRef.current = { offset: Number.NaN, followUps: 0 };
       return;
     }
 
@@ -125,14 +189,51 @@ export function useEndReachedPagination({
 
     pendingIntentRef.current = null;
     setIsPendingIntent(false);
-    void onFetchNextPage();
+    void dispatchFetch();
   }, [
     cursor,
+    dispatchFetch,
     hasNextPage,
     isActive,
     isBusy,
     isFetchNextPageError,
-    onFetchNextPage,
+  ]);
+
+  // Resting near end zone follow-up:
+  // When a load finishes and the list is still resting in the end zone without
+  // adding visible items, allow limited follow-up requests.
+  useEffect(() => {
+    const wasBusy = prevBusyRef.current;
+    prevBusyRef.current = isBusy;
+
+    if (!wasBusy || isBusy) return;
+    if (!isActive || !hasNextPage || isFetchNextPageError || isAutoFetching) {
+      return;
+    }
+    if (!listRef?.current) return;
+
+    const frame = requestAnimationFrame(() => {
+      const list = listRef.current;
+      if (!list || !isNearEnd(list, endReachedThreshold)) return;
+      const offset = list.getAbsoluteLastScrollOffset?.() ?? 0;
+      if (offset !== restingRef.current.offset) {
+        restingRef.current = { offset, followUps: 0 };
+      }
+      if (restingRef.current.followUps >= MAX_RESTING_FOLLOW_UPS) return;
+      restingRef.current.followUps += 1;
+      void dispatchFetch();
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [
+    dispatchFetch,
+    endReachedThreshold,
+    hasNextPage,
+    isActive,
+    isAutoFetching,
+    isBusy,
+    isFetchNextPageError,
+    listRef,
   ]);
 
   return {

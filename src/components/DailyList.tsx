@@ -176,6 +176,8 @@ export const DailyList = React.forwardRef<
   }, [queryClient, refetch, onRefreshStateChange]);
 
   const currentCursor = data?.pages.at(-1)?.date ?? (data?.pages.length || 0);
+  const flashListRef = React.useRef<FlashListRef<DailyListItem>>(null);
+
   const isBusy =
     isFetching ||
     isRefreshing ||
@@ -189,6 +191,8 @@ export const DailyList = React.forwardRef<
       isBusy,
       cursor: currentCursor,
       onFetchNextPage: () => fetchNextPage({ cancelRefetch: false }),
+      listRef: flashListRef,
+      endReachedThreshold: 0.5,
     });
   cancelPendingIntentRef.current = cancelPendingIntent;
 
@@ -197,7 +201,6 @@ export const DailyList = React.forwardRef<
     [data],
   );
 
-  const flashListRef = React.useRef<FlashListRef<DailyListItem>>(null);
   const scrollHandler = useCollapsibleChromeScroll(chrome);
 
   React.useImperativeHandle(ref, () => ({

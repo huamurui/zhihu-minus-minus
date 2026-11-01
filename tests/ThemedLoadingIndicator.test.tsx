@@ -1,4 +1,5 @@
-import { render } from '@testing-library/react-native';
+import { act, render } from '@testing-library/react-native';
+import { AccessibilityInfo } from 'react-native';
 import { ThemedLoadingIndicator } from '../src/components/ThemedLoadingIndicator';
 
 jest.mock('react-native-reanimated', () => {
@@ -37,6 +38,10 @@ jest.mock('../src/components/Themed', () => ({
 }));
 
 describe('ThemedLoadingIndicator', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('renders correctly with default props', async () => {
     const host = await render(<ThemedLoadingIndicator testID="spinner" />);
     expect(host.getByTestId('spinner')).toBeTruthy();
@@ -69,5 +74,29 @@ describe('ThemedLoadingIndicator', () => {
         <ThemedLoadingIndicator animating={false} testID="spinner" />,
       );
     }).not.toThrow();
+  });
+
+  it('respects AccessibilityInfo reduce motion preference', async () => {
+    let listener: ((enabled: boolean) => void) | undefined;
+    jest
+      .spyOn(AccessibilityInfo, 'isReduceMotionEnabled')
+      .mockResolvedValue(true);
+    jest
+      .spyOn(AccessibilityInfo, 'addEventListener')
+      .mockImplementation((_event, cb) => {
+        listener = cb as (enabled: boolean) => void;
+        return { remove: jest.fn() } as unknown as ReturnType<
+          typeof AccessibilityInfo.addEventListener
+        >;
+      });
+
+    const host = await render(
+      <ThemedLoadingIndicator animating={true} testID="spinner" />,
+    );
+    expect(host.getByTestId('spinner')).toBeTruthy();
+
+    await act(async () => {
+      listener?.(false);
+    });
   });
 });
