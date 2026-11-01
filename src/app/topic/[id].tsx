@@ -39,7 +39,6 @@ import { refreshInfiniteQuery } from '@/utils/query';
 export default function TopicDetail() {
   const queryClient = useQueryClient();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const tintColor = useThemeColor({}, 'primary');
@@ -254,14 +253,6 @@ export default function TopicDetail() {
           headerShadowVisible: false,
           headerStyle: { backgroundColor },
           headerTintColor: textColor,
-          headerLeft: () => (
-            <BouncyButton
-              onPress={() => router.back()}
-              className="mr-2 p-2 rounded-full"
-            >
-              <Ionicons name="chevron-back" size={28} color={textColor} />
-            </BouncyButton>
-          ),
         }}
       />
 

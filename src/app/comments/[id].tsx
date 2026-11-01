@@ -1,7 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { FlashList } from '@shopify/flash-list';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { BlurView } from 'expo-blur';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -37,6 +36,7 @@ import { CommentIdentityBadges } from '@/components/CommentIdentityBadges';
 import { LikeButton } from '@/components/LikeButton';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { StableAvatar } from '@/components/StableAvatar';
+import { FloatingSurface } from '@/components/surfaces/FloatingSurface';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -532,7 +532,9 @@ export default function CommentScreen() {
         ]}
         pointerEvents="box-none"
       >
-        <BlurView
+        <FloatingSurface
+          glassStyle="regular"
+          colorScheme={colorScheme === 'dark' ? 'dark' : 'light'}
           intensity={100}
           tint={colorScheme === 'dark' ? 'dark' : 'light'}
           style={{
@@ -572,7 +574,7 @@ export default function CommentScreen() {
               {segmentPostingHint}
             </Text>
           )}
-        </BlurView>
+        </FloatingSurface>
       </Reanimated.View>
 
       <CommentActionSheet

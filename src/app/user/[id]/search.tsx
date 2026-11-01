@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type FeedItem, getMemberWithFallback } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
 import { FeedCard } from '@/components/FeedCard';
+import { GlassNavigationButton } from '@/components/navigation/GlassNavigationButton';
 import { toProfileSearchFeedItem } from '@/components/profile/profileSearchResults';
 import { useProfileSearch } from '@/components/profile/useProfileSearch';
 import { QueryErrorView } from '@/components/QueryErrorView';
@@ -107,18 +108,17 @@ function ProfileSearchScreen({ id }: { id: string }) {
           borderBottomWidth: StyleSheet.hairlineWidth,
         }}
       >
-        <BouncyButton
-          accessibilityRole="button"
+        <GlassNavigationButton
+          icon="back"
           accessibilityLabel="返回个人主页"
           onPress={() =>
             router.canGoBack()
               ? router.back()
               : router.replace({ pathname: '/user/[id]', params: { id } })
           }
-          style={{ padding: 8 }}
-        >
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </BouncyButton>
+          size={40}
+          color={colors.text}
+        />
         <View
           style={{
             flex: 1,

@@ -6,6 +6,7 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { FeedItem } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
+import { GlassNavigationButton } from '@/components/navigation/GlassNavigationButton';
 import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -118,12 +119,13 @@ export default function GuestDetailScreen() {
         ]}
         className="flex-row items-center justify-between px-[15px]"
       >
-        <BouncyButton
+        <GlassNavigationButton
+          icon="back"
+          accessibilityLabel="返回"
           onPress={() => router.back()}
-          className="w-10 h-10 justify-center items-center rounded-full"
-        >
-          <Ionicons name="chevron-back" size={28} color={textColor} />
-        </BouncyButton>
+          size={40}
+          color={textColor}
+        />
         <Text className="text-[17px] font-bold">游客预览</Text>
         <View
           className="px-2 py-0.5 rounded-full"

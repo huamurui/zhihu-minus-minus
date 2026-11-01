@@ -162,7 +162,7 @@ export interface AppSettings {
   enableHapticFeedback: boolean;
   /** 关注动态、消息通知与私信的未读角标样式 */
   unreadBadgeStyle: UnreadBadgeStyle;
-  /** iOS 是否使用系统原生底部 Tab（iOS 26+ 显示 Liquid Glass） */
+  /** iOS 是否使用系统原生界面与底部 Tab（iOS 26+ 显示 Liquid Glass） */
   useNativeIOSBottomTabs: boolean;
   /** 是否并排显示列表与详情；仅由开关控制，不限制设备、尺寸或方向。 */
   enableLargeScreenLayout: boolean;
@@ -329,6 +329,9 @@ export const useSettingsStore = create<SettingsState>()(
           );
           if (!isValidUnreadBadgeStyle(nextSettings.unreadBadgeStyle)) {
             nextSettings.unreadBadgeStyle = 'count';
+          }
+          if (typeof nextSettings.useNativeIOSBottomTabs !== 'boolean') {
+            nextSettings.useNativeIOSBottomTabs = true;
           }
           if (
             typeof nextSettings.recommendRequestIncludeDesktop !== 'boolean'

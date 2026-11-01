@@ -38,6 +38,7 @@ import {
 import { ContentActionButton } from '@/components/ContentActionButton';
 import { FollowButton } from '@/components/FollowButton';
 import { MoreActionsButton } from '@/components/MoreActionsButton';
+import { GlassNavigationButton } from '@/components/navigation/GlassNavigationButton';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { ReadingProgressNotice } from '@/components/ReadingProgressNotice';
 import { SegmentedVoteCapsule } from '@/components/SegmentedVoteCapsule';
@@ -340,12 +341,13 @@ export default function ArticleDetail() {
           pointerEvents="none"
         />
 
-        <BouncyButton
+        <GlassNavigationButton
+          icon="back"
+          accessibilityLabel="返回"
           onPress={() => router.back()}
-          className="w-10 h-10 justify-center items-center z-50 rounded-full"
-        >
-          <Ionicons name="chevron-back" size={28} color={textColor} />
-        </BouncyButton>
+          size={40}
+          color={textColor}
+        />
 
         <Animated.View
           className="flex-1 mx-4"

@@ -1,7 +1,11 @@
-import { BlurView } from 'expo-blur';
+import { GlassContainer } from 'expo-glass-effect';
 import type { ComponentProps, ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
+import {
+  FloatingSurface,
+  useIsLiquidGlassActive,
+} from '@/components/surfaces/FloatingSurface';
 import { useRuntimeThemeColors } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 
@@ -43,9 +47,12 @@ export function ContentActionBar({
 }: ContentActionBarProps) {
   const colors = useRuntimeThemeColors();
   const colorScheme = useColorScheme();
+  const useGlass = useIsLiquidGlassActive();
   const bottom = getContentActionBarBottom(bottomInset, bottomOffset);
 
   if (variant === 'islands') {
+    const IslandsContainer = useGlass ? GlassContainer : View;
+
     return (
       <Animated.View
         pointerEvents={visible ? 'auto' : 'none'}
@@ -57,108 +64,132 @@ export function ContentActionBar({
           {
             bottom,
             height: CONTENT_ACTION_BAR_HEIGHT,
-            opacity: visible ? 1 : 0,
+            opacity: useGlass ? 1 : visible ? 1 : 0,
+            transform:
+              useGlass && !visible
+                ? [{ translateY: bottom + CONTENT_ACTION_BAR_HEIGHT + 30 }]
+                : undefined,
           },
           style,
         ]}
       >
-        {leading ? (
-          <View
-            style={[
-              styles.islandShadow,
-              shrinkLeading && styles.shrinkableLeading,
-              {
-                backgroundColor: colors.contentOverlayStrong,
-              },
-              colorScheme === 'light' && {
-                shadowColor: colors.shadow,
-                ...styles.shadow,
-              },
-            ]}
-          >
-            <BlurView
-              intensity={130}
-              tint={colorScheme}
+        <IslandsContainer
+          {...(useGlass ? { spacing: 8 } : {})}
+          style={styles.islandsInnerRow}
+        >
+          {leading ? (
+            <View
               style={[
-                styles.surface,
-                styles.islandLeading,
-                {
-                  height: CONTENT_ACTION_BAR_HEIGHT,
-                  borderRadius: CONTENT_ACTION_BAR_HEIGHT / 2,
-                  borderColor: colors.contentBorder,
+                styles.islandShadow,
+                shrinkLeading && styles.shrinkableLeading,
+                !useGlass && {
+                  backgroundColor: colors.contentOverlayStrong,
+                  ...(colorScheme === 'light'
+                    ? { shadowColor: colors.shadow, ...styles.shadow }
+                    : {}),
                 },
               ]}
             >
-              {leading}
-            </BlurView>
+              <FloatingSurface
+                glassStyle="regular"
+                colorScheme={colorScheme}
+                intensity={130}
+                tint={colorScheme}
+                style={[
+                  styles.surface,
+                  styles.islandLeading,
+                  {
+                    height: CONTENT_ACTION_BAR_HEIGHT,
+                    borderRadius: CONTENT_ACTION_BAR_HEIGHT / 2,
+                    borderWidth: useGlass ? 0 : StyleSheet.hairlineWidth,
+                    borderColor: useGlass ? undefined : colors.contentBorder,
+                    backgroundColor: useGlass
+                      ? undefined
+                      : colors.contentOverlayStrong,
+                  },
+                ]}
+              >
+                {leading}
+              </FloatingSurface>
+            </View>
+          ) : null}
+
+          <View style={styles.islandRightGroup}>
+            {trailing ? (
+              <View
+                style={[
+                  styles.islandShadow,
+                  !useGlass && {
+                    backgroundColor: colors.contentOverlayStrong,
+                    ...(colorScheme === 'light'
+                      ? { shadowColor: colors.shadow, ...styles.shadow }
+                      : {}),
+                  },
+                ]}
+              >
+                <FloatingSurface
+                  glassStyle="regular"
+                  colorScheme={colorScheme}
+                  intensity={130}
+                  tint={colorScheme}
+                  style={[
+                    styles.surface,
+                    styles.islandTrailing,
+                    {
+                      height: CONTENT_ACTION_BAR_HEIGHT,
+                      borderRadius: CONTENT_ACTION_BAR_HEIGHT / 2,
+                      borderWidth: useGlass ? 0 : StyleSheet.hairlineWidth,
+                      borderColor: useGlass ? undefined : colors.contentBorder,
+                      backgroundColor: useGlass
+                        ? undefined
+                        : colors.contentOverlayStrong,
+                    },
+                  ]}
+                >
+                  {trailing}
+                </FloatingSurface>
+              </View>
+            ) : null}
+
+            {accessory ? (
+              <View
+                style={[
+                  styles.islandShadow,
+                  styles.islandAccessoryContainer,
+                  !useGlass && {
+                    backgroundColor: colors.contentOverlayStrong,
+                    ...(colorScheme === 'light'
+                      ? { shadowColor: colors.shadow, ...styles.shadow }
+                      : {}),
+                  },
+                ]}
+              >
+                <FloatingSurface
+                  glassStyle="regular"
+                  colorScheme={colorScheme}
+                  intensity={130}
+                  tint={colorScheme}
+                  style={[
+                    styles.surface,
+                    styles.islandAccessory,
+                    {
+                      width: CONTENT_ACTION_BAR_HEIGHT,
+                      height: CONTENT_ACTION_BAR_HEIGHT,
+                      borderRadius: CONTENT_ACTION_BAR_HEIGHT / 2,
+                      borderWidth: useGlass ? 0 : StyleSheet.hairlineWidth,
+                      borderColor: useGlass ? undefined : colors.contentBorder,
+                      backgroundColor: useGlass
+                        ? undefined
+                        : colors.contentOverlayStrong,
+                    },
+                  ]}
+                >
+                  {accessory}
+                </FloatingSurface>
+              </View>
+            ) : null}
           </View>
-        ) : null}
-
-        <View style={styles.islandRightGroup}>
-          {trailing ? (
-            <View
-              style={[
-                styles.islandShadow,
-                {
-                  backgroundColor: colors.contentOverlayStrong,
-                },
-                colorScheme === 'light' && {
-                  shadowColor: colors.shadow,
-                  ...styles.shadow,
-                },
-              ]}
-            >
-              <BlurView
-                intensity={130}
-                tint={colorScheme}
-                style={[
-                  styles.surface,
-                  styles.islandTrailing,
-                  {
-                    height: CONTENT_ACTION_BAR_HEIGHT,
-                    borderRadius: CONTENT_ACTION_BAR_HEIGHT / 2,
-                    borderColor: colors.contentBorder,
-                  },
-                ]}
-              >
-                {trailing}
-              </BlurView>
-            </View>
-          ) : null}
-
-          {accessory ? (
-            <View
-              style={[
-                styles.islandShadow,
-                styles.islandAccessoryContainer,
-                {
-                  backgroundColor: colors.contentOverlayStrong,
-                },
-                colorScheme === 'light' && {
-                  shadowColor: colors.shadow,
-                  ...styles.shadow,
-                },
-              ]}
-            >
-              <BlurView
-                intensity={130}
-                tint={colorScheme}
-                style={[
-                  styles.surface,
-                  styles.islandAccessory,
-                  {
-                    width: CONTENT_ACTION_BAR_HEIGHT,
-                    height: CONTENT_ACTION_BAR_HEIGHT,
-                    borderRadius: CONTENT_ACTION_BAR_HEIGHT / 2,
-                    borderColor: colors.contentBorder,
-                  },
-                ]}
-              >
-                {accessory}
-              </BlurView>
-            </View>
-          ) : null}
-        </View>
+        </IslandsContainer>
       </Animated.View>
     );
   }
@@ -174,16 +205,23 @@ export function ContentActionBar({
           bottom,
           height: CONTENT_ACTION_BAR_HEIGHT,
           borderRadius: CONTENT_ACTION_BAR_HEIGHT / 2,
-          opacity: visible ? 1 : 0,
+          opacity: useGlass ? 1 : visible ? 1 : 0,
+          transform:
+            useGlass && !visible
+              ? [{ translateY: bottom + CONTENT_ACTION_BAR_HEIGHT + 30 }]
+              : undefined,
         },
-        colorScheme === 'light' && {
-          shadowColor: colors.shadow,
-          ...styles.shadow,
-        },
+        !useGlass &&
+          colorScheme === 'light' && {
+            shadowColor: colors.shadow,
+            ...styles.shadow,
+          },
         style,
       ]}
     >
-      <BlurView
+      <FloatingSurface
+        glassStyle="regular"
+        colorScheme={colorScheme}
         intensity={130}
         tint={colorScheme}
         style={[
@@ -191,8 +229,9 @@ export function ContentActionBar({
           {
             height: CONTENT_ACTION_BAR_HEIGHT,
             borderRadius: CONTENT_ACTION_BAR_HEIGHT / 2,
-            backgroundColor: colors.contentOverlayStrong,
-            borderColor: colors.contentBorder,
+            borderWidth: useGlass ? 0 : StyleSheet.hairlineWidth,
+            backgroundColor: useGlass ? undefined : colors.contentOverlayStrong,
+            borderColor: useGlass ? undefined : colors.contentBorder,
           },
         ]}
       >
@@ -218,14 +257,14 @@ export function ContentActionBar({
         ) : (
           children
         )}
-      </BlurView>
+      </FloatingSurface>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { position: 'absolute', left: 16, right: 16, zIndex: 1000 },
-  surface: { overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth },
+  surface: { overflow: 'hidden' },
   shadow: {
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,
@@ -256,6 +295,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   islandsContainer: {
+    backgroundColor: 'transparent',
+  },
+  islandsInnerRow: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',

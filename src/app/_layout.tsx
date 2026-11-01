@@ -51,6 +51,7 @@ const queryClient = createAppQueryClient();
 
 export const unstable_settings = {
   anchor: '(tabs)',
+  initialRouteName: '(tabs)',
 };
 
 function RootLayout() {
@@ -221,7 +222,11 @@ function RootLayout() {
                 {/* 底部 Tab 主框架 */}
                 <Stack.Screen
                   name="(tabs)"
-                  options={{ headerShown: false, title: '知乎' }}
+                  options={{
+                    headerShown: false,
+                    title: '知乎',
+                    gestureEnabled: false,
+                  }}
                 />
 
                 {/* 登录页：建议做成从底部弹出的 Modal */}
