@@ -23,7 +23,6 @@ import PagerView, {
 import Animated, {
   Extrapolate,
   interpolate,
-  interpolateColor,
   type SharedValue,
   useAnimatedStyle,
   useEvent,
@@ -49,6 +48,7 @@ import { DailyList } from '@/components/DailyList';
 import { FeedCard } from '@/components/FeedCard';
 import { GuestBootstrap } from '@/components/GuestBootstrap';
 import { HotCard, type HotItem } from '@/components/HotCard';
+import { GlassTopNavigation } from '@/components/home/GlassTopNavigation';
 import {
   getHomeNavigationMetrics,
   ScrollableNavigationRow,
@@ -203,7 +203,6 @@ export default function HomeScreen() {
     (currentTabs.includes('profile') ? 1 : 0);
   const {
     topInset,
-    topPadding,
     bottomViewportWidth: containerWidth,
     bottomContentWidth,
     bottomItemWidth,
@@ -392,6 +391,31 @@ export default function HomeScreen() {
     };
   });
 
+  // 玻璃模式顶部导航栏动画样式（主要通过 translateY 位移隐藏，避免中间透明度破坏原生玻璃折射上下文）
+  const topGlassNavAnimStyle = useAnimatedStyle(() => {
+    if (homeTabsCount === 0) {
+      return {
+        transform: [{ translateY: -120 }],
+        pointerEvents: 'none',
+      };
+    }
+    const fadeStart = homeTabsCount - 1;
+    const fadeEnd = homeTabsCount;
+    const translateY = interpolate(
+      scrollX.value,
+      [fadeStart, fadeEnd],
+      [0, -120],
+      Extrapolate.CLAMP,
+    );
+    const hideDistance = insets.top + TOP_NAV_HEIGHT;
+    const isHidden =
+      topNavOffset.value >= hideDistance || scrollX.value > fadeStart + 0.5;
+    return {
+      transform: [{ translateY: translateY - topNavOffset.value }],
+      pointerEvents: isHidden ? 'none' : 'auto',
+    };
+  });
+
   const bottomNavAnimStyle = useAnimatedStyle(() => {
     const hideDistance = insets.bottom + BOTTOM_NAV_HEIGHT;
     const visibility = 1 - bottomNavOffset.value / hideDistance;
@@ -399,22 +423,6 @@ export default function HomeScreen() {
       opacity: visibility,
       transform: [{ translateY: bottomNavOffset.value }],
       pointerEvents: visibility <= 0 ? 'none' : 'auto',
-    };
-  });
-
-  // 顶部 Tab 指示器动画
-  const topIndicatorStyle = useAnimatedStyle(() => {
-    if (homeTabsCount <= 1) return { transform: [{ translateX: 0 }] };
-    const tabWidth = 58;
-    const maxIndex = Math.max(0, homeTabsCount - 1);
-    const clampedScroll = interpolate(
-      scrollX.value,
-      [0, maxIndex],
-      [0, maxIndex],
-      Extrapolate.CLAMP,
-    );
-    return {
-      transform: [{ translateX: clampedScroll * tabWidth }],
     };
   });
 
@@ -547,100 +555,24 @@ export default function HomeScreen() {
         </AnimatedPagerView>
       </GestureDetector>
 
-      {/* 2. 顶部 Tab 导航 (Home 专属) */}
-      <Animated.View
-        style={[
-          styles.topNavContainer,
-          colorScheme === 'light' && styles.lightTranslucentShadow,
-          { top: insets.top, left: topInset, right: topInset },
-          topNavAnimStyle,
-        ]}
-      >
-        <BlurView
-          intensity={100}
-          tint={colorScheme === 'dark' ? 'dark' : 'light'}
-          style={[
-            styles.blurWrapper,
-            {
-              backgroundColor:
-                colorScheme === 'dark'
-                  ? 'rgba(0,0,0,0.7)'
-                  : 'rgba(255,255,255,0.85)',
-            },
-          ]}
-        >
-          <View style={[styles.topNav, { paddingHorizontal: topPadding }]}>
-            <ScrollableNavigationRow
-              testID="home-top-navigation"
-              contentWidth={homeTabsCount * 58 + 40}
-              activeStart={
-                Math.min(currentPage, Math.max(0, homeTabsCount - 1)) * 58
-              }
-              activeEnd={
-                Math.min(currentPage, Math.max(0, homeTabsCount - 1)) * 58 + 54
-              }
-            >
-              <View
-                style={{
-                  flexDirection: 'row',
-                  flex: 1,
-                  backgroundColor: 'transparent',
-                  alignItems: 'center',
-                  position: 'relative',
-                }}
-              >
-                <Animated.View
-                  style={[
-                    styles.topPill,
-                    { backgroundColor: indicatorBgColor },
-                    topIndicatorStyle,
-                  ]}
-                />
-                {currentTabs
-                  .filter((t) => !['publish', 'profile'].includes(t))
-                  .map((tab, index) => {
-                    const labels: Record<string, string> = {
-                      following: '关注',
-                      recommend: '推荐',
-                      local: localCityName || '同城',
-                      hot: '热榜',
-                      daily: '日报',
-                    };
-                    return (
-                      <BouncyButton
-                        key={tab}
-                        accessibilityRole="tab"
-                        accessibilityLabel={labels[tab]}
-                        accessibilityState={{ selected: currentPage === index }}
-                        onPress={() => handleTabPress(index)}
-                        style={[
-                          styles.navItem,
-                          { width: 54, paddingHorizontal: 0 },
-                        ]}
-                      >
-                        <TopTabLabel
-                          index={index}
-                          label={labels[tab]}
-                          scrollX={scrollX}
-                          activeColor={tintColor}
-                          inactiveColor={secondaryTextColor}
-                        />
-                      </BouncyButton>
-                    );
-                  })}
-              </View>
-              <BouncyButton
-                accessibilityRole="button"
-                accessibilityLabel="搜索"
-                onPress={() => router.push('/search')}
-                style={styles.searchBtn}
-              >
-                <Ionicons name="search" size={22} color={textColor} />
-              </BouncyButton>
-            </ScrollableNavigationRow>
-          </View>
-        </BlurView>
-      </Animated.View>
+      {/* 2. 顶部 Tab 导航 (Home 专属，原生模式与普通模式均采用 Tab/搜索双胶囊分离设计) */}
+      <GlassTopNavigation
+        tabs={homeTabs}
+        currentPage={currentPage}
+        scrollX={scrollX}
+        topInset={topInset}
+        insets={insets}
+        colorScheme={colorScheme}
+        indicatorBgColor={indicatorBgColor}
+        tintColor={tintColor}
+        secondaryTextColor={secondaryTextColor}
+        textColor={textColor}
+        localCityName={localCityName}
+        animStyle={nativeIOSBottomTabs ? topGlassNavAnimStyle : topNavAnimStyle}
+        useLiquidGlass={nativeIOSBottomTabs}
+        onTabPress={handleTabPress}
+        onSearchPress={() => router.push('/search')}
+      />
 
       {!nativeIOSBottomTabs && (
         /* 3. 底部悬浮导航栏 (Custom TabBar) */
@@ -772,37 +704,6 @@ export default function HomeScreen() {
         />
       )}
     </View>
-  );
-}
-
-function TopTabLabel({
-  index,
-  label,
-  scrollX,
-  activeColor,
-  inactiveColor,
-}: {
-  index: number;
-  label: string;
-  scrollX: SharedValue<number>;
-  activeColor: string;
-  inactiveColor: string;
-}) {
-  const animatedStyle = useAnimatedStyle(() => {
-    const distanceFromSelection = Math.min(1, Math.abs(scrollX.value - index));
-    return {
-      color: interpolateColor(
-        distanceFromSelection,
-        [0, 1],
-        [activeColor, inactiveColor],
-      ),
-    };
-  });
-
-  return (
-    <Animated.Text style={[styles.navText, animatedStyle]}>
-      {label}
-    </Animated.Text>
   );
 }
 
@@ -1660,45 +1561,6 @@ function parseHotData(item: RawFeedItem, index: number): HotItem {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   pager: { flex: 1 },
-  topNavContainer: { position: 'absolute', left: 16, right: 16, zIndex: 100 },
-  blurWrapper: {
-    borderRadius: 25,
-    overflow: 'hidden',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  topNav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    height: 50,
-  },
-  navItem: {
-    paddingHorizontal: 12,
-    height: 34,
-    borderRadius: 17,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 4,
-  },
-  navText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  topPill: {
-    position: 'absolute',
-    width: 54,
-    height: 34,
-    borderRadius: 17,
-    left: 0,
-  },
-  searchBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
 
   bottomBarContainer: {
     position: 'absolute',
