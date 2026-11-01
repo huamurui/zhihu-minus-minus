@@ -32,7 +32,7 @@ import { themeVariables } from '@/utils/themeVariables';
 import { isExpoInternalUrl, parseZhihuUrl } from '@/utils/url';
 import '../global.css';
 import * as Clipboard from 'expo-clipboard';
-import { AppState, type AppStateStatus, Linking } from 'react-native';
+import { AppState, type AppStateStatus, Linking, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { consumeAppClipboardText } from '@/utils/clipboard';
 import { createAppQueryClient } from '@/utils/queryClient';
@@ -281,7 +281,7 @@ function RootLayout() {
                   name="question/[id]/index"
                   options={{
                     headerShown: false,
-                    animation: 'fade',
+                    animation: Platform.OS === 'android' ? 'fade' : 'default',
                   }}
                 />
 
@@ -300,7 +300,7 @@ function RootLayout() {
                   name="answer/[id]"
                   options={{
                     headerShown: false,
-                    animation: 'fade',
+                    animation: Platform.OS === 'android' ? 'fade' : 'default',
                   }}
                 />
 
@@ -309,7 +309,10 @@ function RootLayout() {
                   name="guest/detail"
                   options={{
                     headerShown: false,
-                    animation: 'slide_from_right',
+                    animation:
+                      Platform.OS === 'android'
+                        ? 'slide_from_right'
+                        : 'default',
                   }}
                 />
               </Stack>

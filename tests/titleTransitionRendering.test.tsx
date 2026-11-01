@@ -491,3 +491,41 @@ test('target with enabled=false does not intercept title transition', async () =
     timing.mockRestore();
   }
 });
+
+test('target retries measurement if initial destination frame is invalid', async () => {
+  jest.useFakeTimers();
+  const timing = jest.spyOn(Animated, 'timing').mockReturnValue({
+    start: jest.fn(),
+    stop: jest.fn(),
+    reset: jest.fn(),
+  });
+  try {
+    const host = await render(
+      <TitleTransitionProvider activeRouteKey="source">
+        <Example />
+      </TitleTransitionProvider>,
+    );
+    await fireEvent.press(host.getByText('打开'));
+    await host.rerender(
+      <TitleTransitionProvider activeRouteKey="destination">
+        <TitleTransitionTarget id="question-1">
+          <Text>重试标题</Text>
+        </TitleTransitionTarget>
+      </TitleTransitionProvider>,
+    );
+    const target = host.getByText('重试标题').parent;
+    expect(target).not.toBeNull();
+    await act(() => {
+      if (target)
+        fireEvent(target, 'layout', {
+          nativeEvent: { layout: { x: 0, y: 0, width: 180, height: 24 } },
+        });
+    });
+    // Advance timers to allow next-frame retry
+    await act(() => jest.advanceTimersByTime(20));
+    expect(timing).toHaveBeenCalled();
+  } finally {
+    timing.mockRestore();
+    jest.useRealTimers();
+  }
+});

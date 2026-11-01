@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useMemo, useRef } from 'react';
-import { StyleSheet, View, type ViewInstance } from 'react-native';
+import { Platform, StyleSheet, View, type ViewInstance } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useColorScheme } from '@/components/useColorScheme';
 import { colors } from '@/constants/designTokens';
@@ -85,7 +85,7 @@ const HotCardComponent = ({ item }: { item: HotItem }) => {
               }),
             },
           });
-        } else {
+        } else if (Platform.OS === 'android') {
           transitionTitle(
             titleRef,
             item.questionId,
@@ -101,6 +101,11 @@ const HotCardComponent = ({ item }: { item: HotItem }) => {
             titleSource.onSourceHiddenChange,
             sourceTitle,
           );
+        } else {
+          router.push({
+            pathname: '/question/[id]',
+            params: { id: item.questionId, title: item.title },
+          });
         }
       }}
       style={[styles.row, surface]}
@@ -149,7 +154,6 @@ const HotCardComponent = ({ item }: { item: HotItem }) => {
         <Animated.Image
           fadeDuration={0}
           source={imageSource}
-          sharedTransitionTag={`image-${item.id}`}
           style={styles.image}
           resizeMode="cover"
           accessible={false}

@@ -279,7 +279,8 @@ function RoutePane({
   children: ReactNode;
 }) {
   const focused = useRef(false);
-  const progress = useRef(new Animated.Value(1)).current;
+  const isEntering = visible && active && transitionSequence > 0;
+  const progress = useRef(new Animated.Value(isEntering ? 0 : 1)).current;
   const lastTransition = useRef(0);
   const reduceMotion = useRef(false);
   useEffect(() => {
@@ -375,10 +376,12 @@ function RoutePane({
         style={[
           StyleSheet.absoluteFill,
           {
-            opacity: progress.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0.15, 1],
-            }),
+            opacity: hasTitleTransition
+              ? 1
+              : progress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.15, 1],
+                }),
             ...(expand && !hasTitleTransition
               ? {
                   transform: [

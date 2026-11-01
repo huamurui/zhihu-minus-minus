@@ -24,10 +24,10 @@ export function InitialContentReveal({
   ready: boolean;
   children: ReactNode;
 }) {
-  const initialOpacity = ready && !cachedReduceMotion ? 0 : 1;
+  const reduceMotion = useRef(cachedReduceMotion);
+  const initialOpacity = ready && !reduceMotion.current ? 0 : 1;
   const opacity = useRef(new Animated.Value(initialOpacity)).current;
   const hasRevealed = useRef(false);
-  const reduceMotion = useRef(cachedReduceMotion);
 
   useEffect(() => {
     if (Platform.OS !== 'android') return;
@@ -61,10 +61,7 @@ export function InitialContentReveal({
 
   useLayoutEffect(() => {
     if (Platform.OS !== 'android' || hasRevealed.current) return;
-    if (!ready) {
-      opacity.setValue(1);
-      return;
-    }
+    if (!ready) return;
     hasRevealed.current = true;
     if (reduceMotion.current) {
       opacity.setValue(1);
@@ -81,13 +78,15 @@ export function InitialContentReveal({
       animation.stop();
       opacity.setValue(1);
     };
-  }, [opacity, ready]);
+  }, [ready, opacity]);
 
-  return Platform.OS === 'android' ? (
+  if (Platform.OS !== 'android') {
+    return children;
+  }
+
+  return (
     <Animated.View pointerEvents="box-none" style={{ opacity }}>
       {children}
     </Animated.View>
-  ) : (
-    children
   );
 }

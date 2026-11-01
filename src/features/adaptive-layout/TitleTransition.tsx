@@ -39,6 +39,7 @@ type PendingTitle = {
   measuring: boolean;
   pressTime?: number;
   sourceMeasuredTime?: number;
+  retries?: number;
 };
 type Flight = {
   text: string;
@@ -184,6 +185,20 @@ export function TitleTransitionProvider({
         !ref.current ||
         !root.current
       ) {
+        if (__DEV__) {
+          const reason = !id
+            ? 'missing-id'
+            : !text
+              ? 'missing-text'
+              : reducedMotion.current
+                ? 'reduced-motion'
+                : !ref.current
+                  ? 'missing-ref'
+                  : 'missing-root';
+          console.debug(
+            `[TitleTransition] navigate skipped (${reason}) for id: ${id}`,
+          );
+        }
         open();
         return;
       }
@@ -244,10 +259,25 @@ export function TitleTransitionProvider({
             setWaiting(null);
             setFlight(null);
           }, TARGET_WAIT_MS);
+        } else {
+          if (__DEV__) {
+            const reason = !source
+              ? 'timeout-or-failed-measure'
+              : !validFrame(source)
+                ? 'invalid-source-frame'
+                : reducedMotion.current
+                  ? 'reduced-motion'
+                  : 'invalid-callback';
+            console.debug(
+              `[TitleTransition] source measurement failed (${reason}) for id: ${id}`,
+              { elapsedMs: Date.now() - pressTime },
+            );
+          }
         }
         open();
       };
-      const timeout = setTimeout(() => finish(), 100);
+      const SOURCE_WAIT_MS = Platform.OS === 'android' ? 200 : 100;
+      const timeout = setTimeout(() => finish(), SOURCE_WAIT_MS);
       ref.current.measureInWindow((x, y, width, height) => {
         root.current?.measureInWindow((rootX, rootY) => {
           if (!Number.isFinite(rootX) || !Number.isFinite(rootY)) finish();
@@ -299,6 +329,20 @@ export function TitleTransitionProvider({
         ) {
           if (pending.current === current && token === sequence.current) {
             current.measuring = false;
+            const retries = (current.retries ?? 0) + 1;
+            current.retries = retries;
+            if (retries <= 3 && Date.now() <= current.expires) {
+              setTimeout(() => {
+                if (
+                  pending.current === current &&
+                  token === sequence.current &&
+                  !current.measuring &&
+                  Date.now() <= current.expires
+                ) {
+                  target(id, ref);
+                }
+              }, 16);
+            }
           }
           return;
         }
@@ -455,7 +499,7 @@ export function TitleTransitionTarget({
   const routeKey = useContext(PaneContext)?.routeKey;
   const visible = usePaneVisible();
   const ref = useRef<ViewInstance>(null);
-  const hasLaidOut = useRef(false);
+  const laidOutId = useRef<string | null>(null);
   const isTarget = Boolean(
     enabled &&
       transition?.id === id &&
@@ -468,7 +512,7 @@ export function TitleTransitionTarget({
   const progress = transition?.progress;
 
   useLayoutEffect(() => {
-    if (isTarget && hasLaidOut.current && ref.current) {
+    if (isTarget && laidOutId.current === id && ref.current) {
       context?.target(id, ref.current);
     }
   }, [context, id, isTarget]);
@@ -516,7 +560,7 @@ export function TitleTransitionTarget({
       collapsable={false}
       style={isTarget && !flight ? { opacity: 0 } : motion}
       onLayout={(event) => {
-        hasLaidOut.current = true;
+        laidOutId.current = id;
         onLayout?.(event);
         if (
           enabled &&

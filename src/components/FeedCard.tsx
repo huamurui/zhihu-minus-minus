@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, View as RNView, type ViewInstance } from 'react-native';
-import Animated, { SharedTransition } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { hasAuthenticationCookie } from '@/api/client';
 import { type FeedItem, getVoteSuccessMessage, voteContent } from '@/api/zhihu';
 import { FeedCardActionRow } from '@/components/FeedCardActionRow';
@@ -35,8 +35,6 @@ import { FeedCardPreview } from './FeedCardPreview';
 import { FeedExcerpt } from './FeedExcerpt';
 import { type ShareContentType, ShareMenu } from './ShareMenu';
 import { Text, View } from './Themed';
-
-const slowTransition = SharedTransition.duration(600);
 
 interface FeedCardProps {
   item: FeedItem;
@@ -414,7 +412,10 @@ const FeedCardComponent = ({
           );
         }}
         onPress={() => {
-          if (item.type === 'answers' || item.type === 'questions') {
+          if (
+            Platform.OS === 'android' &&
+            (item.type === 'answers' || item.type === 'questions')
+          ) {
             transitionTitle(
               titleRef,
               String(item.questionId || item.id),
@@ -493,7 +494,6 @@ const FeedCardComponent = ({
               fadeDuration={0}
               source={authorAvatarSource}
               className="w-[22px] h-[22px] rounded-full"
-              sharedTransitionTag={`avatar-${item.author.url_token || item.author.id}`}
             />
             <Text type="secondary" className="ml-2 text-[13px]">
               {item.author.name}
@@ -530,36 +530,47 @@ const FeedCardComponent = ({
             onPress={() => {
               if (item.type === 'answers' && item.questionId) {
                 const questionId = String(item.questionId);
-                transitionTitle(
-                  titleRef,
-                  questionId,
-                  cleanTitle,
-                  () => {
-                    if (currentIdentityRef.current !== identity) return;
-                    router.push({
-                      pathname: '/question/[id]',
-                      params: { id: questionId, title: cleanTitle },
-                    });
-                  },
-                  () => currentIdentityRef.current === identity,
-                  titleSource.onSourceHiddenChange,
-                  sourceTitle,
-                );
+                if (Platform.OS === 'android') {
+                  transitionTitle(
+                    titleRef,
+                    questionId,
+                    cleanTitle,
+                    () => {
+                      if (currentIdentityRef.current !== identity) return;
+                      router.push({
+                        pathname: '/question/[id]',
+                        params: { id: questionId, title: cleanTitle },
+                      });
+                    },
+                    () => currentIdentityRef.current === identity,
+                    titleSource.onSourceHiddenChange,
+                    sourceTitle,
+                  );
+                } else {
+                  router.push({
+                    pathname: '/question/[id]',
+                    params: { id: questionId, title: cleanTitle },
+                  });
+                }
                 return;
               }
-              if (item.type === 'questions')
-                transitionTitle(
-                  titleRef,
-                  String(item.questionId || item.id),
-                  cleanTitle,
-                  () => {
-                    if (currentIdentityRef.current === identity) openDetail();
-                  },
-                  () => currentIdentityRef.current === identity,
-                  titleSource.onSourceHiddenChange,
-                  sourceTitle,
-                );
-              else openDetail();
+              if (item.type === 'questions') {
+                if (Platform.OS === 'android') {
+                  transitionTitle(
+                    titleRef,
+                    String(item.questionId || item.id),
+                    cleanTitle,
+                    () => {
+                      if (currentIdentityRef.current === identity) openDetail();
+                    },
+                    () => currentIdentityRef.current === identity,
+                    titleSource.onSourceHiddenChange,
+                    sourceTitle,
+                  );
+                } else {
+                  openDetail();
+                }
+              } else openDetail();
             }}
           >
             <RNView
@@ -567,16 +578,7 @@ const FeedCardComponent = ({
               collapsable={false}
               style={titleSource.hidden ? { opacity: 0 } : undefined}
             >
-              <Animated.View
-                sharedTransitionTag={
-                  Platform.OS === 'ios'
-                    ? `title-${item.questionId || item.id}`
-                    : undefined
-                }
-                sharedTransitionStyle={slowTransition}
-              >
-                {sourceTitle}
-              </Animated.View>
+              {sourceTitle}
             </RNView>
           </BouncyButton>
         ) : null}
@@ -595,7 +597,6 @@ const FeedCardComponent = ({
               fadeDuration={0}
               source={thumbnailSource}
               className="w-[100px] h-[75px] rounded-md ml-2.5 mt-1"
-              sharedTransitionTag={`image-${item.id}`}
             />
           )}
         </View>
