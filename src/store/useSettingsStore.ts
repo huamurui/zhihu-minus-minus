@@ -162,8 +162,10 @@ export interface AppSettings {
   enableHapticFeedback: boolean;
   /** 关注动态、消息通知与私信的未读角标样式 */
   unreadBadgeStyle: UnreadBadgeStyle;
-  /** iOS 是否使用系统原生底部 Tab（iOS 26+ 显示 Liquid Glass） */
+  /** iOS 是否使用系统原生底部 Tab */
   useNativeIOSBottomTabs: boolean;
+  /** iOS 26+ 是否为导航与悬浮控件启用原生 Liquid Glass 液态玻璃材质 */
+  useIOSLiquidGlass: boolean;
   /** 是否并排显示列表与详情；仅由开关控制，不限制设备、尺寸或方向。 */
   enableLargeScreenLayout: boolean;
   /** 双栏中列表占可用宽度的比例。 */
@@ -245,6 +247,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   enableHapticFeedback: true,
   unreadBadgeStyle: 'count',
   useNativeIOSBottomTabs: true,
+  useIOSLiquidGlass: true,
   enableLargeScreenLayout: false,
   largeScreenListRatio: DEFAULT_LARGE_SCREEN_LIST_RATIO,
   enableBrowseHistory: true,
@@ -330,6 +333,12 @@ export const useSettingsStore = create<SettingsState>()(
           if (!isValidUnreadBadgeStyle(nextSettings.unreadBadgeStyle)) {
             nextSettings.unreadBadgeStyle = 'count';
           }
+          if (typeof nextSettings.useNativeIOSBottomTabs !== 'boolean') {
+            nextSettings.useNativeIOSBottomTabs = true;
+          }
+          if (typeof nextSettings.useIOSLiquidGlass !== 'boolean') {
+            nextSettings.useIOSLiquidGlass = true;
+          }
           if (
             typeof nextSettings.recommendRequestIncludeDesktop !== 'boolean'
           ) {
@@ -374,7 +383,7 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'zhihu-settings-storage',
       storage: createJSONStorage(() => settingsStorage),
-      version: 21,
+      version: 22,
       migrate: (rawPersistedState: unknown, version: number) => {
         const persistedState =
           normalizePersistedSettingsState(rawPersistedState);
@@ -552,6 +561,18 @@ export const useSettingsStore = create<SettingsState>()(
         persistedState.removeImageWatermark =
           typeof persistedState.removeImageWatermark === 'boolean'
             ? persistedState.removeImageWatermark
+            : true;
+
+        // v22 separates liquid glass material preference from native bottom tabs layout
+        if (version < 22) {
+          persistedState.useIOSLiquidGlass =
+            typeof persistedState.useIOSLiquidGlass === 'boolean'
+              ? persistedState.useIOSLiquidGlass
+              : true;
+        }
+        persistedState.useIOSLiquidGlass =
+          typeof persistedState.useIOSLiquidGlass === 'boolean'
+            ? persistedState.useIOSLiquidGlass
             : true;
 
         return persistedState as unknown as SettingsState;

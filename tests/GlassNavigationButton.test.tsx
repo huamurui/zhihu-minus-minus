@@ -1,5 +1,5 @@
-import { fireEvent, render } from '@testing-library/react-native';
-import { AccessibilityInfo, Platform, Text } from 'react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
+import { AccessibilityInfo, Platform, StyleSheet, Text } from 'react-native';
 import { GlassNavigationButton } from '../src/components/navigation/GlassNavigationButton';
 
 jest.mock('react-native-reanimated', () => {
@@ -148,5 +148,44 @@ describe('GlassNavigationButton', () => {
 
     await fireEvent.press(button);
     expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  test('fallback retains transparent background by default and applies custom background when specified', async () => {
+    // Disable liquid glass so fallback BouncyButton is used on iOS
+    const { useSettingsStore } = require('../src/store/useSettingsStore');
+    await act(async () => {
+      useSettingsStore.setState({ useIOSLiquidGlass: false });
+    });
+
+    const hostTransparent = await render(
+      <GlassNavigationButton
+        testID="nav-transparent"
+        icon="back"
+        accessibilityLabel="返回"
+        onPress={jest.fn()}
+      />,
+    );
+    const transparentBtn = hostTransparent.getByTestId('nav-transparent');
+    expect(StyleSheet.flatten(transparentBtn.props.style).backgroundColor).toBe(
+      'transparent',
+    );
+
+    const hostCustomBg = await render(
+      <GlassNavigationButton
+        testID="nav-custom-bg"
+        icon="back"
+        accessibilityLabel="返回"
+        backgroundColor="#123456"
+        onPress={jest.fn()}
+      />,
+    );
+    const customBgBtn = hostCustomBg.getByTestId('nav-custom-bg');
+    expect(StyleSheet.flatten(customBgBtn.props.style).backgroundColor).toBe(
+      '#123456',
+    );
+
+    await act(async () => {
+      useSettingsStore.setState({ useIOSLiquidGlass: true });
+    });
   });
 });

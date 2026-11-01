@@ -12,6 +12,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import Animated, {
+  type AnimatedProps,
   cancelAnimation,
   useAnimatedStyle,
   useSharedValue,
@@ -23,7 +24,13 @@ import { useSettingsStore } from '@/store/useSettingsStore';
 import { ImpactFeedbackStyle, impactAsync } from '@/utils/haptics';
 import { getRippleButtonStyles } from './bouncyButtonStyles';
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+const createAnimated = Animated?.createAnimatedComponent as
+  | ((comp: unknown) => React.ComponentType<AnimatedProps<PressableProps>>)
+  | undefined;
+
+const AnimatedPressable = (typeof createAnimated === 'function'
+  ? createAnimated(Pressable)
+  : Pressable) as unknown as React.ComponentType<AnimatedProps<PressableProps>>;
 
 export interface BouncyButtonProps extends PressableProps {
   children: React.ReactNode;

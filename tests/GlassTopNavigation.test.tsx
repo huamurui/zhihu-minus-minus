@@ -36,16 +36,25 @@ jest.mock('@expo/vector-icons/Ionicons', () => {
 jest.mock('expo-blur', () => {
   const native = jest.requireActual('react-native');
   return {
-    BlurView: (props: Record<string, unknown>) => <native.View {...props} />,
+    BlurView: (props: Record<string, unknown>) => (
+      <native.View {...props} testID={props.testID || 'blur-surface'} />
+    ),
   };
 });
 
 jest.mock('expo-glass-effect', () => {
   const native = jest.requireActual('react-native');
   return {
-    GlassView: (props: Record<string, unknown>) => <native.View {...props} />,
-    GlassContainer: (props: Record<string, unknown>) => (
-      <native.View {...props} />
+    GlassView: (props: {
+      glassEffectStyle?: string;
+      [key: string]: unknown;
+    }) => (
+      <native.View
+        {...props}
+        testID={
+          props.testID || `glass-surface-${props.glassEffectStyle || 'unknown'}`
+        }
+      />
     ),
     isGlassEffectAPIAvailable: jest.fn(() => true),
     isLiquidGlassAvailable: jest.fn(() => true),
@@ -195,6 +204,20 @@ describe('GlassTopNavigation', () => {
 
       expect(host.getByRole('tab', { name: '关注' })).toBeTruthy();
       expect(host.getByRole('button', { name: '搜索' })).toBeTruthy();
+
+      // Outer track must strictly be clear Liquid Glass
+      const clearTrack = host.getByTestId('glass-surface-clear');
+      expect(clearTrack).toBeTruthy();
+      expect(clearTrack.props.glassEffectStyle).toBe('clear');
+
+      // Search button must be regular Liquid Glass with isInteractive
+      const regularSearch = host.getByTestId('glass-surface-regular');
+      expect(regularSearch).toBeTruthy();
+      expect(regularSearch.props.glassEffectStyle).toBe('regular');
+      expect(regularSearch.props.isInteractive).toBe(true);
+
+      // No BlurView rendered in liquid glass mode
+      expect(host.queryByTestId('blur-surface')).toBeNull();
     });
 
     test('renders separated tab track and search button in normal BlurView mode', async () => {
@@ -221,6 +244,12 @@ describe('GlassTopNavigation', () => {
 
       expect(host.getByRole('tab', { name: '关注' })).toBeTruthy();
       expect(host.getByRole('button', { name: '搜索' })).toBeTruthy();
+
+      // BlurViews rendered, no GlassViews
+      const blurViews = host.getAllByTestId('blur-surface');
+      expect(blurViews.length).toBe(2);
+      expect(host.queryByTestId('glass-surface-clear')).toBeNull();
+      expect(host.queryByTestId('glass-surface-regular')).toBeNull();
 
       await fireEvent.press(host.getByRole('button', { name: '搜索' }));
       expect(onSearchPress).toHaveBeenCalledTimes(1);

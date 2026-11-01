@@ -1,7 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { BlurView } from 'expo-blur';
-import { GlassContainer, GlassView } from 'expo-glass-effect';
-import { type StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
+import { GlassView } from 'expo-glass-effect';
+import {
+  Pressable,
+  type StyleProp,
+  StyleSheet,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import Animated, {
   type AnimatedStyle,
   type SharedValue,
@@ -90,9 +96,6 @@ export function GlassTopNavigation({
     };
   });
 
-  // 当处于原生 Liquid Glass 模式时使用 GlassContainer 协调相邻玻璃元件
-  const ContainerView = liquidGlassActive ? GlassContainer : View;
-
   return (
     <Animated.View
       style={[
@@ -101,11 +104,8 @@ export function GlassTopNavigation({
         animStyle,
       ]}
     >
-      <ContainerView
-        {...(liquidGlassActive ? { spacing: 8 } : {})}
-        style={styles.navRow}
-      >
-        {/* 1. 左侧内容分区 Tab 轨道 (原生 Liquid Glass 或普通 BlurView 圆角胶囊) */}
+      <View style={styles.navRow}>
+        {/* 1. 左侧内容分区 Tab 轨道 (原生 Liquid Glass clear 或普通 BlurView 圆角胶囊) */}
         <View
           style={[
             styles.tabsTrackWrapper,
@@ -116,7 +116,7 @@ export function GlassTopNavigation({
         >
           {liquidGlassActive ? (
             <GlassView
-              glassEffectStyle="regular"
+              glassEffectStyle="clear"
               colorScheme={colorScheme === 'dark' ? 'dark' : 'light'}
               pointerEvents="none"
               style={styles.tabsTrackGlass}
@@ -192,19 +192,14 @@ export function GlassTopNavigation({
           </ScrollableNavigationRow>
         </View>
 
-        {/* 2. 右侧固定独立搜索按钮 (原生 Liquid Glass 或普通 BlurView 圆形按钮) */}
-        <BouncyButton
-          accessibilityRole="button"
-          accessibilityLabel="搜索"
-          onPress={onSearchPress}
-          style={[
-            styles.searchBtnWrapper,
-            colorScheme === 'light' &&
-              !liquidGlassActive &&
-              styles.lightTranslucentShadow,
-          ]}
-        >
-          {liquidGlassActive ? (
+        {/* 2. 右侧固定独立搜索按钮 (原生 Liquid Glass regular 或普通 BlurView 圆形按钮) */}
+        {liquidGlassActive ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="搜索"
+            onPress={onSearchPress}
+            style={styles.searchBtnWrapper}
+          >
             <GlassView
               glassEffectStyle="regular"
               colorScheme={colorScheme === 'dark' ? 'dark' : 'light'}
@@ -213,7 +208,17 @@ export function GlassTopNavigation({
             >
               <Ionicons name="search" size={20} color={textColor} />
             </GlassView>
-          ) : (
+          </Pressable>
+        ) : (
+          <BouncyButton
+            accessibilityRole="button"
+            accessibilityLabel="搜索"
+            onPress={onSearchPress}
+            style={[
+              styles.searchBtnWrapper,
+              colorScheme === 'light' && styles.lightTranslucentShadow,
+            ]}
+          >
             <BlurView
               intensity={100}
               tint={colorScheme === 'dark' ? 'dark' : 'light'}
@@ -234,9 +239,9 @@ export function GlassTopNavigation({
             >
               <Ionicons name="search" size={20} color={textColor} />
             </BlurView>
-          )}
-        </BouncyButton>
-      </ContainerView>
+          </BouncyButton>
+        )}
+      </View>
     </Animated.View>
   );
 }

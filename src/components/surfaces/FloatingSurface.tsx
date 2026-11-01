@@ -33,7 +33,7 @@ export function isLiquidGlassSupported(): boolean {
  */
 export function useIsLiquidGlassActive(preferred = true): boolean {
   const userSettingEnabled = useSettingsStore(
-    (state) => state?.useNativeIOSBottomTabs ?? true,
+    (state) => state?.useIOSLiquidGlass ?? true,
   );
   const [reduceTransparency, setReduceTransparency] = useState(false);
 
