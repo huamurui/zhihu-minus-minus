@@ -592,9 +592,14 @@ export const AnswerDetailView = ({
                 </View>
                 <TitleTransitionTarget
                   id={String(questionId || answer?.question?.id || id)}
+                  enabled={isFocused}
                 >
                   <Reanimated.View
-                    sharedTransitionTag={`title-${questionId || answer?.question?.id || id}`}
+                    sharedTransitionTag={
+                      Platform.OS === 'ios'
+                        ? `title-${questionId || answer?.question?.id || id}`
+                        : undefined
+                    }
                     sharedTransitionStyle={slowTransition}
                   >
                     <Text

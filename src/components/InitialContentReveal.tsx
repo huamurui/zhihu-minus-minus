@@ -1,6 +1,21 @@
 import { type ReactNode, useEffect, useLayoutEffect, useRef } from 'react';
 import { AccessibilityInfo, Animated, Platform } from 'react-native';
 
+let cachedReduceMotion = false;
+
+if (Platform.OS === 'android') {
+  void AccessibilityInfo.isReduceMotionEnabled?.()?.then?.((enabled) => {
+    cachedReduceMotion = enabled;
+  });
+  AccessibilityInfo.addEventListener?.('reduceMotionChanged', (enabled) => {
+    cachedReduceMotion = enabled;
+  });
+}
+
+export function setCachedReduceMotionForTest(value: boolean) {
+  cachedReduceMotion = value;
+}
+
 /** Fade the first measured body in without changing its measured height. */
 export function InitialContentReveal({
   ready,
@@ -9,20 +24,27 @@ export function InitialContentReveal({
   ready: boolean;
   children: ReactNode;
 }) {
-  const opacity = useRef(new Animated.Value(1)).current;
-  const hasWaited = useRef(!ready);
-  const hasRevealed = useRef(ready);
-  const reduceMotion = useRef(true);
+  const initialOpacity = ready && !cachedReduceMotion ? 0 : 1;
+  const opacity = useRef(new Animated.Value(initialOpacity)).current;
+  const hasRevealed = useRef(false);
+  const reduceMotion = useRef(cachedReduceMotion);
 
   useEffect(() => {
     if (Platform.OS !== 'android') return;
     let mounted = true;
-    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (mounted) reduceMotion.current = enabled;
+    void AccessibilityInfo.isReduceMotionEnabled?.()?.then?.((enabled) => {
+      cachedReduceMotion = enabled;
+      if (!mounted) return;
+      reduceMotion.current = enabled;
+      if (enabled) {
+        opacity.stopAnimation();
+        opacity.setValue(1);
+      }
     });
-    const subscription = AccessibilityInfo.addEventListener(
+    const subscription = AccessibilityInfo.addEventListener?.(
       'reduceMotionChanged',
       (enabled) => {
+        cachedReduceMotion = enabled;
         reduceMotion.current = enabled;
         if (enabled) {
           opacity.stopAnimation();
@@ -32,7 +54,7 @@ export function InitialContentReveal({
     );
     return () => {
       mounted = false;
-      subscription.remove();
+      subscription?.remove?.();
       opacity.stopAnimation();
     };
   }, [opacity]);
@@ -40,11 +62,14 @@ export function InitialContentReveal({
   useLayoutEffect(() => {
     if (Platform.OS !== 'android' || hasRevealed.current) return;
     if (!ready) {
-      hasWaited.current = true;
+      opacity.setValue(1);
       return;
     }
     hasRevealed.current = true;
-    if (!hasWaited.current || reduceMotion.current) return;
+    if (reduceMotion.current) {
+      opacity.setValue(1);
+      return;
+    }
     opacity.setValue(0);
     const animation = Animated.timing(opacity, {
       toValue: 1,

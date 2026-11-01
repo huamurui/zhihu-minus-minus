@@ -11,7 +11,7 @@ import { CanceledError } from 'axios';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert } from 'react-native';
+import { ActivityIndicator, Alert, Platform } from 'react-native';
 import { RefreshControl } from 'react-native-gesture-handler';
 import Reanimated, {
   SharedTransition,
@@ -494,7 +494,9 @@ export default function QuestionDetail() {
             }}
           >
             <Reanimated.View
-              sharedTransitionTag={`title-${id}`}
+              sharedTransitionTag={
+                Platform.OS === 'ios' ? `title-${id}` : undefined
+              }
               sharedTransitionStyle={slowTransition}
             >
               <Text

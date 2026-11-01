@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import React from 'react';
-import { View as NativeView, type ViewInstance } from 'react-native';
+import { View as NativeView, Platform, type ViewInstance } from 'react-native';
 import Animated from 'react-native-reanimated';
 import {
   getContentCollectionMetadata,
@@ -202,7 +202,11 @@ export const CreationCard = React.forwardRef<
         className="p-4"
       >
         <Animated.View
-          sharedTransitionTag={`title-${item.question?.id || item.id}`}
+          sharedTransitionTag={
+            Platform.OS === 'ios'
+              ? `title-${item.question?.id || item.id}`
+              : undefined
+          }
         >
           <Text
             className="text-lg font-bold mb-1.5 leading-6 text-foreground dark:text-foreground-dark"

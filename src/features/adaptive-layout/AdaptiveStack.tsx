@@ -58,7 +58,10 @@ import { PaneContext, usePaneDimensions } from './PaneContext';
 import { PaneDivider } from './PaneDivider';
 import { PaneStackRouter } from './PaneStackRouter';
 import { resolvePaneDetailHref } from './selection';
-import { TitleTransitionProvider } from './TitleTransition';
+import {
+  TitleTransitionProvider,
+  useTitleTransitionActiveForRoute,
+} from './TitleTransition';
 import { PaneSelectionContext } from './usePaneRouter';
 
 type StackEvents = {
@@ -349,6 +352,7 @@ function RoutePane({
     }),
     [frame.width, frame.height, visible, routeKey, twoPane, expand, progress],
   );
+  const hasTitleTransition = useTitleTransitionActiveForRoute(routeKey);
   const webProps = Platform.OS === 'web' ? { inert: !visible } : {};
   // Keep visibility independent of native-driven opacity on retained routes.
   return (
@@ -375,7 +379,7 @@ function RoutePane({
               inputRange: [0, 1],
               outputRange: [0.15, 1],
             }),
-            ...(expand
+            ...(expand && !hasTitleTransition
               ? {
                   transform: [
                     {

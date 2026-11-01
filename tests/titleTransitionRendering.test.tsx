@@ -412,3 +412,82 @@ test('reduced motion opens the destination without hiding its title', async () =
     reducedMotion.mockRestore();
   }
 });
+
+test('target measures successfully even if onLayout fired before the route became active', async () => {
+  const timing = jest.spyOn(Animated, 'timing').mockReturnValue({
+    start: jest.fn(),
+    stop: jest.fn(),
+    reset: jest.fn(),
+  });
+  try {
+    const host = await render(
+      <TitleTransitionProvider activeRouteKey="source">
+        <Example />
+      </TitleTransitionProvider>,
+    );
+    await fireEvent.press(host.getByText('打开'));
+    // Render destination while route is still "source" (early native mount)
+    await host.rerender(
+      <TitleTransitionProvider activeRouteKey="source">
+        <TitleTransitionTarget id="question-1">
+          <Text>提前布局标题</Text>
+        </TitleTransitionTarget>
+      </TitleTransitionProvider>,
+    );
+    const target = host.getByText('提前布局标题').parent;
+    expect(target).not.toBeNull();
+    // Native onLayout fires while activeRouteKey is still "source"
+    await act(() => {
+      if (target)
+        fireEvent(target, 'layout', {
+          nativeEvent: { layout: { x: 0, y: 0, width: 180, height: 24 } },
+        });
+    });
+    // Now route updates to destination
+    await host.rerender(
+      <TitleTransitionProvider activeRouteKey="destination">
+        <TitleTransitionTarget id="question-1">
+          <Text>提前布局标题</Text>
+        </TitleTransitionTarget>
+      </TitleTransitionProvider>,
+    );
+    // Should have recovered and started the transition timing!
+    expect(timing).toHaveBeenCalled();
+  } finally {
+    timing.mockRestore();
+  }
+});
+
+test('target with enabled=false does not intercept title transition', async () => {
+  const timing = jest.spyOn(Animated, 'timing').mockReturnValue({
+    start: jest.fn(),
+    stop: jest.fn(),
+    reset: jest.fn(),
+  });
+  try {
+    const host = await render(
+      <TitleTransitionProvider activeRouteKey="source">
+        <Example />
+      </TitleTransitionProvider>,
+    );
+    await fireEvent.press(host.getByText('打开'));
+    await host.rerender(
+      <TitleTransitionProvider activeRouteKey="destination">
+        <View>
+          <TitleTransitionTarget id="question-1" enabled={false}>
+            <Text testID="inactive-target">相邻回答标题</Text>
+          </TitleTransitionTarget>
+          <TitleTransitionTarget id="question-1" enabled={true}>
+            <Text testID="active-target">当前回答标题</Text>
+          </TitleTransitionTarget>
+        </View>
+      </TitleTransitionProvider>,
+    );
+    // Inactive target should remain visible directly (not hidden)
+    expect(host.getByTestId('inactive-target')).toBeVisible();
+    // Active target waiting for layout should be hidden
+    expect(host.getByTestId('active-target')).not.toBeVisible();
+  } finally {
+    timing.mockRestore();
+  }
+});

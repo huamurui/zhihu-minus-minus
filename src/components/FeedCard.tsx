@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View as RNView, type ViewInstance } from 'react-native';
+import { Platform, View as RNView, type ViewInstance } from 'react-native';
 import Animated, { SharedTransition } from 'react-native-reanimated';
 import { hasAuthenticationCookie } from '@/api/client';
 import { type FeedItem, getVoteSuccessMessage, voteContent } from '@/api/zhihu';
@@ -568,7 +568,11 @@ const FeedCardComponent = ({
               style={titleSource.hidden ? { opacity: 0 } : undefined}
             >
               <Animated.View
-                sharedTransitionTag={`title-${item.questionId || item.id}`}
+                sharedTransitionTag={
+                  Platform.OS === 'ios'
+                    ? `title-${item.questionId || item.id}`
+                    : undefined
+                }
                 sharedTransitionStyle={slowTransition}
               >
                 {sourceTitle}
