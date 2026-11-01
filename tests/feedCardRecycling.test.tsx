@@ -1,5 +1,6 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
-import React, { Profiler } from 'react';
+import type React from 'react';
+import { Profiler } from 'react';
 import { type FeedItem, voteContent } from '../src/api/zhihu';
 import type { CollectionButton } from '../src/components/CollectionButton';
 import { CreationCard } from '../src/components/CreationCard';

@@ -151,7 +151,7 @@ export const DailyList = React.forwardRef<
   });
   const isLoading = isQueryLoading || (isPending && isPaused);
 
-  const cancelPendingIntentRef = React.useRef<() => void>(() => { });
+  const cancelPendingIntentRef = React.useRef<() => void>(() => {});
 
   const handleRefresh = useCallback(async () => {
     if (refreshInFlightRef.current) return;

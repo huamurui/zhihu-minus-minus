@@ -4,7 +4,14 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   Alert,
   Animated,
@@ -82,7 +89,6 @@ import { refreshInfiniteQuery } from '@/utils/query';
 import { parseZhihuUrl } from '@/utils/url';
 import {
   getNextPageOffset,
-  getRecentActivityTargetId,
   isOwnMemberProfile,
   normalizeUserFeedType,
   type UserFeedType,
@@ -921,7 +927,6 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
       const creation = item as MemberCreation;
       return renderItemContent(creation.item, creation.kind, 'created');
     }
-    }
     const displayItem = getProfileContentItem(item, tabKey);
     if (!displayItem) return null;
 
@@ -1012,6 +1017,11 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
           : (getContentVoteState(mappedType, displayItem) ?? 0),
       type: mappedType,
       videoSource: getZhihuVideoSource(rawType),
+      // Every card on a member's page is theirs unless it names someone else.
+      hideAuthor:
+        tabKey !== 'votes' &&
+        tabKey !== 'activities' &&
+        (!displayItem.author?.id || displayItem.author.id === user?.id),
     };
 
     return (

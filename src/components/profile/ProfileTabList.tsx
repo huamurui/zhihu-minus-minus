@@ -8,10 +8,7 @@ import {
   useLayoutEffect,
   useRef,
 } from 'react';
-import {
-  ActivityIndicator,
-  type ViewInstance as NativeView,
-} from 'react-native';
+import { type ViewInstance as NativeView, StyleSheet } from 'react-native';
 import Reanimated, {
   runOnJS,
   type SharedValue,
@@ -20,6 +17,7 @@ import Reanimated, {
 } from 'react-native-reanimated';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { Text, useThemeColor, View } from '@/components/Themed';
+import { ThemedLoadingIndicator } from '@/components/ThemedLoadingIndicator';
 import { useRefreshAction } from '@/hooks/useRefreshAction';
 import {
   getProfileMinContentHeight,
@@ -96,6 +94,7 @@ export const ProfileTabList = forwardRef<
   ref,
 ) {
   const primaryColor = useThemeColor({}, 'primary');
+  const indicatorTrackColor = useThemeColor({}, 'border');
   const listRef = useRef<FlashListRef<unknown> | null>(null);
   const contentRef = useRef<NativeView>(null);
   const loadedRef = useRef(false);
@@ -348,7 +347,12 @@ export const ProfileTabList = forwardRef<
       ListEmptyComponent={
         query.isLoading ? (
           hideInitialLoadingIndicator ? null : (
-            <ActivityIndicator style={{ margin: 32 }} color={primaryColor} />
+            <ThemedLoadingIndicator
+              size={28}
+              color={primaryColor}
+              trackColor={indicatorTrackColor}
+              style={{ margin: 32 }}
+            />
           )
         ) : query.isError ? (
           <QueryErrorView
@@ -366,7 +370,16 @@ export const ProfileTabList = forwardRef<
       }
       ListFooterComponent={
         query.isFetchingNextPage ? (
-          <ActivityIndicator style={{ margin: 24 }} color={primaryColor} />
+          <View style={styles.footerContainer}>
+            <ThemedLoadingIndicator
+              size={22}
+              color={primaryColor}
+              trackColor={indicatorTrackColor}
+            />
+            <Text type="secondary" style={styles.footerText}>
+              正在加载更多...
+            </Text>
+          </View>
         ) : query.isFetchNextPageError && query.data.length > 0 ? (
           <QueryErrorView
             compact
@@ -380,11 +393,26 @@ export const ProfileTabList = forwardRef<
             onRetry={handleRefresh}
           />
         ) : query.data.length > 0 && !query.hasNextPage ? (
-          <Text type="secondary" className="text-center p-5 text-xs">
-            已显示全部内容
-          </Text>
+          <View style={styles.footerContainer}>
+            <Text type="secondary" style={styles.footerText}>
+              已显示全部内容
+            </Text>
+          </View>
         ) : null
       }
     />
   );
+});
+
+const styles = StyleSheet.create({
+  footerContainer: {
+    height: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerText: {
+    marginLeft: 8,
+    fontSize: 13,
+  },
 });

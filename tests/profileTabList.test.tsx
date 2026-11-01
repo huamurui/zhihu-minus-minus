@@ -73,12 +73,22 @@ jest.mock('@shopify/flash-list', () => {
 
 jest.mock('react-native-reanimated', () => {
   const react = jest.requireActual<typeof import('react')>('react');
+  const native =
+    jest.requireActual<typeof import('react-native')>('react-native');
   return {
     __esModule: true,
-    default: { createAnimatedComponent: (component: unknown) => component },
+    default: {
+      createAnimatedComponent: (component: unknown) => component,
+      View: native.View,
+    },
     useSharedValue: (value: unknown) => react.useRef({ value }).current,
     useAnimatedScrollHandler: (handlers: unknown) => handlers,
     runOnJS: (callback: (...args: unknown[]) => unknown) => callback,
+    useAnimatedStyle: (factory: () => unknown) => factory(),
+    withRepeat: (animation: unknown) => animation,
+    withTiming: (toValue: unknown) => toValue,
+    cancelAnimation: jest.fn(),
+    Easing: { linear: jest.fn() },
   };
 });
 
