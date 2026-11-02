@@ -1,6 +1,6 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
 import type { PropsWithChildren } from 'react';
-import { Animated, Text } from 'react-native';
+import { Animated, Platform, Text } from 'react-native';
 import { AppDialog } from '../src/components/overlays/AppDialog';
 import { BottomSheet } from '../src/components/overlays/BottomSheet';
 import {
@@ -10,6 +10,8 @@ import {
   usePaneVisible,
 } from '../src/features/adaptive-layout/PaneContext';
 import { PaneModal } from '../src/features/adaptive-layout/PaneModal';
+
+let mockFinishAnimation: (finished: boolean) => void;
 
 jest.mock('expo-router', () => ({ useIsFocused: () => true }));
 jest.mock('@expo/vector-icons/Ionicons', () => () => null);
@@ -53,7 +55,14 @@ jest.mock('react-native-reanimated', () => {
     useSharedValue: (value: number) => react.useRef({ value }).current,
     useAnimatedStyle: (style: () => object) => style(),
     withSpring: (value: number) => value,
-    withTiming: (value: number) => value,
+    withTiming: (
+      value: number,
+      _config: unknown,
+      callback?: (finished: boolean) => void,
+    ) => {
+      if (callback) mockFinishAnimation = callback;
+      return value;
+    },
     runOnJS: (callback: () => void) => callback,
   };
 });
@@ -144,3 +153,38 @@ test('modal descendants retain their ancestor visibility after pane bounds are r
   await host.rerender(view(true));
   expect(host.getByText('嵌套菜单')).toBeTruthy();
 });
+
+test.each(['ios', 'android'] as const)(
+  '%s bottom sheet notifies close only after its presentation is gone',
+  async (platform) => {
+    const previousPlatform = Platform.OS;
+    Platform.OS = platform;
+    const onClose = jest.fn();
+    try {
+      const host = await render(
+        <BottomSheet visible title="菜单" onClose={onClose}>
+          <Text>内容</Text>
+        </BottomSheet>,
+      );
+      const modal = host.container.queryAll(
+        (node) =>
+          typeof node.props.onDismiss === 'function' &&
+          node.props.animationType === 'none',
+      )[0];
+      const dismissed = modal.props.onDismiss;
+      await fireEvent.press(host.getByLabelText('关闭'));
+      expect(onClose).not.toHaveBeenCalled();
+      await act(() => mockFinishAnimation(true));
+      if (platform === 'ios') {
+        expect(onClose).not.toHaveBeenCalled();
+        await act(() => dismissed());
+        expect(onClose).toHaveBeenCalledTimes(1);
+        await act(() => dismissed());
+      }
+      expect(onClose).toHaveBeenCalledTimes(1);
+      await host.unmount();
+    } finally {
+      Platform.OS = previousPlatform;
+    }
+  },
+);

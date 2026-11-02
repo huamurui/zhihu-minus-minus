@@ -372,6 +372,38 @@ test('merges capture pieces into one named PNG and shares the image directly', a
   expect(FileSystem.writeAsStringAsync).toHaveBeenCalledTimes(1);
 });
 
+test.each([
+  [
+    '/private/var/tmp/ReactNative/capture.png',
+    'file:///private/var/tmp/ReactNative/capture.png',
+  ],
+  [
+    '/private/var/tmp/ReactNative/中文 #?%.png',
+    'file:///private/var/tmp/ReactNative/%E4%B8%AD%E6%96%87%20%23%3F%25.png',
+  ],
+  [
+    'file:///private/var/tmp/ReactNative/capture.png',
+    'file:///private/var/tmp/ReactNative/capture.png',
+  ],
+])('exports an iOS capture from %s', async (capture, uri) => {
+  const platform = Platform.OS;
+  Platform.OS = 'ios';
+  try {
+    const output = await writeImageExport(
+      { directory, title: '正文', uris: [capture] },
+      context(),
+    );
+    expect(FileSystem.getInfoAsync).toHaveBeenCalledWith(uri);
+    expect(FileSystem.readAsStringAsync).toHaveBeenCalledWith(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    expect(output.files).toHaveLength(1);
+    expect(output.files[0].mimeType).toBe('image/png');
+  } finally {
+    Platform.OS = platform;
+  }
+});
+
 test('shares multiple bounded merged images in a ZIP when one image is too tall', async () => {
   jest.mocked(stitchPngImages).mockImplementationOnce(async function* (images) {
     for await (const bytes of images)

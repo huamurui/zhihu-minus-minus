@@ -84,6 +84,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
     const translateY = useSharedValue(windowHeight);
     const backdropOpacity = useSharedValue(0);
     const closing = useRef(false);
+    const notifyOnDismiss = useRef(false);
 
     useEffect(() => {
       onCloseRef.current = onClose;
@@ -97,8 +98,9 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
           closing.current = false;
           if (!finished) return;
           mountedRef.current = false;
+          notifyOnDismiss.current = notify && Platform.OS === 'ios';
           setMounted(false);
-          if (notify) onCloseRef.current();
+          if (notify && Platform.OS !== 'ios') onCloseRef.current();
         };
 
         backdropOpacity.value = withTiming(0, { duration: EXIT_DURATION });
@@ -121,6 +123,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
 
     useEffect(() => {
       if (visible) {
+        notifyOnDismiss.current = false;
         closing.current = false;
         mountedRef.current = true;
         setMounted(true);
@@ -181,7 +184,9 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       transform: [{ translateY: translateY.value }],
     }));
 
-    if (!mounted) return null;
+    // Keep the iOS Modal mounted until native dismissal delivers onDismiss.
+    // Presenting another native sheet from the animation callback is too early.
+    if (!mounted && Platform.OS !== 'ios') return null;
 
     const surfaceColor = Colors[colorScheme].backgroundSecondary;
     const handleColor =
@@ -195,6 +200,11 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
         animationType="none"
         statusBarTranslucent
         onRequestClose={requestClose}
+        onDismiss={() => {
+          if (!notifyOnDismiss.current) return;
+          notifyOnDismiss.current = false;
+          onCloseRef.current();
+        }}
       >
         <KeyboardAvoidingView
           enabled={keyboardAvoiding}
