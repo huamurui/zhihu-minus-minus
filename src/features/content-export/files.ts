@@ -350,15 +350,21 @@ export async function writeImageExport(
       let inputSize = 0;
       for (const [index, original] of options.uris.entries()) {
         assertExportActive(context);
-        if (!original.startsWith('file://')) throw new ExportIoError('storage');
-        const info = await FileSystem.getInfoAsync(original);
+        // iOS view-shot returns a native absolute path; Expo expects a file URI.
+        // Keep the original capture path unchanged for view-shot's releaseCapture.
+        const uri =
+          Platform.OS === 'ios' && original.startsWith('/')
+            ? `file://${original.split('/').map(encodeURIComponent).join('/')}`
+            : original;
+        if (!uri.startsWith('file://')) throw new ExportIoError('storage');
+        const info = await FileSystem.getInfoAsync(uri);
         if (!info.exists || info.isDirectory)
           throw new ExportIoError('storage');
         if (inputSize + info.size > MAX_OUTPUT_BYTES) {
           throw new ExportIoError('resource-limit');
         }
         assertExportActive(context);
-        const encoded = await FileSystem.readAsStringAsync(original, {
+        const encoded = await FileSystem.readAsStringAsync(uri, {
           encoding: FileSystem.EncodingType.Base64,
         });
         assertExportActive(context);
