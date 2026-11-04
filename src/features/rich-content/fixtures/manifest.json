@@ -2,6 +2,29 @@
   "version": 2,
   "cases": [
     {
+      "id": "ios-dense-inline-formulas-001",
+      "file": "./cases/ios-dense-inline-formulas-001.json",
+      "contentPath": "content",
+      "sourceType": "answer",
+      "collectedAt": "2026-11-04",
+      "traits": [
+        "capture-derived",
+        "inline-formula",
+        "nested-scripts",
+        "radical",
+        "ios"
+      ],
+      "expected": {
+        "paragraphs": 7,
+        "activeImages": 19,
+        "formulaImages": 18
+      },
+      "expectedMetadata": {
+        "type": "answer",
+        "id": "sanitized-ios-dense-inline-formulas"
+      }
+    },
+    {
       "id": "video-playback-001",
       "file": "./cases/video-playback-001.json",
       "contentPath": "content",

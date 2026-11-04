@@ -60,6 +60,8 @@ Block AST 表达内容语义，不规定逐段 cell 或 FlashList 布局。`comp
 
 行内公式还须与宿主容器中的相邻文字保持连续，不能只检查节点类型。列表、引用和裸div/root中的混合文本与公式现已一起进入段落，避免短公式虽标为inline却被单独包成paragraph。Android公式附件统一使用正文前景色；普通图片保持原色，识别出的浅色公式底板先转为前景alpha mask。该着色策略不保留彩色公式的分色语义。
 
+`ios-dense-inline-formulas-001` 保留脱敏后的完整回答正文及原公式表达式，覆盖密集行内公式、嵌套上下标及根式，可在富文本案例页切换后端查看。iOS 公式 SVG 的 MathJax 字形变换兼容见 [原生模块说明](../../../modules/zhihu-rich-text/README.md)；实际设备上的行高、缩放和相邻文字仍需验收。
+
 模型补充参考了 Zhihu++ 的 Kotlin Markdown AST、图片画廊和知识点高亮处理，映射与规范化约定见 [Markdown 参考记录](./docs/markdown-reference.md)。`segment` 对应接口 `segment_infos` 的范围标记；`segmentHighlight` 对应 HTML `highlight-wrap` 的划线；普通 `highlight` 对应 `mark` 的背景高亮。高亮业务元数据可缺省，缺少交互目标或位置时仍保留视觉结构，不用空 ID 或 0 偏移补造提交数据。跨段 `displayText` 用于菜单/复制，不替代本段偏移坐标系。
 
 最小文档示例：

@@ -423,6 +423,7 @@ private final class AttachmentSVGDocument: NSObject, XMLParserDelegate {
     root += " width=\"\(size.width)\" height=\"\(size.height)\">"
     var result = markup.replacingCharacters(in: range, with: root)
     if formula {
+      result = normalizeFormulaSVGTransforms(result)
       // Theme is applied to the bitmap mask, including explicit black and currentColor.
       let currentColor = try? NSRegularExpression(pattern: "currentColor", options: .caseInsensitive)
       result = currentColor?.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result), withTemplate: "#000000") ?? result

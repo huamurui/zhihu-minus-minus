@@ -29,6 +29,7 @@
 - `NSTextAttachment`表示单个 `U+FFFC`。系统复制使用共享flow范围，并将真实附件替换为 `copyText`；拒绝越界、非整数、boolean偏移和拆分surrogate pair的范围。
 - 可信合成空段用小字号与相同的 minimum/maximumLineHeight 保留精确高度；普通正文和附件继续采用最小行高，不裁剪高附件。复制时仅删除这些空段的合成锚点，保留段界换行和用户原始零宽字符。
 - SVG根节点支持 `ex`/`em`、`px`/`pt`、viewBox与vertical-align；仅显式提供宽或高时保持intrinsic比例，基线随fit缩放。SVG使用 `SDWebImageSVGCoder@1.7.0` 的Retina raster路径，普通图片使用ImageIO thumbnail，实际bitmap边长上限2048px。
+- 知乎 MathJax 公式的 `use` 字形可能直接带缩放变换；CoreSVG 会忽略该变换并导致上下标和根式重叠。安全校验后，仅对公式将自闭合和空的成对 `use` 上的变换转移到等价的外层 `g`，保持字形位置和附件原有尺寸/基线。iOS 真机仍需检查公式换行、前后文字及不同字号的排版。
 - 附件以匿名ephemeral session加载，data图片和HTTP(S)资源均限4MiB；进程NSCache限24MB/128条，按图源哈希、kind与几何缓存并合并重复请求。缓存不含主题色，公式转为当前正文色，近白底先去底为alpha mask；普通图片保持原色。
 - 点击由当前TextKit glyph范围分发链接、知识点和附件事件；已有选区时不派发普通点击，长按仍保留系统选择。父ScrollView与系统选区拖柄的手势组合需平台交互验收。
 - 高度事件核对当前flow/version/layoutKey和generation，布局key变化后重测；附件更新保留选区，旧文档加载及过期测量不会回填新正文。
