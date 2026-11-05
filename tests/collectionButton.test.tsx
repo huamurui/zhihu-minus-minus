@@ -190,6 +190,19 @@ test('compact collection keeps its complete accessible count while hiding only t
   expect(getAllContentCollectionStatus).not.toHaveBeenCalled();
 });
 
+test('corner collection count stays visible and exposes the full value', async () => {
+  const host = await setup({
+    count: 12345,
+    isCollected: true,
+    countDisplay: 'corner',
+  });
+  expect(host.getByText('1.2万')).toBeTruthy();
+  const button = host.getByRole('button', { name: '取消收藏' });
+  expect(button).toHaveProp('accessibilityValue', { text: '12345 次收藏' });
+  await fireEvent.press(button);
+  expect(mockToggleCollect).toHaveBeenCalledWith('answer-a', 'answer', true);
+});
+
 test('unknown state loads only after a press, blocks duplicate presses and then toggles the resolved state', async () => {
   const resolve = deferStatus();
   const host = await setup();

@@ -26,6 +26,7 @@ export interface ContentActionBarProps {
   style?: ComponentProps<typeof Animated.View>['style'];
   visible?: boolean;
   shrinkLeading?: boolean;
+  interactiveGlass?: boolean;
 }
 
 /** Preserve safe-area clearance, then raise the floating bar by 20. */
@@ -48,6 +49,7 @@ export function ContentActionBar({
   style,
   visible = true,
   shrinkLeading = false,
+  interactiveGlass = false,
 }: ContentActionBarProps) {
   const colors = useRuntimeThemeColors();
   const colorScheme = useColorScheme();
@@ -99,6 +101,7 @@ export function ContentActionBar({
               >
                 <FloatingSurface
                   glassStyle="regular"
+                  isInteractive={interactiveGlass && visible}
                   colorScheme={useGlass ? 'auto' : colorScheme}
                   intensity={130}
                   tint={colorScheme}
@@ -136,6 +139,7 @@ export function ContentActionBar({
                 >
                   <FloatingSurface
                     glassStyle="regular"
+                    isInteractive={interactiveGlass && visible}
                     colorScheme={useGlass ? 'auto' : colorScheme}
                     intensity={130}
                     tint={colorScheme}
@@ -175,6 +179,7 @@ export function ContentActionBar({
                 >
                   <FloatingSurface
                     glassStyle="regular"
+                    isInteractive={interactiveGlass && visible}
                     colorScheme={useGlass ? 'auto' : colorScheme}
                     intensity={130}
                     tint={colorScheme}
