@@ -32,7 +32,7 @@ import { themeVariables } from '@/utils/themeVariables';
 import { isExpoInternalUrl, parseZhihuUrl } from '@/utils/url';
 import '../global.css';
 import * as Clipboard from 'expo-clipboard';
-import { AppState, type AppStateStatus, Linking } from 'react-native';
+import { AppState, type AppStateStatus, Linking, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { consumeAppClipboardText } from '@/utils/clipboard';
 import { createAppQueryClient } from '@/utils/queryClient';
@@ -51,6 +51,7 @@ const queryClient = createAppQueryClient();
 
 export const unstable_settings = {
   anchor: '(tabs)',
+  initialRouteName: '(tabs)',
 };
 
 function RootLayout() {
@@ -206,9 +207,11 @@ function RootLayout() {
                   },
                   headerTitleStyle: {
                     color: appThemeColors.text,
-                    fontWeight: 'bold',
+                    fontSize: 18,
+                    fontWeight: '600',
                   },
-                  headerTintColor: currentTint,
+                  // Back arrows match the text, as on the custom detail headers.
+                  headerTintColor: appThemeColors.text,
                   headerShadowVisible: false,
                   headerBackButtonDisplayMode: 'minimal',
                 }}
@@ -219,7 +222,11 @@ function RootLayout() {
                 {/* 底部 Tab 主框架 */}
                 <Stack.Screen
                   name="(tabs)"
-                  options={{ headerShown: false, title: '知乎' }}
+                  options={{
+                    headerShown: false,
+                    title: '知乎',
+                    gestureEnabled: false,
+                  }}
                 />
 
                 {/* 登录页：建议做成从底部弹出的 Modal */}
@@ -274,8 +281,18 @@ function RootLayout() {
                   name="question/[id]/index"
                   options={{
                     headerShown: false,
-                    animation: 'fade',
+                    animation: Platform.OS === 'android' ? 'fade' : 'default',
                   }}
+                />
+
+                {/* 自定义顶部栏的页面首次渲染也不能预留默认标题栏。 */}
+                <Stack.Screen
+                  name="user/[id]/index"
+                  options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                  name="user/[id]/stream"
+                  options={{ headerShown: false }}
                 />
 
                 {/* 回答详情页 */}
@@ -283,7 +300,7 @@ function RootLayout() {
                   name="answer/[id]"
                   options={{
                     headerShown: false,
-                    animation: 'fade',
+                    animation: Platform.OS === 'android' ? 'fade' : 'default',
                   }}
                 />
 
@@ -292,7 +309,10 @@ function RootLayout() {
                   name="guest/detail"
                   options={{
                     headerShown: false,
-                    animation: 'slide_from_right',
+                    animation:
+                      Platform.OS === 'android'
+                        ? 'slide_from_right'
+                        : 'default',
                   }}
                 />
               </Stack>

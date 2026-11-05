@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import React, { useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { ActivityIndicator } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -48,10 +48,14 @@ export const DownvoteButton = ({
   const onPrimary = useThemeColor({}, 'onPrimary');
   const mutedColor = useThemeColor({}, 'textSecondary');
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: FlashList identity changes must reset local reaction state even when the next item has equal initial values.
-  React.useEffect(() => {
+  // A recycled FlashList cell resets local reaction state while rendering, even
+  // when the next item has equal initial values; see FeedCard for why this is
+  // not an effect.
+  const [synced, setSynced] = useState({ identity, initialVoted });
+  if (synced.identity !== identity || synced.initialVoted !== initialVoted) {
+    setSynced({ identity, initialVoted });
     setVoted(initialVoted);
-  }, [identity, initialVoted]);
+  }
 
   const isDownvoted = voted === -1;
   const foregroundColor =

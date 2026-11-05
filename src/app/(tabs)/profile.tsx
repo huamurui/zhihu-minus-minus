@@ -18,6 +18,7 @@ import { BottomSheet } from '@/components/overlays/BottomSheet';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
+import { UnreadBadge } from '@/components/UnreadBadge';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { getAuthSessionVersion, useAuthStore } from '@/store/useAuthStore';
@@ -41,8 +42,6 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const accentColor = useThemeColor({}, 'primary');
-  const dangerColor = useThemeColor({}, 'danger');
-  const onDanger = useThemeColor({}, 'onDanger');
   const accentBgColor = useThemeColor({}, 'primaryTransparent');
   const _surfaceColor = Colors[colorScheme].surface;
   const _textColor = Colors[colorScheme].text;
@@ -440,16 +439,12 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
           icon="notifications-outline"
           title="消息通知"
           subtitle="查看赞同、关注与系统消息"
+          color={accentColor}
           onPress={() => router.push('/notifications')}
           right={
             unreadCount > 0 ? (
               <View className="flex-row items-center bg-transparent">
-                <Text
-                  className="text-xs font-bold px-1.5 py-0.5 rounded-[10px] overflow-hidden mr-1"
-                  style={{ backgroundColor: dangerColor, color: onDanger }}
-                >
-                  {unreadCount > 99 ? '99+' : unreadCount}
-                </Text>
+                <UnreadBadge count={unreadCount} placement="inline" />
                 <Ionicons
                   name="chevron-forward"
                   size={16}
@@ -472,6 +467,7 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
           icon="people-outline"
           title="切换账号"
           subtitle="管理登录账号与游客模式"
+          color={accentColor}
           onPress={() => setAccountModalVisible(true)}
           right={
             <View className="flex-row items-center bg-transparent">
@@ -508,15 +504,20 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
 
       {/* 退出登录按钮 */}
       {me && (
-        <BouncyButton
-          className="mt-[30px] py-[15px] items-center"
-          onPress={handleLogout}
-          disabled={sessionChanging}
-        >
-          <Text className="text-[#ff4d4f] text-base font-semibold">
-            退出账号
-          </Text>
-        </BouncyButton>
+        <View type="surface" className="mt-5 mx-3 rounded-2xl overflow-hidden">
+          <BouncyButton
+            className="py-3.5 items-center"
+            onPress={handleLogout}
+            disabled={sessionChanging}
+          >
+            <Text
+              className="text-base font-medium"
+              style={{ color: Colors[colorScheme].danger }}
+            >
+              退出账号
+            </Text>
+          </BouncyButton>
+        </View>
       )}
 
       <View className="h-[100px] bg-transparent" />

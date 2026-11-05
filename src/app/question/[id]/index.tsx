@@ -13,10 +13,7 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert } from 'react-native';
 import { RefreshControl } from 'react-native-gesture-handler';
-import Reanimated, {
-  SharedTransition,
-  useSharedValue,
-} from 'react-native-reanimated';
+import Reanimated, { useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { hasAuthenticationCookie } from '@/api/client';
 import { getContentCollectionMetadata } from '@/api/zhihu';
@@ -37,6 +34,7 @@ import {
 import { BouncyButton } from '@/components/BouncyButton';
 import { CollectionButton } from '@/components/CollectionButton';
 import { ContentActionButton } from '@/components/ContentActionButton';
+import { useContentCardSurface } from '@/components/contentCardSurface';
 import {
   DetailNavigationHeader,
   useDetailNavigationHeight,
@@ -46,12 +44,17 @@ import { FollowButton } from '@/components/FollowButton';
 import { LikeButton } from '@/components/LikeButton';
 import { MoreActionsButton } from '@/components/MoreActionsButton';
 import { QueryErrorView } from '@/components/QueryErrorView';
+import {
+  QUESTION_DETAIL_TEXT_STYLE,
+  QuestionDetailContent,
+} from '@/components/QuestionDetailContent';
 import { ShareMenu } from '@/components/ShareMenu';
 import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
+import { TitleTransitionTarget } from '@/features/adaptive-layout/TitleTransition';
 import { usePaneRouter as useRouter } from '@/features/adaptive-layout/usePaneRouter';
-import { RICH_CONTENT_STALE_TIME, ZhihuContent } from '@/features/rich-content';
+import { RICH_CONTENT_STALE_TIME } from '@/features/rich-content';
 import { useDetailHeaderState } from '@/hooks/useDetailHeaderState';
 import { useGestureScrollView } from '@/hooks/useGestureScrollView';
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
@@ -62,6 +65,7 @@ import { useCollectionStore } from '@/store/useCollectionStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { seedAnswerPreviewEntry } from '@/utils/answerPreviewEntry';
 import { seedAnswerDetailFromList } from '@/utils/contentCache';
+import { formatCount } from '@/utils/formatCount';
 import { seedGuestAnswerFromList } from '@/utils/guestAnswer';
 import { refreshInfiniteQuery } from '@/utils/query';
 import { getZhihuErrorMessage } from '@/utils/zhihuError';
@@ -95,6 +99,7 @@ const QuestionAnswerCard = React.memo(function QuestionAnswerCard({
   const router = useRouter();
   const queryClient = useQueryClient();
   const secondaryColor = useThemeColor({}, 'textSecondary');
+  const surface = useContentCardSurface({ radius: 12, gap: 10 });
   const followMutation = useOptimisticToggle<
     InfiniteData<QuestionAnswersResponse, number | string>
   >({
@@ -160,7 +165,7 @@ const QuestionAnswerCard = React.memo(function QuestionAnswerCard({
   };
 
   return (
-    <View type="surface" className="p-4 pb-2 mb-2.5 mx-1.5 rounded-xl">
+    <View style={surface} className="p-4 pb-2 mx-1.5">
       <View className="flex-row items-center mb-2 bg-transparent">
         <BouncyButton
           accessibilityRole="button"
@@ -168,7 +173,17 @@ const QuestionAnswerCard = React.memo(function QuestionAnswerCard({
           onPress={() => {
             const authorId = item.author.url_token || item.author.id;
             if (authorId)
-              router.push({ pathname: '/user/[id]', params: { id: authorId } });
+              router.push({
+                pathname: '/user/[id]',
+                params: {
+                  id: authorId,
+                  avatar: item.author.avatar_url,
+                  name: item.author.name,
+                  ...(item.author.headline
+                    ? { headline: item.author.headline }
+                    : {}),
+                },
+              });
           }}
           className="flex-row flex-1 items-center bg-transparent"
         >
@@ -258,8 +273,6 @@ const QuestionAnswerCard = React.memo(function QuestionAnswerCard({
     </View>
   );
 });
-
-const slowTransition = SharedTransition.duration(600);
 
 export default function QuestionDetail() {
   const { id, title: initialTitle } = useLocalSearchParams<{
@@ -468,24 +481,25 @@ export default function QuestionDetail() {
             borderBottomRightRadius: 20,
           }}
         >
-          <Reanimated.View
-            sharedTransitionTag={`title-${id}`}
-            sharedTransitionStyle={slowTransition}
+          <TitleTransitionTarget
+            id={String(id)}
             onLayout={({ nativeEvent }) => {
               const { y, height } = nativeEvent.layout;
               onHeaderLayout(Math.max(1, y + height - navigationHeight));
             }}
           >
-            <Text
-              style={{
-                fontSize: 22,
-                lineHeight: 30,
-                fontWeight: '700',
-              }}
-            >
-              {question?.title || initialTitle || '加载中...'}
-            </Text>
-          </Reanimated.View>
+            <View>
+              <Text
+                style={{
+                  fontSize: 22,
+                  lineHeight: 30,
+                  fontWeight: '700',
+                }}
+              >
+                {question?.title || initialTitle || '加载中...'}
+              </Text>
+            </View>
+          </TitleTransitionTarget>
           {qLoading && !question ? (
             <View className="h-[100px] justify-center">
               <ActivityIndicator size="small" color={primaryColor} />
@@ -526,10 +540,9 @@ export default function QuestionDetail() {
                 <View className="mt-3 rounded-2xl overflow-hidden">
                   {detailExpanded ? (
                     <>
-                      <ZhihuContent
+                      <QuestionDetailContent
                         content={question.detail}
-                        objectId={id as string}
-                        type="question"
+                        questionId={id as string}
                       />
                       <BouncyButton
                         accessibilityRole="button"
@@ -562,7 +575,7 @@ export default function QuestionDetail() {
                       <Text
                         type="secondary"
                         numberOfLines={3}
-                        style={{ fontSize: 14, lineHeight: 22 }}
+                        style={QUESTION_DETAIL_TEXT_STYLE}
                       >
                         {question.excerpt?.replace(/<[^>]+>/g, '') || ''}
                       </Text>
@@ -590,7 +603,7 @@ export default function QuestionDetail() {
                   type="secondary"
                   className="mt-3"
                   numberOfLines={3}
-                  style={{ fontSize: 14, lineHeight: 22 }}
+                  style={QUESTION_DETAIL_TEXT_STYLE}
                 >
                   {question.excerpt.replace(/<[^>]+>/g, '')}
                 </Text>
@@ -600,8 +613,8 @@ export default function QuestionDetail() {
                 className="mt-4"
                 style={{ fontSize: 12, lineHeight: 18 }}
               >
-                {question?.follower_count || 0} 关注 ·{' '}
-                {question?.visit_count || 0} 浏览
+                {formatCount(question?.follower_count)} 关注 ·{' '}
+                {formatCount(question?.visit_count)} 浏览
               </Text>
               <View className="flex-row flex-wrap items-center mt-3.5 gap-2">
                 <FollowButton

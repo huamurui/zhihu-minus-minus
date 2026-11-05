@@ -81,6 +81,37 @@ test('profile actions retain their targets and a pending follow cannot be presse
   expect(host.queryByRole('button', { name: '3 位共同关注' })).toBeNull();
 });
 
+test('loading profile displays known identity without inventing statistics or enabling follow', async () => {
+  const host = await render(
+    <ProfileHeader
+      {...props({
+        id: 'synthetic',
+        name: '卡片作者',
+        avatar_url: '',
+        type: 'people',
+      })}
+      isLoading
+    />,
+  );
+  expect(host.getByText('卡片作者')).toBeVisible();
+  expect(host.queryByRole('button', { name: /关注/ })).toBeNull();
+  expect(host.queryByText('0', { exact: true })).toBeNull();
+});
+
+test('card headline remains available if the profile response omits it', async () => {
+  const host = await render(
+    <ProfileHeader {...props()} initialHeadline="卡片简介" />,
+  );
+  expect(host.getByText('卡片简介')).toBeVisible();
+  await host.rerender(
+    <ProfileHeader
+      {...props({ ...member, headline: '' })}
+      initialHeadline="卡片简介"
+    />,
+  );
+  expect(host.queryByText('卡片简介')).toBeNull();
+});
+
 test('a long biography can be read in full without expanding the next member', async () => {
   const description = '这是一段用于检查个人主页简介展开行为的脱敏介绍。'.repeat(
     8,

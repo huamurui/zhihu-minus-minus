@@ -11,7 +11,7 @@ import {
   useContext,
   useSyncExternalStore,
 } from 'react';
-import { useWindowDimensions } from 'react-native';
+import { type Animated, useWindowDimensions } from 'react-native';
 
 export const PaneContext = createContext<{
   width: number;
@@ -19,6 +19,7 @@ export const PaneContext = createContext<{
   visible: boolean;
   routeKey?: string;
   twoPane?: boolean;
+  fixedHeaderEntryProgress?: Animated.Value;
 } | null>(null);
 
 /** Modal contents use window dimensions but retain their originating visibility. */
@@ -37,6 +38,11 @@ export function usePaneVisible(): boolean {
   const pane = useContext(PaneContext);
   const ancestorVisible = useContext(PaneVisibilityContext);
   return (pane?.visible ?? true) && ancestorVisible;
+}
+
+/** Screens with fixed toolbars can animate their content with the route clock. */
+export function useFixedHeaderEntryProgress(): Animated.Value | undefined {
+  return useContext(PaneContext)?.fixedHeaderEntryProgress;
 }
 
 export function useIsTwoPaneLayout(): boolean {

@@ -8,6 +8,7 @@ import { BouncyButton } from '@/components/BouncyButton';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
+import { UnreadBadge } from '@/components/UnreadBadge';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { useRefreshAction } from '@/hooks/useRefreshAction';
@@ -20,8 +21,6 @@ export default function InboxScreen() {
   const navigation = useNavigation();
   const queryClient = useQueryClient();
   const primaryColor = useThemeColor({}, 'primary');
-  const dangerColor = useThemeColor({}, 'danger');
-  const onDanger = useThemeColor({}, 'onDanger');
   const backgroundColor = useThemeColor({}, 'background');
   const borderColor = Colors[colorScheme].border;
 
@@ -82,22 +81,13 @@ export default function InboxScreen() {
             uri={participant.avatar_url}
             className="w-[52px] h-[52px] rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark"
           />
-          {item.unread_count > 0 && (
-            <View
-              className="absolute top-0 right-0 rounded-full min-w-[18px] h-[18px] justify-center items-center px-1 border-2"
-              style={{
-                backgroundColor: dangerColor,
-                borderColor: backgroundColor,
-              }}
-            >
-              <Text
-                className="text-[10px] font-bold"
-                style={{ color: onDanger }}
-              >
-                {item.unread_count > 99 ? '99+' : item.unread_count}
-              </Text>
-            </View>
-          )}
+          <UnreadBadge
+            count={item.unread_count}
+            placement="corner"
+            size={18}
+            borderColor={backgroundColor}
+            className="absolute top-0 right-0"
+          />
         </View>
 
         <View className="ml-[15px] flex-1 bg-transparent justify-center">

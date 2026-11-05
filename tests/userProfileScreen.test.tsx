@@ -1,6 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render, within } from '@testing-library/react-native';
 import type { PropsWithChildren } from 'react';
+import {
+  AccessibilityInfo,
+  Animated,
+  Platform,
+  StyleSheet,
+} from 'react-native';
 import {
   type FeedItem,
   getMemberActivities,
@@ -14,13 +20,19 @@ import {
   getRecentMemberActivities,
   type ZhihuMember,
 } from '../src/api/zhihu/member';
+import { fetchMemberCreations } from '../src/api/zhihu/moments';
 import UserDetailScreen from '../src/app/user/[id]/index';
 import type { ProfileTabListProps } from '../src/components/profile/ProfileTabList';
+import { PaneContext } from '../src/features/adaptive-layout/PaneContext';
 import type { AnswerReadingContext } from '../src/utils/answerReadingContext';
 
 interface MockPagerProps extends PropsWithChildren {
   initialPage: number;
+  scrollEnabled?: boolean;
   onPageSelected: (event: { nativeEvent: { position: number } }) => void;
+  onPageScrollStateChanged: (event: {
+    nativeEvent: { pageScrollState: string };
+  }) => void;
 }
 
 let mockPagerProps: MockPagerProps;
@@ -34,6 +46,7 @@ const mockListUnmount = jest.fn();
 const mockListProps = new Map<string, ProfileTabListProps>();
 const mockFeedItems = new Map<string, FeedItem>();
 const mockFeedContexts = new Map<string, AnswerReadingContext | undefined>();
+const mockProfileHeader = jest.fn();
 const member: ZhihuMember = {
   id: 'member-hash-id',
   url_token: 'member-readable-token',
@@ -41,7 +54,13 @@ const member: ZhihuMember = {
   type: 'people',
   avatar_url: '',
 };
-let mockRoute: { id: string; tab?: string };
+let mockRoute: {
+  id: string;
+  tab?: string;
+  name?: string | string[];
+  avatar?: string | string[];
+  headline?: string | string[];
+};
 let mockAuthState: { cookies: string; me: ZhihuMember | null };
 let mockSessionVersion: number;
 
@@ -77,6 +96,9 @@ jest.mock('../src/api/zhihu/member', () => ({
   getMemberAnswersVotedByMe: jest.fn(),
   getMemberColumnContributions: jest.fn(),
   getRecentMemberActivities: jest.fn(),
+}));
+jest.mock('../src/api/zhihu/moments', () => ({
+  fetchMemberCreations: jest.fn(),
 }));
 jest.mock('../src/api/zhihu/history', () => ({ addReadHistory: jest.fn() }));
 jest.mock('../src/api/client', () => ({
@@ -124,14 +146,20 @@ jest.mock('../src/components/profile/ProfileCover', () => ({
   ProfileToolbarBackground: () => null,
 }));
 jest.mock('../src/components/profile/ProfileHeader', () => ({
-  ProfileHeader: ({ isMe }: { isMe: boolean }) =>
-    jest
+  ProfileHeader: (props: {
+    isMe: boolean;
+    isLoading?: boolean;
+    user: ZhihuMember;
+  }) => {
+    mockProfileHeader(props);
+    return jest
       .requireActual('react')
       .createElement(
         jest.requireActual('react-native').Text,
         { testID: 'profile-owner' },
-        isMe ? '自己的主页' : '其他人的主页',
-      ),
+        props.isMe ? '自己的主页' : '其他人的主页',
+      );
+  },
 }));
 jest.mock('../src/components/FeedCard', () => ({
   FeedCard: ({
@@ -251,6 +279,9 @@ const votedAnswer = {
 beforeEach(() => {
   jest.useFakeTimers();
   jest.clearAllMocks();
+  jest
+    .spyOn(AccessibilityInfo, 'isReduceMotionEnabled')
+    .mockResolvedValue(false);
   mockListProps.clear();
   mockFeedItems.clear();
   mockFeedContexts.clear();
@@ -270,6 +301,7 @@ beforeEach(() => {
   jest.mocked(getMemberAnswersVotedByMe).mockResolvedValue(emptyPage);
   jest.mocked(getMemberColumnContributions).mockResolvedValue(emptyPage);
   jest.mocked(searchContent).mockResolvedValue(emptyPage);
+  jest.mocked(fetchMemberCreations).mockResolvedValue(emptyPage);
   jest.mocked(getRecentMemberActivities).mockResolvedValue({
     ...emptyPage,
     data: [
@@ -292,6 +324,32 @@ afterEach(async () => {
   jest.useRealTimers();
 });
 
+/** A synthetic 创作 entry: the content the member's own list would return. */
+function creationCard(
+  contentType: 'answer' | 'article' | 'pin',
+  id: string,
+  title: string,
+  authorId = member.id,
+  extra: { action_text?: string; created_time?: number } = {},
+) {
+  const author = { ...member, id: authorId, url_token: `${authorId}-token` };
+  return {
+    type: 'moments_feed',
+    ...extra,
+    target:
+      contentType === 'answer'
+        ? { id, type: 'answer', author, question: { id: `q-${id}`, title } }
+        : { id, type: contentType, author, title },
+  };
+}
+
+/** Serve one page of 创作 cards. */
+function mockCreations(cards: ReturnType<typeof creationCard>[]) {
+  jest.mocked(fetchMemberCreations).mockResolvedValue({
+    data: cards,
+    paging: { is_end: true, next: '' },
+  });
+}
 const screen = () => (
   <QueryClientProvider client={client}>
     <UserDetailScreen />
@@ -307,6 +365,231 @@ async function flushQueries(duration = 1) {
   });
 }
 
+test('profile entry motion affects its content while the back control stays fixed and usable', async () => {
+  const timing = jest.spyOn(Animated, 'timing');
+  const progress = new Animated.Value(0.5);
+  const host = await render(
+    <PaneContext.Provider
+      value={{
+        width: 390,
+        height: 844,
+        visible: true,
+        fixedHeaderEntryProgress: progress,
+      }}
+    >
+      {screen()}
+    </PaneContext.Provider>,
+  );
+  await flushQueries();
+  const content = host.getByTestId('profile-entry-content');
+  expect(within(content).getByTestId('profile-owner')).toBeVisible();
+  expect(StyleSheet.flatten(content.props.style).transform).toBeDefined();
+  expect(StyleSheet.flatten(content.props.style).transformOrigin).toBe(
+    '50% 0%',
+  );
+  const background = host.getByTestId('profile-entry-toolbar-background');
+  expect(StyleSheet.flatten(background.props.style).transform).toEqual(
+    StyleSheet.flatten(content.props.style).transform,
+  );
+  expect(StyleSheet.flatten(background.props.style).opacity).toEqual(
+    StyleSheet.flatten(content.props.style).opacity,
+  );
+  expect(timing).not.toHaveBeenCalled();
+  expect(within(content).queryByLabelText('返回')).toBeNull();
+  expect(host.getByLabelText('返回')).toBeEnabled();
+  await host.unmount();
+  timing.mockRestore();
+});
+
+test('a transient zero toolbar measurement does not shift the profile header', async () => {
+  const host = await render(screen());
+  await flushQueries();
+  const previousInset = mockProfileHeader.mock.calls.at(-1)?.[0].topInset;
+  await fireEvent(host.getByTestId('profile-toolbar-row'), 'layout', {
+    nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 0 } },
+  });
+  expect(mockProfileHeader.mock.calls.at(-1)?.[0].topInset).toBe(previousInset);
+  await fireEvent(host.getByTestId('profile-toolbar-row'), 'layout', {
+    nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 80 } },
+  });
+  expect(mockProfileHeader.mock.calls.at(-1)?.[0].topInset).toBe(124);
+  await host.unmount();
+});
+
+test('profile opens from the card before a slow request and does not replay when data arrives', async () => {
+  client.removeQueries({ queryKey: ['user-detail', mockRoute.id] });
+  mockRoute.name = '卡片作者';
+  mockRoute.avatar = 'https://example.com/synthetic-avatar.jpg';
+  mockRoute.headline = '卡片简介';
+  let finish: ((value: ZhihuMember) => void) | undefined;
+  jest.mocked(getMemberWithFallback).mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve;
+    }),
+  );
+  const timing = jest.spyOn(Animated, 'timing');
+  try {
+    const progress = new Animated.Value(0.5);
+    const host = await render(
+      <PaneContext.Provider
+        value={{
+          width: 390,
+          height: 844,
+          visible: true,
+          fixedHeaderEntryProgress: progress,
+        }}
+      >
+        {screen()}
+      </PaneContext.Provider>,
+    );
+    await flushQueries();
+    expect(host.getByTestId('profile-entry-content')).toBeTruthy();
+    expect(timing).not.toHaveBeenCalled();
+    expect(mockProfileHeader).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        isLoading: true,
+        user: expect.objectContaining({
+          name: '卡片作者',
+          avatar_url: 'https://example.com/synthetic-avatar.jpg',
+          headline: '卡片简介',
+        }),
+      }),
+    );
+    expect(mockListProps.get('创作')?.hideInitialLoadingIndicator).toBe(true);
+    timing.mockClear();
+    await act(async () => {
+      finish?.(member);
+    });
+    await flushQueries();
+    expect(host.getByTestId('profile-entry-content')).toBeTruthy();
+    expect(timing).not.toHaveBeenCalled();
+    expect(mockProfileHeader).toHaveBeenLastCalledWith(
+      expect.objectContaining({ isLoading: false, user: member }),
+    );
+    expect(mockListProps.get('创作')?.hideInitialLoadingIndicator).toBe(false);
+    timing.mockClear();
+    await act(() =>
+      client.setQueryData(['user-detail', mockRoute.id], {
+        ...member,
+        headline: '新简介',
+      }),
+    );
+    expect(timing).not.toHaveBeenCalled();
+    await host.unmount();
+  } finally {
+    timing.mockRestore();
+  }
+});
+
+test('repeated profile identity parameters use the first value while loading and after the response', async () => {
+  client.removeQueries({ queryKey: ['user-detail', mockRoute.id] });
+  mockRoute.name = ['卡片作者', '其他作者'];
+  mockRoute.avatar = [
+    'https://example.com/avatar.jpg',
+    'https://example.com/other.jpg',
+  ];
+  mockRoute.headline = ['卡片简介', '其他简介'];
+  let finish: ((value: ZhihuMember) => void) | undefined;
+  jest.mocked(getMemberWithFallback).mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve;
+    }),
+  );
+  const host = await render(screen());
+  await flushQueries();
+  const identity = {
+    initialName: '卡片作者',
+    initialAvatar: 'https://example.com/avatar.jpg',
+    initialHeadline: '卡片简介',
+  };
+  expect(mockProfileHeader).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      ...identity,
+      isLoading: true,
+      user: expect.objectContaining({ name: '卡片作者', headline: '卡片简介' }),
+    }),
+  );
+  await act(async () => finish?.(member));
+  await flushQueries();
+  expect(mockProfileHeader).toHaveBeenLastCalledWith(
+    expect.objectContaining({ ...identity, isLoading: false, user: member }),
+  );
+  expect(host.getByTestId('profile-entry-content')).toBeVisible();
+  await host.unmount();
+});
+
+test('Android waits for the loaded profile header to be measured before showing tabs and list', async () => {
+  jest.replaceProperty(Platform, 'OS', 'android');
+  client.removeQueries({ queryKey: ['user-detail', mockRoute.id] });
+  let finish: ((value: ZhihuMember) => void) | undefined;
+  jest.mocked(getMemberWithFallback).mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve;
+    }),
+  );
+  try {
+    const host = await render(screen());
+    await flushQueries();
+    expect(
+      host.getByTestId('profile-initial-tabs-layout', {
+        includeHiddenElements: true,
+      }),
+    ).not.toBeVisible();
+    expect(mockListProps.get('创作')?.headerHeight).toBe(0);
+    await act(async () => finish?.(member));
+    await flushQueries();
+    expect(
+      host.getByTestId('profile-initial-tabs-layout', {
+        includeHiddenElements: true,
+      }),
+    ).not.toBeVisible();
+    await fireEvent(
+      host.getByTestId('profile-initial-tabs-layout', {
+        includeHiddenElements: true,
+      }),
+      'layout',
+      {
+        nativeEvent: { layout: { x: 0, y: 250, width: 390, height: 52 } },
+      },
+    );
+    expect(host.getByTestId('profile-initial-tabs-layout')).toBeVisible();
+    expect(mockListProps.get('创作')?.headerHeight).toBeGreaterThan(0);
+    await host.unmount();
+  } finally {
+    jest.restoreAllMocks();
+  }
+});
+
+test('a failed initial profile request replaces the placeholder with a retry', async () => {
+  client.removeQueries({ queryKey: ['user-detail', mockRoute.id] });
+  let fail: ((error: Error) => void) | undefined;
+  jest.mocked(getMemberWithFallback).mockReturnValue(
+    new Promise((_, reject) => {
+      fail = reject;
+    }),
+  );
+  const host = await render(screen());
+  expect(host.getByTestId('profile-entry-content')).toBeTruthy();
+  await act(async () => fail?.(new Error('synthetic failure')));
+  await flushQueries();
+  expect(host.getByText('用户资料加载失败')).toBeVisible();
+  expect(host.queryByTestId('profile-entry-content')).toBeNull();
+  await host.unmount();
+});
+
+test('profile content remains visible outside an animated pane', async () => {
+  const timing = jest.spyOn(Animated, 'timing');
+  try {
+    const host = await render(screen());
+    await flushQueries();
+    expect(host.getByTestId('profile-entry-content')).toBeVisible();
+    expect(timing).not.toHaveBeenCalled();
+    await host.unmount();
+  } finally {
+    timing.mockRestore();
+  }
+});
+
 test.each([true, false])(
   'the creation tab sits between activity and answers and loads for own profile: %s',
   async (ownProfile) => {
@@ -315,6 +598,9 @@ test.each([true, false])(
       ? member
       : { ...member, id: 'other-member', url_token: 'other-token' };
     client.setQueryData(['me'], mockAuthState.me);
+    mockCreations([
+      creationCard('article', 'creation-article', '最近更新的创作'),
+    ]);
     const host = await render(screen());
     expect(
       host.getAllByRole('tab').map((tab) => tab.props.accessibilityLabel),
@@ -340,11 +626,13 @@ test.each([true, false])(
       mockPagerProps.onPageSelected({ nativeEvent: { position: 1 } }),
     );
     await flushQueries();
-    expect(getRecentMemberActivities).toHaveBeenCalledWith(
-      'member-hash-id',
-      { offset: expect.any(Number), pageNum: 1 },
-      expect.objectContaining({ aborted: false }),
+    // 创作 reads the App's own list for the member.
+    expect(fetchMemberCreations).toHaveBeenCalledWith(
+      member.id,
+      undefined,
+      expect.anything(),
     );
+    expect(getRecentMemberActivities).not.toHaveBeenCalled();
     expect(host.getByRole('tab', { name: '创作' })).toBeSelected();
     expect(mockListProps.get('创作')?.active).toBe(true);
     expect(host.getByText('最近更新的创作')).toBeTruthy();
@@ -361,7 +649,7 @@ test.each([undefined, 'invalid-tab', 'creations'])(
     await flushQueries();
     expect(mockPagerProps.initialPage).toBe(1);
     expect(host.getByRole('tab', { name: '创作' })).toBeSelected();
-    expect(getRecentMemberActivities).toHaveBeenCalledTimes(1);
+    expect(fetchMemberCreations).toHaveBeenCalledTimes(1);
     expect(getMemberRelations).not.toHaveBeenCalled();
     await host.unmount();
   },
@@ -467,6 +755,42 @@ test('search opens a separate route without altering the active tab or list offs
   await host.unmount();
 });
 
+test('pager retains horizontal swiping capability without dynamic scroll locking', async () => {
+  mockRoute.tab = 'answers';
+  const host = await render(screen());
+  await flushQueries();
+  expect(mockPagerProps.scrollEnabled).toBe(true);
+  await host.unmount();
+});
+
+test('a page swipe records the synced offsets so the header holds its place', async () => {
+  mockRoute.tab = 'answers';
+  const host = await render(screen());
+  await flushQueries();
+  // Measure a real header so the lists have a collapse range to share.
+  await fireEvent(host.getByTestId('profile-collapsible-header'), 'layout', {
+    nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 600 } },
+  });
+  const offsets = mockListProps.get('回答')?.offsets;
+  if (!offsets) throw new Error('lists share the offsets');
+  const collapse = mockListProps.get('回答')?.collapseDistance ?? 0;
+  expect(collapse).toBeGreaterThan(0);
+  const answersIndex = mockListProps.get('回答')?.index ?? 0;
+  const deep = [...offsets.value];
+  deep[answersIndex] = collapse + 500;
+  offsets.value = deep;
+  await act(async () =>
+    mockPagerProps.onPageScrollStateChanged({
+      nativeEvent: { pageScrollState: 'dragging' },
+    }),
+  );
+  // Every other page now reports at least the collapsed header position.
+  offsets.value.forEach((offset, index) => {
+    if (index !== answersIndex) expect(offset).toBe(collapse);
+  });
+  await host.unmount();
+});
+
 test('switching member routes resets visited tabs and the native pager', async () => {
   mockRoute.tab = 'answers';
   client.setQueryData(['me'], member);
@@ -496,13 +820,11 @@ test('switching member routes resets visited tabs and the native pager', async (
   expect(mockPagerMount).toHaveBeenCalledTimes(2);
   expect(mockPagerUnmount).toHaveBeenCalledTimes(1);
   expect(searchContent).not.toHaveBeenCalled();
-  expect(getRecentMemberActivities).toHaveBeenCalledTimes(2);
-  expect(getRecentMemberActivities).toHaveBeenLastCalledWith(
-    'second-member-id',
-    { offset: expect.any(Number), pageNum: 1 },
-    expect.objectContaining({ aborted: false }),
-  );
+  // The first member's 回答 and 创作, then only the second member's 创作.
   expect(getMemberRelations).toHaveBeenCalledTimes(1);
+  expect(
+    jest.mocked(fetchMemberCreations).mock.calls.map(([memberId]) => memberId),
+  ).toEqual([member.id, secondMember.id]);
   await host.unmount();
 });
 
@@ -532,44 +854,11 @@ test('creation cards of different types retain distinct list keys when their IDs
       },
     ],
   });
-  jest.mocked(getRecentMemberActivities).mockResolvedValue({
-    ...emptyPage,
-    data: [
-      {
-        id: 'answer-event',
-        target: {
-          id: 'shared-content-id',
-          type: 'answer',
-          author: { ...member, type: 'people' },
-          content: '<p>本人完整正文</p>',
-          question: { title: '相同标识的回答' },
-        },
-      },
-      {
-        id: 'other-answer-event',
-        target: {
-          id: 'other-answer-id',
-          type: 'answer',
-          author: {
-            ...member,
-            id: 'another-author',
-            url_token: 'another-token',
-          },
-          question: { title: '其他作者回答' },
-          content: '<p>付费片段</p>',
-          paid_info: {},
-        },
-      },
-      {
-        id: 'article-event',
-        target: {
-          id: 'shared-content-id',
-          type: 'article',
-          title: '相同标识的文章',
-        },
-      },
-    ],
-  });
+  mockCreations([
+    creationCard('answer', 'shared-content-id', '相同标识的回答'),
+    creationCard('article', 'shared-content-id', '相同标识的文章'),
+    creationCard('answer', 'other-answer-id', '其他作者回答', 'another-author'),
+  ]);
   const host = await render(screen());
   await flushQueries();
   expect(host.getByText('相同标识的回答')).toBeTruthy();
@@ -583,7 +872,14 @@ test('creation cards of different types retain distinct list keys when their IDs
   expect(mockFeedContexts.get('answers:other-answer-id')).toEqual({
     scene: 'unknown',
   });
-  expect(mockFeedItems.get('other-answer-id')?.answerType).toBe('PAID');
+  // In the server's order; the owner's cards skip the author row.
+  expect(list?.query.data.map(list.keyExtractor)).toEqual([
+    'user-creation-answers-shared-content-id',
+    'user-creation-articles-shared-content-id',
+    'user-creation-answers-other-answer-id',
+  ]);
+  expect(mockFeedItems.get('shared-content-id')?.hideAuthor).toBe(true);
+  expect(mockFeedItems.get('other-answer-id')?.hideAuthor).toBe(false);
   const keys = list?.query.data.map(list.keyExtractor);
   expect(keys).toHaveLength(3);
   expect(new Set(keys).size).toBe(3);
@@ -600,6 +896,52 @@ test('creation cards of different types retain distinct list keys when their IDs
   });
   expect(host.queryByText('无法确认的回答链接')).toBeNull();
   await host.unmount();
+});
+
+test('populates actionText and action time for creations and activities tab cards', () => {
+  const now = 1770156705 * 1000 + 10 * 60 * 1000;
+  jest.spyOn(Date, 'now').mockReturnValue(now);
+
+  mockCreations([
+    creationCard('pin', 'creation-pin-id', '创作想法', member.id, {
+      action_text: '发布了想法',
+      created_time: 1770156705,
+    }),
+  ]);
+  jest.mocked(getMemberActivities).mockResolvedValue({
+    ...emptyPage,
+    data: [
+      {
+        id: 'activity-pin-event',
+        action_text: '发布了想法',
+        created_time: 1770156705,
+        target: {
+          id: 'activity-pin-id',
+          type: 'pin',
+          author: { ...member, type: 'people' },
+          content: '动态想法正文',
+        },
+      },
+    ],
+  });
+
+  return render(screen()).then(async (host) => {
+    await flushQueries();
+    expect(mockFeedItems.get('creation-pin-id')).toMatchObject({
+      actionText: '发布了想法 · 10分钟前',
+      created_time: 1770156705,
+    });
+
+    await fireEvent.press(host.getByRole('tab', { name: '动态' }));
+    await flushQueries();
+    expect(mockFeedItems.get('activity-pin-id')).toMatchObject({
+      actionText: '发布了想法 · 10分钟前',
+      created_time: 1770156705,
+    });
+
+    await host.unmount();
+    jest.restoreAllMocks();
+  });
 });
 
 test.each([true, false])(

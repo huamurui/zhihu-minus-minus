@@ -39,7 +39,6 @@ import { refreshInfiniteQuery } from '@/utils/query';
 export default function TopicDetail() {
   const queryClient = useQueryClient();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const tintColor = useThemeColor({}, 'primary');
@@ -166,6 +165,7 @@ export default function TopicDetail() {
       <View type="surface" className="pb-4">
         <View className="flex-row p-5 items-center bg-transparent">
           <Image
+            fadeDuration={0}
             source={getCachedImageSource(topic.avatar_url)}
             className="w-16 h-16 rounded-xl"
             resizeMode="cover"
@@ -253,14 +253,6 @@ export default function TopicDetail() {
           headerShadowVisible: false,
           headerStyle: { backgroundColor },
           headerTintColor: textColor,
-          headerLeft: () => (
-            <BouncyButton
-              onPress={() => router.back()}
-              className="mr-2 p-2 rounded-full"
-            >
-              <Ionicons name="chevron-back" size={28} color={textColor} />
-            </BouncyButton>
-          ),
         }}
       />
 
@@ -473,6 +465,7 @@ function TopicItem({ topic }: { topic: ZhihuTopic }) {
       }}
     >
       <Image
+        fadeDuration={0}
         source={getCachedImageSource(topic.avatar_url)}
         className="w-8 h-8 rounded-lg"
       />

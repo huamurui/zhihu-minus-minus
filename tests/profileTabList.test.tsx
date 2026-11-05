@@ -73,12 +73,22 @@ jest.mock('@shopify/flash-list', () => {
 
 jest.mock('react-native-reanimated', () => {
   const react = jest.requireActual<typeof import('react')>('react');
+  const native =
+    jest.requireActual<typeof import('react-native')>('react-native');
   return {
     __esModule: true,
-    default: { createAnimatedComponent: (component: unknown) => component },
+    default: {
+      createAnimatedComponent: (component: unknown) => component,
+      View: native.View,
+    },
     useSharedValue: (value: unknown) => react.useRef({ value }).current,
     useAnimatedScrollHandler: (handlers: unknown) => handlers,
     runOnJS: (callback: (...args: unknown[]) => unknown) => callback,
+    useAnimatedStyle: (factory: () => unknown) => factory(),
+    withRepeat: (animation: unknown) => animation,
+    withTiming: (toValue: unknown) => toValue,
+    cancelAnimation: jest.fn(),
+    Easing: { linear: jest.fn() },
   };
 });
 
@@ -177,6 +187,35 @@ async function scrollNative(offset: number) {
 beforeEach(() => {
   jest.clearAllMocks();
   mockMeasureContent.mockReset();
+});
+
+test('initial profile loading leaves the list empty until member details arrive', async () => {
+  const props = createProps({
+    query: createQuery({ isLoading: true }),
+    hideInitialLoadingIndicator: true,
+  });
+  const host = await render(<ProfileTabList {...props} />);
+  expect(mockListProps.ListEmptyComponent).toBeNull();
+  await host.rerender(
+    <ProfileTabList {...props} hideInitialLoadingIndicator={false} />,
+  );
+  expect(mockListProps.ListEmptyComponent).not.toBeNull();
+});
+
+test('cached cards wait for the first measured header before mounting', async () => {
+  const props = createProps({
+    headerHeight: 0,
+    collapseDistance: 0,
+    query: createQuery({ data: ['cached-card'] }),
+    renderItem: () => <Text>已缓存的卡片</Text>,
+  });
+  const host = await render(<ProfileTabList {...props} />);
+  expect(host.queryByText('已缓存的卡片')).toBeNull();
+  await host.rerender(
+    <ProfileTabList {...props} headerHeight={420} collapseDistance={320} />,
+  );
+  expect(host.getByText('已缓存的卡片')).toBeVisible();
+  expect(mockListProps.contentContainerStyle.paddingTop).toBe(420);
 });
 
 test('restores an unmeasured tab after load without losing the request to initial native zero', async () => {
@@ -300,7 +339,6 @@ test('the first header measurement preserves an unloaded absolute scroll request
   const props = createProps({ headerHeight: 0, collapseDistance: 0 });
   const host = await render(<ProfileTabList {...props} ref={ref} />);
   await act(() => ref.current?.scrollToOffset(160));
-  await scrollNative(0);
   await host.rerender(
     <ProfileTabList
       {...props}
@@ -309,6 +347,7 @@ test('the first header measurement preserves an unloaded absolute scroll request
       collapseDistance={320}
     />,
   );
+  await scrollNative(0);
   await readyList();
   expect(mockScrollToOffset).toHaveBeenLastCalledWith({
     offset: 160,
@@ -438,6 +477,23 @@ test('refresh stays visible through query reset and blocks pagination until sett
   expect(mockListProps.refreshing).toBe(false);
 });
 
+test('end-reached while busy records pending intent and resumes when idle', async () => {
+  const fetchNextPage = jest.fn().mockResolvedValue(undefined);
+  const query = createQuery({ data: ['one'], isFetching: true, fetchNextPage });
+  const props = createProps({ query });
+  const host = await render(<ProfileTabList {...props} />);
+
+  await act(() => {
+    mockListProps.onEndReached();
+  });
+  expect(fetchNextPage).not.toHaveBeenCalled();
+
+  await host.rerender(
+    <ProfileTabList {...props} query={{ ...query, isFetching: false }} />,
+  );
+  expect(fetchNextPage).toHaveBeenCalledTimes(1);
+});
+
 test('custom empty state is shown only after loading and errors are handled', async () => {
   const props = createProps({
     emptyState: <Text>登录后查看我赞同过的回答</Text>,
@@ -462,4 +518,74 @@ test('custom empty state is shown only after loading and errors are handled', as
   expect(host.queryByText('登录后查看我赞同过的回答')).toBeNull();
   await host.rerender(<ProfileTabList {...props} emptyState={undefined} />);
   expect(host.getByText('暂无创作内容')).toBeTruthy();
+});
+
+test('shows manual load more button when page has no displayable items but has next page', async () => {
+  const fetchNextPage = jest.fn().mockResolvedValue(undefined);
+  const props: ProfileTabListProps = {
+    index: 0,
+    label: '创作',
+    query: createQuery({
+      data: [],
+      pageCount: 1,
+      hasNextPage: true,
+      fetchNextPage,
+    }),
+    headerHeight: 200,
+    collapseDistance: 100,
+    viewportHeight: 600,
+    bottomInset: 20,
+    offsets: createOffsets(),
+    active: true,
+    renderItem: () => null,
+    keyExtractor: () => 'key',
+  };
+
+  const host = await render(<ProfileTabList {...props} />);
+  expect(host.getByText('暂无已解析内容，但仍有后续数据')).toBeTruthy();
+  const loadMoreBtn = host.getByRole('button', { name: '继续加载下一页' });
+  expect(loadMoreBtn).toBeTruthy();
+
+  await fireEvent.press(loadMoreBtn);
+  expect(fetchNextPage).toHaveBeenCalledTimes(1);
+
+  // When next page fetch is in flight, button is replaced with loading indicator
+  await host.rerender(
+    <ProfileTabList
+      {...props}
+      query={{
+        ...props.query,
+        isFetchingNextPage: true,
+      }}
+    />,
+  );
+  expect(host.queryByRole('button', { name: '继续加载下一页' })).toBeNull();
+});
+
+test('measures content and applies pending scroll on becoming active', async () => {
+  mockMeasureContent.mockClear();
+  const offsets = createOffsets([0, 0]);
+  const props: ProfileTabListProps = {
+    index: 1,
+    label: '回答',
+    query: createQuery({ data: ['one'] }),
+    headerHeight: 200,
+    collapseDistance: 100,
+    viewportHeight: 600,
+    bottomInset: 20,
+    offsets,
+    active: false,
+    renderItem: () => null,
+    keyExtractor: () => 'key',
+  };
+
+  const host = await render(<ProfileTabList {...props} />);
+  expect(mockMeasureContent).not.toHaveBeenCalled();
+
+  // Tab switches to active
+  await host.rerender(<ProfileTabList {...props} active={true} />);
+  await act(async () => {
+    mockListProps.onLoad();
+  });
+  expect(mockMeasureContent).toHaveBeenCalled();
 });

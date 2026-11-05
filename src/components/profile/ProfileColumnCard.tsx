@@ -23,6 +23,7 @@ export function ProfileColumnCard({ column }: { column: ZhihuColumnSummary }) {
       }
     >
       <Image
+        fadeDuration={0}
         source={getCachedImageSource(column.image_url)}
         className="w-14 h-14 rounded-lg"
         resizeMode="cover"

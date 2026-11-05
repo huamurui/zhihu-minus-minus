@@ -49,6 +49,10 @@ test('avatar updates and reopening a page keep the same cached source', async ()
   const host = await render(<StableAvatar uri={uri} style={{ width: 24 }} />);
   const source = host.container.queryAll((node) => node.type === 'Image')[0]
     .props.source;
+  expect(
+    host.container.queryAll((node) => node.type === 'Image')[0].props
+      .fadeDuration,
+  ).toBe(0);
   await host.rerender(<StableAvatar uri={uri} style={{ width: 36 }} />);
   expect(
     host.container.queryAll((node) => node.type === 'Image')[0].props.source,
@@ -70,4 +74,8 @@ test('avatar updates and reopening a page keep the same cached source', async ()
     uri: 'https://example.test/new-avatar.jpg',
     cache: 'force-cache',
   });
+  expect(
+    reopened.container.queryAll((node) => node.type === 'Image')[0].props
+      .fadeDuration,
+  ).toBe(0);
 });

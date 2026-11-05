@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BouncyButton } from '@/components/BouncyButton';
+import { GlassNavigationButton } from '@/components/navigation/GlassNavigationButton';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { Text, useRuntimeThemeColors, View } from '@/components/Themed';
 import {
@@ -43,13 +44,13 @@ function PinEditorScreen({ pinId }: { pinId?: string }) {
         className="flex-row items-center justify-between px-4 pb-3"
         style={{ paddingTop: insets.top + 10 }}
       >
-        <BouncyButton
-          onPress={() => router.back()}
-          className="p-2 rounded-full"
+        <GlassNavigationButton
+          icon="close"
           accessibilityLabel="关闭编辑"
-        >
-          <Ionicons name="close" size={28} color={colors.text} />
-        </BouncyButton>
+          onPress={() => router.back()}
+          size={40}
+          color={colors.text}
+        />
         <Text className="text-lg font-bold">
           {pinId ? '编辑想法' : '发想法'}
         </Text>

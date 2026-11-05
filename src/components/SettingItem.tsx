@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import React from 'react';
 import { View as RNView, StyleSheet } from 'react-native';
+import { BouncyButton } from '@/components/BouncyButton';
 import { Text, useThemeColor } from '@/components/Themed';
 
 /**
@@ -54,18 +55,21 @@ export function SettingItem({
   icon,
   children,
   colorScheme,
+  stacked = false,
 }: {
   label: string;
   icon?: keyof typeof Ionicons.glyphMap;
   children: React.ReactNode;
   colorScheme: 'light' | 'dark';
+  /** 控件放到标签下方整行，用于放不下一行的选项组。 */
+  stacked?: boolean;
 }) {
   void colorScheme;
   const controlBackground = useThemeColor({}, 'controlBackground');
   const textColor = useThemeColor({}, 'text');
 
   return (
-    <RNView style={styles.settingItem}>
+    <RNView style={[styles.settingItem, stacked && styles.stackedItem]}>
       <RNView style={styles.settingLabelContainer}>
         {icon && (
           <RNView
@@ -82,6 +86,74 @@ export function SettingItem({
         <Text style={styles.settingLabel}>{label}</Text>
       </RNView>
       {children}
+    </RNView>
+  );
+}
+
+/**
+ * 设置页的单选分段控件：灰色轨道里一排等宽选项，选中项用主题色浅底高亮。
+ */
+export function SettingOptions<T extends string>({
+  options,
+  value,
+  onChange,
+  accessibilityLabel,
+  fill = false,
+}: {
+  options: ReadonlyArray<{ value: T; label: string }>;
+  /** Undefined leaves every option unselected. */
+  value: T | undefined;
+  onChange: (value: T) => void;
+  accessibilityLabel: string;
+  /** 撑满整行、选项等宽；配合 `SettingItem stacked` 使用。 */
+  fill?: boolean;
+}) {
+  const trackColor = useThemeColor({}, 'controlBackground');
+  const borderColor = useThemeColor({}, 'controlBorder');
+  const selectedColor = useThemeColor({}, 'primary_26');
+  const primaryColor = useThemeColor({}, 'primary');
+  const mutedColor = useThemeColor({}, 'textSecondary');
+
+  return (
+    <RNView
+      accessibilityRole="radiogroup"
+      accessibilityLabel={accessibilityLabel}
+      style={[
+        styles.optionsTrack,
+        fill && styles.filledTrack,
+        { backgroundColor: trackColor, borderColor },
+      ]}
+    >
+      {options.map((option) => {
+        const isSelected = option.value === value;
+        return (
+          <BouncyButton
+            key={option.value}
+            accessibilityRole="radio"
+            accessibilityLabel={option.label}
+            accessibilityState={{ checked: isSelected }}
+            onPress={() => {
+              if (!isSelected) onChange(option.value);
+            }}
+            style={[
+              styles.option,
+              fill && styles.filledOption,
+              isSelected && { backgroundColor: selectedColor },
+            ]}
+          >
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.optionLabel,
+                { color: isSelected ? primaryColor : mutedColor },
+                isSelected && styles.selectedOptionLabel,
+              ]}
+            >
+              {option.label}
+            </Text>
+          </BouncyButton>
+        );
+      })}
     </RNView>
   );
 }
@@ -111,6 +183,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     minHeight: 52,
   },
+  stackedItem: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    justifyContent: 'flex-start',
+    gap: 12,
+  },
   settingLabelContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -124,6 +202,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   settingLabel: { fontSize: 16 },
+  optionsTrack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    padding: 3,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  filledTrack: { alignSelf: 'stretch' },
+  option: {
+    minWidth: 56,
+    minHeight: 32,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filledOption: { flexGrow: 1, flexBasis: 0, minWidth: 0 },
+  optionLabel: { fontSize: 13 },
+  selectedOptionLabel: { fontWeight: '700' },
 });
 
 /**

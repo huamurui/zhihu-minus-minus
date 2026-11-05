@@ -1,13 +1,15 @@
 import { useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View as RNView, type ViewInstance } from 'react-native';
-import Animated, { SharedTransition } from 'react-native-reanimated';
+import { Platform, View as RNView, type ViewInstance } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { hasAuthenticationCookie } from '@/api/client';
 import { type FeedItem, getVoteSuccessMessage, voteContent } from '@/api/zhihu';
 import { FeedCardActionRow } from '@/components/FeedCardActionRow';
 import type { ActionSheetOption } from '@/components/overlays/ActionSheet';
-import { useColorScheme } from '@/components/useColorScheme';
-import Colors from '@/constants/Colors';
+import {
+  useTitleTransition,
+  useTitleTransitionSource,
+} from '@/features/adaptive-layout/TitleTransition';
 import { usePaneRouter as useRouter } from '@/features/adaptive-layout/usePaneRouter';
 import { useContentActions } from '@/hooks/useContentActions';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -28,12 +30,11 @@ import { showToast } from '@/utils/toast';
 import { getZhihuErrorMessage } from '@/utils/zhihuError';
 import { BouncyButton } from './BouncyButton';
 import { CustomContextMenu, type MenuOption } from './CustomContextMenu';
+import { useContentCardSurface } from './contentCardSurface';
 import { FeedCardPreview } from './FeedCardPreview';
 import { FeedExcerpt } from './FeedExcerpt';
 import { type ShareContentType, ShareMenu } from './ShareMenu';
 import { Text, View } from './Themed';
-
-const slowTransition = SharedTransition.duration(600);
 
 interface FeedCardProps {
   item: FeedItem;
@@ -101,6 +102,7 @@ function areFeedCardPropsEqual(
     previousItem.titleString === nextItem.titleString &&
     previousItem.questionId === nextItem.questionId &&
     previousItem.actionText === nextItem.actionText &&
+    previousItem.hideAuthor === nextItem.hideAuthor &&
     previousItem.excerpt === nextItem.excerpt &&
     areFeedContentEqual(previousItem.content, nextItem.content) &&
     previousItem.created_time === nextItem.created_time &&
@@ -129,6 +131,8 @@ const FeedCardComponent = ({
   onUninterested,
 }: FeedCardProps) => {
   const router = useRouter();
+  const transitionTitle = useTitleTransition();
+  const titleRef = useRef<ViewInstance>(null);
   const queryClient = useQueryClient();
   const { cookies } = useAuthStore();
   const [menuVisible, setMenuVisible] = useState(false);
@@ -140,20 +144,15 @@ const FeedCardComponent = ({
       ? item.type
       : null;
   const isGuest = !cookies;
-  const colorScheme = useColorScheme();
+  const surface = useContentCardSurface({ radius: 12, gap: 8 });
 
   const [voted, setVoted] = useState(item.voted || 0);
   const [voteCount, setVoteCount] = useState(item.voteCount || 0);
   const identity = `${item.type}:${item.videoSource || ''}:${item.id}`;
+  const titleSource = useTitleTransitionSource(identity);
   const currentIdentityRef = useRef(identity);
   currentIdentityRef.current = identity;
   const pendingVotesRef = useRef(new Set<string>());
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: FlashList identity changes must reset local reactions even when initial values match the previous item.
-  useEffect(() => {
-    setVoted(item.voted || 0);
-    setVoteCount(item.voteCount || 0);
-  }, [item.id, item.type, item.voted, item.voteCount]);
 
   const itemIdStr = item.id != null ? item.id.toString() : '';
   const storeCollected = useCollectionStore((state) =>
@@ -162,6 +161,14 @@ const FeedCardComponent = ({
 
   const cleanTitle =
     typeof item.title === 'string' ? item.title : item.titleString || '';
+  const sourceTitle = (
+    <Text
+      className="text-lg font-bold leading-6 text-foreground dark:text-foreground-dark"
+      numberOfLines={2}
+    >
+      {item.title}
+    </Text>
+  );
   const authorAvatarSource = useMemo(
     () => getCachedImageSource(item.author.avatar),
     [item.author.avatar],
@@ -249,6 +256,31 @@ const FeedCardComponent = ({
     width: number;
     height: number;
   } | null>(null);
+
+  // A recycled FlashList cell gets another item: reset local reactions and
+  // overlays while rendering, not in an effect. An effect commits the old
+  // item first and schedules one more update per recycled card; during a
+  // large page append those updates chain with FlashList's layout updates
+  // until React aborts with "Maximum update depth exceeded".
+  const [syncedItem, setSyncedItem] = useState({
+    identity,
+    voted: item.voted,
+    voteCount: item.voteCount,
+  });
+  if (
+    syncedItem.identity !== identity ||
+    syncedItem.voted !== item.voted ||
+    syncedItem.voteCount !== item.voteCount
+  ) {
+    setSyncedItem({ identity, voted: item.voted, voteCount: item.voteCount });
+    setVoted(item.voted || 0);
+    setVoteCount(item.voteCount || 0);
+    if (syncedItem.identity !== identity) {
+      setMenuVisible(false);
+      setPreviewVisible(false);
+      setOriginLayout(null);
+    }
+  }
   const shareType: ShareContentType =
     item.type === 'answers'
       ? 'answer'
@@ -286,14 +318,6 @@ const FeedCardComponent = ({
       additionalOptions: feedbackOptions,
     }),
   });
-
-  // Recycled cells must not retain another item's preview or share sheet.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: resetting overlays is keyed to the recycled content identity.
-  useEffect(() => {
-    setMenuVisible(false);
-    setPreviewVisible(false);
-    setOriginLayout(null);
-  }, [identity]);
 
   const menuOptions: MenuOption[] = [
     ...(engagementType
@@ -398,50 +422,95 @@ const FeedCardComponent = ({
             },
           );
         }}
-        onPress={openDetail}
+        onPress={() => {
+          if (
+            Platform.OS === 'android' &&
+            (item.type === 'answers' || item.type === 'questions')
+          ) {
+            transitionTitle(
+              titleRef,
+              String(item.questionId || item.id),
+              cleanTitle,
+              () => {
+                if (currentIdentityRef.current === identity) openDetail();
+              },
+              () => currentIdentityRef.current === identity,
+              titleSource.onSourceHiddenChange,
+              sourceTitle,
+            );
+          } else openDetail();
+        }}
         style={[
-          {
-            backgroundColor: Colors[colorScheme].backgroundSecondary,
-            borderRadius: 12,
-            opacity: previewVisible ? 0 : 1,
-          },
+          surface,
+          { opacity: previewVisible ? 0 : 1 },
           isQuestionType ? { paddingBottom: 10 } : undefined,
         ]}
-        className="p-4 pb-2 mb-2 mx-1.5"
+        className="p-4 pb-2 mx-1.5"
       >
         {/* 动态动作提示 (针对关注流) */}
-        {item.actionText && (
+        {item.actionText && item.hideAuthor && authorId ? (
+          <BouncyButton
+            accessibilityRole="link"
+            accessibilityLabel={`查看${item.author.name}的主页`}
+            onPress={() =>
+              router.push({
+                pathname: '/user/[id]',
+                params: {
+                  id: authorId,
+                  avatar: item.author.avatar,
+                  name: item.author.name,
+                  ...(item.author.headline
+                    ? { headline: item.author.headline }
+                    : {}),
+                },
+              })
+            }
+          >
+            <Text
+              type="secondary"
+              className="text-[13px] mb-2 text-tertiary dark:text-tertiary-dark"
+            >
+              {item.actionText}
+            </Text>
+          </BouncyButton>
+        ) : item.actionText ? (
           <Text
             type="secondary"
             className="text-[13px] mb-2 text-tertiary dark:text-tertiary-dark"
           >
             {item.actionText}
           </Text>
-        )}
+        ) : null}
 
         {/* 热区1：点击作者头像/姓名 -> 用户页 */}
-        <BouncyButton
-          disabled={!authorId}
-          onPress={() =>
-            router.push({
-              pathname: '/user/[id]',
-              params: {
-                id: authorId,
-                avatar: item.author.avatar,
-              },
-            })
-          }
-          className="flex-row items-center mb-2"
-        >
-          <Animated.Image
-            source={authorAvatarSource}
-            className="w-[22px] h-[22px] rounded-full"
-            sharedTransitionTag={`avatar-${item.author.url_token || item.author.id}`}
-          />
-          <Text type="secondary" className="ml-2 text-[13px]">
-            {item.author.name}
-          </Text>
-        </BouncyButton>
+        {item.hideAuthor ? null : (
+          <BouncyButton
+            disabled={!authorId}
+            onPress={() =>
+              router.push({
+                pathname: '/user/[id]',
+                params: {
+                  id: authorId,
+                  avatar: item.author.avatar,
+                  name: item.author.name,
+                  ...(item.author.headline
+                    ? { headline: item.author.headline }
+                    : {}),
+                },
+              })
+            }
+            className="flex-row items-center mb-2"
+          >
+            <Animated.Image
+              fadeDuration={0}
+              source={authorAvatarSource}
+              className="w-[22px] h-[22px] rounded-full"
+            />
+            <Text type="secondary" className="ml-2 text-[13px]">
+              {item.author.name}
+            </Text>
+          </BouncyButton>
+        )}
 
         {/* 话题标签 */}
         {item.topics && item.topics.length > 0 && (
@@ -471,23 +540,57 @@ const FeedCardComponent = ({
           <BouncyButton
             onPress={() => {
               if (item.type === 'answers' && item.questionId) {
-                router.push(`/question/${item.questionId}`);
+                const questionId = String(item.questionId);
+                if (Platform.OS === 'android') {
+                  transitionTitle(
+                    titleRef,
+                    questionId,
+                    cleanTitle,
+                    () => {
+                      if (currentIdentityRef.current !== identity) return;
+                      router.push({
+                        pathname: '/question/[id]',
+                        params: { id: questionId, title: cleanTitle },
+                      });
+                    },
+                    () => currentIdentityRef.current === identity,
+                    titleSource.onSourceHiddenChange,
+                    sourceTitle,
+                  );
+                } else {
+                  router.push({
+                    pathname: '/question/[id]',
+                    params: { id: questionId, title: cleanTitle },
+                  });
+                }
                 return;
               }
-              openDetail();
+              if (item.type === 'questions') {
+                if (Platform.OS === 'android') {
+                  transitionTitle(
+                    titleRef,
+                    String(item.questionId || item.id),
+                    cleanTitle,
+                    () => {
+                      if (currentIdentityRef.current === identity) openDetail();
+                    },
+                    () => currentIdentityRef.current === identity,
+                    titleSource.onSourceHiddenChange,
+                    sourceTitle,
+                  );
+                } else {
+                  openDetail();
+                }
+              } else openDetail();
             }}
           >
-            <Animated.View
-              sharedTransitionTag={`title-${item.questionId || item.id}`}
-              sharedTransitionStyle={slowTransition}
+            <RNView
+              ref={titleRef}
+              collapsable={false}
+              style={titleSource.hidden ? { opacity: 0 } : undefined}
             >
-              <Text
-                className="text-lg font-bold leading-6 text-foreground dark:text-foreground-dark"
-                numberOfLines={2}
-              >
-                {item.title}
-              </Text>
-            </Animated.View>
+              {sourceTitle}
+            </RNView>
           </BouncyButton>
         ) : null}
 
@@ -502,9 +605,9 @@ const FeedCardComponent = ({
           </View>
           {item.image && (
             <Animated.Image
+              fadeDuration={0}
               source={thumbnailSource}
               className="w-[100px] h-[75px] rounded-md ml-2.5 mt-1"
-              sharedTransitionTag={`image-${item.id}`}
             />
           )}
         </View>

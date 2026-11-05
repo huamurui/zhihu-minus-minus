@@ -57,6 +57,19 @@ export const SURFACE_STYLE_OPTIONS: ReadonlyArray<{
   { value: 'flat', label: '扁平' },
 ];
 
+/** 未读角标：红色数字（默认）、主题色数字、小圆点或不显示。 */
+export type UnreadBadgeStyle = 'count' | 'tinted' | 'dot' | 'hidden';
+
+export const UNREAD_BADGE_STYLE_OPTIONS: ReadonlyArray<{
+  value: UnreadBadgeStyle;
+  label: string;
+}> = [
+  { value: 'count', label: '红色数字' },
+  { value: 'tinted', label: '主题色数字' },
+  { value: 'dot', label: '小圆点' },
+  { value: 'hidden', label: '不显示' },
+];
+
 type ThemeColorMap = Record<ColorToken, string>;
 export type RuntimeThemeColors = ThemeColorMap & {
   onPrimary: string;

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import type { ComponentProps, ReactNode } from 'react';
 import type {
   ZhihuPlainPreviewAnswer,
@@ -27,6 +27,8 @@ type ViewabilityCallback = ReturnType<
   typeof useAnswerPreviewFloatingBar
 >['onViewableItemsChanged'];
 let mockViewabilityCallback: ViewabilityCallback | null = null;
+/** List scroll offset; card starts sit 100px down, so 0 keeps them on screen. */
+let mockScrollOffset = 0;
 const mockReadTouch = jest.fn(
   (_answerIds: readonly string[], _enabled?: boolean) => {},
 );
@@ -280,6 +282,10 @@ jest.mock('@shopify/flash-list', () => {
         mockViewabilityCallback = onViewableItemsChanged;
         react.useImperativeHandle(ref, () => ({
           scrollToIndex: mockScrollToIndex,
+          scrollToOffset: jest.fn(),
+          getLayout: () => ({ x: 0, y: 0, width: 400, height: 4000 }),
+          getFirstItemOffset: () => 100,
+          getAbsoluteLastScrollOffset: () => mockScrollOffset,
         }));
         return react.createElement(
           native.View,
@@ -381,6 +387,7 @@ beforeEach(() => {
   mockQuerySessionVersion = null;
   mockSelectedIsPending = false;
   mockViewabilityCallback = null;
+  mockScrollOffset = 0;
   mockActiveAnswerId = null;
   mockFollowingAnswers = [structuredAnswer('following-answer')];
   mockPlainBodies.clear();
@@ -389,6 +396,8 @@ beforeEach(() => {
 });
 
 test('starts the selected answer expanded and lets the floating bar collapse it while preserving its renderer', async () => {
+  // Reading deep in the expanded cards: their starts are above the viewport.
+  mockScrollOffset = 3000;
   const { element } = createHost();
   const host = await render(element);
   expect(host.getAllByText('发布于 2026-10-18 · IP 属地天津')).toHaveLength(2);
@@ -434,12 +443,13 @@ test('starts the selected answer expanded and lets the floating bar collapse it 
   await act(() =>
     mockRenderFloatingBar.mock.calls.at(-1)?.[0].onCollapse('selected-answer'),
   );
-  expectExpandedIds([]);
+  // The card gap stays visible below the header once the scroll lands.
   expect(mockScrollToIndex).toHaveBeenCalledWith({
     index: 0,
     animated: true,
-    viewOffset: -80,
+    viewOffset: -88,
   });
+  await waitFor(() => expectExpandedIds([]));
   expect(host.getByTestId('plain-toggle:selected-answer')).toHaveProp(
     'accessibilityState',
     { expanded: false },
@@ -467,10 +477,12 @@ test('starts the selected answer expanded and lets the floating bar collapse it 
     { expanded: true },
   );
   await fireEvent.press(host.getByTestId('structured-toggle:following-answer'));
-  expectExpandedIds(['selected-answer']);
+  // Collapsing scrolls back to the answer start before its height shrinks.
   expect(mockScrollToIndex).toHaveBeenCalledWith(
-    expect.objectContaining({ index: 1 }),
+    expect.objectContaining({ index: 1, animated: true }),
   );
+  expectExpandedIds(['selected-answer', 'following-answer']);
+  await waitFor(() => expectExpandedIds(['selected-answer']));
   await host.unmount();
 });
 
@@ -603,7 +615,10 @@ test('touches only visible expanded bodies and pauses the selected answer when c
     true,
   );
   await fireEvent.press(host.getByTestId('structured-toggle:following-answer'));
-  expect(mockReadTouch).toHaveBeenLastCalledWith(['selected-answer'], true);
+  // Collapse lands after the jump to the answer start (two animation frames).
+  await waitFor(() =>
+    expect(mockReadTouch).toHaveBeenLastCalledWith(['selected-answer'], true),
+  );
   await act(() =>
     viewabilityCallback()({
       viewableItems: [

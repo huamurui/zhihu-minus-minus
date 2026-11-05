@@ -61,10 +61,16 @@ export interface ZhihuListResponse<T> {
 
 export interface ZhihuMemberActivity {
   id?: string | number;
+  action_text?: string;
+  created_time?: number;
+  action_time?: number;
+  updated_time?: number;
   source?: {
     action_text?: string;
     action_time?: number;
     action_type?: string;
+    actor?: Partial<ZhihuAuthor>;
+    created_time?: number;
   };
   target?: ZhihuMemberActivityTarget;
   type?: string;

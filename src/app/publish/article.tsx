@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
@@ -13,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createArticle } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
+import { GlassNavigationButton } from '@/components/navigation/GlassNavigationButton';
 import {
   Text,
   useRuntimeThemeColors,
@@ -153,12 +153,13 @@ export default function PublishArticleScreen() {
         className="flex-row items-center justify-between px-4 pb-3"
         style={{ paddingTop: insets.top + 10 }}
       >
-        <BouncyButton
+        <GlassNavigationButton
+          icon="close"
+          accessibilityLabel="关闭"
           onPress={() => router.back()}
-          className="p-2 rounded-full"
-        >
-          <Ionicons name="close" size={28} color={textColor} />
-        </BouncyButton>
+          size={40}
+          color={textColor}
+        />
         <Text className="text-lg font-bold">写文章</Text>
         <BouncyButton
           disabled={!isPublishEnabled}

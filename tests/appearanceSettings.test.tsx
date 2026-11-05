@@ -134,6 +134,7 @@ jest.mock('../src/store/useSettingsStore', () => ({
       lineHeightScale: 1.5,
       richContentRenderer: 'native-v2',
       answerReadingMode: 'detail',
+      unreadBadgeStyle: 'count',
       updateSettings: jest.fn(set),
     })),
 }));
@@ -381,4 +382,12 @@ test('selects the answer destination mode without changing the body renderer', a
   expect(useSettingsStore.getState().richContentRenderer).toBe('native-v2');
   await fireEvent.press(host.getByText('回答详情'));
   expect(useSettingsStore.getState().answerReadingMode).toBe('detail');
+});
+
+test('selects a quieter unread badge style', async () => {
+  const host = await render(<AppearanceSettings />);
+  await fireEvent.press(host.getByText('小圆点'));
+  expect(useSettingsStore.getState().unreadBadgeStyle).toBe('dot');
+  await fireEvent.press(host.getByText('不显示'));
+  expect(useSettingsStore.getState().unreadBadgeStyle).toBe('hidden');
 });

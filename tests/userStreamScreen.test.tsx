@@ -1,8 +1,10 @@
-import { act, fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render, within } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
+import { Animated, StyleSheet } from 'react-native';
 import type { ZhihuMemberActivity } from '../src/api/zhihu/member';
 import type { RecentMomentItem } from '../src/api/zhihu/moments';
 import UserStreamScreen from '../src/app/user/[id]/stream';
+import { PaneContext } from '../src/features/adaptive-layout/PaneContext';
 
 const mockParams: { id: string; unreadCount?: string; source?: string } = {
   id: 'member-token',
@@ -10,6 +12,8 @@ const mockParams: { id: string; unreadCount?: string; source?: string } = {
 };
 let mockMoments: RecentMomentItem[] | undefined;
 const mockMarkRead = jest.fn();
+const mockPush = jest.fn();
+let mockMemberLoading = false;
 const mockSetPage = jest.fn();
 const mockRefresh = jest.fn();
 const mockFetchNextPage = jest.fn();
@@ -59,14 +63,16 @@ jest.mock('@tanstack/react-query', () => ({
     getQueryData: () => (mockMoments ? { data: mockMoments } : undefined),
   }),
   useQuery: ({ queryKey }: { queryKey: string[] }) => ({
-    data: {
-      id: queryKey[1],
-      url_token: queryKey[1],
-      name: `合成用户 ${queryKey[1]}`,
-      type: 'people',
-      avatar_url: '',
-    },
-    isLoading: false,
+    data: mockMemberLoading
+      ? undefined
+      : {
+          id: queryKey[1],
+          url_token: queryKey[1],
+          name: `合成用户 ${queryKey[1]}`,
+          type: 'people',
+          avatar_url: '',
+        },
+    isLoading: mockMemberLoading,
     isError: false,
     refetch: jest.fn(),
   }),
@@ -74,7 +80,7 @@ jest.mock('@tanstack/react-query', () => ({
 jest.mock('expo-router', () => ({
   Stack: { Screen: () => null },
   useLocalSearchParams: () => mockParams,
-  useRouter: () => ({ back: jest.fn() }),
+  useRouter: () => ({ back: jest.fn(), push: mockPush }),
 }));
 jest.mock('../src/hooks/useMarkRecentMomentRead', () => ({
   useMarkRecentMomentRead: () => mockMarkRead,
@@ -142,6 +148,7 @@ beforeEach(() => {
   mockParams.unreadCount = '3';
   delete mockParams.source;
   mockMoments = undefined;
+  mockMemberLoading = false;
   mockQuery.activities = ['a', 'b', 'c'].map(activity);
   mockQuery.refreshing = false;
   mockQuery.isFetching = false;
@@ -216,6 +223,89 @@ async function selectPage(
     nativeEvent: { position },
   });
 }
+
+test('the entry transition animates the list while keeping the user toolbar fixed and usable', async () => {
+  const progress = new Animated.Value(0.5);
+  const timing = jest.spyOn(Animated, 'timing');
+  try {
+    const host = await render(
+      <PaneContext.Provider
+        value={{
+          width: 390,
+          height: 844,
+          visible: true,
+          fixedHeaderEntryProgress: progress,
+        }}
+      >
+        <UserStreamScreen />
+      </PaneContext.Provider>,
+    );
+    const content = host.getByTestId('published-stream-entry-content');
+    expect(StyleSheet.flatten(content.props.style).transform).toBeDefined();
+    expect(within(content).getByTestId('published-stream-list')).toBeVisible();
+    expect(within(content).queryByRole('button', { name: '返回' })).toBeNull();
+    expect(host.getByRole('button', { name: '返回' })).toBeEnabled();
+    expect(
+      within(content).queryByRole('link', {
+        name: '查看合成用户 member-token的主页',
+      }),
+    ).toBeNull();
+    await fireEvent.press(
+      host.getByRole('link', { name: '查看合成用户 member-token的主页' }),
+    );
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(timing).not.toHaveBeenCalled();
+    await host.unmount();
+  } finally {
+    timing.mockRestore();
+  }
+});
+
+test('the user information opens the current user profile after changing pages', async () => {
+  mockParams.id = 'first';
+  mockParams.source = 'recent-moments';
+  mockMoments = [moment('first'), moment('second')];
+  const host = await render(<UserStreamScreen />);
+  await fireEvent.press(
+    host.getByRole('link', { name: '查看合成用户 first的主页' }),
+  );
+  expect(mockPush).toHaveBeenLastCalledWith({
+    pathname: '/user/[id]',
+    params: { id: 'first', name: '合成用户 first' },
+  });
+  await selectPage(host, 1);
+  await fireEvent.press(
+    host.getByRole('link', { name: '查看合成用户 second的主页' }),
+  );
+  expect(mockPush).toHaveBeenLastCalledWith({
+    pathname: '/user/[id]',
+    params: { id: 'second', name: '合成用户 second' },
+  });
+  expect(mockPush).toHaveBeenCalledTimes(2);
+  await host.unmount();
+});
+
+test('the cached user information remains a usable profile link while details load', async () => {
+  mockParams.id = 'first';
+  mockParams.source = 'recent-moments';
+  mockMemberLoading = true;
+  const entry = moment('first');
+  entry.actor.avatar_url = 'https://example.test/avatar.jpg';
+  mockMoments = [entry];
+  const host = await render(<UserStreamScreen />);
+  await fireEvent.press(
+    host.getByRole('link', { name: '查看用户 first的主页' }),
+  );
+  expect(mockPush).toHaveBeenCalledWith({
+    pathname: '/user/[id]',
+    params: {
+      id: 'first',
+      name: '用户 first',
+      avatar: 'https://example.test/avatar.jpg',
+    },
+  });
+  await host.unmount();
+});
 
 test('starts at the tapped user and marks only selected pages, preserving strip order across refreshes', async () => {
   mockParams.id = 'middle';

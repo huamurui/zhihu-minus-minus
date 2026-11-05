@@ -27,3 +27,13 @@ export function formatRelativeTime(ts: number, now = Date.now()): string {
 
   return formatDate(ts);
 }
+
+/**
+ * 列表里的紧凑时间：一天以内用相对时间，今年内只显示月-日，更早显示完整日期。
+ */
+export function formatCompactTime(ts: number, now = Date.now()): string {
+  if (now - ts * 1000 < 24 * 60 * 60 * 1000) return formatRelativeTime(ts, now);
+  const d = new Date(ts * 1000);
+  if (d.getFullYear() !== new Date(now).getFullYear()) return formatDate(ts);
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}

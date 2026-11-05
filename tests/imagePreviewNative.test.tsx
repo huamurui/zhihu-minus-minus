@@ -32,9 +32,6 @@ jest.mock('../src/components/ImageActionBottomSheet', () => ({
     ) : null;
   },
 }));
-jest.mock('react-native-image-zoom-viewer', () => () => {
-  throw new Error('Android must not mount the JavaScript viewer');
-});
 jest.mock('../src/utils/saveImage', () => ({ saveImageToGallery: jest.fn() }));
 jest.mock('../src/components/BouncyButton', () => ({
   BouncyButton: jest.requireActual('react-native').Pressable,

@@ -309,6 +309,8 @@ export interface FeedItem {
   title: ReactNode;
   questionId?: string;
   actionText?: string;
+  /** Skip the author row when the action line already names the author. */
+  hideAuthor?: boolean;
   author: FeedAuthor;
   excerpt: ReactNode;
   content?: string | FeedContentSegment[];

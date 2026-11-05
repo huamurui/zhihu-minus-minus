@@ -6,6 +6,7 @@ import Reanimated, {
   useAnimatedStyle,
   useDerivedValue,
 } from 'react-native-reanimated';
+import { ProfileImage } from '@/components/profile/ProfileImage';
 import { useRuntimeThemeColors } from '@/components/Themed';
 import { getCachedImageSource } from '@/utils/imageSource';
 import {
@@ -60,17 +61,20 @@ export function ProfileCover({
       <View style={[styles.disc, { backgroundColor: `${colors.primary}18` }]} />
       <View style={[styles.line, { backgroundColor: `${colors.primary}20` }]} />
       {showCover && (
-        <Image
-          source={source}
+        <ProfileImage
+          uri={url}
           resizeMode="cover"
           style={StyleSheet.absoluteFill}
-          onError={() => setFailedCover(url)}
+          onError={(_event, hasPrevious) => {
+            if (!hasPrevious) setFailedCover(url);
+          }}
         />
       )}
       {showCover && blurOpacity && failedBlur !== url && (
         <Reanimated.View style={[StyleSheet.absoluteFill, blurredStyle]}>
           {/* Keep the blur radius fixed; scrolling only animates opacity. */}
           <Image
+            fadeDuration={0}
             source={source}
             resizeMode="cover"
             blurRadius={20}

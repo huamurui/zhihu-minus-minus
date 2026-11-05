@@ -32,6 +32,7 @@ import {
   CONTENT_ACTION_BAR_HEIGHT,
   getContentActionBarBottom,
 } from '@/components/ContentActionBar';
+import { useContentCardSurface } from '@/components/contentCardSurface';
 import {
   DetailNavigationHeader,
   useDetailNavigationHeight,
@@ -45,6 +46,7 @@ import { usePaneRouter as useRouter } from '@/features/adaptive-layout/usePaneRo
 import { ZhihuStructuredContent } from '@/features/rich-content';
 import { useAnswerPreviewAutoLoad } from '@/hooks/useAnswerPreviewAutoLoad';
 import { useAnswerPreviewBody } from '@/hooks/useAnswerPreviewBody';
+import { useAnswerPreviewCollapse } from '@/hooks/useAnswerPreviewCollapse';
 import { useAnswerPreviewFloatingBar } from '@/hooks/useAnswerPreviewFloatingBar';
 import { useAnswerPreviewQuery } from '@/hooks/useAnswerPreviewQuery';
 import { useAnswerReadTouch } from '@/hooks/useAnswerReadTouch';
@@ -69,6 +71,8 @@ type PreviewAnswer = Exclude<PreviewItem, ZhihuPreviewLoginPrompt>;
 const initialContentIds = new WeakMap<StructuredContent, number>();
 let initialContentSequence = 0;
 const DEFAULT_ANSWER_CONTEXT: AnswerReadingContext = { scene: 'unknown' };
+/** Space between answer cards; also kept above a card scrolled under the header. */
+const CARD_GAP = 8;
 
 /** Cache identity is local; neither prose nor opaque continuation URLs become keys. */
 function initialContentId(content: StructuredContent): number {
@@ -172,7 +176,7 @@ const AnswerPreviewCard = React.memo(function AnswerPreviewCard({
   onBodyLoader,
 }: AnswerPreviewCardProps) {
   const router = useRouter();
-  const colors = useRuntimeThemeColors();
+  const surface = useContentCardSurface({ radius: 16, gap: CARD_GAP });
   const footerRef = useCallback(
     (view: ViewInstance | null) => onFooterRef(item.id, view),
     [item.id, onFooterRef],
@@ -188,14 +192,7 @@ const AnswerPreviewCard = React.memo(function AnswerPreviewCard({
   ) : undefined;
 
   return (
-    <View
-      style={{
-        backgroundColor: colors.backgroundSecondary,
-        borderRadius: 16,
-        padding: 12,
-        marginBottom: 8,
-      }}
-    >
+    <View style={[{ padding: 12 }, surface]}>
       {showQuestion ? (
         <BouncyButton
           accessibilityRole="link"
@@ -224,7 +221,17 @@ const AnswerPreviewCard = React.memo(function AnswerPreviewCard({
         onPress={() => {
           const memberId = item.author.url_token || item.author.id;
           if (memberId)
-            router.push({ pathname: '/user/[id]', params: { id: memberId } });
+            router.push({
+              pathname: '/user/[id]',
+              params: {
+                id: memberId,
+                avatar: item.author.avatar_url,
+                name: item.author.name,
+                ...(item.author.headline
+                  ? { headline: item.author.headline }
+                  : {}),
+              },
+            });
         }}
       >
         <StableAvatar
@@ -438,13 +445,25 @@ export function AnswerPreviewList({
     autoLoad.onFooterLayout();
   }, [floatingBar.onFooterLayout, autoLoad.onFooterLayout]);
   const headerState = useDetailHeaderState(scope);
+  const collapseAnswer = useAnswerPreviewCollapse({
+    listRef,
+    scope,
+    // Leave the card gap visible below the header, as between cards.
+    viewOffset: insets.top + navigationHeight + CARD_GAP,
+  });
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       headerState.onScrollOffset(event.nativeEvent.contentOffset.y);
       floatingBar.onScroll(event);
       autoLoad.onScroll(event);
+      collapseAnswer.onScroll();
     },
-    [headerState.onScrollOffset, floatingBar.onScroll, autoLoad.onScroll],
+    [
+      headerState.onScrollOffset,
+      floatingBar.onScroll,
+      autoLoad.onScroll,
+      collapseAnswer.onScroll,
+    ],
   );
   const handleScrollEnd = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -505,24 +524,24 @@ export function AnswerPreviewList({
     (id: string, expanded: boolean) => {
       if (currentVisibleScope.current !== visibleScope) return;
       if (expanded) recordAnswer(id);
-      setExpandedState((current) => {
-        const ids = new Set(current.scope === scope ? current.ids : [answerId]);
-        if (expanded) ids.add(id);
-        else ids.delete(id);
-        return { scope, ids };
-      });
-      if (!expanded) {
-        const index = query.items.findIndex(
-          (item) => item.type === 'answer' && item.id === id,
-        );
-        if (index >= 0)
-          listRef.current?.scrollToIndex({
-            index,
-            animated: true,
-            // FlashList 2 adds this offset to the target scroll position.
-            viewOffset: -(insets.top + navigationHeight),
-          });
-      }
+      const applyExpanded = () => {
+        if (currentVisibleScope.current !== visibleScope) return;
+        setExpandedState((current) => {
+          const ids = new Set(
+            current.scope === scope ? current.ids : [answerId],
+          );
+          if (expanded) ids.add(id);
+          else ids.delete(id);
+          return { scope, ids };
+        });
+      };
+      const index = expanded
+        ? -1
+        : query.items.findIndex(
+            (item) => item.type === 'answer' && item.id === id,
+          );
+      if (index < 0) applyExpanded();
+      else collapseAnswer.collapse(index, applyExpanded);
     },
     [
       recordAnswer,
@@ -530,8 +549,7 @@ export function AnswerPreviewList({
       visibleScope,
       answerId,
       query.items,
-      insets.top,
-      navigationHeight,
+      collapseAnswer.collapse,
     ],
   );
   const selectedQuestion =
@@ -585,12 +603,17 @@ export function AnswerPreviewList({
         <FlashList<PreviewItem>
           key={scope}
           ref={listRef}
+          // Cards change height as answers and images measure, and every
+          // correction redraws the indicator; the home feed hides it too.
+          showsVerticalScrollIndicator={false}
           data={query.items}
           onViewableItemsChanged={handleViewableItemsChanged}
           viewabilityConfig={floatingBar.viewabilityConfig}
           onScroll={handleScroll}
+          onScrollBeginDrag={collapseAnswer.onScrollBeginDrag}
           onScrollEndDrag={handleScrollEnd}
           onMomentumScrollEnd={handleScrollEnd}
+          onCommitLayoutEffect={collapseAnswer.onCommitLayout}
           scrollEventThrottle={16}
           keyExtractor={(item) => `${item.type}:${item.id}`}
           getItemType={(item) => item.type}

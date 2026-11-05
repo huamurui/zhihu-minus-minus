@@ -55,14 +55,14 @@ test('each double-tap chip applies immediately without a save step', async () =>
 
   // Nothing selected while the action is still unset.
   expect(useSettingsStore.getState().doubleTapAction).toBeUndefined();
-  expect(host.getByRole('button', { name: '双击正文：点赞' })).toBeTruthy();
+  expect(host.getByRole('radio', { name: '点赞' })).toBeTruthy();
 
-  await fireEvent.press(host.getByRole('button', { name: '双击正文：点赞' }));
+  await fireEvent.press(host.getByRole('radio', { name: '点赞' }));
   expect(useSettingsStore.getState().doubleTapAction).toBe('like');
 
-  await fireEvent.press(host.getByRole('button', { name: '双击正文：评论区' }));
+  await fireEvent.press(host.getByRole('radio', { name: '评论区' }));
   expect(useSettingsStore.getState().doubleTapAction).toBe('comments');
 
-  await fireEvent.press(host.getByRole('button', { name: '双击正文：关闭' }));
+  await fireEvent.press(host.getByRole('radio', { name: '关闭' }));
   expect(useSettingsStore.getState().doubleTapAction).toBe('off');
 });

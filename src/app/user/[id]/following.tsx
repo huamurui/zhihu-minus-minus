@@ -262,6 +262,7 @@ export default function FollowingScreen() {
           onPress={() => router.push(`/column/${column.id}`)}
         >
           <Image
+            fadeDuration={0}
             source={getCachedImageSource(column.image_url)}
             className="w-12 h-12 rounded-lg"
           />
@@ -298,6 +299,7 @@ export default function FollowingScreen() {
           onPress={() => router.push(`/topic/${topic.id}`)}
         >
           <Image
+            fadeDuration={0}
             source={getCachedImageSource(topic.avatar_url)}
             className="w-12 h-12 rounded-lg"
           />

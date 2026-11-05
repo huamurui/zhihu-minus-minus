@@ -1,25 +1,21 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Stack, useRouter } from 'expo-router';
-import { View as RNView, ScrollView, StyleSheet, Switch } from 'react-native';
+import { View as RNView, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BouncyButton } from '@/components/BouncyButton';
-import {
-  Section,
-  SettingItem,
-  settingsChipStyles as s,
-} from '@/components/SettingItem';
+import { Section, SettingItem, SettingOptions } from '@/components/SettingItem';
 import { Text, useThemeColor } from '@/components/Themed';
+import { ThemedSwitch } from '@/components/ThemedSwitch';
 import { useColorScheme } from '@/components/useColorScheme';
-import Colors from '@/constants/Colors';
 import {
   type DoubleTapAction,
   useSettingsStore,
 } from '@/store/useSettingsStore';
 
-const DOUBLE_TAP_ACTIONS: { key: DoubleTapAction; label: string }[] = [
-  { key: 'off', label: '关闭' },
-  { key: 'like', label: '点赞' },
-  { key: 'comments', label: '评论区' },
+const DOUBLE_TAP_ACTIONS: { value: DoubleTapAction; label: string }[] = [
+  { value: 'off', label: '关闭' },
+  { value: 'like', label: '点赞' },
+  { value: 'comments', label: '评论区' },
 ];
 
 export default function FeatureSettings() {
@@ -27,7 +23,6 @@ export default function FeatureSettings() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? 'light';
   const canvasColor = useThemeColor({}, 'background');
-  const tintColor = useThemeColor({}, 'primary');
   const mutedColor = useThemeColor({}, 'textSecondary');
   const {
     enableBrowseHistory,
@@ -60,12 +55,11 @@ export default function FeatureSettings() {
             icon="time-outline"
             colorScheme={colorScheme}
           >
-            <Switch
+            <ThemedSwitch
               value={enableBrowseHistory}
               onValueChange={(value) =>
                 updateSettings({ enableBrowseHistory: value })
               }
-              trackColor={{ true: tintColor }}
             />
           </SettingItem>
           <BouncyButton
@@ -85,43 +79,12 @@ export default function FeatureSettings() {
             icon="hand-left-outline"
             colorScheme={colorScheme}
           >
-            <RNView style={s.row}>
-              {DOUBLE_TAP_ACTIONS.map((option, index) => (
-                <BouncyButton
-                  key={option.key}
-                  accessibilityRole="button"
-                  accessibilityLabel={`双击正文：${option.label}`}
-                  accessibilityState={{
-                    selected: doubleTapAction === option.key,
-                  }}
-                  onPress={() =>
-                    updateSettings({ doubleTapAction: option.key })
-                  }
-                  style={[
-                    s.tabChip,
-                    {
-                      backgroundColor: Colors[colorScheme].backgroundTertiary,
-                      marginLeft: index > 0 ? 8 : 0,
-                    },
-                    doubleTapAction === option.key && {
-                      backgroundColor: tintColor,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      s.tabChipText,
-                      doubleTapAction === option.key && {
-                        color: Colors[colorScheme].onPrimary,
-                        fontWeight: 'bold',
-                      },
-                    ]}
-                  >
-                    {option.label}
-                  </Text>
-                </BouncyButton>
-              ))}
-            </RNView>
+            <SettingOptions
+              accessibilityLabel="双击正文"
+              options={DOUBLE_TAP_ACTIONS}
+              value={doubleTapAction}
+              onChange={(value) => updateSettings({ doubleTapAction: value })}
+            />
           </SettingItem>
         </Section>
 
@@ -131,12 +94,11 @@ export default function FeatureSettings() {
             icon="chatbubbles-outline"
             colorScheme={colorScheme}
           >
-            <Switch
+            <ThemedSwitch
               value={enablePrivateMessaging}
               onValueChange={(value) =>
                 updateSettings({ enablePrivateMessaging: value })
               }
-              trackColor={{ true: tintColor }}
             />
           </SettingItem>
         </Section>

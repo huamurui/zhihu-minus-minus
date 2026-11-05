@@ -26,7 +26,7 @@ import type {
   ZhihuNotificationContent,
   ZhihuNotificationItem,
 } from '@/types/zhihu';
-import { formatDateTime } from '@/utils/date';
+import { formatCompactTime } from '@/utils/date';
 import { getNotificationBody, getNotificationPath } from '@/utils/notification';
 import { refreshInfiniteQuery } from '@/utils/query';
 
@@ -157,7 +157,13 @@ export default function NotificationScreen() {
   const renderItem = ({ item }: { item: ZhihuNotificationItem }) => {
     const content = getNotificationContent(item.content);
     const actor = content?.actors?.[0] || item.actors?.[0] || {};
-    const time = formatDateTime(item.create_time);
+    const time = formatCompactTime(item.create_time);
+    const body = getNotificationBody(item);
+    // The body falls back to the target text; don't quote it twice.
+    const quote =
+      content?.target?.text && content.target.text !== body
+        ? content.target.text
+        : null;
     const iconConfig = getIconConfig(item);
 
     return (
@@ -202,15 +208,15 @@ export default function NotificationScreen() {
                 {content.verb}{' '}
               </Text>
             ) : null}
-            {getNotificationBody(item)}
+            {body}
           </Text>
-          {content?.target?.text && (
+          {quote && (
             <View
               className="mt-2 p-2 rounded"
               style={{ backgroundColor: `${borderColor}20` }}
             >
               <Text numberOfLines={1} type="secondary" className="text-xs">
-                {content.target.text}
+                {quote}
               </Text>
             </View>
           )}

@@ -6,6 +6,7 @@ import { ActivityIndicator, FlatList, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getInvitedQuestions, searchCreatorQuestions } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
+import { GlassNavigationButton } from '@/components/navigation/GlassNavigationButton';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -141,12 +142,13 @@ export default function PublishAnswerScreen() {
         className="flex-row items-center justify-between px-4 pb-3"
         style={{ paddingTop: insets.top + 10 }}
       >
-        <BouncyButton
+        <GlassNavigationButton
+          icon="close"
+          accessibilityLabel="关闭"
           onPress={() => router.back()}
-          className="p-2 rounded-full"
-        >
-          <Ionicons name="close" size={28} color={textColor} />
-        </BouncyButton>
+          size={40}
+          color={textColor}
+        />
         <Text className="text-lg font-bold">写回答</Text>
         <View className="w-10" />
       </View>

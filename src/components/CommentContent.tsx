@@ -71,6 +71,7 @@ const CommentContentComponent: React.FC<CommentContentProps> = ({
               className="rounded-2xl overflow-hidden bg-gray-100 dark:bg-gray-800/60 border border-gray-200/40 dark:border-gray-700/40"
             >
               <Image
+                fadeDuration={0}
                 source={getCachedImageSource(url)}
                 style={
                   imageUrls.length === 1

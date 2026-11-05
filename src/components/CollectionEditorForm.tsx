@@ -2,11 +2,11 @@ import {
   ActivityIndicator,
   ScrollView,
   StyleSheet,
-  Switch,
   TextInput,
 } from 'react-native';
 import { BouncyButton } from '@/components/BouncyButton';
 import { Text, useThemeColor, View } from '@/components/Themed';
+import { ThemedSwitch } from '@/components/ThemedSwitch';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 
@@ -90,11 +90,10 @@ export function CollectionEditorForm({
               公开后其他用户可见
             </Text>
           </View>
-          <Switch
+          <ThemedSwitch
             accessibilityLabel="公开收藏夹"
             value={isPublic}
             onValueChange={onPublicChange}
-            trackColor={{ false: colors.border, true: primaryColor }}
           />
         </View>
       </ScrollView>

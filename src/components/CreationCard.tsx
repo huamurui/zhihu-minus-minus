@@ -2,7 +2,6 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import React from 'react';
 import { View as NativeView, type ViewInstance } from 'react-native';
-import Animated from 'react-native-reanimated';
 import {
   getContentCollectionMetadata,
   getContentVoteCount,
@@ -19,6 +18,7 @@ import { seedAnswerPreviewEntry } from '@/utils/answerPreviewEntry';
 import { getAnswerReadingRouteParams } from '@/utils/answerReadingContext';
 import { getZhihuVideoSource } from '@/utils/zhihuVideo';
 import { BouncyButton } from './BouncyButton';
+import { useContentCardSurface } from './contentCardSurface';
 import { LikeButton } from './LikeButton';
 import { type ShareContentType, ShareMenu } from './ShareMenu';
 
@@ -92,7 +92,7 @@ export const CreationCard = React.forwardRef<
     const router = useRouter();
     const queryClient = useQueryClient();
     const secondaryColor = useThemeColor({}, 'textSecondary');
-    const cardBackground = useThemeColor({}, 'backgroundSecondary');
+    const surface = useContentCardSurface({ radius: 12, gap: 10 });
     const [menuVisible, setMenuVisible] = React.useState(false);
     const footerRef = React.useRef<ViewInstance>(null);
 
@@ -197,26 +197,17 @@ export const CreationCard = React.forwardRef<
     return (
       <BouncyButton
         onPress={handlePress}
-        style={[
-          {
-            backgroundColor: cardBackground,
-            borderRadius: 12,
-            borderWidth: 1.5,
-            borderColor: 'transparent',
-          },
-        ]}
-        className="p-4 mb-2.5"
+        style={[{ borderWidth: 1.5, borderColor: 'transparent' }, surface]}
+        className="p-4"
       >
-        <Animated.View
-          sharedTransitionTag={`title-${item.question?.id || item.id}`}
-        >
+        <View>
           <Text
             className="text-lg font-bold mb-1.5 leading-6 text-foreground dark:text-foreground-dark"
             numberOfLines={2}
           >
             {getTitle()}
           </Text>
-        </Animated.View>
+        </View>
         <View className="bg-transparent mt-1" pointerEvents="none">
           <Text
             type="secondary"

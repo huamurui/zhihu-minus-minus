@@ -86,7 +86,10 @@ export {
   type ZhihuDocumentNormalizationOptions,
   type ZhihuDocumentNormalizationResult,
 } from './normalization/normalizeZhihuDocument';
-export { createRichContentMetrics } from './presentation';
+export {
+  createRichContentMetrics,
+  RICH_CONTENT_BODY_FONT_SIZE,
+} from './presentation';
 export {
   getNeighborAnswerIds,
   getRichContentQueryKey,

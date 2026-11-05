@@ -5,13 +5,13 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Switch,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, type WebViewProps } from 'react-native-webview';
 import { BouncyButton } from '@/components/BouncyButton';
 import { Text, useRuntimeThemeColors } from '@/components/Themed';
+import { ThemedSwitch } from '@/components/ThemedSwitch';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { saveExport, saveExportImages, shareExport } from './files';
 import { useImageExport } from './ImageExportRenderer';
@@ -211,7 +211,7 @@ export function ContentExportScreen({
                 <Text style={styles.optionText}>
                   允许导出当前部分内容（文件中会保留说明）
                 </Text>
-                <Switch
+                <ThemedSwitch
                   accessibilityLabel="允许导出部分内容"
                   value={acceptPartial}
                   onValueChange={setAcceptPartial}
@@ -263,7 +263,7 @@ export function ContentExportScreen({
                     : '图片准备失败时可重试或选择缺图导出'}
                 </Text>
               </View>
-              <Switch
+              <ThemedSwitch
                 accessibilityLabel={
                   format === 'markdown' ? '附带离线图片' : '包含正文图片'
                 }
@@ -280,7 +280,7 @@ export function ContentExportScreen({
                     关闭时使用浅色阅读版
                   </Text>
                 </View>
-                <Switch
+                <ThemedSwitch
                   accessibilityLabel="跟随阅读设置"
                   value={readingStyle}
                   onValueChange={(value) =>

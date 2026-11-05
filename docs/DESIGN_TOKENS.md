@@ -21,7 +21,8 @@
 | --- | --- | --- |
 | 主色实心按钮 | `primary` | `onPrimary` |
 | 主色透明浅底 | `primaryTransparent` 或 `primary_XX` | 原有 `primary`（既有组件配色保持不变） |
-| 危险实心按钮或角标 | `danger` | `onDanger` |
+| 危险实心按钮或红色未读角标 | `danger` | `onDanger` |
+| 主题色未读角标 | `primary` | `onPrimary` |
 | 成功实心按钮 | `success` | `onSuccess` |
 | 警告实心按钮 | `warning` | `onWarning` |
 | 图标和短文字按钮 | 原有表面或透明底 | 原始 `primary`、`danger / success / warning` 等强调色 |

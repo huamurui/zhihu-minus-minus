@@ -28,6 +28,7 @@ export function ThemeModeSelector() {
   const controlBackground = useThemeColor({}, 'controlBackground');
   const mutedTextColor = useThemeColor({}, 'textSecondary');
   const indicatorBackground = useThemeColor({}, 'primary_26');
+  const controlBorder = useThemeColor({}, 'controlBorder');
   const selectedIndex = THEME_MODE_OPTIONS.findIndex(
     ({ mode }) => mode === themeMode,
   );
@@ -39,9 +40,11 @@ export function ThemeModeSelector() {
   }, [position, selectedIndex]);
 
   const indicatorStyle = useAnimatedStyle(() => {
-    const optionWidth = controlWidth.value / THEME_MODE_OPTIONS.length;
+    // The track's 3px padding on each side is outside the options.
+    const optionWidth =
+      Math.max(0, controlWidth.value - 6) / THEME_MODE_OPTIONS.length;
     return {
-      width: Math.max(0, optionWidth - 8),
+      width: Math.max(0, optionWidth),
       opacity: controlWidth.value > 0 ? 1 : 0,
       transform: [{ translateX: position.value * optionWidth }],
     };
@@ -67,7 +70,10 @@ export function ThemeModeSelector() {
       </RNView>
 
       <RNView
-        style={styles.segmentedControl}
+        style={[
+          styles.segmentedControl,
+          { backgroundColor: controlBackground, borderColor: controlBorder },
+        ]}
         accessibilityRole="radiogroup"
         accessibilityLabel="主题模式"
         onLayout={({ nativeEvent }) => {
@@ -155,25 +161,28 @@ const styles = StyleSheet.create({
     maxWidth: 228,
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 44,
+    minHeight: 40,
+    padding: 3,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   indicator: {
     position: 'absolute',
-    left: 4,
-    top: 5,
-    bottom: 5,
+    left: 3,
+    top: 3,
+    bottom: 3,
     borderRadius: 999,
   },
   option: {
     flex: 1,
     flexDirection: 'row',
     gap: 4,
-    minHeight: 44,
-    borderRadius: 22,
+    minHeight: 34,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
   optionLabel: {
     flexShrink: 1,

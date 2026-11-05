@@ -9,6 +9,7 @@ import { normalizeRecentMoments } from '@/utils/recentMoments';
 import { DiagnosticScope } from './DiagnosticScope';
 import { StableAvatar } from './StableAvatar';
 import { Text, useThemeColor, View } from './Themed';
+import { UnreadBadge } from './UnreadBadge';
 
 /**
  * 最近更新的用户头像栏 (朋友圈/动态更新提示)
@@ -24,8 +25,6 @@ function RecentMomentsComponent({
 }) {
   const router = useRouter();
   const primaryColor = useThemeColor({}, 'primary');
-  const dangerColor = useThemeColor({}, 'danger');
-  const onDanger = useThemeColor({}, 'onDanger');
   const surfaceColor = useThemeColor({}, 'backgroundSecondary');
 
   const { data } = useQuery({
@@ -51,12 +50,12 @@ function RecentMomentsComponent({
   }
 
   return (
-    <View className="bg-transparent border-b-[0.5px] border-black/5 dark:border-white/5">
+    <View className="bg-transparent">
       <GestureDetector gesture={scrollGesture}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerClassName="px-4 py-4"
+          contentContainerClassName="px-4 py-4 pt-2"
         >
           {items.map((item) => (
             <Pressable
@@ -88,27 +87,12 @@ function RecentMomentsComponent({
                   />
                 </View>
 
-                {/* 未读数字角标 */}
-                {item.unread_count > 0 && (
-                  <View
-                    className="absolute -right-1 -top-1 rounded-full min-w-[20px] h-[20px] justify-center items-center px-1 border-2"
-                    style={{
-                      backgroundColor: dangerColor,
-                      borderColor: surfaceColor,
-                    }}
-                  >
-                    <Text
-                      className="font-bold text-center"
-                      style={{
-                        color: onDanger,
-                        fontSize: 10,
-                        lineHeight: 12,
-                      }}
-                    >
-                      {item.unread_count > 99 ? '99+' : item.unread_count}
-                    </Text>
-                  </View>
-                )}
+                <UnreadBadge
+                  count={item.unread_count}
+                  placement="corner"
+                  borderColor={surfaceColor}
+                  className="absolute -right-1 -top-1"
+                />
               </View>
 
               <Text

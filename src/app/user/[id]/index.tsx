@@ -1,15 +1,15 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import {
   useInfiniteQuery,
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
+  Animated,
   View as NativeView,
+  Platform,
   ScrollView,
   type ScrollViewInstance,
   StyleSheet,
@@ -45,6 +45,7 @@ import { addReadHistory } from '@/api/zhihu/history';
 import { BouncyButton } from '@/components/BouncyButton';
 import { FeedCard } from '@/components/FeedCard';
 import { FollowButton } from '@/components/FollowButton';
+import { GlassNavigationButton } from '@/components/navigation/GlassNavigationButton';
 import { ProfileColumnCard } from '@/components/profile/ProfileColumnCard';
 import { ProfileToolbarBackground } from '@/components/profile/ProfileCover';
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
@@ -63,13 +64,16 @@ import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
+import { useFixedHeaderEntryProgress } from '@/features/adaptive-layout/PaneContext';
+import { useMemberCreations } from '@/hooks/useMemberCreations';
 import { useUserAnswersVotedByMe } from '@/hooks/useUserAnswersVotedByMe';
 import { useUserColumns } from '@/hooks/useUserColumns';
-import { useUserCreations } from '@/hooks/useUserCreations';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ZhihuAuthor, ZhihuColumnSummary } from '@/types/zhihu';
 import { getProfileAnswerReadingContext } from '@/utils/answerReadingContext';
+import { formatFeedActionText } from '@/utils/feedActionText';
+import type { MemberCreation } from '@/utils/memberCreations';
 import {
   getProfileCoverState,
   getProfileHeaderOffset,
@@ -79,7 +83,6 @@ import { refreshInfiniteQuery } from '@/utils/query';
 import { parseZhihuUrl } from '@/utils/url';
 import {
   getNextPageOffset,
-  getRecentActivityTargetId,
   isOwnMemberProfile,
   normalizeUserFeedType,
   type UserFeedType,
@@ -99,6 +102,10 @@ interface ProfileContentItem {
   title?: string;
   excerpt?: string;
   content?: string | ProfileContentSegment[];
+  created?: number;
+  created_time?: number;
+  updated_time?: number;
+  action_text?: string;
   answer_type?: unknown;
   paid_info?: unknown;
   content_need_truncated?: unknown;
@@ -135,6 +142,17 @@ interface ProfileContentItem {
 interface ProfileActivityItem {
   id?: string | number;
   url?: string;
+  action_text?: string;
+  created_time?: number;
+  action_time?: number;
+  updated_time?: number;
+  actor?: Partial<ZhihuAuthor>;
+  source?: {
+    action_text?: string;
+    action_time?: number;
+    created_time?: number;
+    actor?: Partial<ZhihuAuthor>;
+  };
   target?: ProfileContentItem;
 }
 
@@ -167,9 +185,15 @@ const AnimatedPagerView = Reanimated.createAnimatedComponent(PagerView);
 
 type ProfileRouteParams = {
   id: string;
-  avatar?: string;
+  avatar?: string | string[];
+  name?: string | string[];
+  headline?: string | string[];
   tab?: string;
 };
+
+function profileRouteText(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
 
 export default function UserDetailScreen() {
   const params = useLocalSearchParams<ProfileRouteParams>();
@@ -179,7 +203,26 @@ export default function UserDetailScreen() {
 function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
   const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
-  const { id, avatar: initialAvatar, tab: initialTabParam } = params;
+  const profileEntry = useFixedHeaderEntryProgress();
+  const profileEntryStyle = useMemo(
+    () =>
+      profileEntry && {
+        transformOrigin: '50% 0%',
+        transform: [
+          {
+            scale: profileEntry.interpolate({
+              inputRange: [0, 1],
+              outputRange: [1.06, 1],
+            }),
+          },
+        ],
+      },
+    [profileEntry],
+  );
+  const { id, tab: initialTabParam } = params;
+  const initialAvatar = profileRouteText(params.avatar);
+  const initialName = profileRouteText(params.name);
+  const initialHeadline = profileRouteText(params.headline);
   const router = useRouter();
   const queryClient = useQueryClient();
   const initialTab = getInitialProfileTab(initialTabParam);
@@ -194,6 +237,9 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
   const [followLoading, setFollowLoading] = useState(false);
 
   const [headerHeight, setHeaderHeight] = useState(0);
+  const [initialHeaderReady, setInitialHeaderReady] = useState(
+    Platform.OS !== 'android',
+  );
   const [tabBarHeight, setTabBarHeight] = useState(52);
   const [viewportHeight, setViewportHeight] = useState(0);
   const [navigationRowHeight, setNavigationRowHeight] = useState(56);
@@ -330,6 +376,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
 
   const syncLists = (sourceIndex: number) => {
     const offsets = scrollOffsets.value;
+    const synced = [...offsets];
     for (let index = 0; index < PROFILE_TABS.length; index += 1) {
       if (index === sourceIndex) continue;
       const offset = getProfileSyncedOffset(
@@ -337,8 +384,13 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
         offsets[index],
         collapseDistance,
       );
+      synced[index] = offset;
       listRefs.current[index]?.scrollToOffset(offset);
     }
+    // Offscreen or still-empty pages apply their scroll only once shown. Record
+    // the target now so the header holds its place during the swipe instead of
+    // easing toward a neighbour still at the top.
+    scrollOffsets.value = synced;
   };
 
   const handleTabPress = (index: number) => {
@@ -400,23 +452,9 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
     enabled: !!user && (visitedTabs.activities || activeTab === 'activities'),
   });
 
-  const creationsQuery = useUserCreations(
+  const creationsQuery = useMemberCreations(
     user,
     Boolean(visitedTabs.creations || activeTab === 'creations'),
-  );
-  const creationTargets = useMemo(
-    () =>
-      new Map(
-        creationsQuery.activities.flatMap((activity) => {
-          const target = activity.target;
-          const targetId = target && getRecentActivityTargetId(target);
-          const type = normalizeUserFeedType(target?.type);
-          return target && targetId !== undefined && type
-            ? [[`${type}:${targetId}`, target] as const]
-            : [];
-        }),
-      ),
-    [creationsQuery.activities],
   );
 
   const answersVotedByMeQuery = useUserAnswersVotedByMe(
@@ -521,6 +559,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
           data:
             activitiesQuery.data?.pages.flatMap((page) => page.data || []) ||
             [],
+          pageCount: activitiesQuery.data?.pages.length ?? 0,
           isLoading: activitiesQuery.isLoading,
           isError: activitiesQuery.isError,
           isFetchingNextPage: activitiesQuery.isFetchingNextPage,
@@ -533,7 +572,8 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
       case 'creations':
         return {
           queryKey: creationsQuery.queryKey,
-          data: creationsQuery.feedItems,
+          data: creationsQuery.items,
+          pageCount: creationsQuery.data?.pages.length ?? 0,
           isLoading: creationsQuery.isLoading,
           isError: creationsQuery.isError,
           isFetchingNextPage: creationsQuery.isFetchingNextPage,
@@ -548,6 +588,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
           queryKey: ['user-answers', id, sortBy] as const,
           data:
             answersQuery.data?.pages.flatMap((page) => page.data || []) || [],
+          pageCount: answersQuery.data?.pages.length ?? 0,
           isLoading: answersQuery.isLoading,
           isError: answersQuery.isError,
           isFetchingNextPage: answersQuery.isFetchingNextPage,
@@ -562,6 +603,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
           queryKey: ['user-articles', id] as const,
           data:
             articlesQuery.data?.pages.flatMap((page) => page.data || []) || [],
+          pageCount: articlesQuery.data?.pages.length ?? 0,
           isLoading: articlesQuery.isLoading,
           isError: articlesQuery.isError,
           isFetchingNextPage: articlesQuery.isFetchingNextPage,
@@ -576,6 +618,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
           queryKey: ['user-questions', id] as const,
           data:
             questionsQuery.data?.pages.flatMap((page) => page.data || []) || [],
+          pageCount: questionsQuery.data?.pages.length ?? 0,
           isLoading: questionsQuery.isLoading,
           isError: questionsQuery.isError,
           isFetchingNextPage: questionsQuery.isFetchingNextPage,
@@ -589,6 +632,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
         return {
           queryKey: columnsQuery.queryKey,
           data: columnsQuery.columns,
+          pageCount: columnsQuery.data?.pages.length ?? 0,
           isLoading: columnsQuery.isLoading,
           isError: columnsQuery.isError,
           isFetchingNextPage: columnsQuery.isFetchingNextPage,
@@ -602,6 +646,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
         return {
           queryKey: ['user-pins', id] as const,
           data: pinsQuery.data?.pages.flatMap((page) => page.data || []) || [],
+          pageCount: pinsQuery.data?.pages.length ?? 0,
           isLoading: pinsQuery.isLoading,
           isError: pinsQuery.isError,
           isFetchingNextPage: pinsQuery.isFetchingNextPage,
@@ -615,6 +660,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
         return {
           queryKey: answersVotedByMeQuery.queryKey,
           data: answersVotedByMeQuery.answers,
+          pageCount: answersVotedByMeQuery.data?.pages.length ?? 0,
           isLoading:
             answersVotedByMeQuery.isAuthenticated &&
             answersVotedByMeQuery.isLoading,
@@ -694,22 +740,36 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
     }
   };
 
+  const headerUser: ZhihuMember | undefined =
+    user ??
+    (isUserLoading
+      ? {
+          id,
+          name: initialName ?? '',
+          avatar_url: initialAvatar ?? '',
+          headline: initialHeadline,
+          type: 'people',
+        }
+      : undefined);
   const renderHeader = () =>
-    user ? (
+    headerUser ? (
       <ProfileHeader
-        user={user}
+        user={headerUser}
         initialAvatar={initialAvatar}
+        initialName={initialName}
+        initialHeadline={initialHeadline}
+        isLoading={!user}
         isMe={isMe}
         followLoading={followLoading}
         topInset={navigationHeight}
         onFollow={() => void handleFollow()}
         onFollowers={() =>
-          router.push(`/user/${user.url_token || id}/followers`)
+          router.push(`/user/${user?.url_token || id}/followers`)
         }
         onFollowing={() =>
-          router.push(`/user/${user.url_token || id}/following`)
+          router.push(`/user/${user?.url_token || id}/following`)
         }
-        onMutual={() => router.push(`/user/${user.url_token || id}/mutual`)}
+        onMutual={() => router.push(`/user/${user?.url_token || id}/mutual`)}
       />
     ) : null;
 
@@ -849,22 +909,30 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
     );
   };
 
-  const renderItemContent = (item: unknown, tabKey: ProfileTabKey) => {
+  const renderItemContent = (
+    item: unknown,
+    tabKey: ProfileTabKey,
+    // 创作 lists answers by publish time, whatever the 回答 tab's sort.
+    answerSort: 'created' | 'voteups' = sortBy,
+    actionInfo?: { text?: string; time?: number },
+  ): ReactNode => {
     if (tabKey === 'columns')
       return <ProfileColumnCard column={item as ZhihuColumnSummary} />;
     if (tabKey === 'creations') {
-      const feedItem = item as FeedItem;
-      const target = creationTargets.get(`${feedItem.type}:${feedItem.id}`);
-      return (
-        <FeedCard
-          item={{ ...feedItem, ...getProfileFeedBody(target) }}
-          answerContext={getProfileAnswerReadingContext(
-            target?.author ?? {},
-            user ?? {},
-            id,
-          )}
-        />
-      );
+      const creation = item as MemberCreation;
+      const defaultActionText =
+        creation.kind === 'answers'
+          ? '回答了问题'
+          : creation.kind === 'articles'
+            ? '发表了文章'
+            : '发布了想法';
+      const text =
+        creation.actionText ||
+        (creation.actionTime ? defaultActionText : undefined);
+      return renderItemContent(creation.item, creation.kind, 'created', {
+        text,
+        time: creation.actionTime,
+      });
     }
     const displayItem = getProfileContentItem(item, tabKey);
     if (!displayItem) return null;
@@ -889,6 +957,63 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
         : undefined;
     const contentId = itemId || answerIdFromUrl;
     if (mappedType === 'answers' && !contentId) return null;
+
+    const rawActionTime =
+      actionInfo?.time ??
+      (tabKey === 'activities'
+        ? ((item as ProfileActivityItem)?.action_time ??
+          (item as ProfileActivityItem)?.source?.action_time ??
+          (item as ProfileActivityItem)?.created_time ??
+          (item as ProfileActivityItem)?.source?.created_time ??
+          (item as ProfileActivityItem)?.updated_time)
+        : undefined) ??
+      (typeof displayItem.created === 'number'
+        ? displayItem.created
+        : undefined) ??
+      (typeof displayItem.created_time === 'number'
+        ? displayItem.created_time
+        : undefined) ??
+      (typeof displayItem.updated_time === 'number'
+        ? displayItem.updated_time
+        : undefined);
+
+    const actionTime =
+      typeof rawActionTime === 'number' && Number.isFinite(rawActionTime)
+        ? rawActionTime > 1e11
+          ? Math.floor(rawActionTime / 1000)
+          : rawActionTime
+        : undefined;
+
+    const defaultActivitiesActionText =
+      tabKey === 'activities' && actionTime
+        ? mappedType === 'answers'
+          ? '回答了问题'
+          : mappedType === 'articles'
+            ? '发表了文章'
+            : mappedType === 'pins'
+              ? '发布了想法'
+              : undefined
+        : undefined;
+
+    const itemActionText =
+      actionInfo?.text ??
+      (tabKey === 'activities'
+        ? (item as ProfileActivityItem)?.action_text ||
+          (item as ProfileActivityItem)?.source?.action_text ||
+          (displayItem as { action_text?: string })?.action_text ||
+          defaultActivitiesActionText
+        : undefined);
+
+    const actorName =
+      (item as ProfileActivityItem)?.actor?.name ||
+      (item as ProfileActivityItem)?.source?.actor?.name ||
+      user?.name;
+
+    const formattedActionText = formatFeedActionText(
+      itemActionText,
+      actorName,
+      actionTime,
+    );
 
     const getExcerptText = () => {
       if (rawType === 'pin') {
@@ -923,6 +1048,9 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
     const feedItem: FeedItem = {
       id: contentId || String(displayItem.url),
       title: displayItem.question?.title || displayItem.title || '',
+      actionText: formattedActionText,
+      created_time: actionTime,
+      updated_time: actionTime,
       questionId:
         displayItem.question?.id?.toString() ||
         (rawType === 'question' ? displayItem.id?.toString() : undefined),
@@ -956,6 +1084,10 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
           : (getContentVoteState(mappedType, displayItem) ?? 0),
       type: mappedType,
       videoSource: getZhihuVideoSource(rawType),
+      // Every card on a member's page is theirs unless it names someone else.
+      hideAuthor:
+        tabKey !== 'votes' &&
+        (!displayItem.author?.id || displayItem.author.id === user?.id),
     };
 
     return (
@@ -967,12 +1099,12 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
           tabKey === 'answers' &&
           !displayItem.author?.id &&
           !displayItem.author?.url_token
-            ? { scene: 'profile_answer', memberId: id, memberSort: sortBy }
+            ? { scene: 'profile_answer', memberId: id, memberSort: answerSort }
             : getProfileAnswerReadingContext(
                 displayItem.author ?? {},
                 user ?? {},
                 id,
-                tabKey === 'answers' ? sortBy : 'created',
+                tabKey === 'answers' ? answerSort : 'created',
               )
         }
       />
@@ -995,13 +1127,12 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
       onLayout={(event) => setViewportHeight(event.nativeEvent.layout.height)}
     >
       <Stack.Screen
-        options={{ headerShown: false, title: user?.name || '个人主页' }}
+        options={{
+          headerShown: false,
+          title: user?.name || initialName || '个人主页',
+        }}
       />
-      {isUserLoading ? (
-        <View className="flex-1 items-center justify-center bg-transparent">
-          <ActivityIndicator color={primaryColor} />
-        </View>
-      ) : !user ? (
+      {!user && !isUserLoading ? (
         <View style={{ paddingTop: navigationHeight }}>
           <QueryErrorView
             message="用户资料加载失败"
@@ -1009,12 +1140,17 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
           />
         </View>
       ) : (
-        <>
+        <Animated.View
+          testID="profile-entry-content"
+          pointerEvents="box-none"
+          style={[StyleSheet.absoluteFill, profileEntryStyle]}
+        >
           <NativeView style={StyleSheet.absoluteFill}>
             <AnimatedPagerView
               ref={pagerRef}
               style={{ flex: 1 }}
               initialPage={initialTabIndex}
+              scrollEnabled
               onPageScroll={pageScrollHandler}
               onPageScrollStateChanged={(event) => {
                 if (event.nativeEvent.pageScrollState === 'dragging')
@@ -1062,16 +1198,17 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
                                   ),
                           ]),
                       }}
-                      headerHeight={headerHeight}
+                      headerHeight={initialHeaderReady ? headerHeight : 0}
                       collapseDistance={collapseDistance}
                       viewportHeight={viewportHeight}
+                      hideInitialLoadingIndicator={isUserLoading && !user}
                       bottomInset={insets.bottom}
                       offsets={scrollOffsets}
                       active={activeTab === tab.key}
                       keyExtractor={(item) => {
                         if (tab.key === 'creations') {
-                          const content = item as FeedItem;
-                          return `user-creation-${content.type}-${content.id}`;
+                          const creation = item as MemberCreation;
+                          return `user-creation-${creation.kind}-${getProfileListItemKey(creation.item)}`;
                         }
                         return `user-item-${tab.key}-${getProfileListItemKey(item)}`;
                       }}
@@ -1113,6 +1250,34 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
                               </BouncyButton>
                             )}
                           </View>
+                        ) : tab.key === 'creations' &&
+                          !creationsQuery.isAuthenticated ? (
+                          <View className="items-center py-20 bg-transparent">
+                            <Text type="secondary">
+                              登录后查看创作者的全部创作
+                            </Text>
+                            <BouncyButton
+                              accessibilityRole="button"
+                              accessibilityLabel="登录"
+                              onPress={() => router.push('/login')}
+                              style={{
+                                marginTop: 16,
+                                paddingHorizontal: 20,
+                                paddingVertical: 10,
+                                borderRadius: 8,
+                                backgroundColor: primaryColor,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  color: onPrimaryColor,
+                                  fontWeight: '600',
+                                }}
+                              >
+                                登录
+                              </Text>
+                            </BouncyButton>
+                          </View>
                         ) : undefined
                       }
                     />
@@ -1141,9 +1306,36 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
             ]}
           >
             {renderHeader()}
-            {renderTabsSelector()}
+            {Platform.OS === 'android' ? (
+              <NativeView
+                key={user ? 'loaded' : 'loading'}
+                testID="profile-initial-tabs-layout"
+                pointerEvents={initialHeaderReady ? 'auto' : 'none'}
+                accessibilityElementsHidden={!initialHeaderReady}
+                importantForAccessibility={
+                  initialHeaderReady ? 'auto' : 'no-hide-descendants'
+                }
+                style={{ opacity: initialHeaderReady ? 1 : 0 }}
+                onLayout={(event) => {
+                  if (!user || initialHeaderReady) return;
+                  const { y, height } = event.nativeEvent.layout;
+                  if (
+                    Number.isFinite(y) &&
+                    Number.isFinite(height) &&
+                    height > 0
+                  ) {
+                    setHeaderHeight(y + height);
+                    setInitialHeaderReady(true);
+                  }
+                }}
+              >
+                {renderTabsSelector()}
+              </NativeView>
+            ) : (
+              renderTabsSelector()
+            )}
           </Reanimated.View>
-        </>
+        </Animated.View>
       )}
       <NativeView
         pointerEvents="box-none"
@@ -1156,18 +1348,27 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
           paddingTop: insets.top,
         }}
       >
-        {user ? (
-          <ProfileToolbarBackground
-            coverUrl={user.cover_url}
-            navigationHeight={navigationHeight}
-            headerOffset={headerOffset}
-          />
+        {headerUser ? (
+          <Animated.View
+            testID="profile-entry-toolbar-background"
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, profileEntryStyle]}
+          >
+            <ProfileToolbarBackground
+              coverUrl={user?.cover_url}
+              navigationHeight={navigationHeight}
+              headerOffset={headerOffset}
+            />
+          </Animated.View>
         ) : null}
         <NativeView
           pointerEvents="box-none"
-          onLayout={(event) =>
-            setNavigationRowHeight(event.nativeEvent.layout.height)
-          }
+          testID="profile-toolbar-row"
+          onLayout={(event) => {
+            const height = event.nativeEvent.layout.height;
+            if (Number.isFinite(height) && height > 0)
+              setNavigationRowHeight(height);
+          }}
           style={{
             minHeight: 56,
             flexDirection: 'row',
@@ -1177,27 +1378,16 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
             gap: 10,
           }}
         >
-          <BouncyButton
-            accessibilityRole="button"
+          <GlassNavigationButton
+            icon="back"
             accessibilityLabel="返回"
             onPress={() =>
               router.canGoBack() ? router.back() : router.replace('/(tabs)')
             }
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: `${Colors[colorScheme].backgroundSecondary}E8`,
-            }}
-          >
-            <Ionicons
-              name="arrow-back"
-              size={23}
-              color={Colors[colorScheme].text}
-            />
-          </BouncyButton>
+            size={40}
+            color={Colors[colorScheme].text}
+            backgroundColor={`${Colors[colorScheme].backgroundSecondary}E8`}
+          />
           <Reanimated.View
             pointerEvents="none"
             accessibilityElementsHidden={!compactHeader}
@@ -1206,9 +1396,9 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
               toolbarIdentityStyle,
             ]}
           >
-            {user?.avatar_url ? (
+            {headerUser?.avatar_url ? (
               <StableAvatar
-                uri={user.avatar_url}
+                uri={headerUser.avatar_url}
                 style={{ width: 30, height: 30, borderRadius: 15 }}
               />
             ) : null}
@@ -1221,7 +1411,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
                   fontWeight: '700',
                 }}
               >
-                {user?.name || '个人主页'}
+                {headerUser?.name || initialName || '个人主页'}
               </Text>
               <Text
                 numberOfLines={1}
@@ -1240,28 +1430,17 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
               onPress={() => void handleFollow()}
             />
           )}
-          <BouncyButton
-            accessibilityRole="button"
+          <GlassNavigationButton
+            icon="search"
             accessibilityLabel="搜索此用户的创作"
             disabled={!user}
             onPress={() =>
               router.push({ pathname: '/user/[id]/search', params: { id } })
             }
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: `${Colors[colorScheme].backgroundSecondary}E8`,
-            }}
-          >
-            <Ionicons
-              name="search"
-              size={20}
-              color={Colors[colorScheme].text}
-            />
-          </BouncyButton>
+            size={40}
+            color={Colors[colorScheme].text}
+            backgroundColor={`${Colors[colorScheme].backgroundSecondary}E8`}
+          />
         </NativeView>
       </NativeView>
     </NativeView>

@@ -7,7 +7,6 @@ import {
   View as RNView,
   ScrollView,
   StyleSheet,
-  Switch,
   TextInput,
   UIManager,
 } from 'react-native';
@@ -19,9 +18,10 @@ import Reanimated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BouncyButton } from '@/components/BouncyButton';
-import { Section, SettingItem } from '@/components/SettingItem';
+import { Section, SettingItem, SettingOptions } from '@/components/SettingItem';
 import { NavigationInteractionSettings } from '@/components/settings/NavigationInteractionSettings';
 import { Text, useThemeColor, View } from '@/components/Themed';
+import { ThemedSwitch } from '@/components/ThemedSwitch';
 import { ThemeModeSelector } from '@/components/ThemeModeSelector';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -31,6 +31,7 @@ import {
   resolveThemeColors,
   SURFACE_STYLE_OPTIONS,
   TEXT_CONTRAST_OPTIONS,
+  UNREAD_BADGE_STYLE_OPTIONS,
 } from '@/constants/theme';
 import type { RichContentRenderer } from '@/features/rich-content';
 import { useSettingsStore } from '@/store/useSettingsStore';
@@ -82,6 +83,7 @@ export default function AppearanceSettings() {
     richContentRenderer,
     removeImageWatermark,
     answerReadingMode,
+    unreadBadgeStyle,
     updateSettings,
   } = useSettingsStore();
 
@@ -203,14 +205,13 @@ export default function AppearanceSettings() {
             icon="image-outline"
             colorScheme={colorScheme}
           >
-            <Switch
+            <ThemedSwitch
               accessibilityLabel="去除图片水印"
               accessibilityHint="正文图片加载作者上传的原文件，不带知乎水印"
               value={removeImageWatermark}
               onValueChange={(value) =>
                 updateSettings({ removeImageWatermark: value })
               }
-              trackColor={{ true: tintColor }}
             />
           </SettingItem>
         </Section>
@@ -432,11 +433,10 @@ export default function AppearanceSettings() {
             icon="color-palette-outline"
             colorScheme={colorScheme}
           >
-            <Switch
+            <ThemedSwitch
               accessibilityLabel="显示自定义颜色"
               value={showAdvancedColor}
               onValueChange={toggleAdvancedColor}
-              trackColor={{ true: tintColor }}
             />
           </SettingItem>
 
@@ -524,76 +524,38 @@ export default function AppearanceSettings() {
             icon="contrast-outline"
             colorScheme={colorScheme}
           >
-            <RNView style={styles.optionRow}>
-              {TEXT_CONTRAST_OPTIONS.map((option) => {
-                const isSelected = textContrast === option.value;
-                return (
-                  <BouncyButton
-                    key={option.value}
-                    onPress={() =>
-                      updateSettings({ textContrast: option.value })
-                    }
-                    style={[
-                      styles.optionChip,
-                      {
-                        backgroundColor: Colors[colorScheme].backgroundTertiary,
-                      },
-                      isSelected && { backgroundColor: tintColor },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.optionChipText,
-                        isSelected && {
-                          color: Colors[colorScheme].onPrimary,
-                          fontWeight: 'bold',
-                        },
-                      ]}
-                    >
-                      {option.label}
-                    </Text>
-                  </BouncyButton>
-                );
-              })}
-            </RNView>
+            <SettingOptions
+              accessibilityLabel="文字对比度"
+              options={TEXT_CONTRAST_OPTIONS}
+              value={textContrast}
+              onChange={(value) => updateSettings({ textContrast: value })}
+            />
           </SettingItem>
           <SettingItem
             label="表面层次"
             icon="layers-outline"
             colorScheme={colorScheme}
           >
-            <RNView style={styles.optionRow}>
-              {SURFACE_STYLE_OPTIONS.map((option) => {
-                const isSelected = surfaceStyle === option.value;
-                return (
-                  <BouncyButton
-                    key={option.value}
-                    onPress={() =>
-                      updateSettings({ surfaceStyle: option.value })
-                    }
-                    style={[
-                      styles.optionChip,
-                      {
-                        backgroundColor: Colors[colorScheme].backgroundTertiary,
-                      },
-                      isSelected && { backgroundColor: tintColor },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.optionChipText,
-                        isSelected && {
-                          color: Colors[colorScheme].onPrimary,
-                          fontWeight: 'bold',
-                        },
-                      ]}
-                    >
-                      {option.label}
-                    </Text>
-                  </BouncyButton>
-                );
-              })}
-            </RNView>
+            <SettingOptions
+              accessibilityLabel="表面层次"
+              options={SURFACE_STYLE_OPTIONS}
+              value={surfaceStyle}
+              onChange={(value) => updateSettings({ surfaceStyle: value })}
+            />
+          </SettingItem>
+          <SettingItem
+            label="未读角标"
+            icon="notifications-circle-outline"
+            colorScheme={colorScheme}
+            stacked
+          >
+            <SettingOptions
+              accessibilityLabel="未读角标"
+              options={UNREAD_BADGE_STYLE_OPTIONS}
+              value={unreadBadgeStyle}
+              onChange={(value) => updateSettings({ unreadBadgeStyle: value })}
+              fill
+            />
           </SettingItem>
         </Section>
 
@@ -1125,22 +1087,6 @@ const styles = StyleSheet.create({
   },
   readingPreviewLabel: { flexShrink: 1, fontSize: 15, fontWeight: '600' },
   readingPreviewDescription: { fontSize: 12 },
-  optionRow: {
-    flex: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
-    gap: 6,
-    marginLeft: 12,
-  },
-  optionChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  optionChipText: {
-    fontSize: 13,
-  },
   hexInput: {
     width: 100,
     height: 36,

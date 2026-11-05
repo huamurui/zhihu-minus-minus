@@ -13,7 +13,14 @@ export const StableAvatar = React.memo(
   ({ uri, className, style }: StableAvatarProps) => {
     const source = useMemo(() => getCachedImageSource(uri), [uri]);
 
-    return <Image source={source} className={className} style={style} />;
+    return (
+      <Image
+        source={source}
+        className={className}
+        style={style}
+        fadeDuration={0}
+      />
+    );
   },
   (previous, next) =>
     previous.uri === next.uri &&

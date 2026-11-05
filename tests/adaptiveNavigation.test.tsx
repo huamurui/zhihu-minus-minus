@@ -1,6 +1,7 @@
 import 'react-native-gesture-handler/jestSetup';
 import { Slot, Stack, useLocalSearchParams, useNavigation } from 'expo-router';
 import type { NativeStackNavigationProp } from 'expo-router/native-stack';
+import { HeaderShownContext } from 'expo-router/react-navigation';
 import {
   act,
   fireEvent,
@@ -9,12 +10,15 @@ import {
   testRouter,
   waitFor,
 } from 'expo-router/testing-library';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useContext, useEffect, useState } from 'react';
 import {
+  Animated,
   BackHandler,
   Dimensions,
   Keyboard,
+  Platform,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   View,
@@ -26,6 +30,7 @@ import {
   getVisiblePanes,
 } from '../src/features/adaptive-layout/layout';
 import {
+  useFixedHeaderEntryProgress,
   usePaneDimensions,
   usePaneVisible,
 } from '../src/features/adaptive-layout/PaneContext';
@@ -37,6 +42,11 @@ jest.mock('react-native-gesture-handler', () => ({
   ...jest.requireActual('react-native-gesture-handler'),
   // The divider's native gesture lifecycle has its own controller tests.
   GestureDetector: ({ children }: { children: ReactNode }) => children,
+}));
+
+jest.mock('../src/components/BouncyButton', () => ({
+  BouncyButton:
+    jest.requireActual<typeof import('react-native')>('react-native').Pressable,
 }));
 
 jest.mock('../src/components/Themed', () => ({
@@ -51,12 +61,26 @@ jest.mock('../src/components/Themed', () => ({
 const mounts: Record<string, number> = {};
 const cleanups: Record<string, number> = {};
 let finishRefresh: (() => void) | undefined;
+let profileProgress: Animated.Value | undefined;
+const profileHeaderStates: boolean[] = [];
+let streamProgress: Animated.Value | undefined;
+const streamHeaderStates: boolean[] = [];
 function Page({ name }: { name: string }) {
   const router = usePaneRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [draft, setDraft] = useState('');
   const [scroll, setScroll] = useState(0);
   const visible = usePaneVisible();
+  const entryProgress = useFixedHeaderEntryProgress();
+  const headerShown = useContext(HeaderShownContext);
+  if (name === 'user') {
+    profileProgress = entryProgress;
+    profileHeaderStates.push(headerShown);
+  }
+  if (name === 'stream') {
+    streamProgress = entryProgress;
+    streamHeaderStates.push(headerShown);
+  }
   const { width } = usePaneDimensions();
   const identity = `${name}:${id ?? 'root'}`;
   useEffect(
@@ -145,14 +169,22 @@ async function setTwoPanes(enabled: boolean) {
   );
 }
 
-async function open(initialUrl = '/') {
+async function open(initialUrl = '/', defaultHeaders = false) {
   return renderRouter(
     {
       _layout: {
         default: () => (
           <GestureHandlerRootView style={{ flex: 1 }}>
-            <AdaptiveStack screenOptions={{ headerShown: false }}>
+            <AdaptiveStack screenOptions={{ headerShown: defaultHeaders }}>
               <AdaptiveStack.Screen name="(tabs)" options={{ title: '首页' }} />
+              <AdaptiveStack.Screen
+                name="user/[id]/index"
+                options={{ headerShown: false }}
+              />
+              <AdaptiveStack.Screen
+                name="user/[id]/stream"
+                options={{ headerShown: false }}
+              />
               <AdaptiveStack.Screen
                 name="about"
                 options={{
@@ -170,6 +202,7 @@ async function open(initialUrl = '/') {
       '(tabs)/index': () => <Page name="home" />,
       'answer/[id]': () => <Page name="answer" />,
       'user/[id]/index': () => <Page name="user" />,
+      'user/[id]/stream': () => <Page name="stream" />,
       'login/index': () => <Page name="login" />,
       'comments/[id]': () => <Page name="comments" />,
       'settings/index': () => <Page name="settings" />,
@@ -190,6 +223,8 @@ function appRoutes(result: Awaited<ReturnType<typeof open>>) {
 }
 
 beforeEach(async () => {
+  // Exercise the adaptive host, which remains the Android single-pane path.
+  jest.replaceProperty(Platform, 'OS', 'android');
   for (const key of Object.keys(mounts)) delete mounts[key];
   for (const key of Object.keys(cleanups)) delete cleanups[key];
   finishRefresh = undefined;
@@ -199,6 +234,8 @@ beforeEach(async () => {
   });
   await resize(1200, 800);
 });
+
+afterEach(() => jest.restoreAllMocks());
 
 test('layout projection keeps chronological history and never crosses a full-screen boundary', () => {
   const routes = [
@@ -226,6 +263,124 @@ test('layout projection keeps chronological history and never crosses a full-scr
     getVisiblePanes([{ key: 'login', name: 'login/index' }, routes[1]], 1, true)
       .fullKey,
   ).toBe('a');
+});
+
+test('single-pane navigation animates both opening and returning to a mounted page', async () => {
+  await setTwoPanes(false);
+  const timing = jest.spyOn(Animated, 'timing');
+  try {
+    await open();
+    timing.mockClear();
+    await testRouter.push('/answer/a');
+    expect(timing).toHaveBeenCalled();
+    timing.mockClear();
+    await testRouter.back('/');
+    expect(timing).toHaveBeenCalled();
+    expect(screen.getByTestId('instance-home:root').props.children).toBe(1);
+  } finally {
+    timing.mockRestore();
+  }
+});
+
+test('returning from comments keeps the older profile hidden throughout the answer entrance', async () => {
+  await setTwoPanes(false);
+  const timing = jest.spyOn(Animated, 'timing').mockReturnValue({
+    start: jest.fn(),
+    stop: jest.fn(),
+    reset: jest.fn(),
+  });
+  try {
+    const result = await open();
+    await testRouter.push('/user/u');
+    const profileKey = appRoutes(result).at(-1)?.key;
+    await testRouter.push('/answer/a');
+    const answerKey = appRoutes(result).at(-1)?.key;
+    await testRouter.push('/comments/a?type=answer');
+    await testRouter.back('/answer/a');
+    const profile = screen.getByTestId(`adaptive-route-${profileKey}`, {
+      includeHiddenElements: true,
+    });
+    const answer = screen.getByTestId(`adaptive-route-${answerKey}`);
+    const answerTransition = screen.getByTestId(
+      `adaptive-route-${answerKey}-transition`,
+    );
+    expect(profile).toHaveStyle({ opacity: 0 });
+    expect(answer).toHaveStyle({ opacity: 1 });
+    expect(answerTransition).not.toHaveStyle({ opacity: 1 });
+    expect(screen.getByText('answer:a')).toBeVisible();
+  } finally {
+    timing.mockRestore();
+  }
+});
+
+test('closing a detail does not fade the list pane or leave it partly transparent', async () => {
+  const timing = jest.spyOn(Animated, 'timing').mockReturnValue({
+    start: jest.fn(),
+    stop: jest.fn(),
+    reset: jest.fn(),
+  });
+  try {
+    const result = await open();
+    const listKey = appRoutes(result)[0].key;
+    await fireEvent.press(screen.getByText('open-a-home:root'));
+    await testRouter.back('/');
+    expect(screen.getByTestId(`adaptive-route-${listKey}`)).toHaveStyle({
+      opacity: 1,
+    });
+  } finally {
+    timing.mockRestore();
+  }
+});
+
+test('opening a profile does not move or scale the whole page', async () => {
+  await setTwoPanes(false);
+  const timing = jest.spyOn(Animated, 'timing');
+  try {
+    const result = await open();
+    timing.mockClear();
+    await testRouter.push('/user/u');
+    const key = appRoutes(result).at(-1)?.key;
+    expect(key).toBeDefined();
+    const profile = screen.getByTestId(`adaptive-route-${key}-transition`);
+    expect(StyleSheet.flatten(profile.props.style).transform).toBeUndefined();
+    expect(profileProgress).toBeDefined();
+    expect(timing.mock.calls.some(([value]) => value === profileProgress)).toBe(
+      true,
+    );
+  } finally {
+    timing.mockRestore();
+  }
+});
+
+test('recent publications start without a default header and use the fixed-toolbar transition', async () => {
+  await setTwoPanes(false);
+  streamProgress = undefined;
+  streamHeaderStates.length = 0;
+  const timing = jest.spyOn(Animated, 'timing');
+  try {
+    const result = await open('/', true);
+    await testRouter.push('/user/u/stream');
+    const key = appRoutes(result).at(-1)?.key;
+    const route = screen.getByTestId(`adaptive-route-${key}-transition`);
+    expect(streamHeaderStates.length).toBeGreaterThan(0);
+    expect(streamHeaderStates.every((shown) => !shown)).toBe(true);
+    expect(StyleSheet.flatten(route.props.style).transform).toBeUndefined();
+    expect(streamProgress).toBeDefined();
+    expect(timing.mock.calls.some(([value]) => value === streamProgress)).toBe(
+      true,
+    );
+  } finally {
+    timing.mockRestore();
+  }
+});
+
+test('profile never receives a default header even on its first render', async () => {
+  await setTwoPanes(false);
+  profileHeaderStates.length = 0;
+  await open('/', true);
+  await testRouter.push('/user/u');
+  expect(profileHeaderStates.length).toBeGreaterThan(0);
+  expect(profileHeaderStates.every((shown) => !shown)).toBe(true);
 });
 
 test('rotation preserves route keys, draft state and full back order across both panes', async () => {

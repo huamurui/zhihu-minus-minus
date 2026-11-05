@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { FlashList } from '@shopify/flash-list';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
@@ -123,6 +122,7 @@ export default function ColumnDetail() {
       <View type="surface" className="pb-4 border-b" style={{ borderColor }}>
         <View className="flex-row p-5 items-center bg-transparent">
           <Image
+            fadeDuration={0}
             source={getCachedImageSource(column.image_url)}
             className="w-16 h-16 rounded-xl"
             resizeMode="cover"
@@ -219,6 +219,7 @@ export default function ColumnDetail() {
               </Text>
             </View>
             <Image
+              fadeDuration={0}
               source={getCachedImageSource(thumbnail)}
               className="w-24 h-16 rounded"
               resizeMode="cover"
@@ -264,14 +265,6 @@ export default function ColumnDetail() {
           headerShadowVisible: false,
           headerStyle: { backgroundColor },
           headerTintColor: textColor,
-          headerLeft: () => (
-            <BouncyButton
-              onPress={() => router.back()}
-              className="mr-2 p-2 rounded-full"
-            >
-              <Ionicons name="chevron-back" size={28} color={textColor} />
-            </BouncyButton>
-          ),
         }}
       />
 

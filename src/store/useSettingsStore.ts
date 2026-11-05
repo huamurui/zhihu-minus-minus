@@ -2,10 +2,12 @@ import * as SecureStore from 'expo-secure-store';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { colors } from '@/constants/designTokens';
-import type {
-  ReadingBackground,
-  SurfaceStyle,
-  TextContrast,
+import {
+  type ReadingBackground,
+  type SurfaceStyle,
+  type TextContrast,
+  UNREAD_BADGE_STYLE_OPTIONS,
+  type UnreadBadgeStyle,
 } from '@/constants/theme';
 import type { RichContentRenderer } from '@/features/rich-content';
 import type { FilterMode, FilterQualityLevel } from '@/utils/feedFilter';
@@ -103,6 +105,10 @@ function isValidDoubleTapAction(value: unknown): value is DoubleTapAction {
   return value === 'off' || value === 'like' || value === 'comments';
 }
 
+function isValidUnreadBadgeStyle(value: unknown): value is UnreadBadgeStyle {
+  return UNREAD_BADGE_STYLE_OPTIONS.some((option) => option.value === value);
+}
+
 function isValidRichContentRenderer(v: unknown): v is RichContentRenderer {
   return v === 'webview' || v === 'native-v2';
 }
@@ -154,7 +160,9 @@ export interface AppSettings {
   androidFeedbackType: 'ripple' | 'scale-opacity';
   /** 是否开启应用内震动反馈 */
   enableHapticFeedback: boolean;
-  /** iOS 是否使用系统原生底部 Tab（iOS 26+ 显示 Liquid Glass） */
+  /** 关注动态、消息通知与私信的未读角标样式 */
+  unreadBadgeStyle: UnreadBadgeStyle;
+  /** iOS 是否使用系统原生界面与底部 Tab（iOS 26+ 显示 Liquid Glass） */
   useNativeIOSBottomTabs: boolean;
   /** 是否并排显示列表与详情；仅由开关控制，不限制设备、尺寸或方向。 */
   enableLargeScreenLayout: boolean;
@@ -235,6 +243,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   pressScale: 0.98,
   androidFeedbackType: 'ripple',
   enableHapticFeedback: true,
+  unreadBadgeStyle: 'count',
   useNativeIOSBottomTabs: true,
   enableLargeScreenLayout: false,
   largeScreenListRatio: DEFAULT_LARGE_SCREEN_LIST_RATIO,
@@ -318,6 +327,12 @@ export const useSettingsStore = create<SettingsState>()(
           nextSettings.largeScreenListRatio = normalizeLargeScreenListRatio(
             nextSettings.largeScreenListRatio,
           );
+          if (!isValidUnreadBadgeStyle(nextSettings.unreadBadgeStyle)) {
+            nextSettings.unreadBadgeStyle = 'count';
+          }
+          if (typeof nextSettings.useNativeIOSBottomTabs !== 'boolean') {
+            nextSettings.useNativeIOSBottomTabs = true;
+          }
           if (
             typeof nextSettings.recommendRequestIncludeDesktop !== 'boolean'
           ) {
@@ -362,7 +377,7 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'zhihu-settings-storage',
       storage: createJSONStorage(() => settingsStorage),
-      version: 20,
+      version: 21,
       migrate: (rawPersistedState: unknown, version: number) => {
         const persistedState =
           normalizePersistedSettingsState(rawPersistedState);
@@ -529,6 +544,12 @@ export const useSettingsStore = create<SettingsState>()(
         persistedState.largeScreenListRatio = normalizeLargeScreenListRatio(
           persistedState.largeScreenListRatio,
         );
+        // v21 adds unread badge styles; existing installs keep red counts.
+        persistedState.unreadBadgeStyle = isValidUnreadBadgeStyle(
+          persistedState.unreadBadgeStyle,
+        )
+          ? persistedState.unreadBadgeStyle
+          : 'count';
 
         // v20 adds watermark removal, on by default as body images already were.
         persistedState.removeImageWatermark =

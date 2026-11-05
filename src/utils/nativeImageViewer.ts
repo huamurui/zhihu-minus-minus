@@ -40,7 +40,7 @@ interface GaleriaModule {
 /**
  * The patched Galeria viewer (see patches/@nandorojo+galeria+*.patch). Only
  * Android uses it: it decodes long images in tiles, which the JavaScript
- * viewer cannot. iOS keeps the existing viewer.
+ * viewer cannot. Other platforms use the in-app preview.
  */
 const galeria =
   Platform.OS === 'android'

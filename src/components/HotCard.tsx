@@ -1,16 +1,19 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import React, { useMemo } from 'react';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import React, { useMemo, useRef } from 'react';
+import { Platform, StyleSheet, View, type ViewInstance } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useColorScheme } from '@/components/useColorScheme';
 import { colors } from '@/constants/designTokens';
+import {
+  useTitleTransition,
+  useTitleTransitionSource,
+} from '@/features/adaptive-layout/TitleTransition';
 import { usePaneRouter as useRouter } from '@/features/adaptive-layout/usePaneRouter';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useSettingsStore } from '@/store/useSettingsStore';
-import { contrastingText } from '@/utils/colorContrast';
 import { getCachedImageSource } from '@/utils/imageSource';
 import { BouncyButton } from './BouncyButton';
-import { Text, useRuntimeThemeColors } from './Themed';
+import { useContentCardSurface } from './contentCardSurface';
+import { Text } from './Themed';
 
 export interface HotItem {
   id: string;
@@ -30,26 +33,26 @@ export interface HotItem {
   } | null;
 }
 
+/** 前三名用方块角标，颜色由深到浅；之后的排名是橙色数字。 */
+const RANK_BADGE_COLORS = [
+  colors.light.hotRankFirst,
+  colors.light.hotRankSecond,
+  colors.light.hotRankThird,
+];
+
 const HotCardComponent = ({ item }: { item: HotItem }) => {
   const router = useRouter();
+  const transitionTitle = useTitleTransition();
+  const titleRef = useRef<ViewInstance>(null);
+  const titleSource = useTitleTransitionSource(item.id);
+  const currentId = useRef(item.id);
+  currentId.current = item.id;
   const { cookies } = useAuthStore();
   const colorScheme = useColorScheme();
-  const palette = useRuntimeThemeColors();
-  const fontSizeScale = useSettingsStore((state) => state.fontSizeScale);
-  const { fontScale } = useWindowDimensions();
+  const surface = useContentCardSurface({ radius: 14, gap: 8 });
   const isGuest = !cookies;
 
-  const rankBgColor =
-    item.rank === 1
-      ? colors.light.hotRankFirst
-      : item.rank === 2
-        ? colors.light.hotRankSecond
-        : item.rank === 3
-          ? colors.light.hotRankThird
-          : palette.backgroundTertiary;
-  const rankTextColor =
-    item.rank <= 3 ? contrastingText(rankBgColor) : palette.textSecondary;
-
+  const rankBadgeColor = RANK_BADGE_COLORS[item.rank - 1];
   const labelColor =
     colorScheme === 'dark'
       ? item.labelArea?.night_color || colors.light.hotLabel
@@ -61,8 +64,7 @@ const HotCardComponent = ({ item }: { item: HotItem }) => {
   const labelText =
     item.labelArea?.type === 'text' ? item.labelArea.text : undefined;
   const hasTrend = item.labelArea?.type === 'trend';
-  const hasAnswerCount = (item.answerCount ?? 0) > 0;
-  const hasMetadata = labelText || hasTrend || item.hotValue || hasAnswerCount;
+  const sourceTitle = <Text style={styles.title}>{item.title}</Text>;
 
   return (
     <BouncyButton
@@ -83,165 +85,140 @@ const HotCardComponent = ({ item }: { item: HotItem }) => {
               }),
             },
           });
+        } else if (Platform.OS === 'android') {
+          transitionTitle(
+            titleRef,
+            item.questionId,
+            item.title,
+            () => {
+              if (currentId.current !== item.id) return;
+              router.push({
+                pathname: '/question/[id]',
+                params: { id: item.questionId, title: item.title },
+              });
+            },
+            () => currentId.current === item.id,
+            titleSource.onSourceHiddenChange,
+            sourceTitle,
+          );
         } else {
-          router.push(`/question/${item.questionId}`);
+          router.push({
+            pathname: '/question/[id]',
+            params: { id: item.questionId, title: item.title },
+          });
         }
       }}
-      style={[styles.card, { backgroundColor: palette.backgroundSecondary }]}
+      style={[styles.row, surface]}
     >
-      <View style={styles.content}>
-        <View
-          style={[
-            styles.textColumn,
-            // 窄屏或大字体时让配图换到下一行，保留标题的阅读宽度。
-            { flexBasis: 180 * fontSizeScale * fontScale },
-          ]}
-        >
-          <View style={styles.titleRow}>
-            <View style={[styles.rankBadge, { backgroundColor: rankBgColor }]}>
-              <Text
-                style={[styles.rankText, { color: rankTextColor }]}
-                numberOfLines={1}
-              >
-                {item.rank}
-              </Text>
-            </View>
-            <Text style={styles.title}>{item.title}</Text>
+      <View style={styles.rankColumn}>
+        {rankBadgeColor ? (
+          <View style={[styles.rankBadge, { backgroundColor: rankBadgeColor }]}>
+            <Text style={styles.rankBadgeText}>{item.rank}</Text>
           </View>
-          {hasMetadata ? (
-            <View style={styles.metadata}>
-              {labelText ? (
-                <View
-                  style={[styles.label, { backgroundColor: `${labelColor}15` }]}
-                >
-                  <Text style={[styles.labelText, { color: labelColor }]}>
-                    {labelText}
-                  </Text>
-                </View>
-              ) : null}
-              {hasTrend ? (
-                <View
-                  accessibilityLabel="热度上升"
-                  accessible
-                  style={[styles.label, { backgroundColor: `${labelColor}15` }]}
-                >
-                  <Ionicons name="trending-up" size={12} color={labelColor} />
-                </View>
-              ) : null}
-              {item.hotValue ? (
-                <Text
-                  style={[
-                    styles.metadataText,
-                    { color: colors.light.hotLabel },
-                  ]}
-                >
-                  {item.hotValue}
-                </Text>
-              ) : null}
-              {hasAnswerCount ? (
-                <Text type="secondary" style={styles.metadataText}>
-                  {item.answerCount} 个回答
-                </Text>
-              ) : null}
-            </View>
-          ) : null}
-        </View>
-        {imageSource ? (
-          <Animated.Image
-            source={imageSource}
-            sharedTransitionTag={`image-${item.id}`}
-            style={styles.image}
-            resizeMode="cover"
-            accessible={false}
-          />
+        ) : (
+          <Text
+            style={[styles.rank, { color: colors.light.hotLabel }]}
+            numberOfLines={1}
+          >
+            {item.rank}
+          </Text>
+        )}
+        {labelText ? (
+          <View style={[styles.label, { borderColor: labelColor }]}>
+            <Text style={[styles.labelText, { color: labelColor }]}>
+              {labelText}
+            </Text>
+          </View>
+        ) : null}
+        {hasTrend ? (
+          <View accessibilityLabel="热度上升" accessible style={styles.trend}>
+            <Ionicons name="trending-up" size={13} color={labelColor} />
+          </View>
         ) : null}
       </View>
+      <View style={styles.textColumn}>
+        <View
+          ref={titleRef}
+          collapsable={false}
+          style={titleSource.hidden ? { opacity: 0 } : undefined}
+        >
+          {sourceTitle}
+        </View>
+        {item.hotValue ? (
+          <Text type="secondary" style={styles.hotValue} numberOfLines={1}>
+            {item.hotValue}
+          </Text>
+        ) : null}
+      </View>
+      {imageSource ? (
+        <Animated.Image
+          fadeDuration={0}
+          source={imageSource}
+          style={styles.image}
+          resizeMode="cover"
+          accessible={false}
+        />
+      ) : null}
     </BouncyButton>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
-    paddingHorizontal: 12,
-    paddingVertical: 16,
-    marginBottom: 12,
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
     marginHorizontal: 12,
-    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
   },
-  content: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  textColumn: {
-    flexGrow: 1,
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
+  rankColumn: {
+    minWidth: 24,
+    alignItems: 'center',
+    gap: 4,
   },
   rankBadge: {
-    // 序号随字体和行高增长，不用固定尺寸裁切两位数或大字体。
     minWidth: 20,
     minHeight: 20,
-    flexShrink: 0,
-    alignSelf: 'flex-start',
+    paddingHorizontal: 2,
+    paddingVertical: 1,
+    borderRadius: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    marginTop: 2,
-    borderRadius: 4,
   },
-  // 显式传给 Themed.Text，确保它按实际字号和行高应用阅读偏好。
-  rankText: {
-    fontSize: 11,
-    lineHeight: 16.5,
+  rankBadgeText: {
+    color: '#ffffff',
+    fontSize: 14,
+    lineHeight: 18,
     fontWeight: '800',
   },
-  title: {
-    flex: 1,
-    minWidth: 0,
-    fontSize: 17,
-    lineHeight: 25.5,
-    fontWeight: '700',
-  },
-  image: {
-    width: 85,
-    maxWidth: '100%',
-    aspectRatio: 10 / 9,
-    marginLeft: 'auto',
-    borderRadius: 10,
-    borderWidth: 0.5,
-    borderColor: 'rgba(0,0,0,0.05)',
-  },
-  metadata: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 8,
+  // 显式传给 Themed.Text，确保它按实际字号和行高应用阅读偏好。
+  rank: {
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
   },
   label: {
-    maxWidth: '100%',
-    flexShrink: 1,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+    paddingHorizontal: 2,
+    borderRadius: 3,
+    borderWidth: StyleSheet.hairlineWidth * 2,
   },
-  labelText: {
-    fontSize: 11,
+  labelText: { fontSize: 10, lineHeight: 14, fontWeight: '700' },
+  trend: { alignItems: 'center' },
+  textColumn: { flex: 1, minWidth: 0 },
+  title: {
+    fontSize: 15,
+    lineHeight: 22,
     fontWeight: '700',
   },
-  metadataText: {
-    maxWidth: '100%',
-    flexShrink: 1,
-    fontSize: 12,
-    fontWeight: '500',
+  hotValue: { marginTop: 6, fontSize: 13 },
+  image: {
+    width: 60,
+    height: 60,
+    borderRadius: 6,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(0,0,0,0.05)',
   },
 });
 

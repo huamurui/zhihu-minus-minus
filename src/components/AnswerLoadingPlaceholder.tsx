@@ -40,12 +40,17 @@ function LayoutLoadingIndicator({ message }: { message: string }) {
 
 export function AnswerLoadingPlaceholder({
   phase,
+  minHeight = 200,
 }: {
   phase: AnswerLoadingPhase;
+  minHeight?: number;
 }) {
   const message = loadingMessages[phase];
   return (
-    <View className="h-[200px] justify-center items-center bg-transparent">
+    <View
+      className="justify-center items-center bg-transparent"
+      style={{ minHeight }}
+    >
       {phase === 'fetching-answer' ? (
         <LoadingIndicator message={message} />
       ) : (
