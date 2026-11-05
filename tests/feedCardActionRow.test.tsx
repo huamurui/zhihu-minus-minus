@@ -95,11 +95,17 @@ jest.mock('../src/components/VoteTriangle', () => {
   };
 });
 jest.mock('../src/components/Themed', () => {
+  const react = jest.requireActual<typeof import('react')>('react');
   const native =
     jest.requireActual<typeof import('react-native')>('react-native');
   return {
     Text: native.Text,
     View: native.View,
+    ThemedIcon: ({ name, size }: { name: string; size: number }) =>
+      react.createElement(native.Text, {
+        testID: `icon:${name}`,
+        style: { fontSize: size },
+      }),
     useThemeColor: () => '#1364cc',
     useRuntimeThemeColors: () => ({
       shadow: '#000000',
