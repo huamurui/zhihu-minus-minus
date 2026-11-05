@@ -68,6 +68,43 @@ test('opens at the requested page and saves the currently selected original', as
   expect(saveImageToGallery).toHaveBeenCalledWith(originals[0]);
 });
 
+test('reopening starts the pager, indicator and save action at the new initial page', async () => {
+  const host = await show();
+  const pager = host.container.queryAll(
+    (node) => typeof node.props.onPageSelected === 'function',
+  )[0];
+  await fireEvent(pager, 'pageSelected', { nativeEvent: { position: 0 } });
+  await host.rerender(
+    <ImagePreviewModal
+      visible={false}
+      imageUrls={urls}
+      onClose={host.onClose}
+    />,
+  );
+  await host.rerender(
+    <ImagePreviewModal
+      visible
+      imageUrls={urls}
+      originalUrls={originals}
+      initialIndex={1}
+      onClose={host.onClose}
+    />,
+  );
+  const layout = host.container.queryAll(
+    (node) => typeof node.props.onLayout === 'function',
+  )[0];
+  await fireEvent(layout, 'layout', {
+    nativeEvent: { layout: { width: 320, height: 640 } },
+  });
+  const reopenedPager = host.container.queryAll(
+    (node) => typeof node.props.onPageSelected === 'function',
+  )[0];
+  expect(reopenedPager.props.initialPage).toBe(1);
+  expect(host.getByText('2 / 2')).toBeTruthy();
+  await fireEvent.press(host.getByLabelText('保存图片'));
+  expect(saveImageToGallery).toHaveBeenCalledWith(urls[1]);
+});
+
 test('long press uses the original and zoom disables page swiping', async () => {
   const host = await show();
   const images = host.container.queryAll((node) => node.type === 'Image');

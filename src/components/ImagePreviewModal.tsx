@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Image,
   Pressable,
@@ -35,9 +35,9 @@ export interface ImagePreviewModalProps {
 export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = (props) =>
   isNativeImageViewerAvailable() ? (
     <NativeImagePreview {...props} />
-  ) : (
+  ) : props.visible && props.imageUrls.length > 0 ? (
     <JsImagePreview {...props} />
-  );
+  ) : null;
 
 /**
  * Android: the native viewer decodes long images in tiles, so they stay sharp
@@ -54,7 +54,10 @@ function NativeImagePreview({
   const [sheetUrl, setSheetUrl] = useState<string | null>(null);
   const session = useRef(0);
   const latest = useRef({ imageUrls, originalUrls, initialIndex, onClose });
-  latest.current = { imageUrls, originalUrls, initialIndex, onClose };
+
+  useLayoutEffect(() => {
+    latest.current = { imageUrls, originalUrls, initialIndex, onClose };
+  }, [imageUrls, originalUrls, initialIndex, onClose]);
 
   useEffect(() => {
     const subscriptions = [
@@ -113,7 +116,6 @@ function NativeImagePreview({
 }
 
 function JsImagePreview({
-  visible,
   imageUrls,
   originalUrls,
   initialIndex = 0,
@@ -123,21 +125,12 @@ function JsImagePreview({
   const [sheetUrl, setSheetUrl] = useState<string | null>(null);
   const [zoomed, setZoomed] = useState(false);
   const [size, setSize] = useState({ width: 0, height: 0 });
-  useEffect(() => {
-    if (visible) {
-      setCurrentIndex(initialIndex);
-      setZoomed(false);
-    }
-  }, [visible, initialIndex]);
-
   const displayedIndex = Math.min(
     Math.max(currentIndex, 0),
     Math.max(imageUrls.length - 1, 0),
   );
   const currentUrl =
     originalUrls?.[displayedIndex] ?? imageUrls[displayedIndex];
-  if (!visible || imageUrls.length === 0) return null;
-
   return (
     <PaneModal
       visible

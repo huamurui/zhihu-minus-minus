@@ -126,6 +126,24 @@ test('events from another viewer session are ignored', async () => {
   expect(onClose).not.toHaveBeenCalled();
 });
 
+test('dismiss uses the latest committed close callback without reopening', async () => {
+  const { rerender, onClose } = await show();
+  const nextOnClose = jest.fn();
+  await rerender(
+    <ImagePreviewModal
+      visible
+      imageUrls={SHOWN}
+      originalUrls={ORIGINALS}
+      initialIndex={1}
+      onClose={nextOnClose}
+    />,
+  );
+  await act(async () => emit('onViewerDismiss', { session: 7 }));
+  expect(onClose).not.toHaveBeenCalled();
+  expect(nextOnClose).toHaveBeenCalledTimes(1);
+  expect(mockOpen).toHaveBeenCalledTimes(1);
+});
+
 test('the preview closes when the viewer cannot open', async () => {
   mockOpen.mockResolvedValue(0);
   const { onClose } = await show();
