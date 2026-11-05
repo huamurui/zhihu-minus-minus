@@ -721,6 +721,7 @@ test('an active answer enables collection immediately before comments using its 
       type: 'answer',
       isCollected: true,
       count: 123,
+      countDisplay: 'corner',
       disabled: false,
     }),
   );
@@ -731,6 +732,16 @@ test('an active answer enables collection immediately before comments using its 
       .map((button) => button.props.accessibilityLabel)
       .filter((label) => label === '收藏' || label === '评论'),
   ).toEqual(['收藏', '评论']);
+});
+
+test('shows the comment count in the action and exposes the full count', async () => {
+  const host = await renderAnswer({
+    cachedAnswer: { ...answer, comment_count: 12345 },
+    isFocused: true,
+  });
+  const button = host.getByRole('button', { name: '评论' });
+  expect(button).toHaveProp('accessibilityValue', { text: '12345 条评论' });
+  expect(host.getByText('1.2万')).toBeTruthy();
 });
 
 test('shows cached answer endorsements above relationship and body while disabling inactive actions', async () => {
