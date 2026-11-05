@@ -49,6 +49,57 @@ function elements(html: string, tag: string): Element[] {
 }
 
 describe('stored Zhihu dialect fixtures through Native V2 normalization', () => {
+  it('retains dense inline formulas and their surrounding text as selectable flow attachments', () => {
+    const { document } = normalizeZhihuDocument(
+      string(fixture('ios-dense-inline-formulas-001').content),
+      { documentId: 'fixture:ios-dense-inline-formulas' },
+    );
+    const parts = compileZhihuDocument(document, {
+      fontSize: 17,
+      lineHeight: 25.5,
+    }).parts;
+    const part = parts[0];
+    if (part.type !== 'flow') throw new Error('Expected a text flow');
+    expect(part.flow.text).toContain(
+      '这样的时间界不会沿一般多项式的时间归约传递',
+    );
+    expect(part.flow.attachments).toHaveLength(18);
+    expect(part.flow.attachments.every((item) => item.kind === 'formula')).toBe(
+      true,
+    );
+    expect(part.flow.attachments[4].latex).toContain('\\sqrt');
+    expect(part.flow.attachments[16].copyText).toBe('2^{n^{o(1)}}');
+    const sources = part.flow.sourceMap.filter(
+      (item) => item.kind !== 'synthetic',
+    );
+    const firstSource = sources[0];
+    const lastSource = sources.at(-1);
+    if (!firstSource || !lastSource) throw new Error('Expected source ranges');
+    expect(
+      mapRichTextSelection(part.flow, 0, part.flow.text.length),
+    ).toMatchObject({
+      start: { nodeId: firstSource.nodeId, offset: firstSource.sourceStart },
+      end: { nodeId: lastSource.nodeId, offset: lastSource.sourceEnd },
+    });
+    const selectionStart = part.flow.text.indexOf('每个固定的');
+    const selectionEnd =
+      part.flow.text.indexOf('给定', part.flow.attachments[0].end) + 2;
+    expect(selectionStart).toBeGreaterThanOrEqual(0);
+    expect(selectionEnd).toBeGreaterThan(part.flow.attachments[0].end);
+    expect(
+      mapRichTextSelection(part.flow, selectionStart, selectionEnd),
+    ).toMatchObject({
+      text: '每个固定的 k≥2 ，给定',
+      start: { paragraphId: 'paragraph-1' },
+      end: { paragraphId: 'paragraph-1' },
+    });
+    expect(
+      part.flow.attachments.every(
+        (item) => item.width === undefined && item.height === undefined,
+      ),
+    ).toBe(true);
+  });
+
   it('normalizes all three stored pin content arrays in sequence without dropping their separate card or images', () => {
     const manifest = parseRichContentFixtureManifest(
       JSON.parse(
