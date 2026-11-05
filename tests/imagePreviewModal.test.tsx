@@ -1,205 +1,142 @@
 import { fireEvent, render } from '@testing-library/react-native';
-import type React from 'react';
-import { Animated, Image } from 'react-native';
-import type ImageViewer from 'react-native-image-zoom-viewer';
 import { ImagePreviewModal } from '../src/components/ImagePreviewModal';
 import { saveImageToGallery } from '../src/utils/saveImage';
 
-type ViewerProps = React.ComponentProps<typeof ImageViewer>;
-const mockViewerProps: ViewerProps[] = [];
-
-jest.mock('react-native-image-zoom-viewer', () => {
-  const React = jest.requireActual<typeof import('react')>('react');
-  const ActualViewer = jest.requireActual<
-    typeof import('react-native-image-zoom-viewer')
-  >('react-native-image-zoom-viewer').default;
-  return {
-    __esModule: true,
-    default: (props: ViewerProps) => {
-      mockViewerProps.push(props);
-      return React.createElement(ActualViewer, props);
-    },
-  };
-});
-jest.mock('react-native-image-pan-zoom', () => ({
+jest.mock('../src/utils/nativeImageViewer', () => ({
+  isNativeImageViewerAvailable: () => false,
+}));
+jest.mock('react-native-pager-view', () => ({
   __esModule: true,
   default: jest.requireActual('react-native').View,
 }));
-jest.mock('../src/components/BouncyButton', () => ({
-  BouncyButton: jest.requireActual('react-native').Pressable,
+jest.mock('../src/components/navigation/GlassNavigationButton', () => ({
+  GlassNavigationButton: jest.requireActual('react-native').Pressable,
 }));
 jest.mock('../src/components/ImageActionBottomSheet', () => ({
-  ImageActionBottomSheet: () => null,
+  ImageActionBottomSheet: ({
+    visible,
+    imageUrl,
+  }: {
+    visible: boolean;
+    imageUrl: string | null;
+  }) => {
+    const { Text } =
+      jest.requireActual<typeof import('react-native')>('react-native');
+    return visible ? <Text testID="image-action-sheet">{imageUrl}</Text> : null;
+  },
 }));
 jest.mock('../src/components/Themed', () => ({
   Text: jest.requireActual('react-native').Text,
 }));
-jest.mock('@expo/vector-icons/Ionicons', () => () => null);
 jest.mock('../src/utils/saveImage', () => ({ saveImageToGallery: jest.fn() }));
 
-beforeEach(() => {
-  mockViewerProps.length = 0;
-  jest.clearAllMocks();
-  jest.spyOn(Image, 'getSize').mockImplementation((_uri, success) => {
-    success(640, 480);
+const urls = ['https://example.test/a.jpg', 'https://example.test/b.jpg'];
+const originals = ['https://example.test/original.jpg', undefined] as const;
+
+beforeEach(() => jest.clearAllMocks());
+
+async function show() {
+  const onClose = jest.fn();
+  const host = await render(
+    <ImagePreviewModal
+      visible
+      imageUrls={urls}
+      originalUrls={originals}
+      initialIndex={1}
+      onClose={onClose}
+    />,
+  );
+  const layout = host.container.queryAll(
+    (node) => typeof node.props.onLayout === 'function',
+  )[0];
+  await fireEvent(layout, 'layout', {
+    nativeEvent: { layout: { width: 320, height: 640 } },
   });
-  jest.spyOn(Image, 'prefetch').mockResolvedValue(true);
-  jest.spyOn(Animated, 'timing').mockImplementation(() => ({
-    start: (callback) => callback?.({ finished: true }),
-    stop: jest.fn(),
-    reset: jest.fn(),
-  }));
-});
-
-afterEach(() => {
-  jest.restoreAllMocks();
-});
-
-function latestViewerProps() {
-  return mockViewerProps[mockViewerProps.length - 1];
+  return { ...host, onClose };
 }
 
-test('reopening a loaded image reuses its original dimensions without another getSize or prefetch', async () => {
-  const imageUrls = ['https://example.test/reopened.jpg'];
-  const onClose = jest.fn();
-  const view = (visible: boolean) => (
+test('opens at the requested page and saves the currently selected original', async () => {
+  const host = await show();
+  expect(host.getByText('2 / 2')).toBeTruthy();
+  const pager = host.container.queryAll(
+    (node) => typeof node.props.onPageSelected === 'function',
+  )[0];
+  expect(pager.props.initialPage).toBe(1);
+  await fireEvent(pager, 'pageSelected', { nativeEvent: { position: 0 } });
+  expect(host.getByText('1 / 2')).toBeTruthy();
+  await fireEvent.press(host.getByLabelText('保存图片'));
+  expect(saveImageToGallery).toHaveBeenCalledWith(originals[0]);
+});
+
+test('reopening starts the pager, indicator and save action at the new initial page', async () => {
+  const host = await show();
+  const pager = host.container.queryAll(
+    (node) => typeof node.props.onPageSelected === 'function',
+  )[0];
+  await fireEvent(pager, 'pageSelected', { nativeEvent: { position: 0 } });
+  await host.rerender(
     <ImagePreviewModal
-      visible={visible}
-      imageUrls={imageUrls}
-      onClose={onClose}
-    />
+      visible={false}
+      imageUrls={urls}
+      onClose={host.onClose}
+    />,
   );
-  const host = await render(view(true));
-  expect(Image.getSize).toHaveBeenCalledTimes(1);
-  const image = host.container.queryAll((node) => node.type === 'Image')[0];
-  expect(image).toBeTruthy();
-  expect(image.props.source).toEqual({
-    uri: imageUrls[0],
+  await host.rerender(
+    <ImagePreviewModal
+      visible
+      imageUrls={urls}
+      originalUrls={originals}
+      initialIndex={1}
+      onClose={host.onClose}
+    />,
+  );
+  const layout = host.container.queryAll(
+    (node) => typeof node.props.onLayout === 'function',
+  )[0];
+  await fireEvent(layout, 'layout', {
+    nativeEvent: { layout: { width: 320, height: 640 } },
+  });
+  const reopenedPager = host.container.queryAll(
+    (node) => typeof node.props.onPageSelected === 'function',
+  )[0];
+  expect(reopenedPager.props.initialPage).toBe(1);
+  expect(host.getByText('2 / 2')).toBeTruthy();
+  await fireEvent.press(host.getByLabelText('保存图片'));
+  expect(saveImageToGallery).toHaveBeenCalledWith(urls[1]);
+});
+
+test('long press uses the original and zoom disables page swiping', async () => {
+  const host = await show();
+  const images = host.container.queryAll((node) => node.type === 'Image');
+  expect(images[0].props.source).toEqual({
+    uri: originals[0],
     cache: 'force-cache',
   });
+  const pager = host.container.queryAll(
+    (node) => typeof node.props.onPageSelected === 'function',
+  )[0];
+  const scroll = host.container.queryAll(
+    (node) => typeof node.props.onScroll === 'function',
+  )[0];
+  await fireEvent(scroll, 'scroll', { nativeEvent: { zoomScale: 2 } });
+  expect(pager.props.scrollEnabled).toBe(false);
+  await fireEvent(scroll, 'scroll', { nativeEvent: { zoomScale: 1 } });
+  expect(pager.props.scrollEnabled).toBe(true);
+  await fireEvent(images[0], 'longPress');
+  expect(host.getByTestId('image-action-sheet')).toHaveTextContent(
+    originals[0],
+  );
+  await fireEvent.press(host.getByLabelText('关闭'));
+  expect(host.onClose).toHaveBeenCalledTimes(1);
+});
+
+test('long images are displayed at full width and can scroll vertically', async () => {
+  const host = await show();
+  const image = host.container.queryAll((node) => node.type === 'Image')[0];
   await fireEvent(image, 'load', {
-    nativeEvent: {
-      source: { width: 1280, height: 960, uri: imageUrls[0] },
-    },
+    nativeEvent: { source: { width: 100, height: 1000 } },
   });
-
-  await host.rerender(view(false));
-  await host.rerender(view(true));
-  expect(latestViewerProps().imageUrls[0]).toMatchObject({
-    url: imageUrls[0],
-    width: 1280,
-    height: 960,
-  });
-  expect(Image.getSize).toHaveBeenCalledTimes(1);
-  expect(Image.prefetch).not.toHaveBeenCalled();
-  expect(host.container.queryAll((node) => node.type === 'Image')).toHaveLength(
-    1,
-  );
-  await host.unmount();
-  await render(view(true));
-  expect(Image.getSize).toHaveBeenCalledTimes(1);
-});
-
-test('changing a URL while open loads the new image without reusing previous dimensions', async () => {
-  const firstUrl = 'https://example.test/changed.jpg?version=1';
-  const secondUrl = 'https://example.test/changed.jpg?version=2';
-  const onClose = jest.fn();
-  const view = (url: string) => (
-    <ImagePreviewModal visible imageUrls={[url]} onClose={onClose} />
-  );
-  const host = await render(view(firstUrl));
-  await fireEvent(
-    host.container.queryAll((node) => node.type === 'Image')[0],
-    'load',
-    { nativeEvent: { source: { width: 800, height: 600 } } },
-  );
-
-  await host.rerender(view(secondUrl));
-  expect(Image.getSize).toHaveBeenCalledTimes(2);
-  expect(Image.getSize).toHaveBeenLastCalledWith(
-    secondUrl,
-    expect.any(Function),
-    expect.any(Function),
-  );
-  expect(latestViewerProps().imageUrls[0].width).toBeUndefined();
-  expect(latestViewerProps().imageUrls[0].height).toBeUndefined();
   expect(
-    host.container.queryAll((node) => node.type === 'Image')[0].props.source,
-  ).toEqual({ uri: secondUrl, cache: 'force-cache' });
-});
-
-test('cached rendering preserves onLoad and ignores invalid dimensions', async () => {
-  const uri = 'https://example.test/callback.jpg';
-  const onLoad = jest.fn();
-  const onClose = jest.fn();
-  const host = await render(
-    <ImagePreviewModal visible imageUrls={[uri]} onClose={onClose} />,
-  );
-  const renderImage = latestViewerProps().renderImage;
-  if (!renderImage) throw new Error('Expected a cached image renderer');
-  const imageHost = await render(
-    renderImage({ source: { uri, width: 900, height: 600 }, onLoad }),
-  );
-  expect(
-    imageHost.container.queryAll((node) => node.type === 'Image')[0].props
-      .source,
-  ).toEqual({ uri, width: 900, height: 600, cache: 'force-cache' });
-  const event = { nativeEvent: { source: { width: 0, height: 0 } } };
-  await fireEvent(
-    imageHost.container.queryAll((node) => node.type === 'Image')[0],
-    'load',
-    event,
-  );
-  expect(onLoad).toHaveBeenCalledWith(event);
-  await host.rerender(
-    <ImagePreviewModal visible={false} imageUrls={[uri]} onClose={onClose} />,
-  );
-  await host.rerender(
-    <ImagePreviewModal visible imageUrls={[uri]} onClose={onClose} />,
-  );
-  expect(latestViewerProps().imageUrls[0].width).toBeUndefined();
-  expect(Image.getSize).toHaveBeenCalledTimes(2);
-});
-
-test('first opening stays usable and close and save still target the current image', async () => {
-  const imageUrls = [
-    'https://example.test/actions-first.jpg',
-    'https://example.test/actions-second.jpg',
-  ];
-  const onClose = jest.fn();
-  const host = await render(
-    <ImagePreviewModal
-      visible
-      imageUrls={imageUrls}
-      initialIndex={1}
-      onClose={onClose}
-    />,
-  );
-  expect(Image.getSize).toHaveBeenCalledWith(
-    imageUrls[1],
-    expect.any(Function),
-    expect.any(Function),
-  );
-  expect(host.getByText('2 / 2')).toBeTruthy();
-  const buttons = host.container.queryAll((node) => node.props.hitSlop === 12);
-  expect(buttons).toHaveLength(2);
-  await fireEvent.press(buttons[0]);
-  expect(onClose).toHaveBeenCalledTimes(1);
-  await fireEvent.press(buttons[1]);
-  expect(saveImageToGallery).toHaveBeenCalledWith(imageUrls[1]);
-  expect(latestViewerProps().enablePreload).toBe(false);
-  await host.rerender(
-    <ImagePreviewModal
-      visible
-      imageUrls={[imageUrls[0]]}
-      initialIndex={1}
-      onClose={onClose}
-    />,
-  );
-  expect(latestViewerProps().index).toBe(0);
-  const updatedButtons = host.container.queryAll(
-    (node) => node.props.hitSlop === 12,
-  );
-  await fireEvent.press(updatedButtons[1]);
-  expect(saveImageToGallery).toHaveBeenLastCalledWith(imageUrls[0]);
+    host.container.queryAll((node) => node.props.style?.height === 3200),
+  ).not.toHaveLength(0);
 });

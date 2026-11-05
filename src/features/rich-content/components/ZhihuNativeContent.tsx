@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import {
   Image,
+  PixelRatio,
   Platform,
   Pressable,
   ScrollView,
@@ -25,7 +26,18 @@ import {
 } from '@/modules/zhihu-rich-text';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ZhihuContentSegment, ZhihuSegmentInfo } from '@/types/zhihu';
+import {
+  getImageResizeMethod,
+  getServedImageSize,
+  isLongImage,
+  LONG_IMAGE_CROP_ASPECT,
+} from '@/utils/imageDecode';
 import { getCachedImageSource } from '@/utils/imageSource';
+import {
+  cropLongImage,
+  isNativeImageViewerAvailable,
+  type LongImageCrop,
+} from '@/utils/nativeImageViewer';
 import { getZhihuVideoRoute } from '@/utils/zhihuVideoRoute';
 import {
   compileZhihuDocument,
@@ -106,7 +118,12 @@ export interface ZhihuNativeContentProps {
   lineHeightScale?: number;
   options?: ZhihuNativeTypographyOptions;
   onLinkPress?: (url: string) => void;
-  onImagePress?: (url: string, gallery: readonly string[]) => void;
+  /** `originals[i]` is the full-size image for `gallery[i]`, when known. */
+  onImagePress?: (
+    url: string,
+    gallery: readonly string[],
+    originals?: readonly (string | undefined)[],
+  ) => void;
   onImageLongPress?: (url: string) => void;
   onSelectionChange?: (
     selection: ZhihuNativeContentSelection,
@@ -468,6 +485,34 @@ function NativeParagraph(props: BlockViewProps) {
   );
 }
 
+/**
+ * The top of a long image, cut natively at the width it is shown at.
+ * undefined while cutting; null when there is nothing to cut or it failed.
+ */
+function useLongImageCrop(
+  url: string | null,
+  targetWidth: number,
+): LongImageCrop | null | undefined {
+  const key = url ? `${url}|${targetWidth}` : null;
+  const [result, setResult] = useState<{
+    key: string;
+    crop: LongImageCrop | null;
+  } | null>(null);
+  useEffect(() => {
+    if (!url || !key) return;
+    let current = true;
+    cropLongImage(url, LONG_IMAGE_CROP_ASPECT, targetWidth).then(
+      (crop) => current && setResult({ key, crop }),
+      () => current && setResult({ key, crop: null }),
+    );
+    return () => {
+      current = false;
+    };
+  }, [key, url, targetWidth]);
+  if (!key) return null;
+  return result?.key === key ? result.crop : undefined;
+}
+
 function NativeBlock(props: BlockViewProps) {
   const {
     block,
@@ -489,6 +534,21 @@ function NativeBlock(props: BlockViewProps) {
     width: number;
     height: number;
   } | null>(null);
+  // Very long images show only their top, like the official app: drawn whole
+  // they would need a bitmap taller than the GPU accepts and blur.
+  const longImageUrl =
+    block.type === 'image' &&
+    block.role !== 'avatar' &&
+    block.layout !== 'small' &&
+    !block.resource.offlineUri &&
+    isNativeImageViewerAvailable() &&
+    isLongImage(block.resource.width, block.resource.height)
+      ? (block.resource.originalUrl ?? block.resource.url)
+      : null;
+  const longImage = useLongImageCrop(
+    longImageUrl,
+    PixelRatio.getPixelSizeForLayoutSize(width),
+  );
   const textStyle = { color: textColor, fontSize, lineHeight };
   switch (block.type) {
     case 'image': {
@@ -547,6 +607,33 @@ function NativeBlock(props: BlockViewProps) {
                 height={imageHeight}
                 onError={() => setFailedImageUri(uri)}
               />
+            ) : longImageUrl && longImage !== null ? (
+              <View
+                testID="native-long-image"
+                style={[
+                  styles.longImage,
+                  {
+                    width: imageWidth,
+                    height: longImage
+                      ? (imageWidth * longImage.cropHeight) /
+                        longImage.cropWidth
+                      : imageWidth * LONG_IMAGE_CROP_ASPECT,
+                    backgroundColor: surfaceColor,
+                  },
+                ]}
+              >
+                {longImage ? (
+                  <Image
+                    source={getCachedImageSource(longImage.uri)}
+                    style={StyleSheet.absoluteFill}
+                    resizeMode="cover"
+                    onError={() => setFailedImageUri(uri)}
+                  />
+                ) : null}
+                <View style={styles.longImageBadge}>
+                  <Text style={styles.longImageBadgeText}>长图</Text>
+                </View>
+              </View>
             ) : (
               <Image
                 source={getCachedImageSource(uri)}
@@ -556,6 +643,16 @@ function NativeBlock(props: BlockViewProps) {
                   borderRadius: 8,
                 }}
                 resizeMode="contain"
+                // Decide from the file actually fetched, not the original's size.
+                resizeMethod={getImageResizeMethod({
+                  ...getServedImageSize(
+                    block.resource.url,
+                    block.resource.width,
+                    block.resource.height,
+                  ),
+                  displayPixels:
+                    PixelRatio.getPixelSizeForLayoutSize(imageWidth),
+                })}
                 onError={() => setFailedImageUri(uri)}
                 onLoad={(event) => {
                   const { width: loadedWidth, height: loadedHeight } =
@@ -982,8 +1079,9 @@ export const ZhihuNativeContent = React.memo(function ZhihuNativeContent(
               }
               onImagePress={
                 interactive
-                  ? (url, gallery) =>
-                      isCurrent() && props.onImagePress?.(url, gallery)
+                  ? (url, gallery, originals) =>
+                      isCurrent() &&
+                      props.onImagePress?.(url, gallery, originals)
                   : undefined
               }
               onImageLongPress={
@@ -1173,16 +1271,16 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
   }
   const currentCompilation = useRef(compiled);
   currentCompilation.current = compiled;
-  const previewImages = useMemo(
-    () =>
-      getZhihuDocumentPreviewImages(normalized.document).map(
-        (image) => image.url,
-      ),
-    [normalized.document],
-  );
+  const { previewImages, previewOriginals } = useMemo(() => {
+    const images = getZhihuDocumentPreviewImages(normalized.document);
+    return {
+      previewImages: images.map((image) => image.url),
+      previewOriginals: images.map((image) => image.originalUrl),
+    };
+  }, [normalized.document]);
   const handleImage = useCallback(
-    (url: string) => onImagePress?.(url, previewImages),
-    [onImagePress, previewImages],
+    (url: string) => onImagePress?.(url, previewImages, previewOriginals),
+    [onImagePress, previewImages, previewOriginals],
   );
   const measuredFlowsRef = useRef(new Map<string, string>());
   const measuredBodyKeyRef = useRef<string | null>(null);
@@ -1635,6 +1733,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 8,
   },
+  longImage: { borderRadius: 8, overflow: 'hidden' },
+  longImageBadge: {
+    position: 'absolute',
+    right: 8,
+    bottom: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+  },
+  longImageBadgeText: { color: '#fff', fontSize: 11, lineHeight: 15 },
   caption: { fontSize: 12, lineHeight: 18, marginTop: 6 },
   formula: { alignItems: 'center', paddingVertical: 12 },
   formulaFallback: { fontFamily: 'monospace', fontSize: 17, padding: 12 },
