@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -6,7 +6,12 @@ import path from 'node:path';
 // Exercise the production Swift implementation from the rich-content test
 // suite without adding an iOS-only test target. Other platforms still run the
 // document/attachment fixture tests and skip this CoreSVG compatibility check.
-const testOnMac = process.platform === 'darwin' ? test : test.skip;
+// macOS developers without the Swift toolchain can run the other tests too.
+const hasSwiftCompiler =
+  process.platform === 'darwin' &&
+  spawnSync('xcrun', ['--find', 'swiftc'], { stdio: 'ignore', timeout: 5_000 })
+    .status === 0;
+const testOnMac = hasSwiftCompiler ? test : test.skip;
 
 testOnMac(
   'preserves MathJax glyph geometry for paired and self-closing SVG references',
@@ -40,6 +45,9 @@ testOnMac(
       expect(source).toMatch(/<use transform="scale\(0\.707\)"[^>]*><\/use>/);
       expect(output).toMatch(
         /<g transform="scale\(0\.707\)"><use xlink:href="#[^"]+"[^>]*><\/use><\/g>/,
+      );
+      expect(output).toContain(
+        '<g transform="scale(0.707)"><use xlink:href="#glyph" x="60" y="10"></use></g>',
       );
       expect(output).toContain(
         '<g transform="scale(0.5)"><use xlink:href="#glyph" x="60" y="10"/></g>',
