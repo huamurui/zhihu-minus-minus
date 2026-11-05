@@ -405,7 +405,7 @@ export default function CommentScreen() {
                   setOrderBy((prev) => (prev === 'score' ? 'ts' : 'score'))
                 }
                 style={{
-                  marginRight: 4,
+                  marginRight: useGlass ? 0 : 4,
                   borderRadius: 6,
                   paddingHorizontal: 4,
                   paddingVertical: 2,
