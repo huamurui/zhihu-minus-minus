@@ -14,10 +14,16 @@ import {
   getContentActionBarBottom,
 } from '@/components/ContentActionBar';
 import { ContentActionButton } from '@/components/ContentActionButton';
+import { useContentActionBarColor } from '@/components/ContentActionBarColor';
 import { MoreActionsButton } from '@/components/MoreActionsButton';
 import { SegmentedVoteCapsule } from '@/components/SegmentedVoteCapsule';
 import { useIsLiquidGlassActive } from '@/components/surfaces/FloatingSurface';
-import { Text, useRuntimeThemeColors, View } from '@/components/Themed';
+import {
+  Text,
+  ThemedIcon,
+  useRuntimeThemeColors,
+  View,
+} from '@/components/Themed';
 import { usePaneDimensions } from '@/features/adaptive-layout/PaneContext';
 import { usePaneRouter as useRouter } from '@/features/adaptive-layout/usePaneRouter';
 
@@ -30,6 +36,12 @@ interface AnswerPreviewFloatingBarProps {
   onMore: (answer: ZhihuPreviewAnswerMetadata) => void;
 }
 
+function CollapseIcon() {
+  const colors = useRuntimeThemeColors();
+  const color = useContentActionBarColor(colors.link);
+  return <Ionicons name="chevron-up" size={22} color={color} />;
+}
+
 export function AnswerPreviewFloatingBar({
   answer,
   visible,
@@ -39,7 +51,6 @@ export function AnswerPreviewFloatingBar({
   onMore,
 }: AnswerPreviewFloatingBarProps) {
   const router = useRouter();
-  const colors = useRuntimeThemeColors();
   const { width, fontScale } = usePaneDimensions();
   const compact = width / fontScale < 400;
   const showCommentCount = width / fontScale >= 360;
@@ -69,7 +80,7 @@ export function AnswerPreviewFloatingBar({
           if (shown) onCollapse(answer.id);
         }}
       >
-        <Ionicons name="chevron-up" size={22} color={colors.link} />
+        <CollapseIcon />
       </ContentActionButton>
     ) : null;
 
@@ -118,10 +129,10 @@ export function AnswerPreviewFloatingBar({
                 });
               }}
             >
-              <Ionicons
+              <ThemedIcon
                 name="chatbubble-outline"
                 size={19}
-                color={colors.textSecondary}
+                colorType="secondary"
               />
               {showCommentCount && (
                 <Text type="secondary" style={styles.label}>

@@ -1,3 +1,4 @@
+import type { ColorValue } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 // One rounded outline keeps the empty and filled collection states aligned.
@@ -10,7 +11,7 @@ export function CollectionStarIcon({
   size,
 }: {
   filled: boolean;
-  color: string;
+  color: ColorValue;
   size: number;
 }) {
   return (

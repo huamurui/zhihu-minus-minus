@@ -1,3 +1,4 @@
+import type { ColorValue } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 const TRIANGLE_PATH =
@@ -10,7 +11,7 @@ export const VoteTriangle = ({
   size,
 }: {
   active: boolean;
-  color: string;
+  color: ColorValue;
   direction: 'up' | 'down';
   size: number;
 }) => {

@@ -5,6 +5,7 @@ import { hasAuthenticationCookie } from '@/api/client';
 import { getAllContentCollectionStatus } from '@/api/zhihu/collection';
 import { CollectionStarIcon } from '@/components/CollectionStarIcon';
 import { ContentActionButton } from '@/components/ContentActionButton';
+import { useContentActionBarColor } from '@/components/ContentActionBarColor';
 import { Text, useThemeColor } from '@/components/Themed';
 import { useCollectionAction } from '@/hooks/useCollectionAction';
 import { getAuthSessionVersion, useAuthStore } from '@/store/useAuthStore';
@@ -49,7 +50,9 @@ export function CollectionButton({
     collectionCount !== undefined && collectionCount >= 10000
       ? `${(collectionCount / 10000).toFixed(1).replace(/\.0$/, '')}万`
       : collectionCount;
-  const color = collected ? warningColor : secondaryColor;
+  const color = useContentActionBarColor(
+    collected ? warningColor : secondaryColor,
+  );
   const { toggleCollect, isPending } = useCollectionAction();
   const identity = `${type}:${id}:${sessionVersion}`;
   const targetRef = useRef({ identity });
