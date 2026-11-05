@@ -106,7 +106,8 @@ export function ContentActionBar({
                   intensity={130}
                   tint={colorScheme}
                   style={[
-                    styles.surface,
+                    // Let native interactive glass deform beyond its static bounds.
+                    (!useGlass || !interactiveGlass) && styles.surface,
                     styles.islandLeading,
                     {
                       height: CONTENT_ACTION_BAR_HEIGHT,
@@ -144,7 +145,7 @@ export function ContentActionBar({
                     intensity={130}
                     tint={colorScheme}
                     style={[
-                      styles.surface,
+                      (!useGlass || !interactiveGlass) && styles.surface,
                       styles.islandTrailing,
                       {
                         height: CONTENT_ACTION_BAR_HEIGHT,
@@ -184,7 +185,7 @@ export function ContentActionBar({
                     intensity={130}
                     tint={colorScheme}
                     style={[
-                      styles.surface,
+                      (!useGlass || !interactiveGlass) && styles.surface,
                       styles.islandAccessory,
                       {
                         width: CONTENT_ACTION_BAR_HEIGHT,
