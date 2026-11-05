@@ -17,6 +17,7 @@ import { MoreActionsButton } from '@/components/MoreActionsButton';
 import { ActionSheet } from '@/components/overlays/ActionSheet';
 import { BottomSheet } from '@/components/overlays/BottomSheet';
 import { QueryErrorView } from '@/components/QueryErrorView';
+import { useIsLiquidGlassActive } from '@/components/surfaces/FloatingSurface';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -31,6 +32,7 @@ type CollectionItem = ZhihuCollectionSummary;
 
 export default function MyCollectionsScreen() {
   const colorScheme = useColorScheme();
+  const useGlass = useIsLiquidGlassActive();
   const router = useRouter();
   const navigation = useNavigation();
   const queryClient = useQueryClient();
@@ -147,13 +149,13 @@ export default function MyCollectionsScreen() {
           className="p-2 rounded-full"
           onPress={() => openModal()}
           disabled={isSaving}
-          style={{ marginRight: 15 }}
+          style={{ marginRight: useGlass ? 0 : 15 }}
         >
           <Ionicons name="add" size={28} color={primaryColor} />
         </BouncyButton>
       ),
     });
-  }, [isSaving, navigation, openModal, primaryColor]);
+  }, [isSaving, navigation, openModal, primaryColor, useGlass]);
   const closeModal = () => {
     setModalVisible(false);
     setEditingItem(null);

@@ -7,17 +7,19 @@ import {
   withTiming,
 } from 'react-native-reanimated';
 import type { ZhihuPreviewAnswerMetadata } from '@/api/zhihu/nextRender';
+import { ActionIconCount } from '@/components/ActionIconCount';
 import { CollectionButton } from '@/components/CollectionButton';
 import {
   CONTENT_ACTION_BAR_HEIGHT,
   ContentActionBar,
   getContentActionBarBottom,
 } from '@/components/ContentActionBar';
+import { useContentActionBarColor } from '@/components/ContentActionBarColor';
 import { ContentActionButton } from '@/components/ContentActionButton';
 import { MoreActionsButton } from '@/components/MoreActionsButton';
 import { SegmentedVoteCapsule } from '@/components/SegmentedVoteCapsule';
 import { useIsLiquidGlassActive } from '@/components/surfaces/FloatingSurface';
-import { Text, useRuntimeThemeColors, View } from '@/components/Themed';
+import { ThemedIcon, useRuntimeThemeColors, View } from '@/components/Themed';
 import { usePaneDimensions } from '@/features/adaptive-layout/PaneContext';
 import { usePaneRouter as useRouter } from '@/features/adaptive-layout/usePaneRouter';
 
@@ -30,6 +32,12 @@ interface AnswerPreviewFloatingBarProps {
   onMore: (answer: ZhihuPreviewAnswerMetadata) => void;
 }
 
+function CollapseIcon() {
+  const colors = useRuntimeThemeColors();
+  const color = useContentActionBarColor(colors.link);
+  return <Ionicons name="chevron-up" size={22} color={color} />;
+}
+
 export function AnswerPreviewFloatingBar({
   answer,
   visible,
@@ -39,10 +47,8 @@ export function AnswerPreviewFloatingBar({
   onMore,
 }: AnswerPreviewFloatingBarProps) {
   const router = useRouter();
-  const colors = useRuntimeThemeColors();
   const { width, fontScale } = usePaneDimensions();
   const compact = width / fontScale < 400;
-  const showCommentCount = width / fontScale >= 360;
   const shown = visible && answer !== null;
   const isGlass = useIsLiquidGlassActive();
   const bottom = getContentActionBarBottom(bottomInset);
@@ -69,7 +75,7 @@ export function AnswerPreviewFloatingBar({
           if (shown) onCollapse(answer.id);
         }}
       >
-        <Ionicons name="chevron-up" size={22} color={colors.link} />
+        <CollapseIcon />
       </ContentActionButton>
     ) : null;
 
@@ -79,6 +85,7 @@ export function AnswerPreviewFloatingBar({
       visible={shown}
       style={animatedStyle}
       variant="islands"
+      interactiveGlass
       shrinkLeading
       leading={
         answer ? (
@@ -99,7 +106,7 @@ export function AnswerPreviewFloatingBar({
               type="answer"
               isCollected={answer.relationship.is_favorited}
               count={answer.favlists_count}
-              compact={!showCommentCount}
+              countDisplay="corner"
               disabled={!shown}
             />
             <ContentActionButton
@@ -118,16 +125,17 @@ export function AnswerPreviewFloatingBar({
                 });
               }}
             >
-              <Ionicons
-                name="chatbubble-outline"
-                size={19}
-                color={colors.textSecondary}
-              />
-              {showCommentCount && (
-                <Text type="secondary" style={styles.label}>
-                  {answer.comment_count}
-                </Text>
-              )}
+              <ActionIconCount
+                count={
+                  answer.comment_count > 0 ? answer.comment_count : undefined
+                }
+              >
+                <ThemedIcon
+                  name="chatbubble-outline"
+                  size={20}
+                  colorType="secondary"
+                />
+              </ActionIconCount>
             </ContentActionButton>
             <MoreActionsButton
               accessibilityLabel="回答更多操作"
@@ -152,13 +160,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   action: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    width: 44,
+    height: 44,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
-  label: { fontSize: 13, lineHeight: 20, fontWeight: '600' },
   more: { marginLeft: 4 },
   collapseInline: {
     width: 36,

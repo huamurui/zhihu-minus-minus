@@ -95,11 +95,17 @@ jest.mock('../src/components/VoteTriangle', () => {
   };
 });
 jest.mock('../src/components/Themed', () => {
+  const react = jest.requireActual<typeof import('react')>('react');
   const native =
     jest.requireActual<typeof import('react-native')>('react-native');
   return {
     Text: native.Text,
     View: native.View,
+    ThemedIcon: ({ name, size }: { name: string; size: number }) =>
+      react.createElement(native.Text, {
+        testID: `icon:${name}`,
+        style: { fontSize: size },
+      }),
     useThemeColor: () => '#1364cc',
     useRuntimeThemeColors: () => ({
       shadow: '#000000',
@@ -288,7 +294,7 @@ test('floating bar keeps collection before comments with or without answer colla
     type: 'answer',
     isCollected: false,
     count: 0,
-    compact: false,
+    countDisplay: 'corner',
     disabled: false,
   });
   const actionLabels = host
@@ -319,7 +325,7 @@ test('floating bar keeps collection before comments with or without answer colla
     type: 'answer',
     isCollected: true,
     count: 0,
-    compact: false,
+    countDisplay: 'corner',
     disabled: false,
   });
   expect(host.queryByTestId('collection:answer:answer-a')).toBeNull();
@@ -330,13 +336,13 @@ test('floating bar keeps collection before comments with or without answer colla
 });
 
 test.each([
-  { width: 320, fontScale: 1, visibleCommentCount: false },
-  { width: 360, fontScale: 1, visibleCommentCount: true },
-  { width: 430, fontScale: 1.4, visibleCommentCount: false },
-  { width: 430, fontScale: 1, visibleCommentCount: true },
+  { width: 320, fontScale: 1 },
+  { width: 360, fontScale: 1 },
+  { width: 430, fontScale: 1.4 },
+  { width: 430, fontScale: 1 },
 ])(
   'floating actions remain usable at width $width and font scale $fontScale',
-  async ({ width, fontScale, visibleCommentCount }) => {
+  async ({ width, fontScale }) => {
     mockWindowDimensions.mockReturnValue({
       width,
       height: 852,
@@ -381,12 +387,12 @@ test.each([
     expect(mockCollectionButton).toHaveBeenLastCalledWith(
       expect.objectContaining({
         count: 12345,
-        compact: !visibleCommentCount,
+        countDisplay: 'corner',
       }),
     );
     expect(host.getByTestId('vote-icon')).toBeTruthy();
     expect(host.getByTestId('downvote-icon')).toBeTruthy();
-    expect(host.queryByText('9876') !== null).toBe(visibleCommentCount);
+    expect(host.getByText('9876')).toBeTruthy();
     await fireEvent.press(
       host.getByRole('button', { name: '9876 条回答评论' }),
     );

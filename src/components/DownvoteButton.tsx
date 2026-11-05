@@ -17,6 +17,7 @@ import { updateContentInteractionCaches } from '@/utils/contentCache';
 import { showToast } from '@/utils/toast';
 import { getZhihuErrorMessage } from '@/utils/zhihuError';
 import { BouncyButton } from './BouncyButton';
+import { useContentActionBarColor } from './ContentActionBarColor';
 import { useThemeColor } from './Themed';
 import { VoteTriangle } from './VoteTriangle';
 
@@ -58,7 +59,7 @@ export const DownvoteButton = ({
   }
 
   const isDownvoted = voted === -1;
-  const foregroundColor =
+  const themeForegroundColor =
     variant === 'default'
       ? isDownvoted
         ? onPrimary
@@ -66,6 +67,7 @@ export const DownvoteButton = ({
       : isDownvoted
         ? primaryColor
         : mutedColor;
+  const foregroundColor = useContentActionBarColor(themeForegroundColor);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],

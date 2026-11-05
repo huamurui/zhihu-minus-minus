@@ -16,6 +16,7 @@ import {
   updateAnswer,
 } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
+import { useIsLiquidGlassActive } from '@/components/surfaces/FloatingSurface';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import {
   createPublishingDocument,
@@ -34,6 +35,7 @@ import { getZhihuErrorMessage } from '@/utils/zhihuError';
 
 export default function WriteAnswerScreen() {
   const primaryColor = useThemeColor({}, 'link');
+  const useGlass = useIsLiquidGlassActive();
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const _insets = useSafeAreaInsets();
@@ -196,8 +198,11 @@ export default function WriteAnswerScreen() {
                 <ActivityIndicator size="small" color={primaryColor} />
               ) : (
                 <Text
-                  className="text-base font-bold mr-[15px]"
-                  style={{ color: primaryColor }}
+                  className="text-base font-bold"
+                  style={{
+                    color: primaryColor,
+                    marginRight: useGlass ? 0 : 15,
+                  }}
                 >
                   {existingAnswerId ? '保存' : '发布'}
                 </Text>

@@ -102,6 +102,18 @@ describe('FloatingSurface', () => {
   });
 
   describe('useIsLiquidGlassActive & FloatingSurface rendering', () => {
+    test('passes interactive mode to the native glass view', async () => {
+      const host = await render(
+        <FloatingSurface testID="surface" isInteractive>
+          <Text>Content</Text>
+        </FloatingSurface>,
+      );
+      expect(host.getByTestId('surface-glass')).toHaveProp(
+        'isInteractive',
+        true,
+      );
+    });
+
     test('renders GlassView on iOS when supported and transparency is normal with correct glassEffectStyle', async () => {
       const host = await render(
         <FloatingSurface testID="surface" glassStyle="clear">

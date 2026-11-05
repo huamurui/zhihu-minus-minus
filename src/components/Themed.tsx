@@ -17,6 +17,7 @@ import {
   type TextStyle,
 } from 'react-native';
 import { useShallow } from 'zustand/react/shallow';
+import { useContentActionBarColor } from '@/components/ContentActionBarColor';
 import type Colors from '@/constants/Colors';
 import { typography } from '@/constants/designTokens';
 import { resolveThemeColors } from '@/constants/theme';
@@ -113,6 +114,7 @@ export function Text(
     { light: lightColor, dark: darkColor },
     colorName,
   );
+  const actionBarColor = useContentActionBarColor(color);
 
   const { fontSizeScale, lineHeightScale } = useSettingsStore(
     useShallow((state) => ({
@@ -127,7 +129,13 @@ export function Text(
 
   const finalStyle: TextStyle = {
     ...flattenedStyle,
-    color: flattenedStyle.color || color,
+    color:
+      flattenedStyle.color ||
+      (lightColor ||
+      darkColor ||
+      !['default', 'secondary', 'tertiary', 'caption'].includes(type)
+        ? color
+        : actionBarColor),
     fontSize: currentFontSize * fontSizeScale,
     lineHeight: (currentLineHeight * fontSizeScale * lineHeightScale) / 1.5,
     ...((flattenedStyle.fontWeight ||
@@ -207,6 +215,20 @@ export function ThemedIcon(
     { light: lightColor, dark: darkColor },
     colorName,
   );
+  const actionBarColor = useContentActionBarColor(color);
 
-  return <Ionicons name={name} size={size} color={color} {...otherProps} />;
+  return (
+    <Ionicons
+      name={name}
+      size={size}
+      color={
+        lightColor ||
+        darkColor ||
+        !['default', 'secondary', 'tertiary'].includes(colorType)
+          ? color
+          : actionBarColor
+      }
+      {...otherProps}
+    />
+  );
 }

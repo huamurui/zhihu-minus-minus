@@ -30,6 +30,7 @@ import { ReadingProgressNotice } from '@/components/ReadingProgressNotice';
 import { SegmentedVoteCapsule } from '@/components/SegmentedVoteCapsule';
 import { ShareMenu } from '@/components/ShareMenu';
 import { StableAvatar } from '@/components/StableAvatar';
+import { useIsLiquidGlassActive } from '@/components/surfaces/FloatingSurface';
 import { Text, ThemedIcon, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -45,6 +46,7 @@ import { shouldRetryQuery } from '@/utils/query';
 
 export default function PinDetailScreen() {
   const colorScheme = useColorScheme();
+  const useGlass = useIsLiquidGlassActive();
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -190,7 +192,7 @@ export default function PinDetailScreen() {
           headerRight: () => (
             <MoreActionsButton
               onPress={() => setOpenMenuIdentity(contentIdentity)}
-              style={{ marginRight: 10 }}
+              style={{ marginRight: useGlass ? 0 : 10 }}
             />
           ),
         }}

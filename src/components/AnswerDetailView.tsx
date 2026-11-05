@@ -24,6 +24,7 @@ import {
 } from '@/api/zhihu';
 import { getAllContentCollectionStatus } from '@/api/zhihu/collection';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
+import { ActionIconCount } from '@/components/ActionIconCount';
 import { AnswerEndorsements } from '@/components/AnswerEndorsements';
 import { AnswerLoadingPlaceholder } from '@/components/AnswerLoadingPlaceholder';
 import { BouncyButton } from '@/components/BouncyButton';
@@ -780,6 +781,8 @@ export const AnswerDetailView = ({
       {/* Footer Actions */}
       <ContentActionBar
         bottomInset={insets.bottom}
+        variant="islands"
+        interactiveGlass
         shrinkLeading
         leading={
           <SegmentedVoteCapsule
@@ -800,29 +803,39 @@ export const AnswerDetailView = ({
               type="answer"
               isCollected={activeCollected}
               count={getContentCollectionMetadata(answer).favlistsCount}
-              compact={dimensions.width / dimensions.fontScale < 360}
+              countDisplay="corner"
               disabled={!answer || !isFocused}
             />
             <ContentActionButton
               accessibilityRole="button"
               accessibilityLabel="评论"
+              accessibilityValue={
+                answer
+                  ? { text: `${answer.comment_count ?? 0} 条评论` }
+                  : undefined
+              }
               disabled={!answer}
-              className="items-center justify-center ml-2 px-2.5 py-1.5 flex-row bg-transparent"
+              style={{
+                width: 44,
+                height: 44,
+                paddingHorizontal: 0,
+                paddingVertical: 0,
+              }}
               onPress={() => router.push(`/comments/${id}?type=answer`)}
             >
-              <ThemedIcon
-                name="chatbubble-outline"
-                size={20}
-                colorType="secondary"
-              />
-              {(answer?.comment_count ?? 0) > 0 && (
-                <Text
-                  type="secondary"
-                  className="ml-1 text-[13px] font-semibold"
-                >
-                  {answer?.comment_count}
-                </Text>
-              )}
+              <ActionIconCount
+                count={
+                  (answer?.comment_count ?? 0) > 0
+                    ? answer?.comment_count
+                    : undefined
+                }
+              >
+                <ThemedIcon
+                  name="chatbubble-outline"
+                  size={20}
+                  colorType="secondary"
+                />
+              </ActionIconCount>
             </ContentActionButton>
             <MoreActionsButton
               disabled={!answer}

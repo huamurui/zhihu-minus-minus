@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import type { GestureResponderEvent, StyleProp, ViewStyle } from 'react-native';
 import { StyleSheet } from 'react-native';
 import { BouncyButton } from '@/components/BouncyButton';
+import { useContentActionBarColor } from '@/components/ContentActionBarColor';
 import { useThemeColor } from '@/components/Themed';
 
 interface MoreActionsButtonProps {
@@ -23,6 +24,7 @@ export function MoreActionsButton({
   testID,
 }: MoreActionsButtonProps) {
   const foreground = useThemeColor({}, 'textSecondary');
+  const actionBarForeground = useContentActionBarColor(foreground);
   return (
     <BouncyButton
       testID={testID}
@@ -39,7 +41,7 @@ export function MoreActionsButton({
       <Ionicons
         name="ellipsis-horizontal"
         size={22}
-        color={color ?? foreground}
+        color={color ?? actionBarForeground}
       />
     </BouncyButton>
   );

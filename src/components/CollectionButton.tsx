@@ -3,7 +3,9 @@ import { useEffect, useRef, useState } from 'react';
 import { type GestureResponderEvent, StyleSheet } from 'react-native';
 import { hasAuthenticationCookie } from '@/api/client';
 import { getAllContentCollectionStatus } from '@/api/zhihu/collection';
+import { ActionIconCount } from '@/components/ActionIconCount';
 import { CollectionStarIcon } from '@/components/CollectionStarIcon';
+import { useContentActionBarColor } from '@/components/ContentActionBarColor';
 import { ContentActionButton } from '@/components/ContentActionButton';
 import { Text, useThemeColor } from '@/components/Themed';
 import { useCollectionAction } from '@/hooks/useCollectionAction';
@@ -18,6 +20,7 @@ interface CollectionButtonProps {
   isCollected?: boolean;
   count?: number;
   compact?: boolean;
+  countDisplay?: 'inline' | 'corner';
   variant?: 'inline' | 'floating';
   disabled?: boolean;
 }
@@ -29,6 +32,7 @@ export function CollectionButton({
   isCollected,
   count,
   compact = false,
+  countDisplay = 'inline',
   variant = 'floating',
   disabled = false,
 }: CollectionButtonProps) {
@@ -49,7 +53,9 @@ export function CollectionButton({
     collectionCount !== undefined && collectionCount >= 10000
       ? `${(collectionCount / 10000).toFixed(1).replace(/\.0$/, '')}万`
       : collectionCount;
-  const color = collected ? warningColor : secondaryColor;
+  const color = useContentActionBarColor(
+    collected ? warningColor : secondaryColor,
+  );
   const { toggleCollect, isPending } = useCollectionAction();
   const identity = `${type}:${id}:${sessionVersion}`;
   const targetRef = useRef({ identity });
@@ -147,29 +153,48 @@ export function CollectionButton({
       }
       disabled={disabled || busy}
       onPress={(event) => void handlePress(event)}
+      style={countDisplay === 'corner' ? styles.cornerButton : undefined}
     >
-      <CollectionStarIcon
-        filled={collected === true}
-        size={variant === 'inline' ? 20 : 24}
-        color={color}
-      />
-      {!compact && collectionCount !== undefined && (
-        <Text
-          style={[
-            styles.count,
-            variant === 'floating' && styles.floatingCount,
-            { color },
-          ]}
-          numberOfLines={1}
-        >
-          {countLabel}
-        </Text>
+      {countDisplay === 'corner' ? (
+        <ActionIconCount count={collectionCount} color={color}>
+          <CollectionStarIcon
+            filled={collected === true}
+            size={24}
+            color={color}
+          />
+        </ActionIconCount>
+      ) : (
+        <CollectionStarIcon
+          filled={collected === true}
+          size={variant === 'inline' ? 20 : 24}
+          color={color}
+        />
       )}
+      {countDisplay === 'inline' &&
+        !compact &&
+        collectionCount !== undefined && (
+          <Text
+            style={[
+              styles.count,
+              variant === 'floating' && styles.floatingCount,
+              { color },
+            ]}
+            numberOfLines={1}
+          >
+            {countLabel}
+          </Text>
+        )}
     </ContentActionButton>
   );
 }
 
 const styles = StyleSheet.create({
+  cornerButton: {
+    width: 44,
+    height: 44,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
   count: { marginLeft: 4, fontSize: 13, fontWeight: '600' },
   floatingCount: { fontSize: 14 },
 });

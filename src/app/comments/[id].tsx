@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { FlashList } from '@shopify/flash-list';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { GlassContainer } from 'expo-glass-effect';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -36,7 +37,10 @@ import { CommentIdentityBadges } from '@/components/CommentIdentityBadges';
 import { LikeButton } from '@/components/LikeButton';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { StableAvatar } from '@/components/StableAvatar';
-import { FloatingSurface } from '@/components/surfaces/FloatingSurface';
+import {
+  FloatingSurface,
+  useIsLiquidGlassActive,
+} from '@/components/surfaces/FloatingSurface';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -77,6 +81,8 @@ export default function CommentScreen() {
   const queryClient = useQueryClient();
   const _insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
+  const useGlass = useIsLiquidGlassActive();
+  const ComposerContainer = useGlass ? GlassContainer : NativeView;
   const borderColor = Colors[colorScheme].border;
   const surfaceColor = Colors[colorScheme].surface;
   const textColor = Colors[colorScheme].text;
@@ -399,7 +405,7 @@ export default function CommentScreen() {
                   setOrderBy((prev) => (prev === 'score' ? 'ts' : 'score'))
                 }
                 style={{
-                  marginRight: 4,
+                  marginRight: useGlass ? 0 : 4,
                   borderRadius: 6,
                   paddingHorizontal: 4,
                   paddingVertical: 2,
@@ -532,49 +538,52 @@ export default function CommentScreen() {
         ]}
         pointerEvents="box-none"
       >
-        <FloatingSurface
-          glassStyle="regular"
-          colorScheme={colorScheme === 'dark' ? 'dark' : 'light'}
-          intensity={100}
-          tint={colorScheme === 'dark' ? 'dark' : 'light'}
-          style={{
-            borderRadius: 30,
-            overflow: 'hidden',
-          }}
-        >
-          {canPostComment ? (
-            <CommentComposer
-              colorScheme={colorScheme}
-              borderColor={borderColor}
-              inputRef={inputRef}
-              inputText={inputText}
-              isSubmitting={mutation.isPending}
-              onChangeText={setInputText}
-              onSubmit={submitComment}
-              onCancelReply={() => setReplyTo(null)}
-              placeholder={
-                replyTo
-                  ? `回复 ${replyTo.name}...`
-                  : '既然来了，就留下点什么吧...'
-              }
-              replyToName={replyTo?.name}
-              textColor={textColor}
-              tintColor={tintColor}
-            />
-          ) : (
-            <Text
-              type="secondary"
-              style={{
-                paddingHorizontal: 18,
-                paddingVertical: 14,
-                fontSize: 13,
-                lineHeight: 19,
-              }}
-            >
-              {segmentPostingHint}
-            </Text>
-          )}
-        </FloatingSurface>
+        <ComposerContainer {...(useGlass ? { spacing: 8 } : {})}>
+          <FloatingSurface
+            glassStyle="regular"
+            colorScheme={useGlass ? 'auto' : colorScheme}
+            intensity={100}
+            tint={colorScheme === 'dark' ? 'dark' : 'light'}
+            style={{
+              borderRadius: 30,
+              overflow: 'hidden',
+            }}
+          >
+            {canPostComment ? (
+              <CommentComposer
+                useGlass={useGlass}
+                colorScheme={colorScheme}
+                borderColor={borderColor}
+                inputRef={inputRef}
+                inputText={inputText}
+                isSubmitting={mutation.isPending}
+                onChangeText={setInputText}
+                onSubmit={submitComment}
+                onCancelReply={() => setReplyTo(null)}
+                placeholder={
+                  replyTo
+                    ? `回复 ${replyTo.name}...`
+                    : '既然来了，就留下点什么吧...'
+                }
+                replyToName={replyTo?.name}
+                textColor={textColor}
+                tintColor={tintColor}
+              />
+            ) : (
+              <Text
+                type="secondary"
+                style={{
+                  paddingHorizontal: 18,
+                  paddingVertical: 14,
+                  fontSize: 13,
+                  lineHeight: 19,
+                }}
+              >
+                {segmentPostingHint}
+              </Text>
+            )}
+          </FloatingSurface>
+        </ComposerContainer>
       </Reanimated.View>
 
       <CommentActionSheet
