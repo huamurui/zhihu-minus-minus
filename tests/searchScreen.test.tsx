@@ -137,6 +137,26 @@ test('search history starts its own query immediately without waiting for input 
   );
 });
 
+test('search tabs expose their selection and switch the result type', async () => {
+  const host = await renderSearch();
+  await fireEvent.press(host.getByText('历史关键词'));
+  expect(
+    host.getByRole('tab', { name: '综合' }).props.accessibilityState,
+  ).toEqual({ selected: true });
+
+  await fireEvent.press(host.getByRole('tab', { name: '用户' }));
+  expect(
+    host.getByRole('tab', { name: '用户' }).props.accessibilityState,
+  ).toEqual({ selected: true });
+  expect(searchContent).toHaveBeenLastCalledWith(
+    '历史关键词',
+    0,
+    20,
+    'people',
+    expect.any(Object),
+  );
+});
+
 test('suggestion selection never searches the previous input prefix', async () => {
   jest
     .mocked(getSearchSuggest)
@@ -157,6 +177,27 @@ test('suggestion selection never searches the previous input prefix', async () =
     'general',
     expect.any(Object),
   );
+});
+
+test('editing shows neither search history nor stale suggestions while waiting for new suggestions', async () => {
+  jest
+    .mocked(getSearchSuggest)
+    .mockResolvedValue({ suggest: [{ query: '完整建议词' }] });
+  const host = await renderSearch();
+  const input = host.getByLabelText('搜索知乎内容');
+
+  expect(host.getByText('历史关键词')).toBeTruthy();
+  await fireEvent.changeText(input, '建议');
+  expect(host.queryByText('历史关键词')).toBeNull();
+  await flushQueries();
+  expect(host.getByText('完整建议词')).toBeTruthy();
+
+  await fireEvent.changeText(input, '新词');
+  expect(host.queryByText('历史关键词')).toBeNull();
+  expect(host.queryByText('完整建议词')).toBeNull();
+
+  await fireEvent.press(host.getByLabelText('清空搜索'));
+  expect(host.getByText('历史关键词')).toBeTruthy();
 });
 
 test('submission trims the query and a later suggestion debounce does not replace it', async () => {

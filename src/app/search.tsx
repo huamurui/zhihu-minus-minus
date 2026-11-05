@@ -27,6 +27,7 @@ import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { getZhihuNextOffset } from '@/hooks/useZhihuInfiniteQuery';
 import { useSearchStore } from '@/store/useSearchStore';
+import { useSettingsStore } from '@/store/useSettingsStore';
 import type {
   ZhihuSearchResultItem,
   ZhihuSearchSuggestItem,
@@ -102,12 +103,9 @@ function SearchTabs({
         <BouncyButton
           key={tab.value}
           onPress={() => onSelect(tab.value)}
-          className="py-3 mr-[25px]"
-          style={{
-            borderBottomWidth: 2,
-            borderBottomColor:
-              selected === tab.value ? tintColor : 'transparent',
-          }}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: selected === tab.value }}
+          className="py-3 mr-[25px] items-center"
         >
           <Text
             className="text-[15px]"
@@ -118,6 +116,19 @@ function SearchTabs({
           >
             {tab.label}
           </Text>
+          {selected === tab.value && (
+            <View
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                width: 20,
+                height: 3,
+                borderRadius: 2,
+                backgroundColor: tintColor,
+              }}
+            />
+          )}
         </BouncyButton>
       ))}
     </View>
@@ -216,6 +227,7 @@ export default function SearchScreen() {
   const colorScheme = useColorScheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const fontSizeScale = useSettingsStore((state) => state.fontSizeScale);
   const inputRef = useRef<TextInputInstance>(null);
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -467,8 +479,8 @@ export default function SearchScreen() {
           />
           <Pressable
             onPress={() => inputRef.current?.focus()}
-            className="flex-row items-center rounded-full px-3 h-9 flex-1"
-            style={{ backgroundColor: surfaceColor }}
+            className="flex-row items-center rounded-full px-3 flex-1"
+            style={{ backgroundColor: surfaceColor, minHeight: 42 }}
           >
             <Ionicons
               name="search"
@@ -478,8 +490,13 @@ export default function SearchScreen() {
             />
             <TextInput
               ref={inputRef}
-              className="flex-1 text-sm py-0"
-              style={{ color: textColor }}
+              className="flex-1 py-0"
+              style={{
+                color: textColor,
+                fontSize: 16 * fontSizeScale,
+                textAlignVertical: 'center',
+              }}
+              accessibilityLabel="搜索知乎内容"
               placeholder="搜索知乎内容..."
               placeholderTextColor={Colors[colorScheme].textTertiary}
               value={query}
@@ -491,23 +508,27 @@ export default function SearchScreen() {
               autoFocus
               returnKeyType="search"
             />
-            {query.length > 0 && (
-              <BouncyButton
-                className="p-1 rounded-full"
-                onPress={() => {
-                  setQuery('');
-                  setSubmittedQuery(null);
-                  inputRef.current?.focus();
-                }}
-                hitSlop={15}
-              >
-                <Ionicons
-                  name="close-circle"
-                  size={18}
-                  color={Colors[colorScheme].textTertiary}
-                />
-              </BouncyButton>
-            )}
+            <View className="w-[26px] items-center justify-center">
+              {query.length > 0 && (
+                <BouncyButton
+                  accessibilityRole="button"
+                  accessibilityLabel="清空搜索"
+                  className="p-1 rounded-full"
+                  onPress={() => {
+                    setQuery('');
+                    setSubmittedQuery(null);
+                    inputRef.current?.focus();
+                  }}
+                  hitSlop={15}
+                >
+                  <Ionicons
+                    name="close-circle"
+                    size={18}
+                    color={Colors[colorScheme].textTertiary}
+                  />
+                </BouncyButton>
+              )}
+            </View>
           </Pressable>
           <BouncyButton
             onPress={() => {
@@ -517,7 +538,11 @@ export default function SearchScreen() {
             className="px-2.5 py-2 rounded-full"
             hitSlop={15}
           >
-            <Text style={{ color: linkColor, fontWeight: 'bold' }}>搜索</Text>
+            <Text
+              style={{ color: linkColor, fontSize: 16, fontWeight: 'bold' }}
+            >
+              搜索
+            </Text>
           </BouncyButton>
         </View>
       </View>
@@ -556,12 +581,25 @@ export default function SearchScreen() {
             </Text>
             {activeFilterCount > 0 ? (
               <View
-                className="ml-1.5 min-w-[17px] h-[17px] rounded-full items-center justify-center"
-                style={{ backgroundColor: tintColor }}
+                className="ml-1.5 rounded-full items-center justify-center"
+                style={{
+                  backgroundColor: tintColor,
+                  minWidth: 18,
+                  minHeight: 18,
+                  paddingHorizontal: 3,
+                }}
               >
                 <Text
                   className="text-[10px] font-bold"
-                  style={{ color: onPrimaryColor }}
+                  style={{
+                    color: onPrimaryColor,
+                    fontSize: 10,
+                    lineHeight: 14,
+                    fontWeight: 'bold',
+                    includeFontPadding: false,
+                    textAlign: 'center',
+                    textAlignVertical: 'center',
+                  }}
                 >
                   {activeFilterCount}
                 </Text>
@@ -694,13 +732,13 @@ export default function SearchScreen() {
         </View>
       ) : null}
 
-      {!isSearching &&
-      query.trim() === debouncedQuery &&
-      debouncedQuery.length > 0 &&
-      suggestions?.suggest &&
-      suggestions.suggest.length > 0 ? (
+      {!isSearching && query.length > 0 ? (
         <FlashList
-          data={suggestions.suggest}
+          data={
+            query.trim() === debouncedQuery && debouncedQuery.length > 0
+              ? (suggestions?.suggest ?? [])
+              : []
+          }
           keyExtractor={(item) => item.query}
           renderItem={renderSuggestion}
           {...({
