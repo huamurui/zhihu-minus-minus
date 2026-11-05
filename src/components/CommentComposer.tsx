@@ -6,6 +6,8 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Platform,
+  PlatformColor,
   StyleSheet,
   TextInput,
   type TextInputInstance,
@@ -16,6 +18,7 @@ import {
   uploadImage,
 } from '@/api/zhihu/image';
 import { BouncyButton } from '@/components/BouncyButton';
+import { glassActionColor } from '@/components/ContentActionBarColor';
 import { Text, View } from '@/components/Themed';
 import Colors from '@/constants/Colors';
 import { getZhihuErrorMessage } from '@/utils/zhihuError';
@@ -33,6 +36,7 @@ interface SelectedImage {
 }
 
 interface CommentComposerProps {
+  useGlass?: boolean;
   colorScheme: 'light' | 'dark';
   borderColor: string;
   inputRef: React.RefObject<TextInputInstance | null>;
@@ -48,6 +52,7 @@ interface CommentComposerProps {
 }
 
 export function CommentComposer({
+  useGlass = false,
   colorScheme,
   borderColor,
   inputRef,
@@ -70,6 +75,15 @@ export function CommentComposer({
   const nextImageId = useRef(0);
   const uploadsRef = useRef(new Map<number, AbortController>());
   const busy = isSubmitting || isSending;
+  const foreground = useGlass ? (glassActionColor ?? textColor) : textColor;
+  const secondary = useGlass
+    ? (glassActionColor ?? Colors[colorScheme].textSecondary)
+    : Colors[colorScheme].textSecondary;
+  const actionColor = useGlass ? (glassActionColor ?? tintColor) : tintColor;
+  const placeholderColor =
+    useGlass && Platform.OS === 'ios'
+      ? PlatformColor('secondaryLabelColor')
+      : Colors[colorScheme].textTertiary;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -216,19 +230,25 @@ export function CommentComposer({
 
   return (
     <View
-      className="rounded-[30px] overflow-hidden"
+      className="rounded-[30px]"
       style={{
-        borderWidth: StyleSheet.hairlineWidth,
+        overflow: useGlass ? 'visible' : 'hidden',
+        borderWidth: useGlass ? 0 : StyleSheet.hairlineWidth,
         borderColor,
-        backgroundColor:
-          colorScheme === 'dark'
+        backgroundColor: useGlass
+          ? 'transparent'
+          : colorScheme === 'dark'
             ? 'rgba(26,26,26,0.85)'
             : 'rgba(255,255,255,0.9)',
       }}
     >
       {replyToName && (
         <View className="flex-row justify-between items-center px-[15px] pt-2.5 pb-0.5 bg-transparent">
-          <Text type="secondary" className="text-xs">
+          <Text
+            type="secondary"
+            className="text-xs"
+            style={{ color: secondary }}
+          >
             正在回复 {replyToName}
           </Text>
           <BouncyButton
@@ -236,11 +256,7 @@ export function CommentComposer({
             onPress={onCancelReply}
             style={{ borderRadius: 8 }}
           >
-            <Ionicons
-              name="close-circle"
-              size={16}
-              color={Colors[colorScheme].textSecondary}
-            />
+            <Ionicons name="close-circle" size={16} color={secondary} />
           </BouncyButton>
         </View>
       )}
@@ -293,16 +309,16 @@ export function CommentComposer({
                     borderRadius: 8,
                   }}
                 >
-                  <Ionicons
-                    name="close-circle"
-                    size={18}
-                    color={Colors[colorScheme].textSecondary}
-                  />
+                  <Ionicons name="close-circle" size={18} color={secondary} />
                 </BouncyButton>
               </View>
             ))}
           </View>
-          <Text type="secondary" className="mb-1 text-xs">
+          <Text
+            type="secondary"
+            className="mb-1 text-xs"
+            style={{ color: secondary }}
+          >
             {uploadingCount > 0
               ? `正在上传 ${uploadingCount} 张图片...`
               : failedCount > 0
@@ -326,23 +342,23 @@ export function CommentComposer({
           }}
         >
           {isPicking ? (
-            <ActivityIndicator size="small" color={tintColor} />
+            <ActivityIndicator size="small" color={actionColor} />
           ) : (
-            <Ionicons name="image-outline" size={22} color={tintColor} />
+            <Ionicons name="image-outline" size={22} color={actionColor} />
           )}
         </BouncyButton>
         <TextInput
           ref={inputRef}
           className="flex-1 min-h-[40px] max-h-[100px] px-2 py-2.5"
           style={{
-            color: textColor,
+            color: foreground,
             fontSize: 15,
             lineHeight: 20,
             includeFontPadding: false,
             textAlignVertical: 'center',
           }}
           placeholder={placeholder}
-          placeholderTextColor={Colors[colorScheme].textTertiary}
+          placeholderTextColor={placeholderColor}
           editable={!busy}
           value={inputText}
           onChangeText={onChangeText}
@@ -368,12 +384,12 @@ export function CommentComposer({
           }}
         >
           {busy ? (
-            <ActivityIndicator size="small" color={tintColor} />
+            <ActivityIndicator size="small" color={actionColor} />
           ) : (
             <Text
               className="font-semibold text-base"
               style={{
-                color: tintColor,
+                color: actionColor,
                 opacity:
                   inputText.trim() || selectedImages.length > 0 ? 1 : 0.5,
               }}
