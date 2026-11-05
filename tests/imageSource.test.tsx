@@ -1,5 +1,5 @@
-import { render } from '@testing-library/react-native';
-import { StableAvatar } from '../src/components/StableAvatar';
+import { fireEvent, render } from '@testing-library/react-native';
+import { RetainedAvatar, StableAvatar } from '../src/components/StableAvatar';
 import { getCachedImageSource } from '../src/utils/imageSource';
 
 test.each(['https://example.test/avatar.jpg', 'http://example.test/cover.png'])(
@@ -78,4 +78,49 @@ test('avatar updates and reopening a page keep the same cached source', async ()
     reopened.container.queryAll((node) => node.type === 'Image')[0].props
       .fadeDuration,
   ).toBe(0);
+});
+
+test('keeps the previous avatar visible until its replacement loads', async () => {
+  const oldUri = 'https://example.test/old-avatar.jpg';
+  const newUri = 'https://example.test/new-avatar.jpg';
+  const host = await render(<RetainedAvatar uri={oldUri} />);
+  const images = () => host.container.queryAll((node) => node.type === 'Image');
+
+  await host.rerender(<RetainedAvatar uri={newUri} />);
+  expect(images().map((image) => image.props.source.uri)).toEqual([
+    oldUri,
+    newUri,
+  ]);
+  await fireEvent(images()[1], 'load');
+  expect(images().map((image) => image.props.source.uri)).toEqual([newUri]);
+});
+
+test('retains the previous avatar when a replacement fails or is superseded', async () => {
+  const oldUri = 'https://example.test/old-avatar.jpg';
+  const failedUri = 'https://example.test/failed-avatar.jpg';
+  const latestUri = 'https://example.test/latest-avatar.jpg';
+  const host = await render(<RetainedAvatar uri={oldUri} />);
+  const images = () => host.container.queryAll((node) => node.type === 'Image');
+
+  await host.rerender(<RetainedAvatar uri={failedUri} />);
+  await fireEvent(images()[1], 'error');
+  expect(images().map((image) => image.props.source.uri)).toEqual([oldUri]);
+  await host.rerender(<RetainedAvatar uri={latestUri} />);
+  await host.rerender(<RetainedAvatar uri={null} />);
+  expect(images().map((image) => image.props.source.uri)).toEqual([oldUri]);
+});
+
+test('keeps the image when an author id arrives, but clears it for another author', async () => {
+  const oldUri = 'https://example.test/old-avatar.jpg';
+  const newUri = 'https://example.test/new-avatar.jpg';
+  const host = await render(<RetainedAvatar uri={oldUri} />);
+  const images = () => host.container.queryAll((node) => node.type === 'Image');
+
+  await host.rerender(<RetainedAvatar uri={newUri} ownerId="first" />);
+  expect(images().map((image) => image.props.source.uri)).toEqual([
+    oldUri,
+    newUri,
+  ]);
+  await host.rerender(<RetainedAvatar uri={null} ownerId="second" />);
+  expect(images()).toHaveLength(0);
 });

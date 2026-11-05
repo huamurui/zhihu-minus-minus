@@ -332,6 +332,7 @@ jest.mock('../src/components/ShareMenu', () => {
 });
 jest.mock('../src/components/StableAvatar', () => ({
   StableAvatar: () => null,
+  RetainedAvatar: () => null,
 }));
 jest.mock('../src/components/FollowButton', () => ({
   FollowButton: () => null,

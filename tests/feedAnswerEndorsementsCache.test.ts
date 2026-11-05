@@ -83,6 +83,24 @@ test('complete answer seeds retain labels alongside their ordinary body cache', 
   expect(client.getQueryData(['answer-detail', source.id])).toBeUndefined();
 });
 
+test('reuses the card author headline when seeding answer detail', () => {
+  const client = createClient();
+  seedRichContentFromFeedItem(
+    client,
+    answer({
+      author: {
+        id: 'synthetic-author',
+        name: '合成作者',
+        avatar: '',
+        headline: '合成简介',
+      },
+    }),
+  );
+  expect(
+    client.getQueryData(['answer-detail', 'synthetic-feed-answer']),
+  ).toMatchObject({ author: { headline: '合成简介' } });
+});
+
 test('thin feed, list, and preview entries cache labels without certifying a full body', () => {
   const client = createClient();
   const feed = answer({ id: 'synthetic-thin-feed', content: undefined });

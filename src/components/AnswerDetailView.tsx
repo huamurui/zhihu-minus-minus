@@ -45,7 +45,7 @@ import { ReadingProgressNotice } from '@/components/ReadingProgressNotice';
 import { ReadingScrollIndicator } from '@/components/ReadingScrollIndicator';
 import { SegmentedVoteCapsule } from '@/components/SegmentedVoteCapsule';
 import { ShareMenu } from '@/components/ShareMenu';
-import { StableAvatar } from '@/components/StableAvatar';
+import { RetainedAvatar } from '@/components/StableAvatar';
 import { Text, ThemedIcon, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -611,9 +611,12 @@ export const AnswerDetailView = ({
                 <BouncyButton
                   onPress={goToProfile}
                   className="flex-row items-center flex-1 bg-transparent"
+                  style={{ minHeight: 40 }}
                 >
-                  <StableAvatar
+                  <RetainedAvatar
+                    key={`${sessionVersion}:${id}`}
                     uri={authorAvatarUrl}
+                    ownerId={answer?.author?.id}
                     className="w-9 h-9 rounded-full"
                   />
                   <View className="ml-2.5 flex-1 bg-transparent">

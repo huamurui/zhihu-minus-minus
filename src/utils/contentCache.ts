@@ -256,6 +256,7 @@ export function seedRichContentFromFeedItem(
       avatar_url: item.author.avatar,
       url_token: item.author.url_token,
       type: 'people',
+      ...(contentType === 'answers' && { headline: item.author.headline }),
     },
     comment_count: item.commentCount,
     voteup_count: item.voteCount,
