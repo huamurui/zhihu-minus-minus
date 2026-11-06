@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import {
   useCallback,
@@ -34,6 +34,7 @@ import {
 } from '@/api/zhihu/column';
 import { recordReadHistory } from '@/api/zhihu/history';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
+import { ActionIconCount } from '@/components/ActionIconCount';
 import { AnswerEndorsements } from '@/components/AnswerEndorsements';
 import { BouncyButton } from '@/components/BouncyButton';
 import { CollectionButton } from '@/components/CollectionButton';
@@ -43,6 +44,7 @@ import {
   getContentActionBarBottom,
 } from '@/components/ContentActionBar';
 import { ContentActionButton } from '@/components/ContentActionButton';
+import { ContentDetailLoadingPreview } from '@/components/ContentDetailLoadingPreview';
 import { FollowButton } from '@/components/FollowButton';
 import { InitialContentReveal } from '@/components/InitialContentReveal';
 import { MoreActionsButton } from '@/components/MoreActionsButton';
@@ -55,14 +57,19 @@ import { StableAvatar } from '@/components/StableAvatar';
 import { Text, ThemedIcon, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
-import { usePaneDimensions } from '@/features/adaptive-layout/PaneContext';
+import { TitleTransitionTarget } from '@/features/adaptive-layout/TitleTransition';
 import { RICH_CONTENT_STALE_TIME, ZhihuContent } from '@/features/rich-content';
 import { useDoubleTapAction } from '@/hooks/useDoubleTapAction';
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
 import { useReadingProgress } from '@/hooks/useReadingProgress';
+import { getAuthSessionVersion, useAuthStore } from '@/store/useAuthStore';
 import { useCollectionStore } from '@/store/useCollectionStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ZhihuArticle } from '@/types/zhihu';
+import {
+  type ContentDetailPreview,
+  getContentDetailPreviewKey,
+} from '@/utils/contentDetailPreview';
 import { formatDate } from '@/utils/date';
 import { getCachedImageSource } from '@/utils/imageSource';
 import { shouldRetryQuery } from '@/utils/query';
@@ -70,7 +77,8 @@ import { shouldRetryQuery } from '@/utils/query';
 const ARTICLE_ACTION_BAR_OFFSET = 10;
 
 export default function ArticleDetail() {
-  const dimensions = usePaneDimensions();
+  const queryClient = useQueryClient();
+  const sessionVersion = useAuthStore(() => getAuthSessionVersion());
   const colorScheme = useColorScheme();
   const primaryColor = useThemeColor({}, 'primary');
   const linkColor = useThemeColor({}, 'link');
@@ -83,6 +91,11 @@ export default function ArticleDetail() {
   const router = useRouter();
 
   const isDaily = source === 'daily';
+  const preview = !isDaily
+    ? queryClient.getQueryData<ContentDetailPreview>(
+        getContentDetailPreviewKey('article', String(id ?? ''), sessionVersion),
+      )
+    : undefined;
   const textColor = Colors[colorScheme].text;
 
   const contentIdentity = `${isDaily ? 'daily' : 'article'}:${String(id ?? '')}`;
@@ -299,6 +312,16 @@ export default function ArticleDetail() {
   });
 
   if (isLoading && !data) {
+    if (preview) {
+      return (
+        <ContentDetailLoadingPreview
+          type="article"
+          preview={preview}
+          onBack={() => router.back()}
+          onOpenAuthor={(token) => router.push(`/user/${token}`)}
+        />
+      );
+    }
     return (
       <View className="flex-1 justify-center items-center">
         <Stack.Screen options={{ headerShown: false, title: '正文' }} />
@@ -463,12 +486,14 @@ export default function ArticleDetail() {
               </View>
             ) : (
               <View className="p-5 pt-[10px]">
-                <Text
-                  className="font-bold mb-5"
-                  style={{ fontSize: 22, lineHeight: 32 }}
-                >
-                  {data.title}
-                </Text>
+                <TitleTransitionTarget id={String(id)}>
+                  <Text
+                    className="font-bold mb-5"
+                    style={{ fontSize: 22, lineHeight: 32 }}
+                  >
+                    {data.title}
+                  </Text>
+                </TitleTransitionTarget>
                 <View className="flex-row items-center justify-between bg-transparent mt-2">
                   <BouncyButton
                     onPress={goToProfile}
@@ -496,6 +521,7 @@ export default function ArticleDetail() {
                   <FollowButton
                     following={Boolean(author?.is_following)}
                     loading={followMutation.isPending}
+                    disabled={author?.is_following === undefined}
                     onPress={() => followMutation.mutate()}
                   />
                 </View>
@@ -594,6 +620,8 @@ export default function ArticleDetail() {
       {!isDaily && (
         <ContentActionBar
           bottomInset={insets.bottom}
+          variant="islands"
+          interactiveGlass
           shrinkLeading
           bottomOffset={ARTICLE_ACTION_BAR_OFFSET}
           leading={
@@ -612,30 +640,37 @@ export default function ArticleDetail() {
                 type="article"
                 isCollected={activeCollected}
                 count={getContentCollectionMetadata(data).favlistsCount}
-                compact={dimensions.width / dimensions.fontScale < 360}
+                countDisplay="corner"
               />
               <ContentActionButton
                 accessibilityRole="button"
                 accessibilityLabel="评论"
-                className="items-center justify-center ml-2 px-2.5 py-1.5 flex-row bg-transparent"
+                accessibilityValue={{
+                  text: `${zhihuData?.comment_count ?? 0} 条评论`,
+                }}
+                style={{
+                  width: 44,
+                  height: 44,
+                  paddingHorizontal: 0,
+                  paddingVertical: 0,
+                }}
                 onPress={() => router.push(`/comments/${id}?type=article`)}
               >
-                <ThemedIcon
-                  name="chatbubble-outline"
-                  size={20}
-                  colorType="secondary"
-                />
-                {(zhihuData?.comment_count ?? 0) > 0 && (
-                  <Text
-                    type="secondary"
-                    className="ml-1 text-[13px] font-semibold"
-                  >
-                    {zhihuData?.comment_count}
-                  </Text>
-                )}
+                <ActionIconCount
+                  count={
+                    (zhihuData?.comment_count ?? 0) > 0
+                      ? zhihuData?.comment_count
+                      : undefined
+                  }
+                >
+                  <ThemedIcon
+                    name="chatbubble-outline"
+                    size={20}
+                    colorType="secondary"
+                  />
+                </ActionIconCount>
               </ContentActionButton>
               <MoreActionsButton
-                style={{ marginLeft: 4 }}
                 onPress={() => setOpenMenuIdentity(contentIdentity)}
               />
             </View>

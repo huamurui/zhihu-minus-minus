@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo } from 'react';
 import {
   ActivityIndicator,
   View as RawView,
@@ -14,6 +14,7 @@ import { recordReadHistory } from '@/api/zhihu/history';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
 import { getPin } from '@/api/zhihu/pin';
 import { getContentVoteCount, getContentVoteState } from '@/api/zhihu/voters';
+import { ActionIconCount } from '@/components/ActionIconCount';
 import { BouncyButton } from '@/components/BouncyButton';
 import {
   CONTENT_ACTION_BAR_HEIGHT,
@@ -23,31 +24,46 @@ import {
 import { ContentActionButton } from '@/components/ContentActionButton';
 import { ContentRelationshipNotice } from '@/components/ContentRelationshipNotice';
 import { FollowButton } from '@/components/FollowButton';
+import { InitialContentReveal } from '@/components/InitialContentReveal';
 import { MoreActionsButton } from '@/components/MoreActionsButton';
 import { PinPollCard } from '@/components/PinPollCard';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { ReadingProgressNotice } from '@/components/ReadingProgressNotice';
 import { SegmentedVoteCapsule } from '@/components/SegmentedVoteCapsule';
 import { ShareMenu } from '@/components/ShareMenu';
-import { StableAvatar } from '@/components/StableAvatar';
+import { RetainedAvatar } from '@/components/StableAvatar';
 import { useIsLiquidGlassActive } from '@/components/surfaces/FloatingSurface';
 import { Text, ThemedIcon, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
-import { RICH_CONTENT_STALE_TIME, ZhihuContent } from '@/features/rich-content';
+import {
+  isRichTextNativeAvailable,
+  RICH_CONTENT_STALE_TIME,
+  ZhihuContent,
+} from '@/features/rich-content';
 import { useDoubleTapAction } from '@/hooks/useDoubleTapAction';
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
 import { usePinActions } from '@/hooks/usePinActions';
 import { useReadingProgress } from '@/hooks/useReadingProgress';
+import { getAuthSessionVersion, useAuthStore } from '@/store/useAuthStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ZhihuPin } from '@/types/zhihu';
+import {
+  type ContentDetailPreview,
+  getContentDetailPreviewKey,
+} from '@/utils/contentDetailPreview';
 import { formatDateTime } from '@/utils/date';
 import { shouldRetryQuery } from '@/utils/query';
 
 export default function PinDetailScreen() {
+  const queryClient = useQueryClient();
+  const sessionVersion = useAuthStore(() => getAuthSessionVersion());
   const colorScheme = useColorScheme();
   const useGlass = useIsLiquidGlassActive();
   const { id } = useLocalSearchParams();
+  const preview = queryClient.getQueryData<ContentDetailPreview>(
+    getContentDetailPreviewKey('pin', String(id ?? ''), sessionVersion),
+  );
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const actionBarBottom = getContentActionBarBottom(insets.bottom);
@@ -85,6 +101,27 @@ export default function PinDetailScreen() {
   });
   const isLoading = isQueryLoading || (isPending && isPaused);
   const pinActions = usePinActions(pin);
+  const richContentRenderer = useSettingsStore(
+    (state) => state.richContentRenderer,
+  );
+  const waitForNativeLayout =
+    richContentRenderer === 'native-v2' && isRichTextNativeAvailable();
+  const contentLayoutSource = useMemo(
+    () => ({ id: String(id ?? ''), content: pin?.content }),
+    [id, pin?.content],
+  );
+  const [readyLayoutSource, setReadyLayoutSource] = React.useState<
+    typeof contentLayoutSource | null
+  >(null);
+  const latestLayoutSource = React.useRef(contentLayoutSource);
+  useLayoutEffect(() => {
+    latestLayoutSource.current = contentLayoutSource;
+  }, [contentLayoutSource]);
+  const handleContentLayoutReady = useCallback(() => {
+    if (latestLayoutSource.current === contentLayoutSource) {
+      setReadyLayoutSource(contentLayoutSource);
+    }
+  }, [contentLayoutSource]);
 
   const readingProgress = useReadingProgress({
     contentKey: `pin:${String(id ?? '')}`,
@@ -124,10 +161,37 @@ export default function PinDetailScreen() {
     successMessage: (isActive) => (isActive ? '已取消关注' : '已关注'),
   });
 
+  const previewAuthor = preview?.author;
+  const author = pin?.author;
+  const sameAuthor =
+    !author ||
+    (!!author.id && !!previewAuthor?.id && author.id === previewAuthor.id) ||
+    (!!author.url_token &&
+      !!previewAuthor?.urlToken &&
+      author.url_token === previewAuthor.urlToken) ||
+    (!!author.avatar_url && author.avatar_url === previewAuthor?.avatarUrl);
+  const authorId = author?.id || (sameAuthor ? previewAuthor?.id : undefined);
+  const authorToken =
+    author?.url_token ||
+    (sameAuthor ? previewAuthor?.urlToken : undefined) ||
+    authorId;
+  const authorAvatar =
+    author?.avatar_url || (sameAuthor ? previewAuthor?.avatarUrl : undefined);
+  const authorName =
+    author?.name || (sameAuthor ? previewAuthor?.name : undefined);
+  const authorHeadline =
+    author?.headline ?? (sameAuthor ? previewAuthor?.headline : undefined);
+  const avatarOwnerId = sameAuthor
+    ? previewAuthor?.id || previewAuthor?.urlToken || authorId || authorToken
+    : authorId || authorToken;
+  const avatarKey =
+    pin && !sameAuthor
+      ? `${contentIdentity}:detail:${authorId || authorToken || author?.avatar_url || 'unknown'}`
+      : contentIdentity;
   const goToProfile = useCallback(() => {
-    const token = pin?.author?.url_token || pin?.author?.id;
+    const token = authorToken;
     if (token) router.push(`/user/${token}`);
-  }, [pin?.author, router]);
+  }, [authorToken, router]);
 
   const { gesture: doubleTapVote, isDoubleTapEnabled } = useDoubleTapAction({
     id: String(id ?? ''),
@@ -138,7 +202,7 @@ export default function PinDetailScreen() {
     enabled: Boolean(id) && Boolean(pin),
   });
 
-  if (isLoading && !pin)
+  if (isLoading && !pin && !previewAuthor)
     return (
       <View type="default" className="flex-1 justify-center items-center">
         <ActivityIndicator size="large" color={primaryColor} />
@@ -155,7 +219,7 @@ export default function PinDetailScreen() {
       </View>
     );
 
-  if (!pin)
+  if (!pin && !isLoading)
     return (
       <View type="default" className="flex-1 justify-center items-center px-6">
         <Ionicons
@@ -189,12 +253,14 @@ export default function PinDetailScreen() {
           headerShadowVisible: false,
           headerStyle: { backgroundColor },
           headerTintColor: textColor,
-          headerRight: () => (
-            <MoreActionsButton
-              onPress={() => setOpenMenuIdentity(contentIdentity)}
-              style={{ marginRight: useGlass ? 0 : 10 }}
-            />
-          ),
+          headerRight: pin
+            ? () => (
+                <MoreActionsButton
+                  onPress={() => setOpenMenuIdentity(contentIdentity)}
+                  style={{ marginRight: useGlass ? 0 : 10 }}
+                />
+              )
+            : undefined,
         }}
       />
 
@@ -236,66 +302,91 @@ export default function PinDetailScreen() {
             <View className="flex-row items-center p-5 justify-between bg-transparent">
               <BouncyButton
                 onPress={goToProfile}
+                disabled={!authorToken}
                 className="flex-row items-center flex-1 bg-transparent"
               >
-                <StableAvatar
-                  uri={pin?.author?.avatar_url}
+                <RetainedAvatar
+                  key={avatarKey}
+                  uri={authorAvatar}
+                  ownerId={avatarOwnerId}
                   className="w-11 h-11 rounded-full"
                 />
                 <View className="ml-3 flex-1 bg-transparent">
-                  <Text className="text-base font-bold">
-                    {pin?.author?.name}
-                  </Text>
-                  {pin?.author?.headline ? (
+                  <Text className="text-base font-bold">{authorName}</Text>
+                  {authorHeadline ? (
                     <Text
                       type="secondary"
                       className="text-[13px] mt-0.5"
                       numberOfLines={1}
                     >
-                      {pin.author.headline}
+                      {authorHeadline}
                     </Text>
                   ) : null}
                 </View>
               </BouncyButton>
-              <FollowButton
-                following={Boolean(pin?.author?.is_following)}
-                loading={followMutation.isPending}
-                onPress={() => followMutation.mutate()}
-              />
+              {pin ? (
+                <FollowButton
+                  following={Boolean(pin.author?.is_following)}
+                  loading={followMutation.isPending}
+                  disabled={pin.author?.is_following === undefined}
+                  onPress={() => followMutation.mutate()}
+                />
+              ) : (
+                <View className="bg-transparent" style={{ width: 64 }} />
+              )}
             </View>
 
-            {/* 想法内容 */}
-            <View className="px-5 bg-transparent">
-              <ContentRelationshipNotice
-                contentType="pin"
-                contentId={String(id)}
-                voteCount={pinVoteCount}
+            {pin ? (
+              <>
+                {/* 想法内容 */}
+                <View className="px-5 bg-transparent">
+                  <ContentRelationshipNotice
+                    contentType="pin"
+                    contentId={String(id)}
+                    voteCount={pinVoteCount}
+                  />
+                  <InitialContentReveal
+                    key={String(id)}
+                    ready={
+                      !waitForNativeLayout ||
+                      readyLayoutSource === contentLayoutSource
+                    }
+                  >
+                    <ZhihuContent
+                      suppressDoubleTapSelection={isDoubleTapEnabled}
+                      contentArray={pin.content}
+                      objectId={id as string}
+                      type="pin"
+                      onRefresh={refetch}
+                      onLayoutReady={handleContentLayoutReady}
+                    />
+                  </InitialContentReveal>
+                </View>
+                {poll ? (
+                  <RawView className="px-5 bg-transparent">
+                    <PinPollCard
+                      key={`${id}:${poll.id}`}
+                      poll={poll}
+                      contentId={String(id)}
+                    />
+                  </RawView>
+                ) : null}
+                <Text
+                  type="secondary"
+                  className="text-[#bbb] text-[13px] mt-[30px] italic pb-5 px-5"
+                >
+                  发布于 {pin.created
+                    ? formatDateTime(pin.created)
+                    : '不久前'}{' '}
+                </Text>
+              </>
+            ) : (
+              <ActivityIndicator
+                size="large"
+                color={primaryColor}
+                style={{ marginTop: 24 }}
               />
-              <ZhihuContent
-                suppressDoubleTapSelection={isDoubleTapEnabled}
-                contentArray={pin?.content}
-                objectId={id as string}
-                type="pin"
-                onRefresh={refetch}
-              />
-            </View>
-            {poll ? (
-              <RawView className="px-5 bg-transparent">
-                <PinPollCard
-                  key={`${id}:${poll.id}`}
-                  poll={poll}
-                  contentId={String(id)}
-                />
-              </RawView>
-            ) : null}
-            <Text
-              type="secondary"
-              className="text-[#bbb] text-[13px] mt-[30px] italic pb-5 px-5"
-            >
-              发布于 {pin?.created
-                ? formatDateTime(pin.created)
-                : '不久前'}{' '}
-            </Text>
+            )}
           </ScrollView>
         </RawView>
       </GestureDetector>
@@ -310,46 +401,55 @@ export default function PinDetailScreen() {
       />
 
       {/* 底部交互栏 */}
-      <ContentActionBar
-        bottomInset={insets.bottom}
-        leading={
-          <SegmentedVoteCapsule
-            id={pin?.id ?? ''}
-            count={pinVoteCount}
-            voted={pinVoteState}
-            type="pins"
-            showDownvote={false}
-          />
-        }
-        trailing={
-          <View className="flex-row items-center bg-transparent">
-            <ContentActionButton
-              accessibilityRole="button"
-              accessibilityLabel="评论"
-              className="items-center justify-center ml-2 px-2.5 py-1.5 flex-row bg-transparent"
-              onPress={() => router.push(`/comments/${id}?type=pin`)}
-            >
-              <ThemedIcon
-                name="chatbubble-outline"
-                size={20}
-                colorType="secondary"
-              />
-              {pin?.comment_count > 0 && (
-                <Text
-                  type="secondary"
-                  className="ml-1 text-[13px] font-semibold"
-                >
-                  {pin?.comment_count}
-                </Text>
-              )}
-            </ContentActionButton>
-            <MoreActionsButton
-              style={{ marginLeft: 4 }}
-              onPress={() => setOpenMenuIdentity(contentIdentity)}
+      {pin ? (
+        <ContentActionBar
+          bottomInset={insets.bottom}
+          variant="islands"
+          interactiveGlass
+          shrinkLeading
+          leading={
+            <SegmentedVoteCapsule
+              id={pin.id}
+              count={pinVoteCount}
+              voted={pinVoteState}
+              type="pins"
+              showDownvote={false}
+              allowCountShrink
             />
-          </View>
-        }
-      />
+          }
+          trailing={
+            <View className="flex-row items-center bg-transparent">
+              <ContentActionButton
+                accessibilityRole="button"
+                accessibilityLabel="评论"
+                accessibilityValue={{
+                  text: `${pin.comment_count ?? 0} 条评论`,
+                }}
+                style={{
+                  width: 44,
+                  height: 44,
+                  paddingHorizontal: 0,
+                  paddingVertical: 0,
+                }}
+                onPress={() => router.push(`/comments/${id}?type=pin`)}
+              >
+                <ActionIconCount
+                  count={pin.comment_count > 0 ? pin.comment_count : undefined}
+                >
+                  <ThemedIcon
+                    name="chatbubble-outline"
+                    size={20}
+                    colorType="secondary"
+                  />
+                </ActionIconCount>
+              </ContentActionButton>
+              <MoreActionsButton
+                onPress={() => setOpenMenuIdentity(contentIdentity)}
+              />
+            </View>
+          }
+        />
+      ) : null}
     </View>
   );
 }

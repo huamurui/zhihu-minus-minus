@@ -11,6 +11,7 @@ import type {
   AnswerReadingRouteParams,
 } from '../src/utils/answerReadingContext';
 import { updateContentInteractionCaches } from '../src/utils/contentCache';
+import { getContentDetailPreviewKey } from '../src/utils/contentDetailPreview';
 
 interface MenuProps {
   visible: boolean;
@@ -27,6 +28,8 @@ let mockShareMenuProps: MenuProps;
 const mockUseContentActions = jest.fn();
 const mockCopy = jest.fn();
 const mockPush = jest.fn();
+const mockSetQueryData = jest.fn();
+let mockSessionVersion = 1;
 const mockCollectionButton = jest.fn(
   (_props: React.ComponentProps<typeof CollectionButton>) => {},
 );
@@ -53,7 +56,9 @@ jest.mock('../src/api/zhihu', () => ({
   getContentVoteState: () => 0,
 }));
 jest.mock('../src/api/client', () => ({ hasAuthenticationCookie: () => true }));
-jest.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({}) }));
+jest.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({ setQueryData: mockSetQueryData }),
+}));
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
 jest.mock('@expo/vector-icons/Ionicons', () => () => null);
 jest.mock('../src/components/CollectionButton', () => {
@@ -82,6 +87,7 @@ jest.mock('react-native-reanimated', () => ({
   SharedTransition: { duration: () => ({}) },
 }));
 jest.mock('../src/store/useAuthStore', () => ({
+  getAuthSessionVersion: () => mockSessionVersion,
   useAuthStore: () => ({ cookies: 'synthetic-session' }),
 }));
 jest.mock('../src/store/useCollectionStore', () => ({
@@ -191,7 +197,10 @@ jest.mock('../src/utils/haptics', () => ({
 }));
 jest.mock('../src/utils/toast', () => ({ showToast: jest.fn() }));
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockSessionVersion = 1;
+});
 
 const baseItem: FeedItem = {
   id: 'original',
@@ -204,6 +213,58 @@ const baseItem: FeedItem = {
   commentCount: 0,
   voted: 0,
 };
+
+test('article preview follows a recycled card identity and session', async () => {
+  const item: FeedItem = {
+    ...baseItem,
+    type: 'articles',
+    author: {
+      id: 'author',
+      name: '合成作者',
+      avatar: 'https://example.test/a.jpg',
+    },
+  };
+  const host = await render(<FeedCard item={item} />);
+  await fireEvent.press(host.getByText('合成原卡片'));
+  expect(mockSetQueryData).toHaveBeenCalledWith(
+    ['content-detail-preview', 1, 'article', 'original'],
+    expect.objectContaining({
+      id: 'original',
+      title: '合成原卡片',
+      author: expect.objectContaining({
+        id: 'author',
+        avatarUrl: item.author.avatar,
+      }),
+    }),
+  );
+  mockSessionVersion = 2;
+  await host.rerender(<FeedCard item={{ ...item, id: 'next' }} />);
+  await fireEvent.press(host.getByText('合成原卡片'));
+  expect(mockSetQueryData).toHaveBeenLastCalledWith(
+    ['content-detail-preview', 2, 'article', 'next'],
+    expect.objectContaining({ id: 'next' }),
+  );
+});
+
+test('creation-card pin preview uses the same normalized key when opened', async () => {
+  const item = {
+    id: ' 123 ',
+    author: {
+      id: 'author',
+      name: '合成作者',
+      avatar_url: 'https://example.test/a.jpg',
+    },
+  };
+  const host = await render(<CreationCard item={item} type="pin" />);
+  await fireEvent.press(host.getByText('发布了想法'));
+  expect(mockSetQueryData).toHaveBeenCalledWith(
+    getContentDetailPreviewKey('pin', item.id, 1),
+    expect.objectContaining({
+      id: '123',
+      author: expect.objectContaining({ id: 'author', name: '合成作者' }),
+    }),
+  );
+});
 
 test('recycled feed images switch sources without replaying the Android fade', async () => {
   const first = {
