@@ -842,7 +842,6 @@ export const AnswerDetailView = ({
             </ContentActionButton>
             <MoreActionsButton
               disabled={!answer}
-              style={{ marginLeft: 4 }}
               onPress={() => setMenuVisible(true)}
             />
           </View>

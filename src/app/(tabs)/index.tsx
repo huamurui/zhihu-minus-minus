@@ -255,6 +255,7 @@ export default function HomeScreen() {
   const tintColor = useThemeColor({}, 'primary');
   const textColor = useThemeColor({}, 'text');
   const secondaryTextColor = useThemeColor({}, 'textSecondary');
+  const navigationBorderColor = useThemeColor({}, 'contentBorder');
   const indicatorBgColor = useThemeColor({}, 'primary_26');
   const [currentPage, setCurrentPage] = useState(initialPageIndex);
   const bottomActiveIndex =
@@ -604,7 +605,6 @@ export default function HomeScreen() {
         <Animated.View
           style={[
             styles.bottomBarContainer,
-            colorScheme === 'light' && styles.lightTranslucentShadow,
             { bottom: insets.bottom, width: containerWidth },
             bottomNavAnimStyle,
           ]}
@@ -619,6 +619,8 @@ export default function HomeScreen() {
                   colorScheme === 'dark'
                     ? 'rgba(0,0,0,0.7)'
                     : 'rgba(255,255,255,0.85)',
+                borderColor: navigationBorderColor,
+                borderWidth: StyleSheet.hairlineWidth,
               },
             ]}
           >
@@ -1630,9 +1632,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     alignSelf: 'center',
     zIndex: 1001,
-  },
-  lightTranslucentShadow: {
-    shadowColor: Colors.light.shadow,
   },
   bottomBlur: { borderRadius: 32, overflow: 'hidden', height: 64 },
   bottomNavItems: {

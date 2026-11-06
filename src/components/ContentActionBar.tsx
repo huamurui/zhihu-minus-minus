@@ -89,13 +89,10 @@ export function ContentActionBar({
             {leading ? (
               <View
                 style={[
-                  styles.islandShadow,
+                  styles.islandContainer,
                   shrinkLeading && styles.shrinkableLeading,
                   !useGlass && {
                     backgroundColor: colors.contentOverlayStrong,
-                    ...(colorScheme === 'light'
-                      ? { shadowColor: colors.shadow, ...styles.shadow }
-                      : {}),
                   },
                 ]}
               >
@@ -129,12 +126,9 @@ export function ContentActionBar({
               {trailing ? (
                 <View
                   style={[
-                    styles.islandShadow,
+                    styles.islandContainer,
                     !useGlass && {
                       backgroundColor: colors.contentOverlayStrong,
-                      ...(colorScheme === 'light'
-                        ? { shadowColor: colors.shadow, ...styles.shadow }
-                        : {}),
                     },
                   ]}
                 >
@@ -168,13 +162,10 @@ export function ContentActionBar({
               {accessory ? (
                 <View
                   style={[
-                    styles.islandShadow,
+                    styles.islandContainer,
                     styles.islandAccessoryContainer,
                     !useGlass && {
                       backgroundColor: colors.contentOverlayStrong,
-                      ...(colorScheme === 'light'
-                        ? { shadowColor: colors.shadow, ...styles.shadow }
-                        : {}),
                     },
                   ]}
                 >
@@ -229,11 +220,6 @@ export function ContentActionBar({
               ? [{ translateY: bottom + CONTENT_ACTION_BAR_HEIGHT + 30 }]
               : undefined,
         },
-        !useGlass &&
-          colorScheme === 'light' && {
-            shadowColor: colors.shadow,
-            ...styles.shadow,
-          },
         style,
       ]}
     >
@@ -289,12 +275,6 @@ export function ContentActionBar({
 const styles = StyleSheet.create({
   container: { position: 'absolute', left: 16, right: 16, zIndex: 1000 },
   surface: { overflow: 'hidden' },
-  shadow: {
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 4,
-  },
   barRow: {
     flex: 1,
     flexDirection: 'row',
@@ -328,12 +308,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: 'transparent',
   },
-  islandShadow: {
+  islandContainer: {
     height: CONTENT_ACTION_BAR_HEIGHT,
     borderRadius: CONTENT_ACTION_BAR_HEIGHT / 2,
   },
   islandLeading: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -348,7 +328,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   islandTrailing: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

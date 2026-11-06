@@ -21,6 +21,7 @@ import {
   isLiquidGlassSupported,
   useIsLiquidGlassActive,
 } from '@/components/surfaces/FloatingSurface';
+import { useThemeColor } from '@/components/Themed';
 
 export { isLiquidGlassSupported };
 
@@ -70,6 +71,7 @@ export function GlassTopNavigation({
   onSearchPress,
 }: GlassTopNavigationProps) {
   const liquidGlassActive = useIsLiquidGlassActive(useLiquidGlass ?? true);
+  const borderColor = useThemeColor({}, 'contentBorder');
 
   const labels: Record<string, string> = {
     following: '关注',
@@ -112,20 +114,16 @@ export function GlassTopNavigation({
         style={styles.navRow}
       >
         {/* 1. 左侧内容分区 Tab 轨道 (原生 Liquid Glass regular 或普通 BlurView 圆角胶囊) */}
-        <View
-          style={[
-            styles.tabsTrackWrapper,
-            colorScheme === 'light' &&
-              !liquidGlassActive &&
-              styles.lightTranslucentShadow,
-          ]}
-        >
+        <View style={styles.tabsTrackWrapper}>
           {liquidGlassActive ? (
             <GlassView
               glassEffectStyle="regular"
               colorScheme={colorScheme === 'dark' ? 'dark' : 'light'}
               pointerEvents="none"
-              style={styles.tabsTrackGlass}
+              style={[
+                styles.tabsTrackGlass,
+                { borderColor, borderWidth: StyleSheet.hairlineWidth },
+              ]}
             />
           ) : (
             <BlurView
@@ -138,10 +136,7 @@ export function GlassTopNavigation({
                     colorScheme === 'dark'
                       ? 'rgba(0,0,0,0.7)'
                       : 'rgba(255,255,255,0.85)',
-                  borderColor:
-                    colorScheme === 'dark'
-                      ? 'rgba(255,255,255,0.15)'
-                      : 'rgba(255,255,255,0.4)',
+                  borderColor,
                   borderWidth: StyleSheet.hairlineWidth,
                 },
               ]}
@@ -210,7 +205,10 @@ export function GlassTopNavigation({
               glassEffectStyle="regular"
               colorScheme={colorScheme === 'dark' ? 'dark' : 'light'}
               isInteractive
-              style={styles.searchGlass}
+              style={[
+                styles.searchGlass,
+                { borderColor, borderWidth: StyleSheet.hairlineWidth },
+              ]}
             >
               <Ionicons name="search" size={20} color={textColor} />
             </GlassView>
@@ -220,10 +218,7 @@ export function GlassTopNavigation({
             accessibilityRole="button"
             accessibilityLabel="搜索"
             onPress={onSearchPress}
-            style={[
-              styles.searchBtnWrapper,
-              colorScheme === 'light' && styles.lightTranslucentShadow,
-            ]}
+            style={styles.searchBtnWrapper}
           >
             <BlurView
               intensity={100}
@@ -235,10 +230,7 @@ export function GlassTopNavigation({
                     colorScheme === 'dark'
                       ? 'rgba(0,0,0,0.7)'
                       : 'rgba(255,255,255,0.85)',
-                  borderColor:
-                    colorScheme === 'dark'
-                      ? 'rgba(255,255,255,0.15)'
-                      : 'rgba(255,255,255,0.4)',
+                  borderColor,
                   borderWidth: StyleSheet.hairlineWidth,
                 },
               ]}
@@ -324,12 +316,5 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  lightTranslucentShadow: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
   },
 });
