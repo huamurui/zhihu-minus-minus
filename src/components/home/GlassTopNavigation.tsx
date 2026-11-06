@@ -17,11 +17,11 @@ import type { EdgeInsets } from 'react-native-safe-area-context';
 import { BouncyButton } from '@/components/BouncyButton';
 import { ScrollableNavigationRow } from '@/components/home/ScrollableNavigationRow';
 import { TopTabLabel } from '@/components/home/TopTabLabel';
-import { useThemeColor } from '@/components/Themed';
 import {
   isLiquidGlassSupported,
   useIsLiquidGlassActive,
 } from '@/components/surfaces/FloatingSurface';
+import { useThemeColor } from '@/components/Themed';
 
 export { isLiquidGlassSupported };
 

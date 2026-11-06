@@ -176,8 +176,7 @@ export const LikeButton = ({
         variant === 'default' && {
           backgroundColor: isUpvoted ? primaryColor : borderColor,
         },
-        (variant === 'ghost' ||
-          variant === 'minimal') && {
+        (variant === 'ghost' || variant === 'minimal') && {
           borderRadius: 99,
         },
         // The segmented capsule clips both halves to its shared outline.
