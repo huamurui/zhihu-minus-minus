@@ -12,6 +12,7 @@ import {
 } from 'expo-router/testing-library';
 import { type ReactNode, useContext, useEffect, useState } from 'react';
 import {
+  AccessibilityInfo,
   Animated,
   BackHandler,
   Dimensions,
@@ -34,6 +35,7 @@ import {
   usePaneDimensions,
   usePaneVisible,
 } from '../src/features/adaptive-layout/PaneContext';
+import * as titleTransition from '../src/features/adaptive-layout/TitleTransition';
 import { usePaneRouter } from '../src/features/adaptive-layout/usePaneRouter';
 import { useRefreshAction } from '../src/hooks/useRefreshAction';
 import { useSettingsStore } from '../src/store/useSettingsStore';
@@ -225,6 +227,9 @@ function appRoutes(result: Awaited<ReturnType<typeof open>>) {
 beforeEach(async () => {
   // Exercise the adaptive host, which remains the Android single-pane path.
   jest.replaceProperty(Platform, 'OS', 'android');
+  jest
+    .spyOn(AccessibilityInfo, 'isReduceMotionEnabled')
+    .mockResolvedValue(false);
   for (const key of Object.keys(mounts)) delete mounts[key];
   for (const key of Object.keys(cleanups)) delete cleanups[key];
   finishRefresh = undefined;
@@ -282,7 +287,86 @@ test('single-pane navigation animates both opening and returning to a mounted pa
   }
 });
 
-test('returning from comments keeps the older profile hidden throughout the answer entrance', async () => {
+test.each([false, true])(
+  'Android fades an entering page when the title transition is active: %s',
+  async (hasTitleTransition) => {
+    await setTwoPanes(false);
+    jest
+      .spyOn(titleTransition, 'useTitleTransitionActiveForRoute')
+      .mockReturnValue(hasTitleTransition);
+    const timing = jest.spyOn(Animated, 'timing').mockReturnValue({
+      start: jest.fn(),
+      stop: jest.fn(),
+      reset: jest.fn(),
+    });
+    try {
+      const result = await open();
+      const homeKey = appRoutes(result)[0].key;
+      await testRouter.push('/answer/a');
+      const answerKey = appRoutes(result).at(-1)?.key;
+      const entering = screen.getByTestId(
+        `adaptive-route-${answerKey}-transition`,
+      );
+      const underneath = screen.getByTestId(`adaptive-route-${homeKey}`, {
+        includeHiddenElements: true,
+      });
+      expect(entering).toBeVisible();
+      expect(entering).not.toHaveStyle({ opacity: 1 });
+      expect(underneath).toHaveStyle({ opacity: 1 });
+      expect(underneath.props.pointerEvents).toBe('none');
+      expect(timing).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ toValue: 1, useNativeDriver: true }),
+      );
+    } finally {
+      timing.mockRestore();
+    }
+  },
+);
+
+test('reduced-motion back navigation removes the exiting route immediately', async () => {
+  jest
+    .spyOn(AccessibilityInfo, 'isReduceMotionEnabled')
+    .mockResolvedValue(true);
+  await setTwoPanes(false);
+  const result = await open();
+  await testRouter.push('/answer/a');
+  const answerKey = appRoutes(result).at(-1)?.key;
+  await act(async () => {});
+  await testRouter.back('/');
+  expect(
+    screen.queryByTestId(`adaptive-route-${answerKey}`, {
+      includeHiddenElements: true,
+    }),
+  ).toBeNull();
+  expect(screen.getByText('home:root')).toBeVisible();
+});
+
+test('entering a full-screen page keeps both prior panes under the fade', async () => {
+  const timing = jest.spyOn(Animated, 'timing').mockReturnValue({
+    start: jest.fn(),
+    stop: jest.fn(),
+    reset: jest.fn(),
+  });
+  try {
+    const result = await open();
+    const listKey = appRoutes(result)[0].key;
+    await fireEvent.press(screen.getByText('open-a-home:root'));
+    const detailKey = appRoutes(result).at(-1)?.key;
+    await testRouter.push('/settings');
+    for (const key of [listKey, detailKey]) {
+      const pane = screen.getByTestId(`adaptive-route-${key}`, {
+        includeHiddenElements: true,
+      });
+      expect(pane).toHaveStyle({ opacity: 1 });
+      expect(pane.props.pointerEvents).toBe('none');
+    }
+  } finally {
+    timing.mockRestore();
+  }
+});
+
+test('returning from comments keeps the answer stationary and fades out comments', async () => {
   await setTwoPanes(false);
   const timing = jest.spyOn(Animated, 'timing').mockReturnValue({
     start: jest.fn(),
@@ -296,6 +380,8 @@ test('returning from comments keeps the older profile hidden throughout the answ
     await testRouter.push('/answer/a');
     const answerKey = appRoutes(result).at(-1)?.key;
     await testRouter.push('/comments/a?type=answer');
+    const commentsKey = appRoutes(result).at(-1)?.key;
+    timing.mockClear();
     await testRouter.back('/answer/a');
     const profile = screen.getByTestId(`adaptive-route-${profileKey}`, {
       includeHiddenElements: true,
@@ -306,7 +392,15 @@ test('returning from comments keeps the older profile hidden throughout the answ
     );
     expect(profile).toHaveStyle({ opacity: 0 });
     expect(answer).toHaveStyle({ opacity: 1 });
-    expect(answerTransition).not.toHaveStyle({ opacity: 1 });
+    expect(answerTransition).toHaveStyle({ opacity: 1 });
+    const comments = screen.getByTestId(`adaptive-route-${commentsKey}`, {
+      includeHiddenElements: true,
+    });
+    expect(comments.props.pointerEvents).toBe('none');
+    expect(timing).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ toValue: 0, useNativeDriver: true }),
+    );
     expect(screen.getByText('answer:a')).toBeVisible();
   } finally {
     timing.mockRestore();
