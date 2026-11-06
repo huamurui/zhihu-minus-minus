@@ -357,7 +357,9 @@ export default function PinDetailScreen() {
                   type="secondary"
                   className="text-[#bbb] text-[13px] mt-[30px] italic pb-5 px-5"
                 >
-                  发布于 {pin.created ? formatDateTime(pin.created) : '不久前'}{' '}
+                  发布于 {pin.created
+                    ? formatDateTime(pin.created)
+                    : '不久前'}{' '}
                 </Text>
               </>
             ) : (
@@ -402,7 +404,9 @@ export default function PinDetailScreen() {
               <ContentActionButton
                 accessibilityRole="button"
                 accessibilityLabel="评论"
-                accessibilityValue={{ text: `${pin.comment_count ?? 0} 条评论` }}
+                accessibilityValue={{
+                  text: `${pin.comment_count ?? 0} 条评论`,
+                }}
                 style={{
                   width: 44,
                   height: 44,

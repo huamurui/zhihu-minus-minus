@@ -53,7 +53,9 @@ jest.mock('../src/api/zhihu', () => ({
   getContentVoteState: () => 0,
 }));
 jest.mock('../src/api/client', () => ({ hasAuthenticationCookie: () => true }));
-jest.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({}) }));
+jest.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({ setQueryData: jest.fn() }),
+}));
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
 jest.mock('@expo/vector-icons/Ionicons', () => () => null);
 jest.mock('../src/components/CollectionButton', () => {
@@ -82,6 +84,7 @@ jest.mock('react-native-reanimated', () => ({
   SharedTransition: { duration: () => ({}) },
 }));
 jest.mock('../src/store/useAuthStore', () => ({
+  getAuthSessionVersion: () => 1,
   useAuthStore: () => ({ cookies: 'synthetic-session' }),
 }));
 jest.mock('../src/store/useCollectionStore', () => ({

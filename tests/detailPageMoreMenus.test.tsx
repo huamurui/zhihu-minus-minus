@@ -166,7 +166,11 @@ jest.mock('@tanstack/react-query', () => ({
     mockMutationOptions = options;
     return { mutate: mockMutate, isPending: false };
   },
-  useQueryClient: () => ({ invalidateQueries: mockInvalidateQueries }),
+  useQueryClient: () => ({
+    invalidateQueries: mockInvalidateQueries,
+    getQueryData: (queryKey: readonly unknown[]) =>
+      mockQueryData[queryKey.join(':')],
+  }),
 }));
 jest.mock('@shopify/flash-list', () => {
   const react = jest.requireActual<typeof import('react')>('react');
