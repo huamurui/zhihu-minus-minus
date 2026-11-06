@@ -30,6 +30,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
 } from 'react';
@@ -177,17 +178,19 @@ export function AdaptiveStackContent({
   const listWidth = getListPaneWidth(width, ratio);
   const detailLeft = listWidth + PANE_DIVIDER_WIDTH;
   const previousPane = getVisiblePanes(state.routes, state.index - 1, enabled);
-  const underlayKey = panes.fullKey
-    ? previousPane.fullKey
+  const underlayKeys = panes.fullKey
+    ? [previousPane.fullKey, previousPane.listKey, previousPane.detailKey]
     : panes.detailKey
-      ? previousPane.detailKey
-      : undefined;
+      ? [previousPane.detailKey]
+      : [];
   const previous = useRef<{
     activeKey: string | undefined;
     routeKeys: string[];
     active: RetainedRoute | null;
   } | null>(null);
   const [exiting, setExiting] = useState<RetainedRoute | null>(null);
+  const completedExit = useRef<string | null>(null);
+  const [, markExitComplete] = useReducer((version: number) => version + 1, 0);
   const pendingExit =
     Platform.OS === 'android' &&
     previous.current?.activeKey !== activeKey &&
@@ -201,8 +204,14 @@ export function AdaptiveStackContent({
     pendingExit ?? (transition.current.returning ? exiting : null);
   const activeRoute = state.routes[state.index];
   useLayoutEffect(() => {
-    if (pendingExit) setExiting(pendingExit);
-    else if (!transition.current.returning) setExiting(null);
+    if (pendingExit) {
+      if (completedExit.current === pendingExit.route.key) {
+        setExiting(null);
+      } else {
+        completedExit.current = null;
+        setExiting(pendingExit);
+      }
+    } else if (!transition.current.returning) setExiting(null);
     previous.current = {
       activeKey,
       routeKeys: state.routes.map((route) => route.key),
@@ -224,7 +233,9 @@ export function AdaptiveStackContent({
     };
   });
   const finishExit = useCallback((routeKey: string) => {
+    completedExit.current = routeKey;
     setExiting((current) => (current?.route.key === routeKey ? null : current));
+    markExitComplete();
   }, []);
   const commitRatio = useCallback((next: number) => {
     setRatio(next);
@@ -297,7 +308,7 @@ export function AdaptiveStackContent({
                   background={
                     Platform.OS === 'android' &&
                     !transition.current.returning &&
-                    route.key === underlayKey &&
+                    underlayKeys.includes(route.key) &&
                     !visible
                   }
                   active={route.key === activeKey && !isList}

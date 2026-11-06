@@ -12,6 +12,7 @@ import {
 } from 'expo-router/testing-library';
 import { type ReactNode, useContext, useEffect, useState } from 'react';
 import {
+  AccessibilityInfo,
   Animated,
   BackHandler,
   Dimensions,
@@ -226,6 +227,9 @@ function appRoutes(result: Awaited<ReturnType<typeof open>>) {
 beforeEach(async () => {
   // Exercise the adaptive host, which remains the Android single-pane path.
   jest.replaceProperty(Platform, 'OS', 'android');
+  jest
+    .spyOn(AccessibilityInfo, 'isReduceMotionEnabled')
+    .mockResolvedValue(false);
   for (const key of Object.keys(mounts)) delete mounts[key];
   for (const key of Object.keys(cleanups)) delete cleanups[key];
   finishRefresh = undefined;
@@ -306,7 +310,8 @@ test.each([false, true])(
       const underneath = screen.getByTestId(`adaptive-route-${homeKey}`, {
         includeHiddenElements: true,
       });
-      expect(entering).toHaveStyle({ opacity: 0.05 });
+      expect(entering).toBeVisible();
+      expect(entering).not.toHaveStyle({ opacity: 1 });
       expect(underneath).toHaveStyle({ opacity: 1 });
       expect(underneath.props.pointerEvents).toBe('none');
       expect(timing).toHaveBeenCalledWith(
@@ -318,6 +323,48 @@ test.each([false, true])(
     }
   },
 );
+
+test('reduced-motion back navigation removes the exiting route immediately', async () => {
+  jest
+    .spyOn(AccessibilityInfo, 'isReduceMotionEnabled')
+    .mockResolvedValue(true);
+  await setTwoPanes(false);
+  const result = await open();
+  await testRouter.push('/answer/a');
+  const answerKey = appRoutes(result).at(-1)?.key;
+  await act(async () => {});
+  await testRouter.back('/');
+  expect(
+    screen.queryByTestId(`adaptive-route-${answerKey}`, {
+      includeHiddenElements: true,
+    }),
+  ).toBeNull();
+  expect(screen.getByText('home:root')).toBeVisible();
+});
+
+test('entering a full-screen page keeps both prior panes under the fade', async () => {
+  const timing = jest.spyOn(Animated, 'timing').mockReturnValue({
+    start: jest.fn(),
+    stop: jest.fn(),
+    reset: jest.fn(),
+  });
+  try {
+    const result = await open();
+    const listKey = appRoutes(result)[0].key;
+    await fireEvent.press(screen.getByText('open-a-home:root'));
+    const detailKey = appRoutes(result).at(-1)?.key;
+    await testRouter.push('/settings');
+    for (const key of [listKey, detailKey]) {
+      const pane = screen.getByTestId(`adaptive-route-${key}`, {
+        includeHiddenElements: true,
+      });
+      expect(pane).toHaveStyle({ opacity: 1 });
+      expect(pane.props.pointerEvents).toBe('none');
+    }
+  } finally {
+    timing.mockRestore();
+  }
+});
 
 test('returning from comments keeps the answer stationary and fades out comments', async () => {
   await setTwoPanes(false);
