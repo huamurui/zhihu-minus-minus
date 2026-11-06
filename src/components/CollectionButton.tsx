@@ -8,6 +8,7 @@ import { CollectionStarIcon } from '@/components/CollectionStarIcon';
 import { useContentActionBarColor } from '@/components/ContentActionBarColor';
 import { ContentActionButton } from '@/components/ContentActionButton';
 import { Text, useThemeColor } from '@/components/Themed';
+import { typography } from '@/constants/designTokens';
 import { useCollectionAction } from '@/hooks/useCollectionAction';
 import { getAuthSessionVersion, useAuthStore } from '@/store/useAuthStore';
 import { useCollectionStore } from '@/store/useCollectionStore';
@@ -195,6 +196,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     paddingVertical: 0,
   },
-  count: { marginLeft: 4, fontSize: 13, fontWeight: '600' },
+  count: {
+    marginLeft: 4,
+    fontSize: typography.fontSize.body,
+    fontWeight: '600',
+  },
   floatingCount: { fontSize: 14 },
 });

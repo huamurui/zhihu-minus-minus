@@ -138,10 +138,11 @@ export const DownvoteButton = ({
           backgroundColor: isDownvoted ? primaryColor : `${primaryColor}1a`,
         },
         (variant === 'ghost' ||
-          variant === 'minimal' ||
-          variant === 'segmented') && {
+          variant === 'minimal') && {
           borderRadius: 99,
         },
+        // The segmented capsule clips both halves to its shared outline.
+        variant === 'segmented' && { height: '100%', borderRadius: 0 },
       ]}
     >
       {loading ? (

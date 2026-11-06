@@ -139,7 +139,6 @@ export function AnswerPreviewFloatingBar({
             </ContentActionButton>
             <MoreActionsButton
               accessibilityLabel="回答更多操作"
-              style={styles.more}
               onPress={() => {
                 if (shown) onMore(answer);
               }}
@@ -165,16 +164,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     paddingVertical: 0,
   },
-  more: { marginLeft: 4 },
   collapseInline: {
-    width: 36,
-    height: CONTENT_ACTION_BAR_HEIGHT,
+    width: 44,
+    height: 44,
     paddingHorizontal: 0,
     paddingVertical: 0,
   },
   collapseCircle: {
-    width: CONTENT_ACTION_BAR_HEIGHT,
-    height: CONTENT_ACTION_BAR_HEIGHT,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 0,

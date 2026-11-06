@@ -11,6 +11,7 @@ export default function NativeTabLayout() {
   const visibleTabs = useSettingsStore((state) => state.visibleTabs);
   const tintColor = useThemeColor({}, 'primary');
   const inactiveColor = useThemeColor({}, 'textSecondary');
+  const borderColor = useThemeColor({}, 'contentBorder');
   const minimizeBehavior =
     Number(Platform.Version) >= 26 ? 'onScrollDown' : undefined;
 
@@ -22,6 +23,7 @@ export default function NativeTabLayout() {
     <NativeTabs
       minimizeBehavior={minimizeBehavior}
       tintColor={tintColor}
+      shadowColor={borderColor}
       iconColor={{ default: inactiveColor, selected: tintColor }}
       labelStyle={{
         default: { color: inactiveColor },
