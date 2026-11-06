@@ -36,7 +36,11 @@ import { useIsLiquidGlassActive } from '@/components/surfaces/FloatingSurface';
 import { Text, ThemedIcon, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
-import { RICH_CONTENT_STALE_TIME, ZhihuContent } from '@/features/rich-content';
+import {
+  isRichTextNativeAvailable,
+  RICH_CONTENT_STALE_TIME,
+  ZhihuContent,
+} from '@/features/rich-content';
 import { useDoubleTapAction } from '@/hooks/useDoubleTapAction';
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
 import { usePinActions } from '@/hooks/usePinActions';
@@ -97,6 +101,11 @@ export default function PinDetailScreen() {
   });
   const isLoading = isQueryLoading || (isPending && isPaused);
   const pinActions = usePinActions(pin);
+  const richContentRenderer = useSettingsStore(
+    (state) => state.richContentRenderer,
+  );
+  const waitForNativeLayout =
+    richContentRenderer === 'native-v2' && isRichTextNativeAvailable();
   const contentLayoutSource = useMemo(
     () => ({ id: String(id ?? ''), content: pin?.content }),
     [id, pin?.content],
@@ -159,7 +168,8 @@ export default function PinDetailScreen() {
     (!!author.id && !!previewAuthor?.id && author.id === previewAuthor.id) ||
     (!!author.url_token &&
       !!previewAuthor?.urlToken &&
-      author.url_token === previewAuthor.urlToken);
+      author.url_token === previewAuthor.urlToken) ||
+    (!!author.avatar_url && author.avatar_url === previewAuthor?.avatarUrl);
   const authorId = author?.id || (sameAuthor ? previewAuthor?.id : undefined);
   const authorToken =
     author?.url_token ||
@@ -174,6 +184,10 @@ export default function PinDetailScreen() {
   const avatarOwnerId = sameAuthor
     ? previewAuthor?.id || previewAuthor?.urlToken || authorId || authorToken
     : authorId || authorToken;
+  const avatarKey =
+    pin && !sameAuthor
+      ? `${contentIdentity}:detail:${authorId || authorToken || author?.avatar_url || 'unknown'}`
+      : contentIdentity;
   const goToProfile = useCallback(() => {
     const token = authorToken;
     if (token) router.push(`/user/${token}`);
@@ -292,6 +306,7 @@ export default function PinDetailScreen() {
                 className="flex-row items-center flex-1 bg-transparent"
               >
                 <RetainedAvatar
+                  key={avatarKey}
                   uri={authorAvatar}
                   ownerId={avatarOwnerId}
                   className="w-11 h-11 rounded-full"
@@ -332,7 +347,10 @@ export default function PinDetailScreen() {
                   />
                   <InitialContentReveal
                     key={String(id)}
-                    ready={readyLayoutSource === contentLayoutSource}
+                    ready={
+                      !waitForNativeLayout ||
+                      readyLayoutSource === contentLayoutSource
+                    }
                   >
                     <ZhihuContent
                       suppressDoubleTapSelection={isDoubleTapEnabled}

@@ -1,5 +1,5 @@
 import { Stack } from 'expo-router';
-import { ActivityIndicator } from 'react-native';
+import { ActivityIndicator, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BouncyButton } from '@/components/BouncyButton';
 import { GlassNavigationButton } from '@/components/navigation/GlassNavigationButton';
@@ -55,8 +55,12 @@ export function ContentDetailLoadingPreview({
           />
         </View>
       ) : null}
-      <View
-        style={type === 'article' ? { paddingTop: insets.top + 60 } : undefined}
+      <ScrollView
+        testID="content-detail-preview-scroll"
+        style={{ flex: 1 }}
+        contentContainerStyle={
+          type === 'article' ? { paddingTop: insets.top + 60 } : undefined
+        }
       >
         <View className={type === 'article' ? 'p-5 pt-[10px]' : 'p-5'}>
           {type === 'article' && preview.title ? (
@@ -106,7 +110,7 @@ export function ContentDetailLoadingPreview({
           color={primaryColor}
           style={{ marginTop: 24 }}
         />
-      </View>
+      </ScrollView>
     </View>
   );
 }

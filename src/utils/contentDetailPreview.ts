@@ -33,7 +33,7 @@ export function getContentDetailPreviewKey(
   id: string,
   sessionVersion: number,
 ) {
-  return ['content-detail-preview', sessionVersion, type, id] as const;
+  return ['content-detail-preview', sessionVersion, type, id.trim()] as const;
 }
 
 /** Store only display fields; the detail query remains responsible for fetching. */
