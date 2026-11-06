@@ -197,7 +197,8 @@ export function AdaptiveStackContent({
     !state.routes.some((route) => route.key === previous.current?.activeKey)
       ? previous.current.active
       : null;
-  const retained = pendingExit ?? (transition.current.returning ? exiting : null);
+  const retained =
+    pendingExit ?? (transition.current.returning ? exiting : null);
   const activeRoute = state.routes[state.index];
   useLayoutEffect(() => {
     if (pendingExit) setExiting(pendingExit);
@@ -213,7 +214,9 @@ export function AdaptiveStackContent({
               index: state.index,
               left: activeRoute.key === panes.detailKey ? detailLeft : 0,
               width:
-                activeRoute.key === panes.detailKey ? width - detailLeft : width,
+                activeRoute.key === panes.detailKey
+                  ? width - detailLeft
+                  : width,
               height,
               twoPane: !!panes.listKey,
             }
@@ -263,59 +266,66 @@ export function AdaptiveStackContent({
               <Text style={{ color: colors.textSecondary }}>选择左侧内容</Text>
             </View>
           ) : null}
-          {[...state.routes, ...(retained ? [retained.route] : [])].map((route, index) => {
-            const retainedRoute = retained?.route.key === route.key ? retained : null;
-            const isExiting = retainedRoute !== null;
-            const descriptor = retainedRoute?.descriptor ?? descriptors[route.key];
-            const isList = route.key === panes.listKey;
-            const isDetail = route.key === panes.detailKey;
-            const visible =
-              isExiting || isList || isDetail || route.key === panes.fullKey;
-            const paneWidth = retainedRoute
-              ? retainedRoute.width
-              : isList
-                ? listWidth
-                : isDetail
-                  ? width - detailLeft
-                  : width;
-            return (
-              <RoutePane
-                key={route.key}
-                routeKey={route.key}
-                twoPane={retainedRoute?.twoPane ?? !!panes.listKey}
-                testID={`adaptive-route-${route.key}`}
-                left={retainedRoute?.left ?? (isDetail ? detailLeft : 0)}
-                width={paneWidth}
-                height={retainedRoute?.height ?? height}
-                visible={visible}
-                background={
-                  Platform.OS === 'android' && route.key === underlayKey && !visible
-                }
-                active={route.key === activeKey && !isList}
-                exiting={isExiting}
-                animateEntry={
-                  Platform.OS !== 'android' || !transition.current.returning
-                }
-                onExited={finishExit}
-                expand={
-                  route.name !== 'user/[id]/index' &&
-                  route.name !== 'user/[id]/stream'
-                }
-                transitionSequence={transition.current.sequence}
-              >
-                <AdaptiveScreen
-                  options={descriptor.options}
-                  canGoBack={(retainedRoute?.index ?? state.index) > 0}
-                  onBack={actions.back}
-                  previousTitle={
-                    descriptors[state.routes[index - 1]?.key]?.options.title
+          {[...state.routes, ...(retained ? [retained.route] : [])].map(
+            (route, index) => {
+              const retainedRoute =
+                retained?.route.key === route.key ? retained : null;
+              const isExiting = retainedRoute !== null;
+              const descriptor =
+                retainedRoute?.descriptor ?? descriptors[route.key];
+              const isList = route.key === panes.listKey;
+              const isDetail = route.key === panes.detailKey;
+              const visible =
+                isExiting || isList || isDetail || route.key === panes.fullKey;
+              const paneWidth = retainedRoute
+                ? retainedRoute.width
+                : isList
+                  ? listWidth
+                  : isDetail
+                    ? width - detailLeft
+                    : width;
+              return (
+                <RoutePane
+                  key={route.key}
+                  routeKey={route.key}
+                  twoPane={retainedRoute?.twoPane ?? !!panes.listKey}
+                  testID={`adaptive-route-${route.key}`}
+                  left={retainedRoute?.left ?? (isDetail ? detailLeft : 0)}
+                  width={paneWidth}
+                  height={retainedRoute?.height ?? height}
+                  visible={visible}
+                  background={
+                    Platform.OS === 'android' &&
+                    !transition.current.returning &&
+                    route.key === underlayKey &&
+                    !visible
                   }
+                  active={route.key === activeKey && !isList}
+                  exiting={isExiting}
+                  animateEntry={
+                    Platform.OS !== 'android' || !transition.current.returning
+                  }
+                  onExited={finishExit}
+                  expand={
+                    route.name !== 'user/[id]/index' &&
+                    route.name !== 'user/[id]/stream'
+                  }
+                  transitionSequence={transition.current.sequence}
                 >
-                  {descriptor.render()}
-                </AdaptiveScreen>
-              </RoutePane>
-            );
-          })}
+                  <AdaptiveScreen
+                    options={descriptor.options}
+                    canGoBack={(retainedRoute?.index ?? state.index) > 0}
+                    onBack={actions.back}
+                    previousTitle={
+                      descriptors[state.routes[index - 1]?.key]?.options.title
+                    }
+                  >
+                    {descriptor.render()}
+                  </AdaptiveScreen>
+                </RoutePane>
+              );
+            },
+          )}
           {panes.listKey ? (
             <PaneDivider
               width={width}
@@ -367,7 +377,8 @@ function RoutePane({
   const hasTitleTransition = useTitleTransitionActiveForRoute(routeKey);
   const useGlass = useIsLiquidGlassActive();
   const focused = useRef(false);
-  const isEntering = visible && active && animateEntry && transitionSequence > 0;
+  const isEntering =
+    visible && active && animateEntry && transitionSequence > 0;
   const progress = useRef(new Animated.Value(isEntering ? 0 : 1)).current;
   const lastTransition = useRef(0);
   const reduceMotion = useRef(false);
@@ -489,15 +500,14 @@ function RoutePane({
         style={[
           StyleSheet.absoluteFill,
           {
-            opacity:
-              exiting
-                ? progress
-                : hasTitleTransition || useGlass
-                  ? 1
-                  : progress.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.15, 1],
-                    }),
+            opacity: exiting
+              ? progress
+              : (hasTitleTransition && Platform.OS !== 'android') || useGlass
+                ? 1
+                : progress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [Platform.OS === 'android' ? 0.05 : 0.15, 1],
+                  }),
             ...(expand && !hasTitleTransition && !exiting
               ? {
                   transform: [
