@@ -1534,6 +1534,7 @@ function parseFollowingData(item: RawFeedItem): FeedItem | null {
       avatar:
         target.author?.avatar_url ||
         'https://picx.zhimg.com/v2-abed1a8c04700ba7d72b45195223e0ff_l.jpg',
+      headline: target.author?.headline || '',
     },
     excerpt:
       target.excerpt ||

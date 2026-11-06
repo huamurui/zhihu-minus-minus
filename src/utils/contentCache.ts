@@ -218,6 +218,10 @@ export function seedRichContentFromFeedItem(
   if (
     item.type === 'videos' ||
     !hasInlineRichContent(item.content) ||
+    ((item.type === 'articles' || item.type === 'pins') &&
+      (item.contentNeedTruncated === true ||
+        (item.type === 'articles' && typeof item.content !== 'string') ||
+        (item.type === 'pins' && !Array.isArray(item.content)))) ||
     (item.type === 'answers' &&
       (!item.questionId ||
         item.answerType === 'PAID' ||
@@ -255,8 +259,8 @@ export function seedRichContentFromFeedItem(
       name: item.author.name,
       avatar_url: item.author.avatar,
       url_token: item.author.url_token,
+      headline: item.author.headline,
       type: 'people',
-      ...(contentType === 'answers' && { headline: item.author.headline }),
     },
     comment_count: item.commentCount,
     voteup_count: item.voteCount,

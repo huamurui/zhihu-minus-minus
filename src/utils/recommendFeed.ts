@@ -64,6 +64,7 @@ export function parseRecommendData(item: RawFeedItem): FeedItem | null {
       (type === 'question' ? target.id?.toString() : ''),
     author: {
       id: target.author?.id || '',
+      url_token: target.author?.url_token || '',
       name: target.author?.name || '匿名用户',
       avatar:
         target.author?.avatar_url ||

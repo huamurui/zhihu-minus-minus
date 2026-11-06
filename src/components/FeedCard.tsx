@@ -23,6 +23,7 @@ import {
   seedRichContentFromFeedItem,
   updateContentInteractionCaches,
 } from '@/utils/contentCache';
+import { seedContentDetailPreview } from '@/utils/contentDetailPreview';
 import { ImpactFeedbackStyle, impactAsync } from '@/utils/haptics';
 import { getCachedImageSource } from '@/utils/imageSource';
 import { getRecommendFeedbackTarget } from '@/utils/recommendFeedback';
@@ -218,6 +219,14 @@ const FeedCardComponent = ({
     // FeedCard 可能来自首页、搜索、用户页或话题页。把卡片已有的正文
     // 写入统一详情缓存，避免只有首页 queryFn 执行时才能享受到加速。
     seedRichContentFromFeedItem(queryClient, item, isAuthenticated);
+
+    if (item.type === 'articles' || item.type === 'pins') {
+      seedContentDetailPreview(
+        queryClient,
+        item.type === 'articles' ? 'article' : 'pin',
+        item,
+      );
+    }
 
     const params = {
       id: item.id,
@@ -425,11 +434,15 @@ const FeedCardComponent = ({
         onPress={() => {
           if (
             Platform.OS === 'android' &&
-            (item.type === 'answers' || item.type === 'questions')
+            (item.type === 'answers' ||
+              item.type === 'questions' ||
+              (item.type === 'articles' && !isGuest))
           ) {
             transitionTitle(
               titleRef,
-              String(item.questionId || item.id),
+              String(
+                item.type === 'articles' ? item.id : item.questionId || item.id,
+              ),
               cleanTitle,
               () => {
                 if (currentIdentityRef.current === identity) openDetail();
@@ -565,11 +578,18 @@ const FeedCardComponent = ({
                 }
                 return;
               }
-              if (item.type === 'questions') {
+              if (
+                item.type === 'questions' ||
+                (item.type === 'articles' && !isGuest)
+              ) {
                 if (Platform.OS === 'android') {
                   transitionTitle(
                     titleRef,
-                    String(item.questionId || item.id),
+                    String(
+                      item.type === 'articles'
+                        ? item.id
+                        : item.questionId || item.id,
+                    ),
                     cleanTitle,
                     () => {
                       if (currentIdentityRef.current === identity) openDetail();

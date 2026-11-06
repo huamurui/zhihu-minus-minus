@@ -16,6 +16,7 @@ import { useCollectionStore } from '@/store/useCollectionStore';
 import type { ZhihuContentSegment } from '@/types/zhihu';
 import { seedAnswerPreviewEntry } from '@/utils/answerPreviewEntry';
 import { getAnswerReadingRouteParams } from '@/utils/answerReadingContext';
+import { seedContentDetailPreview } from '@/utils/contentDetailPreview';
 import { getZhihuVideoSource } from '@/utils/zhihuVideo';
 import { BouncyButton } from './BouncyButton';
 import { useContentCardSurface } from './contentCardSurface';
@@ -53,7 +54,14 @@ interface CreationItem {
     title?: string;
     titleString?: string;
   };
-  author?: { name?: string; headline?: string };
+  author?: {
+    id?: string | number;
+    name?: string;
+    avatar?: string;
+    avatar_url?: string;
+    url_token?: string;
+    headline?: string;
+  };
   relationship?: { voting?: number; is_favorited?: boolean };
   reaction?: {
     statistics?: { favorites?: number; like_count?: number };
@@ -125,6 +133,8 @@ export const CreationCard = React.forwardRef<
     const handlePress = () => {
       if (type === 'answer') {
         seedAnswerPreviewEntry(queryClient, { ...item, type });
+      } else if (type === 'article' || type === 'pin') {
+        seedContentDetailPreview(queryClient, type, item);
       }
       if (onPress) {
         onPress();
