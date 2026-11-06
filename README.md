@@ -1,15 +1,23 @@
 # 🐱 知乎-- (Zhihu Minus Minus)
 
+[![CI](https://github.com/huamurui/zhihu-minus-minus/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/huamurui/zhihu-minus-minus/actions/workflows/ci.yml)
+[![版本](https://img.shields.io/badge/version-v0.9.10-blue)](./package.json)
+![平台](https://img.shields.io/badge/platform-Android%20%7C%20iOS-brightgreen)
+[![许可证](https://img.shields.io/badge/license-GPL--3.0-blue)](./LICENSE)
+
+一款轻量、无广告的第三方知乎客户端，支持 **Android 与 iOS**。
+
+
 > [!IMPORTANT]
-> **🚧 项目声明**：本项目目前核心功能基本稳定，但仍有不完善之处；知乎 API 的变动也可能导致部分功能失效。
+> **🚧 项目声明**：本项目不是知乎官方产品，与知乎及其关联公司不存在隶属、授权或背书关系。
+>
+> 本项目核心功能基本稳定，但仍有不完善之处。项目依赖非公开接口，知乎服务端的变化可能随时导致部分功能失效。
 >
 > 欢迎提交 Issue、Pull Request 或 Fork 参与改进。也可以看看其他客户端：
 > - <https://github.com/zhihulite/Hydrogen>  
 > - <https://github.com/zly2006/zhihu-plus-plus>
 
 ![zhihu--](./src/assets/images/favicon.svg)
-
-一款轻量、无广告的第三方知乎客户端，支持 **Android 与 iOS**。
 
 ## ✨ 特性
 
@@ -187,4 +195,4 @@ npm run check
 </a>
 
 ---
-**Version**: v0.9.9 | **Last Updated**: 2026-11-06
+**Version**: v0.9.10 | **Last Updated**: 2026-11-06
