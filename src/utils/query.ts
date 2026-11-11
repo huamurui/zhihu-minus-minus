@@ -1,9 +1,10 @@
-import type {
-  GetNextPageParamFunction,
-  QueryClient,
-  QueryFunction,
-  QueryKey,
-  QueryOptions,
+import {
+  type GetNextPageParamFunction,
+  onlineManager,
+  type QueryClient,
+  type QueryFunction,
+  type QueryKey,
+  type QueryOptions,
 } from '@tanstack/react-query';
 import axios from 'axios';
 
@@ -48,7 +49,7 @@ export function shouldRetryQuery(
 interface CachedInfiniteQueryOptions
   extends Omit<
     QueryOptions<unknown, unknown, unknown, QueryKey>,
-    'queryFn' | 'behavior'
+    'queryFn' | 'behavior' | 'persister' | 'initialData'
   > {
   queryFn?: QueryFunction<unknown, QueryKey, unknown>;
   initialPageParam?: unknown;
@@ -60,7 +61,9 @@ interface CachedInfiniteQueryOptions
  * The first page is fetched with the query's registered fetcher and the cache is
  * replaced only after the request succeeds, so a failed pull keeps cached content.
  * `pages: 1` still limits the refresh to a single request instead of refetching
- * every page loaded so far.
+ * every page loaded so far. In-flight fetches for the same key are cancelled first
+ * so an ongoing pagination request cannot swallow the refresh, and offline pulls
+ * resolve immediately instead of leaving the refresh indicator waiting.
  *
  * @param queryClient The active QueryClient instance
  * @param queryKey The query key of the infinite query
@@ -87,6 +90,15 @@ export async function refreshInfiniteQuery(
     return;
   }
 
+  if (
+    (options.networkMode ?? 'online') === 'online' &&
+    !onlineManager.isOnline()
+  ) {
+    return;
+  }
+
+  await queryClient.cancelQueries({ queryKey, exact: true });
+
   try {
     await queryClient.fetchInfiniteQuery<
       unknown,
@@ -95,17 +107,13 @@ export async function refreshInfiniteQuery(
       QueryKey,
       unknown
     >({
+      ...options,
       queryKey,
       queryFn: options.queryFn,
       getNextPageParam: options.getNextPageParam,
       initialPageParam: options.initialPageParam,
       pages: 1,
       staleTime: 0,
-      retry: options.retry,
-      retryDelay: options.retryDelay,
-      networkMode: options.networkMode,
-      meta: options.meta,
-      gcTime: options.gcTime,
     });
   } catch {
     // Keep the cached pages visible; the next refresh or retry can recover.
