@@ -83,6 +83,9 @@ test('keeps cached pages and resolves when a refresh request fails', async () =>
     pages: [10, 20, 30],
     pageParams: [0, 1, 2],
   });
+  const state = client.getQueryState(['refresh-target']);
+  expect(state?.status).toBe('success');
+  expect(state?.error).toBeNull();
   const options = client.getQueryCache().find({
     queryKey: ['refresh-target'],
   })?.options as { maxPages?: number } | undefined;

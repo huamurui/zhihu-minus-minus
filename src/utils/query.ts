@@ -102,6 +102,7 @@ export async function refreshInfiniteQuery(
   }
 
   await queryClient.cancelQueries({ queryKey, exact: true });
+  const previousState = query.state;
 
   try {
     await queryClient.fetchInfiniteQuery<
@@ -119,7 +120,17 @@ export async function refreshInfiniteQuery(
       pages: 1,
       staleTime: 0,
     });
-  } catch {
-    // Keep the cached pages visible; the next refresh or retry can recover.
+  } catch (error) {
+    // Keep the cached pages and their success state: list screens treat a query
+    // error as a failed next page and stop automatic pagination.
+    if (
+      previousState.status === 'success' &&
+      previousState.data !== undefined &&
+      query.state.error === error
+    ) {
+      queryClient.setQueryData(queryKey, previousState.data, {
+        updatedAt: previousState.dataUpdatedAt,
+      });
+    }
   }
 }
