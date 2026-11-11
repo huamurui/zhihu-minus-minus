@@ -507,7 +507,14 @@ test('passes each answer collection state and count to its inline actions', asyn
 
 test('refresh restores the selected answer and collapses later answers for both viewport hooks', async () => {
   const { client, element } = createHost();
-  const resetQueries = jest.spyOn(client, 'resetQueries');
+  const refreshQuery = jest.fn(async () => ({ data: [] }));
+  await client.fetchInfiniteQuery({
+    queryKey: ['answer-preview-list', 'selected-answer', 1],
+    queryFn: refreshQuery,
+    initialPageParam: 'initial',
+    getNextPageParam: () => undefined,
+  });
+  refreshQuery.mockClear();
   const host = await render(element);
   await fireEvent.press(host.getByTestId('structured-toggle:following-answer'));
   await fireEvent.press(host.getByTestId('plain-toggle:selected-answer'));
@@ -515,10 +522,7 @@ test('refresh restores the selected answer and collapses later answers for both 
 
   await fireEvent.press(host.getByTestId('refresh-preview-list'));
   expect(mockRefetchSelected).toHaveBeenCalledTimes(1);
-  expect(resetQueries).toHaveBeenCalledWith({
-    queryKey: ['answer-preview-list', 'selected-answer', 1],
-    exact: true,
-  });
+  expect(refreshQuery).toHaveBeenCalledTimes(1);
   expectExpandedIds(['selected-answer']);
   expect(host.getByTestId('structured-toggle:following-answer')).toHaveProp(
     'accessibilityState',
