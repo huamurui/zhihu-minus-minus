@@ -93,6 +93,23 @@ test('keeps cached pages and resolves when a refresh request fails', async () =>
   unsubscribe();
 });
 
+test('keeps concurrent cache updates when a refresh fails', async () => {
+  const { client, requests, unsubscribe } = createObservedQuery();
+  const refresh = refreshInfiniteQuery(client, ['refresh-target']);
+  await flush();
+
+  const updated = { pages: [11, 21, 31, 40], pageParams: [0, 1, 2, 3] };
+  client.setQueryData(['refresh-target'], updated);
+  requests[0].result.reject(new Error('synthetic network failure'));
+
+  await expect(refresh).resolves.toBeUndefined();
+  expect(client.getQueryData(['refresh-target'])).toEqual(updated);
+  const state = client.getQueryState(['refresh-target']);
+  expect(state?.status).toBe('success');
+  expect(state?.error).toBeNull();
+  unsubscribe();
+});
+
 test('resolves without a request while offline', async () => {
   const { client, requests, unsubscribe } = createObservedQuery();
   onlineManager.setOnline(false);

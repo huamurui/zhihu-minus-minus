@@ -122,15 +122,27 @@ export async function refreshInfiniteQuery(
     });
   } catch (error) {
     // Keep the cached pages and their success state: list screens treat a query
-    // error as a failed next page and stop automatic pagination.
+    // error as a failed next page and stop automatic pagination. Use the latest
+    // data because a concurrent cache update (for example a vote) may have
+    // landed while the refresh was in flight.
     if (
       previousState.status === 'success' &&
       previousState.data !== undefined &&
       query.state.error === error
     ) {
-      queryClient.setQueryData(queryKey, previousState.data, {
-        updatedAt: previousState.dataUpdatedAt,
-      });
+      const currentState = query.state;
+      queryClient.setQueryData(
+        queryKey,
+        currentState.data !== undefined
+          ? currentState.data
+          : previousState.data,
+        {
+          updatedAt:
+            currentState.data !== undefined
+              ? currentState.dataUpdatedAt
+              : previousState.dataUpdatedAt,
+        },
+      );
     }
   }
 }
