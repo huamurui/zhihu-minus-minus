@@ -80,6 +80,10 @@ export async function refreshInfiniteQuery(
     | CachedInfiniteQueryOptions
     | undefined;
 
+  // A disabled query (for example the signed-out creations tab) shows its own
+  // prompt; forcing a fetch would replace it with the query function's error.
+  if (query?.isDisabled()) return;
+
   if (
     query?.queryType !== 'infinite' ||
     !options?.queryFn ||

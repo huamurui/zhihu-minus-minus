@@ -106,6 +106,31 @@ test('resolves without a request while offline', async () => {
   unsubscribe();
 });
 
+test('skips refresh while every observer is disabled', async () => {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+  });
+  const requests: number[] = [];
+  const observer = new InfiniteQueryObserver(client, {
+    queryKey: ['disabled-refresh'],
+    initialPageParam: 0,
+    enabled: false,
+    queryFn: async ({ pageParam }) => {
+      requests.push(pageParam);
+      return 1;
+    },
+    getNextPageParam: () => undefined,
+  });
+  const unsubscribe = observer.subscribe(() => undefined);
+
+  await expect(
+    refreshInfiniteQuery(client, ['disabled-refresh']),
+  ).resolves.toBeUndefined();
+
+  expect(requests).toEqual([]);
+  unsubscribe();
+});
+
 test('cancels an in-flight pagination fetch before requesting the first page', async () => {
   const { client, observer, requests, unsubscribe } = createObservedQuery();
   const nextPage = observer.fetchNextPage();
