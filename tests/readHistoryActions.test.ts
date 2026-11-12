@@ -1,4 +1,8 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  InfiniteQueryObserver,
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/react-query';
 import { act, renderHook } from '@testing-library/react-native';
 import { createElement, type PropsWithChildren } from 'react';
 import { batchDelReadHistory } from '../src/api/zhihu/history';
@@ -14,12 +18,28 @@ jest.mock('../src/store/useAuthStore', () => ({
 
 async function setup() {
   const client = new QueryClient();
-  const reset = jest.spyOn(client, 'resetQueries');
   const host = await renderHook(() => useReadHistoryActions(), {
     wrapper: ({ children }: PropsWithChildren) =>
       createElement(QueryClientProvider, { client }, children),
   });
-  return { client, host, reset };
+  return { client, host };
+}
+
+function observeHistory(client: QueryClient) {
+  const requests: number[] = [];
+  const observer = new InfiniteQueryObserver(client, {
+    queryKey: ['read-history'],
+    initialPageParam: 0,
+    initialData: { pages: ['old history'], pageParams: [0] },
+    staleTime: Infinity,
+    queryFn: async ({ pageParam }) => {
+      requests.push(pageParam);
+      return 'new history';
+    },
+    getNextPageParam: () => undefined,
+  });
+  const unsubscribe = observer.subscribe(() => undefined);
+  return { requests, unsubscribe };
 }
 
 beforeEach(() => {
@@ -27,7 +47,7 @@ beforeEach(() => {
   mockSession = 0;
 });
 
-test('overlapping clear and delete actions perform one request and reset only history', async () => {
+test('overlapping clear and delete actions perform one request and refresh only history', async () => {
   let finish: () => void = () => {};
   jest.mocked(batchDelReadHistory).mockImplementation(
     () =>
@@ -35,8 +55,8 @@ test('overlapping clear and delete actions perform one request and reset only hi
         finish = resolve;
       }),
   );
-  const { client, host, reset } = await setup();
-  client.setQueryData(['read-history'], { pages: [1, 2], pageParams: [0, 20] });
+  const { client, host } = await setup();
+  const history = observeHistory(client);
   client.setQueryData(['unrelated-list'], 'keep');
   let first: Promise<boolean> | undefined;
   let duplicate: Promise<boolean> | undefined;
@@ -55,13 +75,14 @@ test('overlapping clear and delete actions perform one request and reset only hi
     await first;
   });
   expect(await first).toBe(true);
-  expect(reset).toHaveBeenCalledWith({
-    queryKey: ['read-history'],
-    exact: true,
+  expect(history.requests).toEqual([0]);
+  expect(client.getQueryData(['read-history'])).toEqual({
+    pages: ['new history'],
+    pageParams: [0],
   });
-  expect(client.getQueryData(['read-history'])).toBeUndefined();
   expect(client.getQueryData(['unrelated-list'])).toBe('keep');
   expect(host.result.current.isPending).toBe(false);
+  history.unsubscribe();
   await host.unmount();
   client.clear();
 });
@@ -74,20 +95,28 @@ test('late deletion cannot clear or refresh the next account history', async () 
         finish = resolve;
       }),
   );
-  const { client, host, reset } = await setup();
+  const { client, host } = await setup();
+  const history = observeHistory(client);
   let deletion: Promise<boolean> | undefined;
   await act(() => {
     deletion = host.result.current.deleteHistory({ clear: true });
   });
   await act(async () => {
     mockSession += 1;
-    client.setQueryData(['read-history'], 'next-account');
+    client.setQueryData(['read-history'], {
+      pages: ['next-account'],
+      pageParams: [0],
+    });
     finish();
     await deletion;
   });
   expect(await deletion).toBe(false);
-  expect(reset).not.toHaveBeenCalled();
-  expect(client.getQueryData(['read-history'])).toBe('next-account');
+  expect(history.requests).toEqual([]);
+  expect(client.getQueryData(['read-history'])).toEqual({
+    pages: ['next-account'],
+    pageParams: [0],
+  });
+  history.unsubscribe();
   await host.unmount();
   client.clear();
 });

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-/** A query reset enters initial loading; track the user's refresh independently. */
+/** Track the user's pull-to-refresh independently from the query's fetching state. */
 export function useRefreshAction(action: () => Promise<unknown>) {
   const [refreshing, setRefreshing] = useState(false);
   const pending = useRef<Promise<void> | null>(null);
