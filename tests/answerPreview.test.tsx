@@ -37,6 +37,7 @@ import {
   getAnswerPreviewEntryKey,
   seedAnswerPreviewEntry,
 } from '../src/utils/answerPreviewEntry';
+import { refreshInfiniteQuery } from '../src/utils/query';
 
 jest.mock('../src/api/client', () => ({
   __esModule: true,
@@ -615,6 +616,76 @@ test('the preview hook follows server cursors and isolates explicit scene and ac
   client.clear();
 });
 
+test('only the first response of the current preview feed can declare its question header', async () => {
+  const captured = normalizeZhihuAnswerPreviewPage(nextRenderSegLikeFixture);
+  const next = captured.paging.next;
+  const client = new QueryClient();
+  const wrapper = ({ children }: PropsWithChildren) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
+  const options: AnswerPreviewQueryOptions = {
+    answerId: 'synthetic-answer-001',
+    scene: 'recommend',
+    questionId: 'question-of-the-clicked-answer',
+    enabled: false,
+  };
+  const host = await renderHook(useAnswerPreviewQuery, {
+    initialProps: options,
+    wrapper,
+  });
+  const key = host.result.current.queryKey;
+  const otherNext = next.replace('synthetic-question-001', 'another-question');
+  const setFirst = async (
+    url: string,
+    expected: string | undefined,
+    initialUrl = key[1],
+  ) => {
+    await act(() =>
+      client.setQueryData(key, {
+        pageParams: [initialUrl, url],
+        pages: [
+          { ...captured, paging: { ...captured.paging, next: url } },
+          { ...captured, paging: { ...captured.paging, next: otherNext } },
+        ],
+      }),
+    );
+    await waitFor(() => {
+      expect(host.result.current.data?.pages[0].paging.next).toBe(url);
+      expect(host.result.current.data?.pageParams[0]).toBe(initialUrl);
+      expect(host.result.current.feedQuestionId).toBe(expected);
+    });
+  };
+  await setFirst(next, 'synthetic-question-001');
+  await setFirst(next.replace('api.zhihu.com', 'example.invalid'), undefined);
+  await setFirst(
+    next.replace('scenes=question_feed', 'scenes=recommend'),
+    undefined,
+  );
+  await setFirst(
+    next.replace('collection_type=question', 'collection_type=member'),
+    undefined,
+  );
+  await setFirst(
+    next.replace('synthetic-question-001', '..%2Fother'),
+    undefined,
+  );
+  await setFirst(
+    next.replace('id=synthetic-answer-001', 'id=other-answer'),
+    undefined,
+  );
+  await setFirst(next, undefined, next);
+  await setFirst(next, 'synthetic-question-001');
+  await act(() => {
+    mockSessionVersion = 2;
+    useAuthStore.setState({ cookies: 'synthetic-new-session' });
+  });
+  await waitFor(() => expect(host.result.current.queryKey[2]).toBe(2));
+  expect(host.result.current.feedQuestionId).toBeUndefined();
+  expect(apiClient.get).not.toHaveBeenCalled();
+  await host.unmount();
+  client.clear();
+});
+
 test('a response arriving after the login session changes is rejected before normalization', async () => {
   let finish: (value: { data: unknown }) => void = () => undefined;
   jest.mocked(apiClient.get).mockImplementationOnce(
@@ -627,6 +698,78 @@ test('a response arriving after the login session changes is rejected before nor
   mockSessionVersion = 2;
   finish({ data: response([answer()]) });
   await expect(request).rejects.toThrow('登录状态已变化');
+});
+
+test('overlapping list pages keep the body and continuation of a displayed answer until refresh', async () => {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  const wrapper = ({ children }: PropsWithChildren) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
+  const first = answer('reading', content(['first-section'], INNER_NEXT));
+  const overlap = answer('reading', content(['short-preview']));
+  overlap.reaction.statistics.comment_count = 18;
+  const pages = [
+    response([first, answer('empty', content([]))], OUTER_NEXT),
+    response([
+      overlap,
+      answer('empty', content(['available'])),
+      answer('next-answer'),
+    ]),
+    response([answer('reading', content(['refreshed-section']))]),
+  ];
+  jest.mocked(apiClient.get).mockImplementation(async (url) => ({
+    data: String(url).startsWith('/answers/')
+      ? plainAnswer('selected')
+      : pages.shift(),
+  }));
+  const host = await renderHook(useAnswerPreviewQuery, {
+    initialProps: { answerId: 'selected' },
+    wrapper,
+  });
+  const readingCard = () => {
+    const item = host.result.current.items.find(({ id }) => id === 'reading');
+    if (!item || !('structuredContent' in item))
+      throw new Error('Missing reading card');
+    return item;
+  };
+  await waitFor(() => expect(host.result.current.isSuccess).toBe(true));
+  const firstBody = readingCard().structuredContent;
+  await act(async () => {
+    await host.result.current.fetchNextPage();
+  });
+  await waitFor(() => expect(readingCard().comment_count).toBe(18));
+  expect(readingCard().structuredContent).toBe(firstBody);
+  expect(
+    getStructuredContentContinuation([readingCard().structuredContent], [])
+      .next,
+  ).toBe(INNER_NEXT);
+  expect(host.result.current.items.map(({ id }) => id)).toEqual([
+    'selected',
+    'reading',
+    'empty',
+    'next-answer',
+  ]);
+  expect(
+    host.result.current.items.find(({ id }) => id === 'empty'),
+  ).toMatchObject({
+    structuredContent: { segments: [{ id: 'available' }] },
+  });
+
+  await act(async () => {
+    await refreshInfiniteQuery(client, host.result.current.queryKey);
+  });
+  await waitFor(() =>
+    expect(
+      readingCard().structuredContent.segments.map(({ id }) => id),
+    ).toEqual(['refreshed-section']),
+  );
+  expect(host.result.current.items.some(({ id }) => id === 'next-answer')).toBe(
+    false,
+  );
+  await host.unmount();
+  client.clear();
 });
 
 test('refreshes loaded body reactions without resetting the first page and rejects recycled or expired callbacks', async () => {

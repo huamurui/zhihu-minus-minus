@@ -52,6 +52,51 @@ function scroll(y: number): NativeSyntheticEvent<NativeScrollEvent> {
 
 type MeasureCallback = Parameters<ViewInstance['measureInWindow']>[0];
 
+test('switches actions to the answer below the header when the preceding footer scrolls past it', async () => {
+  const a = answer('answer-a');
+  const b = answer('answer-b');
+  const host = await renderHook(useAnswerPreviewFloatingBar, {
+    initialProps: {
+      scope: 'same-screen',
+      items: [a, b],
+      expandedIds: new Set([a.id, b.id]),
+      navigationHeight: 80,
+    },
+  });
+  let firstFooterY = 15;
+  const footerA = {
+    measureInWindow: (callback: MeasureCallback) =>
+      callback(0, firstFooterY, 350, 44),
+  };
+  const footerB = {
+    measureInWindow: (callback: MeasureCallback) => callback(0, 950, 350, 44),
+  };
+  await act(() => {
+    host.result.current.registerFooter(a.id, footerA);
+    host.result.current.registerFooter(b.id, footerB);
+    host.result.current.onViewableItemsChanged({
+      viewableItems: [{ item: a }, { item: b }],
+    });
+    host.result.current.onScrollEnd(scroll(600));
+  });
+  expect(host.result.current.activeAnswer).toBe(b);
+  expect(host.result.current.visible).toBe(true);
+
+  firstFooterY = 70; // Some of the preceding answer's own buttons are still visible.
+  await act(() => host.result.current.onScrollEnd(scroll(545)));
+  expect(host.result.current.visible).toBe(false);
+
+  // FlashList may still report the previous row alone while the list moves.
+  firstFooterY = -180;
+  await act(() => {
+    host.result.current.onViewableItemsChanged({
+      viewableItems: [{ item: a }],
+    });
+    host.result.current.onScrollEnd(scroll(795));
+  });
+  expect(host.result.current.visible).toBe(false);
+});
+
 test('uses the current answer and rejects old scope, recycled footer and superseded measurements', async () => {
   let now = 1000;
   const clock = jest.spyOn(Date, 'now').mockImplementation(() => now);
