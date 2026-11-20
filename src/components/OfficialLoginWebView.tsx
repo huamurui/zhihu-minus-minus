@@ -69,7 +69,7 @@ export function OfficialLoginWebView({
         source={ZHIHU_SIGNIN}
         sharedCookiesEnabled
         incognito={false}
-        contentMode={desktop ? 'desktop' : undefined}
+        contentMode={desktop ? 'desktop' : 'mobile'}
         userAgent={
           desktop && Platform.OS === 'android'
             ? ANDROID_DESKTOP_USER_AGENT

@@ -317,7 +317,7 @@ test.each(['ios', 'android'] as const)(
 
       await fireEvent.press(host.getByRole('button', { name: '手机登录' }));
       const mobile = host.getByTestId('login-webview');
-      expect(mobile.props.contentMode).toBeUndefined();
+      expect(mobile.props.contentMode).toBe('mobile');
       expect(mobile.props.userAgent).toBeUndefined();
       mockInject.mockClear();
       await fireEvent(mobile, 'load', {
