@@ -54,10 +54,15 @@ jest.mock('../src/components/ShareMenu', () => ({ ShareMenu: () => null }));
 jest.mock('../src/components/QueryErrorView', () => ({
   QueryErrorView: () => null,
 }));
-jest.mock('../src/features/rich-content', () => ({
-  RICH_CONTENT_STALE_TIME: 60_000,
-  ZhihuContent: () => null,
-}));
+jest.mock('../src/features/rich-content', () => {
+  const { Text } =
+    jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    RICH_CONTENT_BODY_FONT_SIZE: 17,
+    RICH_CONTENT_STALE_TIME: 60_000,
+    ZhihuContent: ({ content }: { content: string }) => <Text>{content}</Text>,
+  };
+});
 
 const question: ZhihuQuestionDetail = {
   id: '7',
@@ -104,6 +109,44 @@ beforeEach(() => {
 afterEach(() => {
   for (const client of clients) client.clear();
   clients.length = 0;
+});
+
+test('shows the fetched rich description immediately and lets the reader collapse and reopen it', async () => {
+  const { wrapper } = setupClient();
+  const detail = '<p>正文包含<strong>格式</strong>和图片</p>';
+  const request = deferred<ZhihuQuestionDetail>();
+  jest.mocked(getQuestion).mockReturnValueOnce(request.promise);
+  const host = await render(
+    <AnswerPreviewQuestionHeader id="7" title="路由标题" />,
+    { wrapper },
+  );
+  expect(host.getByText('路由标题')).toBeTruthy();
+  expect(getQuestion).toHaveBeenCalledWith('7', undefined, {
+    signal: expect.any(AbortSignal),
+  });
+  await act(() =>
+    request.resolve({ ...question, detail, excerpt: '问题摘要' }),
+  );
+  expect(await host.findByText(detail)).toBeTruthy();
+  await fireEvent.press(host.getByText('收起问题描述'));
+  expect(host.queryByText(detail)).toBeNull();
+  expect(host.getByText('问题摘要')).toBeTruthy();
+  await fireEvent.press(host.getByText('展开问题描述'));
+  expect(host.getByText(detail)).toBeTruthy();
+  expect(getQuestion).toHaveBeenCalledTimes(1);
+});
+
+test('shows the entire available excerpt when the question has no rich description', async () => {
+  const { wrapper } = setupClient();
+  const excerpt = '第一行\n第二行\n第三行\n第四行';
+  jest.mocked(getQuestion).mockResolvedValueOnce({ ...question, excerpt });
+  const host = await render(
+    <AnswerPreviewQuestionHeader id="7" title="路由标题" />,
+    { wrapper },
+  );
+  const description = await host.findByText(excerpt);
+  expect(description.props.numberOfLines).toBeUndefined();
+  expect(host.queryByText('展开问题描述')).toBeNull();
 });
 
 test('shares the question page cache for rendering, optimistic follow and settled refetch', async () => {

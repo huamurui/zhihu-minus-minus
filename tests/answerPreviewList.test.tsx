@@ -20,6 +20,14 @@ import type { useAnswerPreviewFloatingBar } from '../src/hooks/useAnswerPreviewF
 let mockSessionVersion = 1;
 let mockQuerySessionVersion: number | null = null;
 let mockSelectedIsPending = false;
+let mockSelectedIsError = false;
+let mockListIsError = false;
+let mockHasNextPage = false;
+let mockFeedQuestionId: string | undefined;
+let mockEndReached: (() => void) | undefined;
+const mockFetchNextPage = jest.fn();
+const mockRouterPush = jest.fn();
+const mockQuestionHeaderMount = jest.fn();
 let mockActiveAnswerId: string | null = null;
 let mockFollowingAnswers: Array<ZhihuPlainPreviewAnswer | ZhihuPreviewAnswer> =
   [];
@@ -37,7 +45,7 @@ type CollapseProps = ComponentProps<typeof CollapsibleRichContent>;
 const mockPlainCollapses = new Map<string, CollapseProps>();
 const mockStructuredBodies = new Map<string, ZhihuStructuredContentProps>();
 const mockRefetchSelected = jest.fn(() => Promise.resolve(undefined));
-const mockScrollToIndex = jest.fn();
+const mockScrollToOffset = jest.fn();
 const mockRenderCardActions = jest.fn(
   (_props: ComponentProps<typeof FeedCardActionRow>) => null,
 );
@@ -82,7 +90,7 @@ const mockAutoLoad = jest.fn(
 );
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
+  useRouter: () => ({ push: mockRouterPush, back: jest.fn() }),
 }));
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 24, bottom: 20, left: 0, right: 0 }),
@@ -98,16 +106,24 @@ jest.mock('../src/store/useSettingsStore', () => ({
 }));
 jest.mock('../src/hooks/useAnswerPreviewQuery', () => ({
   useAnswerPreviewQuery: ({ answerId }: { answerId: string }) => ({
-    items: [mockPlainAnswer(answerId), ...mockFollowingAnswers],
+    items: [
+      ...(mockSelectedIsPending || mockSelectedIsError
+        ? []
+        : [mockPlainAnswer(answerId)]),
+      ...mockFollowingAnswers,
+    ],
     sessionVersion: mockQuerySessionVersion ?? mockSessionVersion,
     queryKey: ['answer-preview-list', answerId, mockSessionVersion],
     selectedIsPending: mockSelectedIsPending,
-    selectedIsError: false,
+    selectedIsError: mockSelectedIsError,
+    selectedError: mockSelectedIsError ? new Error('回答不可用') : null,
     isPending: false,
-    isError: false,
+    isError: mockListIsError,
     isFetching: false,
     isFetchingNextPage: false,
-    hasNextPage: false,
+    feedQuestionId: mockFeedQuestionId,
+    hasNextPage: mockHasNextPage,
+    fetchNextPage: mockFetchNextPage,
     refetchSelected: mockRefetchSelected,
   }),
 }));
@@ -176,9 +192,23 @@ jest.mock('../src/components/AnswerPreviewFloatingBar', () => ({
     onCollapse: (id: string) => void;
   }) => mockRenderFloatingBar(props),
 }));
-jest.mock('../src/components/AnswerPreviewQuestionHeader', () => ({
-  AnswerPreviewQuestionHeader: () => null,
-}));
+jest.mock('../src/components/AnswerPreviewQuestionHeader', () => {
+  const react = jest.requireActual<typeof import('react')>('react');
+  const native =
+    jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    AnswerPreviewQuestionHeader: ({ id }: { id: string }) => {
+      react.useEffect(() => {
+        mockQuestionHeaderMount(id);
+      }, [id]);
+      return react.createElement(
+        native.Text,
+        { testID: 'preview-question' },
+        id,
+      );
+    },
+  };
+});
 jest.mock('../src/components/FeedCardActionRow', () => ({
   FeedCardActionRow: (props: ComponentProps<typeof FeedCardActionRow>) =>
     mockRenderCardActions(props),
@@ -190,9 +220,19 @@ jest.mock('../src/components/AnswerEndorsements', () => ({
 jest.mock('../src/components/StableAvatar', () => ({
   StableAvatar: () => null,
 }));
-jest.mock('../src/components/QueryErrorView', () => ({
-  QueryErrorView: () => null,
-}));
+jest.mock('../src/components/QueryErrorView', () => {
+  const react = jest.requireActual<typeof import('react')>('react');
+  const native =
+    jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    QueryErrorView: ({ onRetry }: { onRetry: () => void }) =>
+      react.createElement(native.Pressable, {
+        accessibilityRole: 'button',
+        accessibilityLabel: '重试',
+        onPress: onRetry,
+      }),
+  };
+});
 jest.mock('../src/components/ShareMenu', () => ({ ShareMenu: () => null }));
 jest.mock('../src/features/rich-content', () => {
   const react = jest.requireActual<typeof import('react')>('react');
@@ -266,7 +306,12 @@ jest.mock('@shopify/flash-list', () => {
           renderItem,
           keyExtractor,
           refreshControl,
+          ListHeaderComponent,
+          ListEmptyComponent,
+          ListFooterComponent,
+          onEndReached,
           onViewableItemsChanged,
+          onScroll,
         }: {
           data: ZhihuReadingPreviewItem[];
           renderItem: (info: {
@@ -275,21 +320,34 @@ jest.mock('@shopify/flash-list', () => {
           }) => ReactNode;
           keyExtractor: (item: ZhihuReadingPreviewItem) => string;
           refreshControl: ReactNode;
+          ListHeaderComponent: ReactNode;
+          ListEmptyComponent: ReactNode;
+          ListFooterComponent: ReactNode;
+          onEndReached?: () => void;
           onViewableItemsChanged: ViewabilityCallback;
+          onScroll: ComponentProps<typeof native.ScrollView>['onScroll'];
         },
         ref,
       ) => {
+        mockEndReached = onEndReached;
         mockViewabilityCallback = onViewableItemsChanged;
         react.useImperativeHandle(ref, () => ({
-          scrollToIndex: mockScrollToIndex,
-          scrollToOffset: jest.fn(),
-          getLayout: () => ({ x: 0, y: 0, width: 400, height: 4000 }),
+          props: { data },
+          scrollToOffset: mockScrollToOffset,
+          getLayout: (index: number) => ({
+            x: 0,
+            y: index * 600,
+            width: 400,
+            height: 4000,
+          }),
           getFirstItemOffset: () => 100,
           getAbsoluteLastScrollOffset: () => mockScrollOffset,
         }));
         return react.createElement(
-          native.View,
-          null,
+          native.ScrollView,
+          { testID: 'preview-list', onScroll },
+          ListHeaderComponent,
+          data.length === 0 ? ListEmptyComponent : null,
           data.map((item, index) =>
             react.createElement(
               native.View,
@@ -297,6 +355,7 @@ jest.mock('@shopify/flash-list', () => {
               renderItem({ item, index }),
             ),
           ),
+          ListFooterComponent,
           react.isValidElement<{ onRefresh?: () => void }>(refreshControl)
             ? react.createElement(native.Pressable, {
                 testID: 'refresh-preview-list',
@@ -356,11 +415,14 @@ function expectExpandedIds(ids: string[]) {
   expect([...autoLoadOptions.expandedIds].sort()).toEqual([...ids].sort());
 }
 
-function createHost(answerId = 'selected-answer') {
+function createHost(
+  answerId = 'selected-answer',
+  props?: Omit<ComponentProps<typeof AnswerPreviewList>, 'answerId'>,
+) {
   const client = new QueryClient();
   const screen = (selectedId: string) => (
     <QueryClientProvider client={client}>
-      <AnswerPreviewList answerId={selectedId} />
+      <AnswerPreviewList answerId={selectedId} {...props} />
     </QueryClientProvider>
   );
   return { client, screen, element: screen(answerId) };
@@ -386,6 +448,11 @@ beforeEach(() => {
   mockSessionVersion = 1;
   mockQuerySessionVersion = null;
   mockSelectedIsPending = false;
+  mockSelectedIsError = false;
+  mockListIsError = false;
+  mockHasNextPage = false;
+  mockFeedQuestionId = undefined;
+  mockEndReached = undefined;
   mockViewabilityCallback = null;
   mockScrollOffset = 0;
   mockActiveAnswerId = null;
@@ -444,10 +511,9 @@ test('starts the selected answer expanded and lets the floating bar collapse it 
     mockRenderFloatingBar.mock.calls.at(-1)?.[0].onCollapse('selected-answer'),
   );
   // The card gap stays visible below the header once the scroll lands.
-  expect(mockScrollToIndex).toHaveBeenCalledWith({
-    index: 0,
+  expect(mockScrollToOffset).toHaveBeenCalledWith({
+    offset: 12,
     animated: true,
-    viewOffset: -88,
   });
   await waitFor(() => expectExpandedIds([]));
   expect(host.getByTestId('plain-toggle:selected-answer')).toHaveProp(
@@ -476,10 +542,13 @@ test('starts the selected answer expanded and lets the floating bar collapse it 
     'accessibilityState',
     { expanded: true },
   );
+  await fireEvent.scroll(host.getByTestId('preview-list'), {
+    nativeEvent: { contentOffset: { x: 0, y: 2800 } },
+  });
   await fireEvent.press(host.getByTestId('structured-toggle:following-answer'));
   // Collapsing scrolls back to the answer start before its height shrinks.
-  expect(mockScrollToIndex).toHaveBeenCalledWith(
-    expect.objectContaining({ index: 1, animated: true }),
+  expect(mockScrollToOffset).toHaveBeenCalledWith(
+    expect.objectContaining({ offset: 612, animated: true }),
   );
   expectExpandedIds(['selected-answer', 'following-answer']);
   await waitFor(() => expectExpandedIds(['selected-answer']));
@@ -535,6 +604,25 @@ test('refresh restores the selected answer and collapses later answers for both 
   await host.unmount();
 });
 
+test('a pending collapse cannot override a pull-to-refresh reopening the first answer', async () => {
+  jest.useFakeTimers();
+  try {
+    mockScrollOffset = 3000;
+    const host = await render(createHost().element);
+    await fireEvent.press(host.getByTestId('plain-toggle:selected-answer'));
+    expect(mockScrollToOffset).toHaveBeenCalledWith({
+      animated: true,
+      offset: 12,
+    });
+    await fireEvent.press(host.getByTestId('refresh-preview-list'));
+    await act(async () => jest.advanceTimersByTimeAsync(1500));
+    expectExpandedIds(['selected-answer']);
+    await host.unmount();
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
 test('route and account changes keep only the current selected answer expanded and discard old callbacks', async () => {
   const { element, screen } = createHost('selected-a');
   const host = await render(element);
@@ -562,13 +650,13 @@ test('route and account changes keep only the current selected answer expanded a
     'accessibilityState',
     { expanded: false },
   );
-  mockScrollToIndex.mockClear();
+  mockScrollToOffset.mockClear();
   await act(() => {
     staleExpansion?.(true);
     staleSelectedExpansion?.(false);
   });
   expectExpandedIds(['selected-a']);
-  expect(mockScrollToIndex).not.toHaveBeenCalled();
+  expect(mockScrollToOffset).not.toHaveBeenCalled();
 
   await fireEvent.press(host.getByTestId('structured-toggle:following-answer'));
   await fireEvent.press(host.getByTestId('plain-toggle:selected-a'));
@@ -702,4 +790,90 @@ test('does not enable touch while the entry is pending or its query session is s
   mockSessionVersion = 2;
   await host.rerender(screen('selected-answer'));
   expect(mockReadTouch).toHaveBeenLastCalledWith(['selected-answer'], false);
+});
+
+test('mounts the question feed header immediately and preserves it when the selected answer becomes ready', async () => {
+  mockSelectedIsPending = true;
+  mockHasNextPage = true;
+  const { element, screen } = createHost('selected-answer', {
+    answerContext: { scene: 'question_feed' },
+    questionId: 'route-question',
+  });
+  const host = await render(element);
+  expect(host.getByTestId('preview-question')).toHaveTextContent(
+    'route-question',
+  );
+  expect(host.queryByTestId('structured-toggle:following-answer')).toBeNull();
+  expect(mockReadTouch).toHaveBeenLastCalledWith([], false);
+  await act(() => mockEndReached?.());
+  expect(mockFetchNextPage).not.toHaveBeenCalled();
+  mockSelectedIsPending = false;
+  await host.rerender(screen('selected-answer'));
+  expect(host.getByTestId('plain-body:selected-answer')).toBeTruthy();
+  expect(host.getByTestId('structured-toggle:following-answer')).toBeTruthy();
+  expect(host.getByTestId('preview-question')).toHaveTextContent(
+    'route-question',
+  );
+  expect(mockQuestionHeaderMount).toHaveBeenCalledTimes(1);
+  await act(() => mockEndReached?.());
+  expect(mockFetchNextPage).toHaveBeenCalledTimes(1);
+});
+
+test('keeps question details, retry and the full-answer entry available when both answer queries fail', async () => {
+  mockListIsError = true;
+  mockSelectedIsError = true;
+  mockFollowingAnswers = [];
+  const { element } = createHost('selected-answer', {
+    answerContext: { scene: 'question_feed' },
+    questionId: 'route-question',
+  });
+  const host = await render(element);
+  expect(host.getByTestId('preview-question')).toHaveTextContent(
+    'route-question',
+  );
+  await fireEvent.press(host.getByRole('button', { name: '重试' }));
+  expect(mockRefetchSelected).toHaveBeenCalledTimes(1);
+  await fireEvent.press(host.getByText('进入所选回答详情'));
+  expect(mockRouterPush).toHaveBeenCalledWith({
+    pathname: '/answer/[id]',
+    params: expect.objectContaining({
+      id: 'selected-answer',
+      readingMode: 'detail',
+      questionId: 'route-question',
+    }),
+  });
+});
+
+test('a mixed recommendation feed does not request a shared question header using the entry answer’s question ID', async () => {
+  mockSelectedIsPending = true;
+  const { element, screen } = createHost('selected-answer', {
+    answerContext: { scene: 'recommend' },
+    questionId: 'route-question',
+  });
+  const host = await render(element);
+  expect(host.queryByTestId('preview-question')).toBeNull();
+  mockSelectedIsPending = false;
+  await host.rerender(screen('selected-answer'));
+  expect(host.getByTestId('plain-body:selected-answer')).toBeTruthy();
+  expect(mockQuestionHeaderMount).not.toHaveBeenCalled();
+});
+
+test('shows the server-declared feed question as soon as its response arrives at a recommendation entry', async () => {
+  mockSelectedIsPending = true;
+  const { element, screen } = createHost('selected-answer', {
+    answerContext: { scene: 'recommend' },
+    questionId: 'opening-card-question',
+  });
+  const host = await render(element);
+  expect(host.queryByTestId('preview-question')).toBeNull();
+  mockFeedQuestionId = 'server-feed-question';
+  await host.rerender(screen('selected-answer'));
+  expect(host.getByTestId('preview-question')).toHaveTextContent(
+    'server-feed-question',
+  );
+  expect(host.queryByTestId('structured-toggle:following-answer')).toBeNull();
+  mockSelectedIsPending = false;
+  await host.rerender(screen('selected-answer'));
+  expect(host.getByTestId('plain-body:selected-answer')).toBeTruthy();
+  expect(mockQuestionHeaderMount).toHaveBeenCalledTimes(1);
 });

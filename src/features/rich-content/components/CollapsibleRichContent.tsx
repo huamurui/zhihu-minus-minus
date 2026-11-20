@@ -58,7 +58,11 @@ export function CollapsibleRichContent({
   const overflows =
     measuredHeight !== null && measuredHeight > previewHeight + 48;
   const clipped = !expanded && overflows;
-  const constrainHeight = !expanded && (overflows || measuredHeight === null);
+  // The next native layout can replace a small placeholder with the entire
+  // answer before its onLayout reaches JS. Keep the collapsed row bounded.
+  const collapsedMaxHeight = overflows
+    ? previewHeight
+    : Math.max(previewHeight, measuredHeight ?? 0);
   const showToggle = overflows || hasMore;
 
   return (
@@ -80,9 +84,7 @@ export function CollapsibleRichContent({
         }}
         style={[
           styles.viewport,
-          constrainHeight
-            ? { maxHeight: previewHeight, overflow: 'hidden' }
-            : undefined,
+          !expanded && { maxHeight: collapsedMaxHeight, overflow: 'hidden' },
         ]}
       >
         <View

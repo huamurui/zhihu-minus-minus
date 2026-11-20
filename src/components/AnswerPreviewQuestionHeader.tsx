@@ -44,7 +44,7 @@ export function AnswerPreviewQuestionHeader({
     hasAuthenticationCookie(state.cookies),
   );
   const sessionVersion = useAuthStore(() => getAuthSessionVersion());
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const [menuVisible, setMenuVisible] = useState(false);
   const {
     data: question,
@@ -140,7 +140,7 @@ export function AnswerPreviewQuestionHeader({
               ) : (
                 <Text
                   type="secondary"
-                  numberOfLines={3}
+                  numberOfLines={question.detail ? 3 : undefined}
                   style={QUESTION_DETAIL_TEXT_STYLE}
                 >
                   {(question.excerpt || question.detail || '').replace(
