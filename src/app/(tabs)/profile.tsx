@@ -3,24 +3,20 @@ import CookieManager from '@preeternal/react-native-cookie-manager';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import React from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  RefreshControl,
-  ScrollView,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Alert, ScrollView } from 'react-native';
 import { verifyZhihuSession } from '@/api/session';
 import { getMe, getMemberWithFallback } from '@/api/zhihu';
 import { AuthStorageNotice } from '@/components/AuthStorageNotice';
 import { BouncyButton } from '@/components/BouncyButton';
 import { BottomSheet } from '@/components/overlays/BottomSheet';
+import { MyProfileScrollView } from '@/components/profile/MyProfileScrollView';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { UnreadBadge } from '@/components/UnreadBadge';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
+import { useRefreshAction } from '@/hooks/useRefreshAction';
 import { getAuthSessionVersion, useAuthStore } from '@/store/useAuthStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { useVerificationStore } from '@/store/useVerificationStore';
@@ -38,13 +34,10 @@ interface ProfileScreenProps {
 
 export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
   const colorScheme = useColorScheme();
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
   const accentColor = useThemeColor({}, 'primary');
   const accentBgColor = useThemeColor({}, 'primaryTransparent');
-  const _surfaceColor = Colors[colorScheme].surface;
-  const _textColor = Colors[colorScheme].text;
   const { enablePrivateMessaging } = useSettingsStore();
   const {
     cookies,
@@ -62,7 +55,6 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
   const {
     data: me,
     isLoading: isMeLoading,
-    isFetching: isMeFetching,
     isError: isMeError,
     refetch: refetchMe,
   } = useQuery({
@@ -87,11 +79,7 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
 
   const memberId = me?.url_token || me?.id;
 
-  const {
-    data: member,
-    isFetching: isMemberFetching,
-    isError: isMemberError,
-  } = useQuery({
+  const { data: member, isError: isMemberError } = useQuery({
     queryKey: ['me-detail', memberId],
     queryFn: () => getMemberWithFallback(memberId as string),
     enabled: !!memberId,
@@ -99,7 +87,6 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
 
   const profile = member || me;
 
-  const isRefreshing = isMeFetching || isMemberFetching;
   const refreshProfile = React.useCallback(async () => {
     if (!cookies) return;
     const meResult = await refetchMe();
@@ -114,6 +101,8 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
       // The member query exposes its own retry UI below.
     }
   }, [cookies, queryClient, refetchMe]);
+  const { refresh: pullToRefresh, refreshing } =
+    useRefreshAction(refreshProfile);
 
   const unreadCount =
     (me?.default_notifications_count || 0) +
@@ -292,235 +281,212 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
     }
   };
 
+  const openIdentity = me
+    ? () => router.push(`/user/${me.url_token || me.id}`)
+    : cookies
+      ? undefined
+      : () => router.push('/login');
+  const openAccounts = () => setAccountModalVisible(true);
+  const openSettings = () => router.push('/settings' as Href);
+
   return (
-    <ScrollView
-      className="flex-1"
-      refreshControl={
-        <RefreshControl
-          refreshing={isRefreshing}
-          onRefresh={() => void refreshProfile()}
-          tintColor={accentColor}
-        />
-      }
-    >
-      {/* 顶部用户信息区 */}
-      <AuthStorageNotice />
-      <View
-        type="surface"
-        className="px-5 pb-5 rounded-b-[24px]"
-        style={{ paddingTop: insets.top + 20 }}
+    <>
+      <MyProfileScrollView
+        name={me?.name || (cookies ? '我的' : '点击登录')}
+        avatarUri={me?.avatar_url}
+        coverUrl={cookies && me ? member?.cover_url : undefined}
+        loading={!!cookies && !me && isMeLoading}
+        identityLabel={
+          me ? `${me.name}，查看个人主页` : cookies ? '我的' : '点击登录'
+        }
+        onOpenIdentity={openIdentity}
+        onOpenAccounts={openAccounts}
+        onOpenSettings={openSettings}
+        refreshing={refreshing}
+        onRefresh={() => void pullToRefresh()}
       >
-        {me ? (
-          <BouncyButton
-            className="flex-row items-center mb-[25px]"
-            onPress={() => router.push(`/user/${me.url_token || me.id}`)}
-          >
-            <StableAvatar
-              uri={me.avatar_url}
-              className="w-16 h-16 rounded-full bg-surface-tertiary dark:bg-surface-tertiary-dark"
-            />
-            <View className="flex-1 ml-[15px] bg-transparent">
-              <Text className="text-[22px] font-bold">{me.name}</Text>
-              <Text
-                type="secondary"
-                className="text-[13px] mt-1"
-                numberOfLines={1}
-              >
-                {me.headline || '点击查看个人主页'}
-              </Text>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={Colors[colorScheme].tabIconDefault}
-            />
-          </BouncyButton>
-        ) : cookies && isMeLoading ? (
-          <View className="h-24 items-center justify-center bg-transparent">
-            <ActivityIndicator color={accentColor} />
-          </View>
-        ) : cookies && isMeError ? (
-          <QueryErrorView
-            compact
-            message="个人资料加载失败"
-            onRetry={() => void refreshProfile()}
-          />
-        ) : (
-          <BouncyButton
-            className="flex-row items-center mb-[25px]"
-            onPress={() => router.push('/login')}
-          >
-            <View className="w-16 h-16 rounded-full border border-border dark:border-border-dark justify-center items-center">
-              <Ionicons
-                name="person"
-                size={40}
-                color={Colors[colorScheme].tabIconDefault}
-              />
-            </View>
-            <View className="flex-1 ml-[15px] bg-transparent">
-              <Text className="text-[22px] font-bold">点击登录</Text>
-              <Text type="secondary" className="text-[13px] mt-1">
-                登录后开启更多精彩内容
-              </Text>
-            </View>
-          </BouncyButton>
-        )}
-
-        {/* 数据战绩统计 */}
-        <View className="flex-row justify-between px-2.5 bg-transparent">
-          <StatItem
-            count={profile?.answer_count || 0}
-            label="回答"
-            onPress={() =>
-              profile &&
-              router.push(
-                `/user/${profile.url_token || profile.id}?tab=answers`,
-              )
-            }
-          />
-          <StatItem
-            count={profile?.articles_count || 0}
-            label="文章"
-            onPress={() =>
-              profile &&
-              router.push(
-                `/user/${profile.url_token || profile.id}?tab=articles`,
-              )
-            }
-          />
-          <StatItem
-            count={member?.following_count || 0}
-            label="关注"
-            onPress={() =>
-              profile &&
-              router.push(`/user/${profile.url_token || profile.id}/following`)
-            }
-          />
-          <StatItem
-            count={member?.follower_count || 0}
-            label="粉丝"
-            onPress={() =>
-              profile &&
-              router.push(`/user/${profile.url_token || profile.id}/followers`)
-            }
-          />
-        </View>
-        {me && isMemberError ? (
-          <BouncyButton
-            className="items-center mt-3 bg-transparent"
-            onPress={() => void refreshProfile()}
-          >
-            <Text type="secondary" className="text-xs">
-              详细统计加载失败，点此重试
+        <View className="px-5 pb-5">
+          {me || !cookies ? (
+            <Text
+              type="secondary"
+              className="text-[13px] text-center mb-5"
+              numberOfLines={1}
+              onPress={openIdentity}
+            >
+              {me
+                ? me.headline || '点击查看个人主页'
+                : '登录后开启更多精彩内容'}
             </Text>
-          </BouncyButton>
-        ) : null}
-      </View>
+          ) : isMeError ? (
+            <QueryErrorView
+              compact
+              message="个人资料加载失败"
+              onRetry={() => void refreshProfile()}
+            />
+          ) : null}
 
-      <MenuSection title="我的内容">
-        <MenuItem
-          icon="bookmark-outline"
-          title="我的收藏"
-          subtitle="整理和继续阅读收藏内容"
-          color={Colors[colorScheme].warning}
-          onPress={() => router.push('/collections')}
-        />
-        <MenuItem
-          icon="time-outline"
-          title="最近浏览"
-          subtitle="找回最近看过的内容"
-          color={accentColor}
-          onPress={() => router.push('/history')}
-        />
-      </MenuSection>
+          {/* 数据战绩统计 */}
+          <View className="flex-row justify-between px-2.5 bg-transparent">
+            <StatItem
+              count={profile?.answer_count || 0}
+              label="回答"
+              onPress={() =>
+                profile &&
+                router.push(
+                  `/user/${profile.url_token || profile.id}?tab=answers`,
+                )
+              }
+            />
+            <StatItem
+              count={profile?.articles_count || 0}
+              label="文章"
+              onPress={() =>
+                profile &&
+                router.push(
+                  `/user/${profile.url_token || profile.id}?tab=articles`,
+                )
+              }
+            />
+            <StatItem
+              count={member?.following_count || 0}
+              label="关注"
+              onPress={() =>
+                profile &&
+                router.push(
+                  `/user/${profile.url_token || profile.id}/following`,
+                )
+              }
+            />
+            <StatItem
+              count={member?.follower_count || 0}
+              label="粉丝"
+              onPress={() =>
+                profile &&
+                router.push(
+                  `/user/${profile.url_token || profile.id}/followers`,
+                )
+              }
+            />
+          </View>
+          {me && isMemberError ? (
+            <BouncyButton
+              className="items-center mt-3 bg-transparent"
+              onPress={() => void refreshProfile()}
+            >
+              <Text type="secondary" className="text-xs">
+                详细统计加载失败，点此重试
+              </Text>
+            </BouncyButton>
+          ) : null}
+        </View>
 
-      <MenuSection title="消息与账户">
-        <MenuItem
-          icon="notifications-outline"
-          title="消息通知"
-          subtitle="查看赞同、关注与系统消息"
-          color={accentColor}
-          onPress={() => router.push('/notifications')}
-          right={
-            unreadCount > 0 ? (
+        <AuthStorageNotice />
+        <MenuSection title="我的内容">
+          <MenuItem
+            icon="bookmark-outline"
+            title="我的收藏"
+            subtitle="整理和继续阅读收藏内容"
+            color={Colors[colorScheme].warning}
+            onPress={() => router.push('/collections')}
+          />
+          <MenuItem
+            icon="time-outline"
+            title="最近浏览"
+            subtitle="找回最近看过的内容"
+            color={accentColor}
+            onPress={() => router.push('/history')}
+          />
+        </MenuSection>
+
+        <MenuSection title="消息与账户">
+          <MenuItem
+            icon="notifications-outline"
+            title="消息通知"
+            subtitle="查看赞同、关注与系统消息"
+            color={accentColor}
+            onPress={() => router.push('/notifications')}
+            right={
+              unreadCount > 0 ? (
+                <View className="flex-row items-center bg-transparent">
+                  <UnreadBadge count={unreadCount} placement="inline" />
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color={Colors[colorScheme].tabIconDefault}
+                  />
+                </View>
+              ) : undefined
+            }
+          />
+          {enablePrivateMessaging && (
+            <MenuItem
+              icon="chatbubbles-outline"
+              title="我的私信"
+              subtitle="查看与知乎用户的对话"
+              color="#4caf50"
+              onPress={() => router.push('/inbox')}
+            />
+          )}
+          <MenuItem
+            icon="people-outline"
+            title="切换账号"
+            subtitle="管理登录账号与游客模式"
+            color={accentColor}
+            onPress={openAccounts}
+            right={
               <View className="flex-row items-center bg-transparent">
-                <UnreadBadge count={unreadCount} placement="inline" />
+                <Text type="secondary" className="mr-1 text-[13px]">
+                  {accounts.length} 个账号
+                </Text>
                 <Ionicons
                   name="chevron-forward"
                   size={16}
                   color={Colors[colorScheme].tabIconDefault}
                 />
               </View>
-            ) : undefined
-          }
-        />
-        {enablePrivateMessaging && (
-          <MenuItem
-            icon="chatbubbles-outline"
-            title="我的私信"
-            subtitle="查看与知乎用户的对话"
-            color="#4caf50"
-            onPress={() => router.push('/inbox')}
+            }
           />
-        )}
-        <MenuItem
-          icon="people-outline"
-          title="切换账号"
-          subtitle="管理登录账号与游客模式"
-          color={accentColor}
-          onPress={() => setAccountModalVisible(true)}
-          right={
-            <View className="flex-row items-center bg-transparent">
-              <Text type="secondary" className="mr-1 text-[13px]">
-                {accounts.length} 个账号
-              </Text>
-              <Ionicons
-                name="chevron-forward"
-                size={16}
-                color={Colors[colorScheme].tabIconDefault}
-              />
-            </View>
-          }
-        />
-      </MenuSection>
+        </MenuSection>
 
-      <MenuSection title="设置">
-        <MenuItem
-          icon="settings-outline"
-          title="设置"
-          subtitle="偏好、内容、功能与关于"
-          color={accentColor}
-          onPress={() => router.push('/settings' as Href)}
-        />
-        {__DEV__ && (
+        <MenuSection title="设置">
           <MenuItem
-            icon="bug-outline"
-            title="富文本测试案例（开发）"
+            icon="settings-outline"
+            title="设置"
+            subtitle="偏好、内容、功能与关于"
             color={accentColor}
-            onPress={() => router.push('/dev/rich-content' as Href)}
+            onPress={openSettings}
           />
-        )}
-      </MenuSection>
+          {__DEV__ && (
+            <MenuItem
+              icon="bug-outline"
+              title="富文本测试案例（开发）"
+              color={accentColor}
+              onPress={() => router.push('/dev/rich-content' as Href)}
+            />
+          )}
+        </MenuSection>
 
-      {/* 退出登录按钮 */}
-      {me && (
-        <View type="surface" className="mt-5 mx-3 rounded-2xl overflow-hidden">
-          <BouncyButton
-            className="py-3.5 items-center"
-            onPress={handleLogout}
-            disabled={sessionChanging}
+        {/* 退出登录按钮 */}
+        {me && (
+          <View
+            type="surface"
+            className="mt-5 mx-3 rounded-2xl overflow-hidden"
           >
-            <Text
-              className="text-base font-medium"
-              style={{ color: Colors[colorScheme].danger }}
+            <BouncyButton
+              className="py-3.5 items-center"
+              onPress={handleLogout}
+              disabled={sessionChanging}
             >
-              退出账号
-            </Text>
-          </BouncyButton>
-        </View>
-      )}
-
-      <View className="h-[100px] bg-transparent" />
+              <Text
+                className="text-base font-medium"
+                style={{ color: Colors[colorScheme].danger }}
+              >
+                退出账号
+              </Text>
+            </BouncyButton>
+          </View>
+        )}
+      </MyProfileScrollView>
 
       <BottomSheet
         visible={accountModalVisible}
@@ -663,7 +629,7 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
           </BouncyButton>
         </View>
       </BottomSheet>
-    </ScrollView>
+    </>
   );
 }
 
