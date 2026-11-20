@@ -12,8 +12,8 @@ import {
 } from '@/api/zhihu/question';
 import { CommentBubbleIcon } from '@/components/CommentBubbleIcon';
 import {
-  QUESTION_DETAIL_TEXT_STYLE,
   QuestionDetailContent,
+  QuestionDetailSummary,
 } from '@/components/QuestionDetailContent';
 import { TitleTransitionTarget } from '@/features/adaptive-layout/TitleTransition';
 import { RICH_CONTENT_STALE_TIME } from '@/features/rich-content';
@@ -85,6 +85,10 @@ export function AnswerPreviewQuestionHeader({
       wasFollowing ? '已取消关注' : '已关注问题',
   });
   const questionTitle = question?.title || title;
+  const summary = (question?.excerpt || question?.detail || '').replace(
+    /<[^>]+>/g,
+    '',
+  );
 
   return (
     <View
@@ -136,18 +140,10 @@ export function AnswerPreviewQuestionHeader({
                 <QuestionDetailContent
                   content={question.detail}
                   questionId={id}
+                  summary={summary}
                 />
               ) : (
-                <Text
-                  type="secondary"
-                  numberOfLines={3}
-                  style={QUESTION_DETAIL_TEXT_STYLE}
-                >
-                  {(question.excerpt || question.detail || '').replace(
-                    /<[^>]+>/g,
-                    '',
-                  )}
-                </Text>
+                <QuestionDetailSummary text={summary} />
               )}
               {question.detail ? (
                 <ContentActionButton

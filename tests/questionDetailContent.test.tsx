@@ -60,3 +60,22 @@ test('the expanded description keeps the reading size and line height settings',
     });
   }
 });
+
+test('the summary stays in place of the expanded body until its layout is ready', async () => {
+  // Without it the renderer shows grey placeholder bars for a few frames.
+  await render(
+    <QuestionDetailContent
+      content="<p>合成问题描述</p>"
+      questionId="q1"
+      summary="合成摘要"
+    />,
+  );
+  const props = mockRichContent.mock.calls.at(-1)?.[0];
+  expect(props?.renderPlaceholder).toBeDefined();
+  const placeholder = await render(
+    <>{props?.renderPlaceholder?.('text-layout')}</>,
+  );
+  expect(placeholder.getByText('合成摘要')).toHaveStyle(
+    QUESTION_DETAIL_TEXT_STYLE,
+  );
+});
