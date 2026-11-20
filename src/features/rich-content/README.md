@@ -144,7 +144,7 @@ tiqian-super-mini选区已接回回答的既有业务菜单，但仅开放可逐
 
 正文双击与选字共用 `suppressDoubleTapSelection` 策略，由宿主 `useDoubleTapAction.isDoubleTapEnabled` 决定：启用快捷动作或等待首次设置时，双击留给宿主，长按仍进入系统选区；关闭、日报、未聚焦回答以及没有双击宿主的预览和脚注弹窗保持系统行为。Android 文字流用系统 `GestureDetector` 区分短按与长按，短按不进入 `TextView` 的双击选词逻辑；长按确认后交回原生选择与拖柄，不依赖特定 Android 版本的 Editor 内部状态。iOS 通过公开 `UITextInteraction` 手势失败关系让系统选词等待双击识别，不改变系统长按时限。
 
-Android 手势库在第二次抬起识别双击时会吞掉原生 `UP`；3.3.0 的原生取消路径在终止事件上仍可能拿不到已清空的 pointer 状态，导致文字流的长按计时未结束。项目通过 [RNGH 补丁](../../../patches/react-native-gesture-handler+3.3.0.patch) 在首次接管恰好发生于 `UP/CANCEL` 时，沿原生触摸目标链补发一次 `CANCEL`。已在 `MOVE` 阶段交给手势库的触摸不额外取消，避免中断 `NativeViewGestureHandler` 驱动的滚动或惯性滚动；不调整系统长按时限。
+Android 在第二次抬起时识别双击。Gesture Handler 3.5.0 在清理指针位置和手势状态前，向被接管的原生视图派发 `CANCEL`，结束文字视图的长按计时。真机复验时，双击后抬手并等两秒，确认文字没有迟发选区，再检查持续长按仍能选字，快速纵向滑动后仍有惯性。[上游修复 #4637](https://github.com/software-mansion/react-native-gesture-handler/pull/4637)
 
 Android 首次进入回答时，文字可能在加入窗口前完成测量。系统 `TextView.Editor` 此时会缓存不可用的选择控制器，复用已有文字布局后，单纯挂载窗口不会重新计算它。`FlowTextView` 在挂载已有布局且允许选择的文字时，通过公开的 cursor visibility setter 刷新控制器，并同步恢复原光标偏好，不替换文字、movement method 或已有选区。`bash scripts/test-android-text-selection.sh <adb-serial>` 使用合成正文对照原生 TextView 和实际编译的 FlowTextView；API 36.1 模拟器已复现旧逻辑长按不建立选区，并验证修复后可选、重新挂载保留已有选区。它不代替完整回答页上的双击、拖柄、滚动和不同厂商系统验收。
 

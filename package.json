@@ -5,6 +5,12 @@
   "expo": {
     "autolinking": {
       "nativeModulesDir": "./modules"
+    },
+    "install": {
+      "exclude": [
+        "react-native-gesture-handler@~3.3.0",
+        "react-native-pager-view@9.0.7"
+      ]
     }
   },
   "scripts": {
@@ -80,8 +86,8 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-native": "0.88.0",
-    "react-native-gesture-handler": "~3.3.0",
-    "react-native-pager-view": "9.0.7",
+    "react-native-gesture-handler": "~3.5.0",
+    "react-native-pager-view": "10.0.3",
     "react-native-reanimated": "4.7.1",
     "react-native-root-siblings": "^5.0.1",
     "react-native-root-toast": "^4.0.1",

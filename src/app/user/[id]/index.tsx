@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import PagerView, {
   type PagerViewOnPageScrollEvent,
+  type PagerViewRef,
 } from 'react-native-pager-view';
 import Reanimated, {
   interpolate,
@@ -252,7 +253,7 @@ function UserProfileScreen({ params }: { params: ProfileRouteParams }) {
   const [compactHeader, setCompactHeader] = useState(false);
   const [profileTabViewportWidth, setProfileTabViewportWidth] = useState(0);
   const [tabLayoutVersion, setTabLayoutVersion] = useState(0);
-  const pagerRef = useRef<PagerView>(null);
+  const pagerRef = useRef<PagerViewRef>(null);
   const profileTabsScrollRef = useRef<ScrollViewInstance>(null);
   const profileTabLayoutsRef = useRef<
     Array<{ x: number; width: number } | undefined>

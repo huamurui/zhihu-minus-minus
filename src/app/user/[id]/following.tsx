@@ -4,7 +4,7 @@ import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, Image, View as NativeView } from 'react-native';
-import PagerView from 'react-native-pager-view';
+import PagerView, { type PagerViewRef } from 'react-native-pager-view';
 import {
   getMemberFollowing,
   getMemberFollowingColumns,
@@ -70,7 +70,7 @@ export default function FollowingScreen() {
   const [visitedTabs, setVisitedTabs] = useState<Record<string, boolean>>({
     users: true,
   });
-  const pagerRef = useRef<PagerView>(null);
+  const pagerRef = useRef<PagerViewRef>(null);
 
   const colorScheme = useColorScheme();
   const borderColor = Colors[colorScheme].border;

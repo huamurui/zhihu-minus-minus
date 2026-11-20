@@ -14,7 +14,7 @@ import {
   useState,
 } from 'react';
 import type { LayoutChangeEvent } from 'react-native';
-import PagerView from 'react-native-pager-view';
+import PagerView, { type PagerViewRef } from 'react-native-pager-view';
 import { recordReadHistory } from '@/api/zhihu/history';
 import {
   AnswerDetailView,
@@ -161,7 +161,7 @@ function AnswerDetailScreen() {
   });
   const selectedId =
     selection.pagerKey === pagerKey ? selection.answerId : initialId;
-  const pagerRef = useRef<PagerView>(null);
+  const pagerRef = useRef<PagerViewRef>(null);
 
   // 3. 构建 ID 列表
   const latestAnswerIds = useMemo(() => {
@@ -257,9 +257,8 @@ function AnswerDetailScreen() {
       const retried = reason === 'layout' ? layoutRetry : positionRetry;
       if (retried.current === pending) return;
       retried.current = pending;
-      // Pager 9 rejects a command whose index has not been inserted natively
-      // yet. Retry after native layout/position feedback, once per signal type
-      // and page-list revision, so a rejected scroll event cannot form a loop.
+      // Reconcile native position with this revision of the answer list.
+      // Retry once per signal type so a stale scroll event cannot form a loop.
       pagerRef.current?.setPageWithoutAnimation(pending.index);
     },
     [],

@@ -19,6 +19,7 @@ import { Platform, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import PagerView, {
   type PagerViewOnPageScrollEvent,
+  type PagerViewRef,
 } from 'react-native-pager-view';
 import Animated, {
   Extrapolate,
@@ -227,7 +228,7 @@ export default function HomeScreen() {
   const scrollX = useSharedValue(initialPageIndex);
   const topNavOffset = useSharedValue(0);
   const bottomNavOffset = useSharedValue(0);
-  const pagerRef = useRef<PagerView>(null);
+  const pagerRef = useRef<PagerViewRef>(null);
   const pagerGesture = useMemo(() => Gesture.Native(), []);
   const [recentMomentsInteracting, setRecentMomentsInteracting] =
     useState(false);

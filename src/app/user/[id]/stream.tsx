@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
-import PagerView from 'react-native-pager-view';
+import PagerView, { type PagerViewRef } from 'react-native-pager-view';
 import type { RecentMomentsResponse } from '@/api/zhihu';
 import { UserPublishedStream } from '@/components/profile/UserPublishedStream';
 import { useMarkRecentMomentRead } from '@/hooks/useMarkRecentMomentRead';
@@ -31,7 +31,7 @@ function UserStreamPager({ id, unreadCount, source }: StreamParams) {
   const [visitedPages, setVisitedPages] = useState(
     () => new Set([stream.initialPage]),
   );
-  const pagerRef = useRef<PagerView>(null);
+  const pagerRef = useRef<PagerViewRef>(null);
   const markRead = useMarkRecentMomentRead();
   const currentEntry = stream.entries[currentPage];
 
