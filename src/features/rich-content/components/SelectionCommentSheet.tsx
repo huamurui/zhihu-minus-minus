@@ -65,6 +65,7 @@ function SelectionCommentDraft({
     <BottomSheet
       visible
       keyboardAvoiding
+      scrollable
       title="评论所选文字"
       subtitle={selection.text}
       onClose={onClose}

@@ -1,13 +1,21 @@
+import type { ColorValue } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { commentBubble, commentBubblePath } from '@/constants/commentBubble';
+import {
+  commentBubble,
+  commentBubbleCenterline,
+} from '@/constants/commentBubble';
 import { useContentActionBarColor } from './ContentActionBarColor';
 import { useThemeColor } from './Themed';
 
-const toolbarPath = commentBubblePath(commentBubble.toolbarWeight);
-
-export function CommentBubbleIcon({ size }: { size: number }) {
+export function CommentBubbleIcon({
+  size,
+  color,
+}: {
+  size: number;
+  color?: ColorValue;
+}) {
   const secondary = useThemeColor({}, 'textSecondary');
-  const color = useContentActionBarColor(secondary);
+  const actionBarColor = useContentActionBarColor(secondary);
   return (
     <Svg
       width={size}
@@ -15,7 +23,13 @@ export function CommentBubbleIcon({ size }: { size: number }) {
       viewBox={`0 0 ${commentBubble.viewBoxSize} ${commentBubble.viewBoxSize}`}
       accessible={false}
     >
-      <Path d={toolbarPath} fill={color} />
+      <Path
+        d={commentBubbleCenterline}
+        fill="none"
+        stroke={color ?? actionBarColor}
+        strokeWidth={commentBubble.toolbarWeight}
+        strokeLinejoin="round"
+      />
     </Svg>
   );
 }

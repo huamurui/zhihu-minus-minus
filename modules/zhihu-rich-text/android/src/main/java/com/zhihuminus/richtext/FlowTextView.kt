@@ -242,13 +242,11 @@ internal class FlowTextView(context: Context) : TextView(context) {
     canvas.translate(totalPaddingLeft.toFloat() - scrollX, totalPaddingTop.toFloat() - scrollY)
     for (decoration in activeFlow.decorations) {
       val range = decoration.range(activeFlow.text) ?: continue
-      var visibleEnd = range.end
-      while (visibleEnd > range.start && activeFlow.text[visibleEnd - 1] == '\n') visibleEnd -= 1
-      if (visibleEnd <= range.start) continue
+      val lastCharacter = lastVisibleCharacter(activeFlow.text, range) ?: continue
       val firstLine = textLayout.getLineForOffset(range.start)
-      val lastLine = textLayout.getLineForOffset(visibleEnd - 1)
+      val lastLine = textLayout.getLineForOffset(lastCharacter)
       val icon = config.commentIcon?.takeIf { decoration.optBoolean("hasComments") && it.path != null }
-      val marker = icon?.let { commentMarkerBounds(decoration, range, activeFlow.text, textLayout) }
+      val marker = icon?.let { commentMarkerBounds(decoration, lastCharacter, textLayout) }
       decorationPaint.color = parseColor(decoration.optString("color"), config.linkColor)
       decorationPaint.strokeWidth = (decoration.number("thickness", 1.2).toFloat() * scale).coerceAtLeast(1f)
       decorationPaint.style = Paint.Style.STROKE
@@ -270,7 +268,7 @@ internal class FlowTextView(context: Context) : TextView(context) {
         var left = min(startX, endX)
         var right = max(startX, endX)
         if (line == lastLine && marker != null) {
-          if (textLayout.isRtlCharAt(visibleEnd - 1)) left = max(left, marker.right)
+          if (textLayout.isRtlCharAt(lastCharacter)) left = max(left, marker.right)
           else right = min(right, marker.left)
           if (right <= left) continue
         }
@@ -308,19 +306,22 @@ internal class FlowTextView(context: Context) : TextView(context) {
     canvas.restore()
   }
 
+  private fun lastVisibleCharacter(text: String, range: TextRange): Int? {
+    var index = range.end - 1
+    while (index >= range.start && text[index] == '\n') index--
+    return index.takeIf { it >= range.start }
+  }
+
   // Query the current Layout both for painting and tapping. TextView can reuse its
   // display list or replace the Layout between a draw and the next touch event.
   private fun commentMarkerBounds(
-    spec: JSONObject, range: TextRange, text: String, textLayout: Layout, includeTouchArea: Boolean = false
+    spec: JSONObject, lastCharacter: Int, textLayout: Layout, includeTouchArea: Boolean = false
   ): RectF? {
     val icon = config.commentIcon ?: return null
-    var end = range.end
-    while (end > range.start && text[end - 1] == '\n') end -= 1
-    if (end <= range.start) return null
-    val lastLine = textLayout.getLineForOffset(end - 1)
-    val endX = visualEndHorizontal(end, lastLine)
+    val lastLine = textLayout.getLineForOffset(lastCharacter)
+    val endX = visualEndHorizontal(lastCharacter + 1, lastLine)
     val underlineY = textLayout.getLineBaseline(lastLine) + spec.number("offset", 3.0).toFloat() * scale
-    val rtl = textLayout.isRtlCharAt(end - 1)
+    val rtl = textLayout.isRtlCharAt(lastCharacter)
     val size = minOf(icon.size * scale, textLayout.width.toFloat(), textLayout.height.toFloat())
     val inset = icon.insetX * scale
     val x = (if (rtl) endX + inset else endX - inset - size).coerceIn(0f, textLayout.width - size)
@@ -344,17 +345,24 @@ internal class FlowTextView(context: Context) : TextView(context) {
     val localY = y - totalPaddingTop + scrollY
     if (localY < 0 || localY > textLayout.height) return null
     val line = textLayout.getLineForVertical(localY.toInt())
-    val marker = activeFlow.decorations.lastOrNull { item ->
-      if (!item.has("actionId") || !item.optBoolean("hasComments")) return@lastOrNull false
-      val range = item.range(activeFlow.text) ?: return@lastOrNull false
-      val bounds = commentMarkerBounds(item, range, activeFlow.text, textLayout, includeTouchArea = true) ?: return@lastOrNull false
-      bounds.contains(localX, localY)
+    var marker: JSONObject? = null
+    var markerCharacter: Int? = null
+    for (item in activeFlow.decorations.asReversed()) {
+      if (!item.has("actionId") || !item.optBoolean("hasComments")) continue
+      val range = item.range(activeFlow.text) ?: continue
+      val last = lastVisibleCharacter(activeFlow.text, range) ?: continue
+      val hit = commentMarkerBounds(item, last, textLayout, includeTouchArea = true) ?: continue
+      if (!hit.contains(localX, localY)) continue
+      // Link text keeps its normal action, including the extra area around
+      // the icon. Tapping the visible icon always opens its discussion.
+      if (commentMarkerBounds(item, last, textLayout)?.contains(localX, localY) == true) return item to "segment"
+      if (marker == null) {
+        marker = item
+        markerCharacter = last
+      }
     }
     if (marker == null && (localX < textLayout.getLineLeft(line) || localX > textLayout.getLineRight(line))) return null
-    // The right half of the final glyph can resolve to the *next* caret. Hit the
-    // actual painted marker first, and use its terminal character for nested links.
-    val offset = marker?.range(activeFlow.text)?.let { it.end - 1 }
-      ?: textLayout.getOffsetForHorizontal(line, localX)
+    val offset = markerCharacter ?: textLayout.getOffsetForHorizontal(line, localX)
     // offset is the closest caret; include the preceding attachment glyph.
     for (item in activeFlow.attachments) {
       val range = item.range(activeFlow.text) ?: continue

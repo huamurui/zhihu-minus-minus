@@ -31,6 +31,7 @@ jest.mock('../src/components/Themed', () => {
   return {
     Text: native.Text,
     View: native.View,
+    useThemeColor: () => '#555555',
     useRuntimeThemeColors: () => ({
       backgroundSecondary: '#eeeeee',
       link: '#123456',

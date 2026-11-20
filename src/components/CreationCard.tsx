@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import React from 'react';
 import { View as NativeView, type ViewInstance } from 'react-native';
@@ -9,6 +8,7 @@ import {
   type VoteContentType,
 } from '@/api/zhihu';
 import { CollectionButton } from '@/components/CollectionButton';
+import { CommentBubbleIcon } from '@/components/CommentBubbleIcon';
 import { MoreActionsButton } from '@/components/MoreActionsButton';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { usePaneRouter as useRouter } from '@/features/adaptive-layout/usePaneRouter';
@@ -279,11 +279,7 @@ export const CreationCard = React.forwardRef<
                 }}
                 className="flex-row items-center justify-center ml-3 p-2 rounded-full bg-transparent"
               >
-                <Ionicons
-                  name="chatbubble-outline"
-                  size={16}
-                  color={secondaryColor}
-                />
+                <CommentBubbleIcon size={16} color={secondaryColor} />
                 <Text type="secondary" className="ml-1 text-xs font-semibold">
                   {(item.comment_count ?? 0) > 0 ? item.comment_count : '0'}
                 </Text>

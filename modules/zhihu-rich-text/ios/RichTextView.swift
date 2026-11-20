@@ -295,7 +295,7 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
       }
     }
     manager.decorations = flow.decorations.compactMap { spec in
-      guard let range = richTextRange(spec, in: flow.text) else { return nil }
+      guard let range = richTextDecorationRange(spec, in: flow.text) else { return nil }
       return RichTextDrawDecoration(
         range: range, kind: spec["kind"] as? String ?? "solid",
         color: richTextColor(spec["color"], fallback: config.linkColor),
@@ -422,7 +422,8 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
     container.size = CGSize(width: width, height: .greatestFiniteMagnitude)
     manager.ensureLayout(for: container)
     let fit = textView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
-    let rawHeight = flow.text.length == 0 ? 0 : max(fit.height, manager.usedRect(for: container).maxY)
+    let rawHeight = flow.text.length == 0 ? 0
+      : max(fit.height, manager.usedRect(for: container).maxY, manager.commentMarkersMaxY(in: container))
     guard rawHeight.isFinite else { return }
     let pixelScale = max(1, traitCollection.displayScale)
     let height = ceil(rawHeight * pixelScale) / pixelScale
@@ -490,10 +491,12 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
   private func action(at point: CGPoint) -> (spec: RichTextSpec, kind: String)? {
     guard let flow, manager.numberOfGlyphs > 0 else { return nil }
     let location = CGPoint(x: point.x - textView.textContainerInset.left + textView.contentOffset.x, y: point.y - textView.textContainerInset.top + textView.contentOffset.y)
-    let marker = manager.commentMarker(at: location).flatMap { id in flow.decorations.first { $0["actionId"] as? String == id } }
+    let hit = manager.commentMarker(at: location)
+    let marker = hit.flatMap { hit in flow.decorations.first { $0["actionId"] as? String == hit.actionId } }
+    if let marker, hit?.insideIcon == true { return (marker, "segment") }
     let character: Int
-    if let marker, let range = richTextRange(marker, in: flow.text) {
-      character = NSMaxRange(range) - 1
+    if let hit, marker != nil {
+      character = hit.endCharacter
     } else {
       let glyph = manager.glyphIndex(for: location, in: container)
       guard glyph < manager.numberOfGlyphs,

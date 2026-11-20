@@ -15,13 +15,28 @@ final class RichTextLayoutManager: NSLayoutManager {
   var decorations: [RichTextDrawDecoration] = []
   var commentIcon: RichTextCommentIcon?
 
-  func commentMarker(at point: CGPoint) -> String? {
+  typealias MarkerHit = (actionId: String, endCharacter: Int, insideIcon: Bool)
+
+  func commentMarker(at point: CGPoint) -> MarkerHit? {
     guard let container = textContainers.first else { return nil }
-    return decorations.first { decoration in
-      decoration.hasComments && decoration.actionId != nil &&
-        commentMarkerBounds(decoration, in: container)?.hit.contains(point) == true
-    }?.actionId
+    var nearby: MarkerHit?
+    for decoration in decorations where decoration.hasComments {
+      guard let id = decoration.actionId, let bounds = commentMarkerBounds(decoration, in: container),
+            bounds.hit.contains(point) else { continue }
+      let hit: MarkerHit = (id, NSMaxRange(decoration.range) - 1, bounds.draw.contains(point))
+      if hit.insideIcon { return hit }
+      if nearby == nil { nearby = hit }
+    }
+    return nearby
   }
+  func commentMarkersMaxY(in container: NSTextContainer) -> CGFloat {
+    guard commentIcon != nil else { return 0 }
+    return decorations.reduce(0) { maxY, decoration in
+      guard decoration.hasComments, let bounds = commentMarkerBounds(decoration, in: container) else { return maxY }
+      return max(maxY, bounds.draw.maxY)
+    }
+  }
+
   var quotes: [NSRange] = []
   var quoteColor = UIColor.gray
   var scale: CGFloat = 1

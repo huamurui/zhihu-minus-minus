@@ -330,7 +330,7 @@ const FeedCardComponent = ({
 
   const menuOptions: MenuOption[] = [
     ...(engagementType
-      ? [
+      ? ([
           {
             key: 'like',
             title:
@@ -341,7 +341,7 @@ const FeedCardComponent = ({
                 : isPinType
                   ? '点赞'
                   : '赞同',
-            icon: voted === 1 ? 'caret-up' : 'caret-up-outline',
+            icon: voted === 1 ? 'vote-up-active' : 'vote-up',
             onPress: async () => {
               if (pendingVotesRef.current.has(identity)) return;
               pendingVotesRef.current.add(identity);
@@ -391,7 +391,7 @@ const FeedCardComponent = ({
           {
             key: 'comment',
             title: '评论',
-            icon: 'chatbubble-outline',
+            icon: 'comment-bubble',
             onPress: () => {
               const type =
                 item.type === 'articles'
@@ -404,7 +404,7 @@ const FeedCardComponent = ({
               );
             },
           },
-        ]
+        ] satisfies MenuOption[])
       : []),
     ...contentActions.map((action) => ({
       key: action.key,

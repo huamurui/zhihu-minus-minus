@@ -217,7 +217,7 @@ export default function AppearanceSettings() {
           </SettingItem>
           <SettingItem
             label="点击划线查看评论"
-            icon="chatbubble-outline"
+            icon="comment-bubble"
             colorScheme={colorScheme}
           >
             <ThemedSwitch

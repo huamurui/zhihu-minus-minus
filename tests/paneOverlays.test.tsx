@@ -1,6 +1,23 @@
-import { act, fireEvent, render } from '@testing-library/react-native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  act,
+  fireEvent,
+  render,
+  userEvent,
+  waitFor,
+  within,
+} from '@testing-library/react-native';
+import * as ImagePicker from 'expo-image-picker';
 import type { PropsWithChildren } from 'react';
-import { Animated, Platform, Text } from 'react-native';
+import {
+  Animated,
+  DeviceEventEmitter,
+  Platform,
+  StyleSheet,
+  Text,
+} from 'react-native';
+import { createAnswerSelectionComment } from '../src/api/zhihu/comment';
+import { uploadImage } from '../src/api/zhihu/image';
 import { AppDialog } from '../src/components/overlays/AppDialog';
 import { BottomSheet } from '../src/components/overlays/BottomSheet';
 import {
@@ -15,10 +32,19 @@ import {
   usePaneVisible,
 } from '../src/features/adaptive-layout/PaneContext';
 import { PaneModal } from '../src/features/adaptive-layout/PaneModal';
+import { SelectionCommentSheet } from '../src/features/rich-content/components/SelectionCommentSheet';
 
 let mockFinishAnimation: (finished: boolean) => void;
 let mockFocused = true;
 
+jest.mock('../src/api/zhihu/comment', () => ({
+  createAnswerSelectionComment: jest.fn(),
+}));
+jest.mock('../src/api/zhihu/image', () => ({ uploadImage: jest.fn() }));
+jest.mock('expo-image-picker', () => ({
+  requestMediaLibraryPermissionsAsync: jest.fn(),
+  launchImageLibraryAsync: jest.fn(),
+}));
 jest.mock('expo-router', () => ({ useIsFocused: () => mockFocused }));
 jest.mock('@expo/vector-icons/Ionicons', () => () => null);
 jest.mock('../src/components/BouncyButton', () => ({
@@ -28,6 +54,7 @@ jest.mock('../src/components/Themed', () => ({
   Text: jest.requireActual('react-native').Text,
   View: jest.requireActual('react-native').View,
   useThemeColor: () => '#336699',
+  useRuntimeThemeColors: () => ({ text: '#111', link: '#234', border: '#ddd' }),
 }));
 jest.mock('../src/components/useColorScheme', () => ({
   useColorScheme: () => 'light',
@@ -188,6 +215,112 @@ test('a hidden pane suspends and reopens its bottom sheet without requesting dis
   expect(host.getByText('1200:true')).toBeTruthy();
   expect(onClose).not.toHaveBeenCalled();
 });
+
+test.each([
+  { width: 320, height: 568, keyboardHeight: 280, scrollHeight: 160 },
+  { width: 568, height: 320, keyboardHeight: 180, scrollHeight: 80 },
+])(
+  'can scroll to and submit a selection comment with 12 images above the keyboard on a $width × $height phone',
+  async ({ width, height, keyboardHeight, scrollHeight }) => {
+    const selection = {
+      text: '选中的原文',
+      startParagraphId: 'p1',
+      endParagraphId: 'p1',
+      startOffset: 0,
+      endOffset: 5,
+    };
+    const assets = Array.from({ length: 12 }, (_, index) => ({
+      uri: `file:///preview-${index}.png`,
+      width: 40,
+      height: 30,
+    }));
+    jest
+      .mocked(ImagePicker.requestMediaLibraryPermissionsAsync)
+      .mockResolvedValue({
+        granted: true,
+      } as ImagePicker.MediaLibraryPermissionResponse);
+    jest
+      .mocked(ImagePicker.launchImageLibraryAsync)
+      .mockResolvedValue({ canceled: false, assets });
+    jest
+      .mocked(uploadImage)
+      .mockImplementation(async ({ uri, width, height }) => ({
+        imageId: uri,
+        src: 'https://example.com/image.png',
+        width,
+        height,
+      }));
+    jest
+      .mocked(createAnswerSelectionComment)
+      .mockResolvedValue({ id: 'created' });
+    const onPosted = jest.fn();
+    const host = await render(
+      <QueryClientProvider
+        client={
+          new QueryClient({
+            defaultOptions: { mutations: { gcTime: Infinity } },
+          })
+        }
+      >
+        <SelectionCommentSheet
+          answerId="42"
+          selection={selection}
+          onClose={jest.fn()}
+          onPosted={onPosted}
+        />
+      </QueryClientProvider>,
+    );
+    const scroll = host.container.queryAll(
+      (node) => node.props.keyboardShouldPersistTaps === 'handled',
+    )[0];
+    const keyboardArea = host.container.queryAll(
+      (node) =>
+        typeof node.props.onLayout === 'function' &&
+        StyleSheet.flatten(node.props.style)?.paddingBottom === 0,
+    )[0];
+    await fireEvent(keyboardArea, 'layout', {
+      persist: () => {},
+      nativeEvent: { layout: { x: 0, y: 0, width, height } },
+    });
+    await act(() =>
+      DeviceEventEmitter.emit('keyboardWillShow', {
+        duration: 0,
+        endCoordinates: {
+          screenX: 0,
+          screenY: height - keyboardHeight,
+          width,
+          height: keyboardHeight,
+        },
+      }),
+    );
+    expect(keyboardArea).toHaveStyle({ paddingBottom: keyboardHeight });
+    const form = within(scroll);
+    expect(form.getByText(selection.text)).toBeOnTheScreen();
+    await fireEvent.press(form.getByLabelText('添加图片'));
+    expect(await form.findByText('已上传 12 张图片')).toBeOnTheScreen();
+    await userEvent.setup().scrollTo(scroll, {
+      y: 500 - scrollHeight,
+      layoutMeasurement: { width, height: scrollHeight },
+      contentSize: { width, height: 500 },
+    });
+    await fireEvent.changeText(
+      form.getByPlaceholderText('写下你的评论…'),
+      '附图说明',
+    );
+    await fireEvent.press(form.getByLabelText('发布评论'));
+    await waitFor(() => expect(onPosted).toHaveBeenCalledTimes(1));
+    expect(createAnswerSelectionComment).toHaveBeenLastCalledWith(
+      '42',
+      selection,
+      expect.stringContaining('附图说明'),
+    );
+    expect(
+      jest
+        .mocked(createAnswerSelectionComment)
+        .mock.lastCall?.[2].match(/\[图片\]/g),
+    ).toHaveLength(assets.length);
+  },
+);
 
 test('modal descendants retain their ancestor visibility after pane bounds are reset', async () => {
   const view = (visible: boolean) => (

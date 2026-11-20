@@ -89,6 +89,15 @@ func richTextRange(_ spec: RichTextSpec, in text: NSString) -> NSRange? {
   return validRichTextRange(range, in: text) ? range : nil
 }
 
+/** Newline glyphs have no ink. Decorations end at the last visible text position. */
+func richTextDecorationRange(_ spec: RichTextSpec, in text: NSString) -> NSRange? {
+  guard var range = richTextRange(spec, in: text) else { return nil }
+  while range.length > 0 && text.character(at: NSMaxRange(range) - 1) == 0x000a {
+    range.length -= 1
+  }
+  return range.length > 0 ? range : nil
+}
+
 /** Only a complete synthetic blank paragraph may opt into exact line metrics. */
 func richTextEmptyLineAnchor(_ spec: RichTextSpec, in text: NSString) -> NSRange? {
   guard let flag = spec["emptyLine"] as? NSNumber,

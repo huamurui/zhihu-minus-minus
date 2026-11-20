@@ -53,7 +53,7 @@ import { ZhihuContent } from '@/features/rich-content';
 - 链接的 `kind` 保留普通链接、@ 提及和 # 话题语义；图片的 `role` 区分正文图与日报作者头像，可选 `layout` 保留结构化正文的 normal/small 布局。
 - `unsupported` 保留来源类型和纯文本 fallback，便于后续规范化测试识别遗漏；不把任意字符串并入 `type` 联合。
 - 脚注定义只存于 `document.footnotes`，行内 `footnoteReference.definitionId` 指向定义的节点 ID。展示编号 `label` 与节点 ID 分开，允许多次引用同一定义。
-- 回答划线在已知评论数大于零时绘制与回答工具栏同形的空心 SVG 评论图标。底栏和正文的线宽分别由 `src/constants/commentBubble.ts` 中的 `toolbarWeight` 和 `markerWeight` 控制。三端正文共用 `segmentCommentIcon.ts`，其中 `size` 控制尺寸，`insetX` 控制从末字边缘向内的距离，`offsetY` 控制图框上边缘相对划线的垂直偏移。图标不占正文字符或选区偏移。“点击划线查看评论”控制单击段落菜单，长按选字和正文链接独立工作。
+- 回答划线在已知评论数大于零时绘制与应用内其他评论入口同形的空心 SVG 图标。气泡与尖角共用一条等宽的圆角描边。常规图标和正文标记的线宽分别由 `src/constants/commentBubble.ts` 中的 `toolbarWeight` 和 `markerWeight` 控制。三端正文共用 `segmentCommentIcon.ts`，其中 `size` 控制尺寸，`insetX` 控制从末字边缘向内的距离，`offsetY` 控制图框上边缘相对划线的垂直偏移。图标不占正文字符或选区偏移。“点击划线查看评论”控制单击段落菜单，长按选字和正文链接独立工作。
 - 回答的选区操作显示在当前阅读窗格的浮层。点“评论”会保留选中的原文和首尾段落的 UTF-16 偏移，在编辑器点发布后写入该选区的讨论。切换回答或离开页面时会收起操作。
 - 知乎脚注的 `data-text` 可为空。原生和 WebView 优先显示脚注说明，缺少说明时显示可打开的安全来源 URL。导出时链接及其 URL 文字共用导出过滤规则。脱敏案例 `url-only-footnotes-001` 保留了六条引用的属性结构，正文与来源地址均已替换。
 

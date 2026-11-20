@@ -6,10 +6,12 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { FeedItem } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
+import { CommentBubbleIcon } from '@/components/CommentBubbleIcon';
 import { GlassNavigationButton } from '@/components/navigation/GlassNavigationButton';
 import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
+import { VoteTriangle } from '@/components/VoteTriangle';
 import Colors from '@/constants/Colors';
 import { ZhihuContent } from '@/features/rich-content';
 import { contrastingText } from '@/utils/colorContrast';
@@ -232,8 +234,9 @@ export default function GuestDetailScreen() {
                   className="flex-row items-center px-3 py-1.5 rounded-full"
                   style={{ backgroundColor: `${tintColor}08` }}
                 >
-                  <Ionicons
-                    name="caret-up-circle-outline"
+                  <VoteTriangle
+                    active={false}
+                    direction="up"
                     size={15}
                     color={tintColor}
                   />
@@ -253,11 +256,7 @@ export default function GuestDetailScreen() {
                     className="flex-row items-center px-3 py-1.5 rounded-full"
                     style={{ backgroundColor: `${secondaryTextColor}08` }}
                   >
-                    <Ionicons
-                      name="chatbubble-ellipses-outline"
-                      size={14}
-                      color={secondaryTextColor}
-                    />
+                    <CommentBubbleIcon size={14} color={secondaryTextColor} />
                     <Text
                       className="text-xs font-semibold ml-1"
                       style={{ color: secondaryTextColor }}
@@ -320,15 +319,10 @@ export default function GuestDetailScreen() {
                     backgroundColor: `${tintColor}05`,
                   }}
                 >
-                  <Ionicons
-                    name="chatbubble-ellipses-outline"
-                    size={16}
-                    color={tintColor}
-                    style={{ marginRight: 6 }}
-                  />
+                  <CommentBubbleIcon size={16} color={tintColor} />
                   <Text
                     className="font-bold text-[14px]"
-                    style={{ color: tintColor }}
+                    style={{ color: tintColor, marginLeft: 6 }}
                   >
                     查看全部 {item.commentCount} 条评论
                   </Text>

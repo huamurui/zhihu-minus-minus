@@ -824,7 +824,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
                   },
                   {
                     key: 'comments',
-                    icon: 'chatbubble-outline' as const,
+                    icon: 'comment-bubble' as const,
                     label: `${activeSegment.comment_count || 0} 评论`,
                     disabled: !activeSegment.seg_ids,
                     onPress: () => {
@@ -862,7 +862,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
                   },
                   {
                     key: 'discussion',
-                    icon: 'chatbubbles-outline' as const,
+                    icon: 'comment-bubble' as const,
                     label: '查看详细讨论',
                     onPress: () => {
                       const { text, startIndex, endIndex } = activeSegment;

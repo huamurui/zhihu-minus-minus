@@ -608,6 +608,28 @@ test('exports URL-only citations and redacts both the link and its generated lab
   }
 });
 
+test('redacts URL labels split across formatting while keeping descriptive link styling', () => {
+  const { document } = normalizeZhihuDocument(
+    '<p><a href="https://example.org/source#export-demo"><strong>https://example.org/</strong><em>source#export-demo</em></a>' +
+      '<a href="https://example.org/private?token=synthetic"><code>https://example.org/private?token=synthetic</code></a>' +
+      '<a href="https://example.org/source#export-demo"><strong>资料说明</strong></a></p>',
+    { documentId: 'styled-link-labels' },
+  );
+  const input = { ...source([]), document };
+  const html = main(serializeExportHtml(input, options));
+  const markdown = serializeExportMarkdown(input, options);
+  for (const output of [html, markdown]) {
+    expect(output).not.toMatch(/export-demo|synthetic/);
+    expect(output).toContain('来源链接未导出');
+  }
+  expect(html).toContain('>https://example.org/source</a>');
+  expect(html).toContain('<strong>资料说明</strong>');
+  expect(markdown).toContain(
+    '[https://example\\.org/source](<https://example.org/source>)',
+  );
+  expect(markdown).toContain('[**资料说明**](<https://example.org/source>)');
+});
+
 test('footnotes referenced only inside an HTML table remain visible in Markdown', () => {
   const complex = table(true);
   const noteReference: ZhihuBlock = {

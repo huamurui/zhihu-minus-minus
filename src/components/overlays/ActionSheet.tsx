@@ -1,6 +1,6 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useMemo, useRef } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
+import { ActionIcon, type ActionIconName } from '@/components/ActionIcon';
 import { BouncyButton } from '@/components/BouncyButton';
 import { CollectionStarIcon } from '@/components/CollectionStarIcon';
 import { Text, useThemeColor, View } from '@/components/Themed';
@@ -12,7 +12,7 @@ import { BottomSheet, type BottomSheetHandle } from './BottomSheet';
 export interface ActionSheetOption {
   key: string;
   label: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: ActionIconName;
   iconFamily?: 'ionicons' | 'collection-star';
   iconSolid?: boolean;
   onPress: () => unknown;
@@ -142,7 +142,7 @@ export function ActionSheet({
                         filled={option.iconSolid === true}
                       />
                     ) : (
-                      <Ionicons
+                      <ActionIcon
                         name={option.icon}
                         size={21}
                         color={iconColor}

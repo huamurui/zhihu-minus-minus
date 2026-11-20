@@ -435,8 +435,7 @@ export default React.memo(function ZhihuDOMContent({
           text-decoration-color: ${primaryColor}40;
           cursor: ${segmentTapEnabled ? 'pointer' : 'auto'};
         }
-        .segment-comments::after {
-          content: '';
+        .segment-comment-icon {
           display: inline-block;
           width: ${segmentCommentIcon.size}px;
           height: ${segmentCommentIcon.size}px;
@@ -480,6 +479,16 @@ export default React.memo(function ZhihuDOMContent({
 
         const container = document.getElementById('content');
         container.innerHTML = htmlContent;
+        // Give the icon its own hit target without adding characters to the
+        // source range. Text inside an enclosing link keeps its normal action.
+        const commentMarkers = new WeakMap();
+        container.querySelectorAll('.segment-comments').forEach(function(owner) {
+          const icon = document.createElement('span');
+          icon.className = 'segment-comment-icon';
+          icon.setAttribute('aria-hidden', 'true');
+          owner.appendChild(icon);
+          commentMarkers.set(icon, owner);
+        });
 
         // Index the source before references, link cards and KaTeX rewrite the DOM.
         // A null entry is a boundary that a server-addressable selection cannot cross.
@@ -829,6 +838,16 @@ export default React.memo(function ZhihuDOMContent({
             return;
           }
           let target = e.target;
+          const marker = commentMarkers.get(target);
+          if (marker) {
+            e.preventDefault();
+            const pid = marker.getAttribute('data-pid');
+            const nodeId = marker.getAttribute('data-segment-node-id');
+            if (${segmentTapEnabled} && pid && nodeId) {
+              postBridgeMessage({ type: 'segment', pid, nodeId });
+            }
+            return;
+          }
           let segmentTarget = null;
           const videoTarget = findVideoTarget(target);
           if (videoTarget) {

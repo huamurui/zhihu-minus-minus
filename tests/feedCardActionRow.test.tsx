@@ -259,7 +259,7 @@ test('non-engagement cards retain their more action without vote or comment cont
     />,
   );
   expect(host.queryByTestId('vote-icon')).toBeNull();
-  expect(host.queryByTestId('icon:chatbubble-outline')).toBeNull();
+  expect(host.queryByRole('button', { name: '评论' })).toBeNull();
   expect(mockCollectionButton).not.toHaveBeenCalled();
   expect(host.getAllByRole('button')).toHaveLength(1);
   await fireEvent.press(host.getByRole('button', { name: '更多操作' }));

@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { FlashList } from '@shopify/flash-list';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { GlassContainer } from 'expo-glass-effect';
@@ -28,6 +27,7 @@ import {
 } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
 import { CommentActionSheet } from '@/components/CommentActionSheet';
+import { CommentBubbleIcon } from '@/components/CommentBubbleIcon';
 import {
   CommentComposer,
   type CommentDraft,
@@ -467,11 +467,7 @@ export default function CommentScreen() {
                 }}
               >
                 <View className="flex-row items-center mb-1 bg-transparent">
-                  <Ionicons
-                    name="chatbox-ellipses-outline"
-                    size={14}
-                    color={tintColor}
-                  />
+                  <CommentBubbleIcon size={14} color={tintColor} />
                   <Text
                     style={{
                       color: tintColor,

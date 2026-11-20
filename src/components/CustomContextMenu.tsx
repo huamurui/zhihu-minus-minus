@@ -1,6 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { BlurView } from 'expo-blur';
-import type { ComponentProps } from 'react';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   type LayoutRectangle,
@@ -16,6 +14,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import { ActionIcon, type ActionIconName } from '@/components/ActionIcon';
 import { BouncyButton } from '@/components/BouncyButton';
 import { CollectionStarIcon } from '@/components/CollectionStarIcon';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -45,7 +44,7 @@ export const ANIMATION_CONFIG = {
 export interface MenuOption {
   key: string;
   title: string;
-  icon: string;
+  icon: ActionIconName;
   iconFamily?: 'ionicons' | 'collection-star';
   iconSolid?: boolean;
   isDestructive?: boolean;
@@ -348,10 +347,8 @@ export function CustomContextMenu({
                       filled={option.iconSolid === true}
                     />
                   ) : (
-                    <Ionicons
-                      name={
-                        option.icon as ComponentProps<typeof Ionicons>['name']
-                      }
+                    <ActionIcon
+                      name={option.icon}
                       size={20}
                       color={
                         option.isDestructive

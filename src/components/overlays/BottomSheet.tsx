@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type React from 'react';
 import {
+  Fragment,
   forwardRef,
   useCallback,
   useEffect,
@@ -13,6 +14,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   type StyleProp,
   StyleSheet,
   useWindowDimensions,
@@ -50,11 +52,21 @@ interface BottomSheetProps {
   contentStyle?: StyleProp<ViewStyle>;
   dismissible?: boolean;
   keyboardAvoiding?: boolean;
+  /** Scroll the header and body together when the keyboard leaves little room. */
+  scrollable?: boolean;
   showHandle?: boolean;
 }
 
 const ENTER_DURATION = 220;
 const EXIT_DURATION = 180;
+
+function ScrollableContent({ children }: React.PropsWithChildren) {
+  return (
+    <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
+      {children}
+    </ScrollView>
+  );
+}
 
 export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
   function BottomSheet(
@@ -71,6 +83,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       contentStyle,
       dismissible = true,
       keyboardAvoiding = false,
+      scrollable = false,
       showHandle = true,
     },
     ref,
@@ -192,6 +205,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
     const handleColor =
       colorScheme === 'dark' ? Colors.dark.border : Colors.light.controlBorder;
     const hasHeader = title || subtitle || headerLeft || headerRight;
+    const Content = scrollable ? ScrollableContent : Fragment;
 
     return (
       <PaneModal
@@ -253,58 +267,60 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
               </GestureDetector>
             )}
 
-            {hasHeader && (
-              <View style={styles.header}>
-                {headerLeft ? (
-                  <View style={styles.headerSide}>{headerLeft}</View>
-                ) : (
-                  <View style={styles.headerSide} />
-                )}
-                <View style={styles.headerCopy}>
-                  {title ? <Text style={styles.title}>{title}</Text> : null}
-                  {subtitle ? (
-                    <Text
-                      type="secondary"
-                      style={styles.subtitle}
-                      numberOfLines={2}
-                    >
-                      {subtitle}
-                    </Text>
-                  ) : null}
+            <Content>
+              {hasHeader && (
+                <View style={styles.header}>
+                  {headerLeft ? (
+                    <View style={styles.headerSide}>{headerLeft}</View>
+                  ) : (
+                    <View style={styles.headerSide} />
+                  )}
+                  <View style={styles.headerCopy}>
+                    {title ? <Text style={styles.title}>{title}</Text> : null}
+                    {subtitle ? (
+                      <Text
+                        type="secondary"
+                        style={styles.subtitle}
+                        numberOfLines={2}
+                      >
+                        {subtitle}
+                      </Text>
+                    ) : null}
+                  </View>
+                  {headerRight ? (
+                    <View style={[styles.headerSide, styles.headerRight]}>
+                      {headerRight}
+                    </View>
+                  ) : dismissible ? (
+                    <View style={[styles.headerSide, styles.headerRight]}>
+                      <BouncyButton
+                        accessibilityRole="button"
+                        accessibilityLabel="关闭"
+                        hitSlop={8}
+                        onPress={requestClose}
+                        style={[
+                          styles.closeButton,
+                          {
+                            backgroundColor:
+                              Colors[colorScheme].backgroundTertiary,
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name="close"
+                          size={18}
+                          color={Colors[colorScheme].textSecondary}
+                        />
+                      </BouncyButton>
+                    </View>
+                  ) : (
+                    <View style={styles.headerSide} />
+                  )}
                 </View>
-                {headerRight ? (
-                  <View style={[styles.headerSide, styles.headerRight]}>
-                    {headerRight}
-                  </View>
-                ) : dismissible ? (
-                  <View style={[styles.headerSide, styles.headerRight]}>
-                    <BouncyButton
-                      accessibilityRole="button"
-                      accessibilityLabel="关闭"
-                      hitSlop={8}
-                      onPress={requestClose}
-                      style={[
-                        styles.closeButton,
-                        {
-                          backgroundColor:
-                            Colors[colorScheme].backgroundTertiary,
-                        },
-                      ]}
-                    >
-                      <Ionicons
-                        name="close"
-                        size={18}
-                        color={Colors[colorScheme].textSecondary}
-                      />
-                    </BouncyButton>
-                  </View>
-                ) : (
-                  <View style={styles.headerSide} />
-                )}
-              </View>
-            )}
+              )}
 
-            {children}
+              {children}
+            </Content>
           </Reanimated.View>
         </KeyboardAvoidingView>
       </PaneModal>
@@ -313,6 +329,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
 );
 
 const styles = StyleSheet.create({
+  scroll: { flexGrow: 0, flexShrink: 1 },
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',

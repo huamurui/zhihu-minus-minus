@@ -79,9 +79,13 @@ function formula(
     : '<span class="missing-image">[公式不可用]</span>';
 }
 
-function link(url: string, label: string): string {
+function link(
+  url: string,
+  label: string,
+  runs?: readonly ZhihuInlineRun[],
+): string {
   const safe = getSafeExportUrl(url);
-  const text = exportLinkLabel(url, safe, label, escapeText);
+  const text = exportLinkLabel(url, safe, label, escapeText, runs);
   return safe
     ? `<a href="${escapeText(safe)}" rel="noreferrer noopener">${text}</a>`
     : text;
@@ -117,7 +121,7 @@ function inline(
         case 'inlineImage':
           return image(run.resource, run.alt ?? '', context, 'inline');
         case 'link':
-          return link(run.url, inline(run.children, context));
+          return link(run.url, inline(run.children, context), run.children);
         case 'inlineFormula':
           return `<span class="inline-formula">${formula(run.formula, false, context)}</span>`;
         case 'segment':

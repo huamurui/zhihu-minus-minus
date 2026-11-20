@@ -2,6 +2,7 @@ import type {
   ZhihuDocument,
   ZhihuFootnoteDefinition,
   ZhihuImageResource,
+  ZhihuInlineRun,
 } from '@/features/rich-content';
 import { getSafeExportImageUrl, getSafePreparedAsset } from './safeUrl';
 import type { ExportRenderOptions } from './types';
@@ -60,16 +61,30 @@ export function escapeExportMarkdown(value: string): string {
   return value.replace(/([\\`*_{}[\]()<>#+.!|~$-])/g, '\\$1');
 }
 
-/** URL-only citations must redact their visible label along with the href. */
+function plainLinkLabel(runs: readonly ZhihuInlineRun[]): string {
+  return runs
+    .map((run) => {
+      if ('children' in run) return plainLinkLabel(run.children);
+      if ('text' in run) return run.text;
+      if (run.type === 'unsupported') return run.fallbackText;
+      return '\uFFFC'; // A reference, break or attachment is part of the label too.
+    })
+    .join('');
+}
+
+/** Compare source text before HTML/Markdown styling or escaping can obscure a URL. */
 export function exportLinkLabel(
   url: string,
   safeUrl: string | undefined,
   label: string,
   escapeText: (text: string) => string,
+  runs?: readonly ZhihuInlineRun[],
 ): string {
-  return safeUrl !== url && label === escapeText(url)
-    ? escapeText(safeUrl ?? '来源链接未导出')
-    : label;
+  if (safeUrl === url) return label;
+  const urlOnly = runs
+    ? plainLinkLabel(runs).trim() === url
+    : label.trim() === escapeText(url);
+  return urlOnly ? escapeText(safeUrl ?? '来源链接未导出') : label;
 }
 
 export function resolveExportImage(

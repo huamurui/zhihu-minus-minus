@@ -531,7 +531,7 @@ function selectionRuntime(
     lastTimer();
     return JSON.parse(postMessage.mock.calls.at(-1)?.[0] as string).info;
   }
-  return { document, select, close: () => window.close() };
+  return { document, select, postMessage, close: () => window.close() };
 }
 
 test('maps styled and element boundaries to the original UTF-16 text within and across paragraphs', async () => {
@@ -810,6 +810,44 @@ test('formula scripts and fonts are inline with no CDN dependency', async () => 
     if (isTag(script)) expect(script.attribs.src).toBeUndefined();
   expect(html).toContain('data:font/woff2;base64,');
 });
+
+test.each([true, false])(
+  'keeps a comment icon inside a link independently tappable (segment taps %s)',
+  async (segmentTapEnabled) => {
+    const { html } = await renderPage({
+      htmlContent:
+        '<p data-pid="p"><a href="https://example.com/"><span class="segment-interactable segment-comments" data-pid="p" data-segment-node-id="n">链接文字</span></a></p>',
+      segmentTapEnabled,
+    });
+    const { document, select, postMessage, close } = selectionRuntime(html);
+    try {
+      const span = document.querySelector<HTMLElement>('.segment-comments');
+      const icon = span?.querySelector<HTMLElement>('.segment-comment-icon');
+      if (!span?.firstChild || !icon) throw new Error('Expected linked marker');
+      expect(span.textContent).toBe('链接文字');
+      expect(
+        select(span.firstChild, 0, span, span.childNodes.length),
+      ).toMatchObject({
+        text: '链接文字',
+        startOffset: 0,
+        endOffset: 4,
+      });
+      postMessage.mockClear();
+      icon.click();
+      expect(postMessage.mock.calls).toEqual(
+        segmentTapEnabled
+          ? [[bridgeMessage(html, { type: 'segment', pid: 'p', nodeId: 'n' })]]
+          : [],
+      );
+      span.click();
+      expect(postMessage).toHaveBeenLastCalledWith(
+        bridgeMessage(html, { type: 'link', href: 'https://example.com/' }),
+      );
+    } finally {
+      close();
+    }
+  },
+);
 
 test.each([true, false])(
   'honors segment taps = %s and preserves links within a marked passage',
