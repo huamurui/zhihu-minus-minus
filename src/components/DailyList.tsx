@@ -273,6 +273,7 @@ export const DailyList = React.forwardRef<
         showsVerticalScrollIndicator={false}
         bounces
         alwaysBounceVertical
+        nestedScrollEnabled
         overScrollMode="never"
         data={flattenedData}
         keyExtractor={(item) =>

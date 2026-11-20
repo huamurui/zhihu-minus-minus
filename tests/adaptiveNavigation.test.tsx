@@ -167,7 +167,7 @@ async function setTwoPanes(enabled: boolean) {
   await act(() =>
     useSettingsStore
       .getState()
-      .updateSettings({ enableLargeScreenLayout: enabled }),
+      .updateSettings({ largeScreenLayoutMode: enabled ? 'dual' : 'single' }),
   );
 }
 
@@ -234,7 +234,7 @@ beforeEach(async () => {
   for (const key of Object.keys(cleanups)) delete cleanups[key];
   finishRefresh = undefined;
   useSettingsStore.setState({
-    enableLargeScreenLayout: true,
+    largeScreenLayoutMode: 'dual',
     largeScreenListRatio: 1 / 3,
   });
   await resize(1200, 800);
@@ -598,14 +598,14 @@ test('starting with panes disabled, resizing and changing preferences retain the
   await act(() =>
     useSettingsStore
       .getState()
-      .updateSettings({ enableLargeScreenLayout: false }),
+      .updateSettings({ largeScreenLayoutMode: 'single' }),
   );
   expect(screen.getByTestId('draft-answer:a').props.value).toBe('saved');
   expect(appRoutes(result).map((route) => route.key)).toEqual(keys);
   await act(() =>
     useSettingsStore
       .getState()
-      .updateSettings({ enableLargeScreenLayout: true }),
+      .updateSettings({ largeScreenLayoutMode: 'dual' }),
   );
   expect(screen.getByTestId('draft-answer:a').props.value).toBe('saved');
   await testRouter.back();
@@ -683,7 +683,7 @@ test.each([
   [800, 1200],
   [1200, 800],
 ])(
-  'only the switch controls panes at %s by %s without remounting pages',
+  'forced layout choices apply at %s by %s without remounting pages',
   async (width, height) => {
     await resize(width, height);
     const result = await open();
@@ -723,6 +723,24 @@ test.each([
     await testRouter.back('/');
   },
 );
+
+test('automatic layout follows available window width without resetting the selection or drafts', async () => {
+  useSettingsStore.setState({ largeScreenLayoutMode: 'auto' });
+  await resize(1200, 800);
+  const result = await open();
+  expect(screen.getByTestId('adaptive-empty-detail')).toBeVisible();
+  await fireEvent.press(screen.getByText('open-a-home:root'));
+  await fireEvent.changeText(screen.getByTestId('draft-answer:a'), 'saved');
+  const keys = appRoutes(result).map((route) => route.key);
+
+  await resize(600, 800);
+  expect(screen.queryByTestId('adaptive-divider')).toBeNull();
+  expect(screen.getByTestId('draft-answer:a').props.value).toBe('saved');
+  await resize(1200, 800);
+  expect(screen.getByTestId('adaptive-divider')).toBeVisible();
+  expect(screen.getByTestId('draft-answer:a').props.value).toBe('saved');
+  expect(appRoutes(result).map((route) => route.key)).toEqual(keys);
+});
 
 test.each([320, 390, 700, 1200])(
   'both panes remain within width %s at every divider limit',

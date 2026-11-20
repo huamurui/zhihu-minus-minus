@@ -1,25 +1,29 @@
-package com.zhihuminus.pullrefresh
+package expo.modules.pullrefresh
 
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Build
 import android.os.VibrationEffect
+import android.os.VibrationEffect.Composition.PRIMITIVE_CLICK
 import android.os.Vibrator
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.animation.DecelerateInterpolator
+import android.widget.ScrollView
 import androidx.core.view.NestedScrollingParent3
 import androidx.core.view.NestedScrollingParentHelper
 import androidx.core.view.ViewCompat
+import androidx.core.widget.NestedScrollView
 import expo.modules.kotlin.AppContext
 import expo.modules.kotlin.records.Field
 import expo.modules.kotlin.records.Record
 import expo.modules.kotlin.viewevent.EventDispatcher
 import expo.modules.kotlin.views.ExpoView
 import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 
@@ -50,7 +54,11 @@ class PullRefreshView(
   private var pullOffsetPx = 0f
   private var downX = 0f
   private var downY = 0f
-  private var interceptingTouch = false
+  private enum class Gesture { IDLE, TRACKING, DIRECT, NESTED }
+
+  private var gesture = Gesture.IDLE
+  private var startedAtTop = false
+  private var fingerDistance = 0f
   private var pullEnabled = true
   private var hapticsEnabled = true
   private var refreshing = false
@@ -65,9 +73,8 @@ class PullRefreshView(
 
   fun setPullEnabled(enabled: Boolean) {
     pullEnabled = enabled
-    if (!enabled && !refreshing && pullOffsetPx > 0f) {
-      interceptingTouch = false
-      parent?.requestDisallowInterceptTouchEvent(false)
+    if (!enabled) finishGesture(cancelled = true)
+    if (!enabled && !refreshing && refreshLatched) {
       refreshLatched = false
       animatePullTo(0f)
     }
@@ -82,12 +89,11 @@ class PullRefreshView(
 
     refreshing = value
     if (value) {
+      finishGesture(cancelled = true)
       refreshLatched = true
-      thresholdHapticArmed = false
       animatePullTo(holdDistancePx)
     } else {
       refreshLatched = false
-      thresholdHapticArmed = true
       animatePullTo(0f)
     }
   }
@@ -107,77 +113,74 @@ class PullRefreshView(
     constrainDistances()
   }
 
-  override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
-    if (!canStartPull()) return false
-
+  // Children may disallow interception or stop a nested scroll on CANCEL as well as UP.
+  // Observe the real end of the touch stream and settle exactly once for either drag path.
+  override fun dispatchTouchEvent(event: MotionEvent): Boolean {
     when (event.actionMasked) {
       MotionEvent.ACTION_DOWN -> {
-        settleAnimator?.cancel()
         downX = event.x
         downY = event.y
-        interceptingTouch = false
+        gesture = if (canStartPull()) Gesture.TRACKING else Gesture.IDLE
+        startedAtTop = gesture == Gesture.TRACKING && !contentCanScrollUp()
       }
-
-      MotionEvent.ACTION_MOVE -> {
-        val horizontalDistance = abs(event.x - downX)
-        val verticalDistance = event.y - downY
-        if (
-          verticalDistance > touchSlop &&
-          verticalDistance > horizontalDistance &&
-          !contentCanScrollUp()
-        ) {
-          interceptingTouch = true
-          parent?.requestDisallowInterceptTouchEvent(true)
-          return true
-        }
-      }
-
-      MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-        interceptingTouch = false
+      MotionEvent.ACTION_MOVE -> if (gesture == Gesture.TRACKING) {
+        val dx = abs(event.x - downX)
+        if (dx > touchSlop && dx > abs(event.y - downY)) gesture = Gesture.IDLE
       }
     }
-
-    return false
+    val handled = super.dispatchTouchEvent(event)
+    when (event.actionMasked) {
+      MotionEvent.ACTION_UP -> finishGesture(cancelled = false)
+      MotionEvent.ACTION_CANCEL -> finishGesture(cancelled = true)
+    }
+    return handled
   }
 
+  private fun finishGesture(cancelled: Boolean) {
+    val wasPulling = gesture == Gesture.DIRECT || gesture == Gesture.NESTED
+    gesture = Gesture.IDLE
+    if (!wasPulling) return
+    parent?.requestDisallowInterceptTouchEvent(false)
+    if (refreshing || refreshLatched) return
+    if (cancelled) animatePullTo(0f) else settleAfterRelease()
+  }
+
+  private fun startDirectPull(event: MotionEvent): Boolean {
+    val dy = event.y - downY
+    if (
+      gesture != Gesture.TRACKING || !startedAtTop || dy <= touchSlop ||
+      dy <= abs(event.x - downX) || contentCanScrollUp()
+    ) return false
+
+    beginPull(Gesture.DIRECT)
+    updatePullOffset(applyDragResistance(fingerDistance + dy), true)
+    return true
+  }
+
+  override fun onInterceptTouchEvent(event: MotionEvent): Boolean =
+    event.actionMasked == MotionEvent.ACTION_MOVE && startDirectPull(event)
+
   override fun onTouchEvent(event: MotionEvent): Boolean {
-    if (!pullEnabled || refreshing) return false
-
-    when (event.actionMasked) {
-      MotionEvent.ACTION_DOWN -> {
-        downX = event.x
-        downY = event.y
-        return true
-      }
-
-      MotionEvent.ACTION_MOVE -> {
-        if (!interceptingTouch) return false
-        val fingerDistance = max(0f, event.y - downY)
-        updatePullOffset(applyDragResistance(fingerDistance), true)
-        return true
-      }
-
-      MotionEvent.ACTION_UP -> {
-        if (interceptingTouch) {
-          interceptingTouch = false
-          settleAfterRelease()
-          parent?.requestDisallowInterceptTouchEvent(false)
-          return true
-        }
-      }
-
-      MotionEvent.ACTION_CANCEL -> {
-        if (interceptingTouch) {
-          interceptingTouch = false
-          refreshLatched = false
-          animatePullTo(0f)
-          parent?.requestDisallowInterceptTouchEvent(false)
-          return true
-        }
+    if (gesture == Gesture.IDLE) return false
+    if (event.actionMasked == MotionEvent.ACTION_MOVE) {
+      if (gesture == Gesture.DIRECT) {
+        val distance = max(0f, fingerDistance + event.y - downY)
+        updatePullOffset(applyDragResistance(distance), true)
+      } else {
+        // No child accepted DOWN (e.g. a short list). This view owns MOVE directly.
+        startDirectPull(event)
       }
     }
+    return true
+  }
 
-    return super.onTouchEvent(event)
+  private fun beginPull(owner: Gesture) {
+    settleAnimator?.cancel()
+    gesture = owner
+    // A new drag can catch an unfinished return animation at its displayed position.
+    fingerDistance = min(pullOffsetPx, thresholdPx) / BASE_DRAG_RESISTANCE +
+      max(0f, pullOffsetPx - thresholdPx) / EXTRA_DRAG_RESISTANCE
+    parent?.requestDisallowInterceptTouchEvent(true)
   }
 
   override fun onStartNestedScroll(
@@ -186,8 +189,7 @@ class PullRefreshView(
     axes: Int,
     type: Int
   ): Boolean =
-    pullEnabled &&
-      !refreshing &&
+    gesture == Gesture.TRACKING &&
       type == ViewCompat.TYPE_TOUCH &&
       (axes and ViewCompat.SCROLL_AXIS_VERTICAL) != 0
 
@@ -202,14 +204,6 @@ class PullRefreshView(
 
   override fun onStopNestedScroll(target: View, type: Int) {
     nestedScrollingHelper.onStopNestedScroll(target, type)
-    if (
-      type == ViewCompat.TYPE_TOUCH &&
-      !interceptingTouch &&
-      !refreshing &&
-      pullOffsetPx > 0f
-    ) {
-      settleAfterRelease()
-    }
   }
 
   override fun onNestedPreScroll(
@@ -219,11 +213,12 @@ class PullRefreshView(
     consumed: IntArray,
     type: Int
   ) {
-    if (dy <= 0 || pullOffsetPx <= 0f || refreshing) return
-
-    val consumedY = min(dy.toFloat(), pullOffsetPx)
-    updatePullOffset(pullOffsetPx - consumedY, type == ViewCompat.TYPE_TOUCH)
-    consumed[1] += consumedY.toInt()
+    if (type != ViewCompat.TYPE_TOUCH || gesture != Gesture.NESTED || dy <= 0) return
+    val consumedY = min(dy.toFloat(), fingerDistance)
+    if (consumedY <= 0f) return
+    fingerDistance -= consumedY
+    updatePullOffset(applyDragResistance(fingerDistance), true)
+    consumed[1] += ceil(consumedY).toInt()
   }
 
   override fun onNestedScroll(
@@ -258,19 +253,13 @@ class PullRefreshView(
     if (
       dyUnconsumed >= 0 ||
       type != ViewCompat.TYPE_TOUCH ||
-      !pullEnabled ||
-      refreshing ||
+      (gesture != Gesture.TRACKING && gesture != Gesture.NESTED) ||
       target.canScrollVertically(-1)
-    ) {
-      return
-    }
+    ) return
 
-    val dragDistance = -dyUnconsumed.toFloat()
-    val resistance = resistanceForOffset(pullOffsetPx)
-    updatePullOffset(
-      min(maxPullDistancePx, pullOffsetPx + dragDistance * resistance),
-      type == ViewCompat.TYPE_TOUCH
-    )
+    if (gesture == Gesture.TRACKING) beginPull(Gesture.NESTED)
+    fingerDistance -= dyUnconsumed.toFloat()
+    updatePullOffset(applyDragResistance(fingerDistance), true)
     consumed[1] += dyUnconsumed
   }
 
@@ -308,27 +297,33 @@ class PullRefreshView(
 
   override fun getNestedScrollAxes(): Int = nestedScrollingHelper.nestedScrollAxes
 
+  override fun onDetachedFromWindow() {
+    finishGesture(cancelled = true)
+    super.onDetachedFromWindow()
+  }
+
   fun dispose() {
     settleAnimator?.cancel()
     settleAnimator = null
   }
 
   private fun canStartPull(): Boolean =
-    pullEnabled && !refreshing && childCount > 0
+    pullEnabled && !refreshing && !refreshLatched && childCount > 0
 
-  private fun contentCanScrollUp(): Boolean {
-    val content = getChildAt(0) ?: return false
-    return canScrollUp(content)
-  }
+  private fun contentCanScrollUp(): Boolean =
+    findVerticalScroller(getChildAt(0))?.canScrollVertically(-1) == true
 
-  private fun canScrollUp(view: View): Boolean {
-    if (view.canScrollVertically(-1)) return true
-    if (view !is ViewGroup) return false
-
-    for (index in 0 until view.childCount) {
-      if (canScrollUp(view.getChildAt(index))) return true
+  private fun findVerticalScroller(view: View?): View? {
+    if (view == null || view.visibility != View.VISIBLE) return null
+    // The outer list owns the top edge; an embedded scrolled card must not block it.
+    if (view is ScrollView || view is NestedScrollView ||
+      view.canScrollVertically(-1) || view.canScrollVertically(1)) return view
+    if (view is ViewGroup) {
+      for (index in 0 until view.childCount) {
+        findVerticalScroller(view.getChildAt(index))?.let { return it }
+      }
     }
-    return false
+    return null
   }
 
   private fun applyDragResistance(fingerDistance: Float): Float {
@@ -344,17 +339,10 @@ class PullRefreshView(
     )
   }
 
-  private fun resistanceForOffset(offset: Float): Float {
-    if (thresholdPx <= 0f) return BASE_DRAG_RESISTANCE
-    val progress = (offset / thresholdPx).coerceIn(0f, 1f)
-    return BASE_DRAG_RESISTANCE - progress * RESISTANCE_DROP
-  }
-
   private fun settleAfterRelease() {
     if (!pullEnabled || refreshing || refreshLatched) return
 
     if (pullOffsetPx >= thresholdPx) {
-      emitThresholdReachedIfNeeded()
       refreshLatched = true
       animatePullTo(holdDistancePx)
       onRefreshTriggered(Unit)
@@ -384,10 +372,14 @@ class PullRefreshView(
   private fun updatePullOffset(offset: Float, dragging: Boolean) {
     pullOffsetPx = offset.coerceIn(0f, maxPullDistancePx)
 
-    if (pullOffsetPx < thresholdPx * THRESHOLD_REARM_PROGRESS) {
+    if (pullOffsetPx >= thresholdPx && thresholdHapticArmed) {
+      thresholdHapticArmed = false
+      if (dragging && pullEnabled && hapticsEnabled && !refreshing && !refreshLatched) {
+        playThresholdHaptic()
+      }
+    } else if (pullOffsetPx < thresholdPx * THRESHOLD_REARM_PROGRESS) {
       thresholdHapticArmed = true
     }
-    emitThresholdReachedIfNeeded()
 
     getChildAt(0)?.translationY = pullOffsetPx
     onPull(
@@ -399,38 +391,17 @@ class PullRefreshView(
     )
   }
 
-  private fun emitThresholdReachedIfNeeded() {
-    if (
-      !refreshing &&
-      thresholdHapticArmed &&
-      pullOffsetPx >= thresholdPx
-    ) {
-      thresholdHapticArmed = false
-      if (hapticsEnabled) {
-        emitVibration(durationMs = 34L, amplitude = 55)
-      }
-    }
-  }
-
-  private fun emitVibration(durationMs: Long, amplitude: Int) {
-    // VibrationEffect 不接受 0ms；对非振幅控制设备来说，0ms 就代表不发这一拍。
-    if (durationMs <= 0L) return
-
-    val activeVibrator = vibrator ?: return
-    if (!activeVibrator.hasVibrator()) return
-
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      val effectiveAmplitude = if (activeVibrator.hasAmplitudeControl()) {
-        amplitude.coerceIn(1, 255)
-      } else {
-        VibrationEffect.DEFAULT_AMPLITUDE
-      }
-      activeVibrator.vibrate(
-        VibrationEffect.createOneShot(durationMs, effectiveAmplitude)
-      )
+  private fun playThresholdHaptic() {
+    val motor = vibrator ?: return
+    if (!motor.hasVibrator()) return
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && motor.areAllPrimitivesSupported(PRIMITIVE_CLICK)) {
+      motor.vibrate(VibrationEffect.startComposition().addPrimitive(PRIMITIVE_CLICK, 0.65f).compose())
+    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      val amplitude = if (motor.hasAmplitudeControl()) 152 else VibrationEffect.DEFAULT_AMPLITUDE
+      motor.vibrate(VibrationEffect.createOneShot(15L, amplitude))
     } else {
       @Suppress("DEPRECATION")
-      activeVibrator.vibrate(durationMs)
+      motor.vibrate(15L)
     }
   }
 
@@ -443,14 +414,13 @@ class PullRefreshView(
   private fun dpToPx(valueDp: Float): Float = valueDp * density
 
   private companion object {
+    const val THRESHOLD_REARM_PROGRESS = 0.985f
     const val DEFAULT_THRESHOLD_DP = 76f
     const val DEFAULT_HOLD_DISTANCE_DP = 68f
     const val DEFAULT_MAX_PULL_DISTANCE_DP = 128f
     const val BASE_DRAG_RESISTANCE = 0.5f
     const val EXTRA_DRAG_RESISTANCE = 0.28f
-    const val RESISTANCE_DROP = 0.16f
     const val RESET_DURATION_MS = 220L
     const val HOLD_DURATION_MS = 160L
-    const val THRESHOLD_REARM_PROGRESS = 0.99f
   }
 }

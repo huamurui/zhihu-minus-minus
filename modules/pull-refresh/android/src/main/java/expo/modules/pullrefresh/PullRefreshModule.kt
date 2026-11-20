@@ -1,11 +1,11 @@
-package com.zhihuminus.pullrefresh
+package expo.modules.pullrefresh
 
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
 class PullRefreshModule : Module() {
   override fun definition() = ModuleDefinition {
-    Name("ZhihuPullRefresh")
+    Name("PullRefresh")
 
     View(PullRefreshView::class) {
       Events("onPull", "onRefreshTriggered")

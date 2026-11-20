@@ -5,6 +5,7 @@ import {
   forwardRef,
   useCallback,
   useEffect,
+  useEffectEvent,
   useImperativeHandle,
   useMemo,
   useRef,
@@ -12,6 +13,7 @@ import {
 } from 'react';
 import {
   KeyboardAvoidingView,
+  type ModalProps,
   Platform,
   Pressable,
   ScrollView,
@@ -59,6 +61,12 @@ interface BottomSheetProps {
 
 const ENTER_DURATION = 220;
 const EXIT_DURATION = 180;
+// An iPhone native modal would otherwise rotate a landscape window to portrait.
+const sheetOrientations: ModalProps['supportedOrientations'] = [
+  'portrait',
+  'portrait-upside-down',
+  'landscape',
+];
 
 function ScrollableContent({ children }: React.PropsWithChildren) {
   return (
@@ -134,8 +142,8 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
 
     useImperativeHandle(ref, () => ({ close: requestClose }), [requestClose]);
 
-    useEffect(() => {
-      if (visible) {
+    const animateVisibilityChange = useEffectEvent((show: boolean) => {
+      if (show) {
         notifyOnDismiss.current = false;
         closing.current = false;
         mountedRef.current = true;
@@ -151,7 +159,13 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       } else if (mountedRef.current) {
         animateClosed(false);
       }
-    }, [animateClosed, backdropOpacity, translateY, visible, windowHeight]);
+    });
+
+    useEffect(() => {
+      // Sample the current window height for each transition. Resizing an open
+      // sheet must not restart its entrance or interrupt a pending dismissal.
+      animateVisibilityChange(visible);
+    }, [visible]);
 
     const panGesture = useMemo(
       () =>
@@ -209,6 +223,8 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
 
     return (
       <PaneModal
+        windowOverlayInTwoPanes
+        supportedOrientations={sheetOrientations}
         visible={mounted}
         transparent
         animationType="none"
@@ -221,6 +237,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
         }}
       >
         <KeyboardAvoidingView
+          onAccessibilityEscape={requestClose}
           enabled={keyboardAvoiding}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.overlay}

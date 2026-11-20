@@ -15,7 +15,7 @@ import Svg, { Circle } from 'react-native-svg';
 import {
   type PullRefreshNativeEvent,
   PullRefreshNativeView,
-} from '@/modules/zhihu-pull-refresh';
+} from '@/modules/pull-refresh';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { PullToRefreshProps } from './PullToRefresh.types';
 
@@ -78,9 +78,7 @@ export function PullToRefresh({
     (event) => {
       'worklet';
       if (!event.eventName.endsWith('onPull')) return;
-
       pullDistance.value = event.offset;
-      // Android 仅保留原生阈值震动，拖动进度不触发震动。
     },
     ['onPull'],
   );

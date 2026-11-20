@@ -25,6 +25,7 @@ import { UpdateChecker } from '@/components/UpdateChecker';
 import { VerificationModal } from '@/components/VerificationModal';
 import { AdaptiveStack as Stack } from '@/features/adaptive-layout/AdaptiveStack';
 import { useQueryConnectivity } from '@/hooks/useQueryConnectivity';
+import { useInitialSettingsReady } from '@/store/useSettingsStore';
 import {
   useSyncThemeWithNativeWind,
   useThemeStore,
@@ -64,6 +65,7 @@ function RootLayout() {
   const router = useRouter();
   const isDark = useThemeStore((state) => state.isDark);
   const hasThemeHydrated = useThemeStore((state) => state.hasHydrated);
+  const settingsReady = useInitialSettingsReady();
   const appThemeColors = useRuntimeThemeColors();
   const currentTint = appThemeColors.primary;
   const baseNavigationTheme = isDark ? DarkTheme : DefaultTheme;
@@ -175,11 +177,13 @@ function RootLayout() {
 
   // 这里简单处理：如果以后需要加载字体，可以写在这里
   useEffect(() => {
-    if (hasThemeHydrated) {
+    if (hasThemeHydrated && settingsReady) {
       void SplashScreen.hideAsync();
     }
-  }, [hasThemeHydrated]);
-  // throw new Error('test')
+  }, [hasThemeHydrated, settingsReady]);
+  // The first screen must already know whether to request images and which
+  // navigator to mount, including when a cached feed is immediately available.
+  if (!settingsReady) return null;
   return (
     <GestureHandlerRootView
       // Native fade transitions make both screens translucent. Keep an opaque,

@@ -9,6 +9,12 @@ import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { type TabKey, useSettingsStore } from '@/store/useSettingsStore';
 
+const LAYOUT_OPTIONS = [
+  { value: 'auto', label: '自动' },
+  { value: 'single', label: '单栏' },
+  { value: 'dual', label: '双栏' },
+] as const;
+
 const ANDROID_FEEDBACK_OPTIONS = [
   { value: 'ripple', label: '水波纹' },
   { value: 'scale-opacity', label: '缩放' },
@@ -22,7 +28,7 @@ export function NavigationInteractionSettings() {
     androidFeedbackType,
     defaultTab,
     enableHapticFeedback,
-    enableLargeScreenLayout,
+    largeScreenLayoutMode,
     enablePressFeedback,
     localCityName,
     pressOpacity,
@@ -55,21 +61,23 @@ export function NavigationInteractionSettings() {
     <>
       <Section title="双栏布局（试验性）" colorScheme={colorScheme}>
         <SettingItem
-          label="启用双栏布局"
+          label="布局模式"
           icon="grid-outline"
           colorScheme={colorScheme}
+          stacked
         >
-          <ThemedSwitch
-            accessibilityLabel="启用双栏布局"
-            accessibilityHint="试验性功能，开启后并排显示列表与详情"
-            value={enableLargeScreenLayout}
-            onValueChange={(value) =>
-              updateSettings({ enableLargeScreenLayout: value })
+          <SettingOptions
+            accessibilityLabel="布局模式"
+            options={LAYOUT_OPTIONS}
+            value={largeScreenLayoutMode}
+            onChange={(value) =>
+              updateSettings({ largeScreenLayoutMode: value })
             }
+            fill
           />
         </SettingItem>
         <Text type="secondary" style={styles.feedbackHint}>
-          试验性功能，布局和手势仍在完善。开启后并排显示列表与详情，不限制屏幕大小或横竖屏。长按两栏之间再拖动可调整栏宽，按住时显示指示器。切换时保留返回记录。
+          自动模式在宽窗口并排显示列表与详情，窗口变窄时切回单栏。长按两栏之间再拖动可调整栏宽。切换时保留返回记录。
           {Platform.OS === 'ios'
             ? ' iOS 切换布局时页面会重新加载，滚动位置等临时状态可能重置。'
             : ' 切换时保留当前页面状态。'}

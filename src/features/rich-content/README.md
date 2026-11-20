@@ -110,6 +110,10 @@ Enriched组件、专属dialect normalizer、相关测试、依赖和native patch
 
 通常使用 `ZhihuContent` 让正文遵循持久偏好；需要固定后端时可显式传入 `renderer="native-v2"`。该外壳已经封装完整 WebView fallback及图片/链接交互；JSON 文档只在选择 WebView 或缺少原生模块时安全序列化，经过原有清洗及 DOM bridge。字面公式分隔符不被再次当作公式解析，选区只使用文字坐标稳定的真实段落。直接使用 `ZhihuNativeContent` 时必须提供 `renderFallback: () => React.ReactNode`；开发研究模式可提供独立 JSON 分段组件。首次native测量使用同排版骨架或宿主placeholder。模块本身无需反向依赖外壳。
 
+## 正文图片按需加载
+
+外观与阅读设置中的「无图模式」对应 `imageLoadingMode: 'manual'`。块级和行内配图只在读者点选后获取。原生后端在点选前保留布局尺寸，延后传递附件 URL 和启动长图裁剪。WebView 在将正文插入页面前移除待加载图片的网络地址。公式和头像仍可显示，视频及链接卡片省略装饰封面，保留播放和跳转操作。导出继续使用原始文档和资源清单。
+
 ## 正文视频播放
 
 HTML `video` / `source`、`video-box` 和想法 `video` 分段保留安全封面，中央显示“播放视频”，点击进入应用内原生播放器。封面优先读取 `poster`、视频卡片子图的懒加载地址或想法 `thumbnail`；没有封面时保留文字播放入口。`data-lens-id` 与想法 `video_id` / `video_bo_id` 保存为 `lensId`，优先于可能不同的 `zvideo` 页面 ID；知乎 `/video/<id>` 同样是 Lens ID，`/zvideo/<id>` 则先读取视频详情中的播放身份。播放器按 Lens API 返回的 playlist 选择实际资源。

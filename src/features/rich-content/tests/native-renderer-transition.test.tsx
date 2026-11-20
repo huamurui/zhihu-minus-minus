@@ -11,6 +11,7 @@ import type { RichTextFlow } from '../richText';
 
 let mockNativeAvailable = true;
 let mockTextColor = '#234567';
+let mockImageLoadingMode: 'auto' | 'manual' = 'auto';
 const mockNativeViews = new Map<string, RichTextNativeViewProps>();
 const mockNativeMounts = new Map<string, number>();
 const mockNativeRenders = new Map<string, number>();
@@ -49,7 +50,11 @@ jest.mock('../../../components/Themed', () => ({
   }),
 }));
 jest.mock('../../../store/useSettingsStore', () => ({
-  useSettingsStore: () => ({ fontSizeScale: 1, lineHeightScale: 1.5 }),
+  useSettingsStore: () => ({
+    fontSizeScale: 1,
+    lineHeightScale: 1.5,
+    imageLoadingMode: mockImageLoadingMode,
+  }),
 }));
 jest.mock('react-native-svg', () => ({
   SvgUri: (props: { uri: string; color?: string; fill?: string }) => {
@@ -106,6 +111,7 @@ async function bodyLayout(width = 320): Promise<void> {
 beforeEach(() => {
   jest.clearAllMocks();
   mockNativeAvailable = true;
+  mockImageLoadingMode = 'auto';
   mockTextColor = '#234567';
   mockNativeViews.clear();
   mockNativeMounts.clear();
@@ -633,6 +639,36 @@ describe('Native V2 renderer staging transitions', () => {
       expect(onLayoutReady).not.toHaveBeenCalled();
     },
   );
+
+  it('keeps the tapped image loaded and defers the next image when the tail mounts', async () => {
+    mockImageLoadingMode = 'manual';
+    const props = {
+      content: [
+        '<img src="https://example.com/first.jpg" alt="首图">',
+        '<hr>'.repeat(12),
+        '<img src="https://example.com/last.jpg" alt="尾图">',
+      ].join(''),
+      type: 'answer' as const,
+      objectId: 'manual-progressive-images',
+      progressive: true,
+      renderFallback: () => null,
+    };
+    const renderer = await render(
+      <ZhihuNativeContent {...props} pauseProgressiveTail />,
+    );
+    await containerLayout(320);
+    await bodyLayout();
+    await fireEvent.press(screen.getByLabelText('点击加载图片'));
+    expect(screen.getByLabelText('首图')).toBeVisible();
+    expect(screen.queryByLabelText('点击加载图片')).toBeNull();
+
+    await renderer.rerender(<ZhihuNativeContent {...props} />);
+    const deferredTail = await screen.findByLabelText('点击加载图片');
+    expect(screen.getByLabelText('首图')).toBeVisible();
+    expect(screen.queryByLabelText('尾图')).toBeNull();
+    await fireEvent.press(deferredTail);
+    expect(screen.getByLabelText('尾图')).toBeVisible();
+  });
 
   it('preserves one selectable flow and a single layout gate for long continuous prose', async () => {
     const onFirstContentLayout = jest.fn();

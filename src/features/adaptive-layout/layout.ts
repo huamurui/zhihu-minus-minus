@@ -1,3 +1,5 @@
+import type { LargeScreenLayoutMode } from '@/store/useSettingsStore';
+
 export type PaneRole = 'list' | 'detail' | 'full';
 
 export interface PaneRoute {
@@ -6,6 +8,11 @@ export interface PaneRoute {
 }
 
 export const PANE_DIVIDER_WIDTH = 16;
+const TWO_PANE_MIN_WIDTH = 840;
+
+export function shouldUseTwoPanes(mode: LargeScreenLayoutMode, width: number) {
+  return mode === 'dual' || (mode === 'auto' && width >= TWO_PANE_MIN_WIDTH);
+}
 
 /** Unknown routes stay full screen, especially login, editors and media viewers. */
 export function getPaneRole(name: string): PaneRole {
