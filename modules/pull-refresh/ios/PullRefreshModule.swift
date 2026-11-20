@@ -2,7 +2,7 @@ import ExpoModulesCore
 
 public final class PullRefreshModule: Module {
   public func definition() -> ModuleDefinition {
-    Name("ZhihuPullRefresh")
+    Name("PullRefresh")
 
     View(PullRefreshView.self) {
       Events("onPull", "onRefreshTriggered")
@@ -13,6 +13,10 @@ public final class PullRefreshModule: Module {
 
       Prop("hapticsEnabled") { (view: PullRefreshView, enabled: Bool) in
         view.setHapticsEnabled(enabled)
+      }
+
+      Prop("hapticTickPositions") { (view: PullRefreshView, positions: [Double]) in
+        view.setHapticTickPositions(positions)
       }
 
       Prop("refreshing") { (view: PullRefreshView, refreshing: Bool) in

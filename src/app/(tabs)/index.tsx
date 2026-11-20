@@ -1347,6 +1347,7 @@ const FeedList = React.forwardRef<
           showsVerticalScrollIndicator={false}
           bounces
           alwaysBounceVertical
+          nestedScrollEnabled
           overScrollMode="never"
           data={flattenedData}
           extraData={listExtraData}

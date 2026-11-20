@@ -3,9 +3,9 @@ require 'json'
 package = JSON.parse(File.read(File.join(__dir__, '..', 'package.json')))
 
 Pod::Spec.new do |s|
-  s.name           = 'ZhihuPullRefresh'
+  s.name           = 'PullRefresh'
   s.version        = package['version']
-  s.summary        = 'Native pull-to-refresh container for Zhihu--'
+  s.summary        = 'Native pull-to-refresh container'
   s.description    = s.summary
   s.license        = { :type => 'MIT' }
   s.authors        = { 'Zhihu--' => 'noreply@example.invalid' }
@@ -16,7 +16,7 @@ Pod::Spec.new do |s|
   s.static_framework = true
 
   s.dependency 'ExpoModulesCore'
-  s.source_files = '**/*.{h,m,swift}'
+  s.source_files = '*.swift'
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
     'SWIFT_COMPILATION_MODE' => 'wholemodule'
