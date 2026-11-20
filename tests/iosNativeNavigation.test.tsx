@@ -8,7 +8,7 @@ import {
   testRouter,
 } from 'expo-router/testing-library';
 import type { ReactNode } from 'react';
-import { Text } from 'react-native';
+import { Dimensions, Text } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AdaptiveStack } from '../src/features/adaptive-layout/AdaptiveStack';
 import { useSettingsStore } from '../src/store/useSettingsStore';
@@ -42,7 +42,7 @@ function Protected() {
 }
 
 async function open() {
-  useSettingsStore.setState({ enableLargeScreenLayout: false });
+  useSettingsStore.setState({ largeScreenLayoutMode: 'single' });
   return renderRouter({
     _layout: {
       default: () => (
@@ -104,7 +104,7 @@ test('iOS layout changes preserve route identities and back order while switchin
   await act(() =>
     useSettingsStore
       .getState()
-      .updateSettings({ enableLargeScreenLayout: true }),
+      .updateSettings({ largeScreenLayoutMode: 'dual' }),
   );
   expect(screen.getByTestId('adaptive-stack')).toBeVisible();
   expect(
@@ -113,7 +113,7 @@ test('iOS layout changes preserve route identities and back order while switchin
   await act(() =>
     useSettingsStore
       .getState()
-      .updateSettings({ enableLargeScreenLayout: false }),
+      .updateSettings({ largeScreenLayoutMode: 'single' }),
   );
   expect(nativeScreen(before.at(-1)?.key ?? '')).toBeTruthy();
   expect(
@@ -135,4 +135,38 @@ test('native dismissal respects removal prevention', async () => {
   });
   expect(blocked).toHaveBeenCalledTimes(1);
   expect(screen.getByText('protected')).toBeVisible();
+});
+
+test('automatic iOS layout preserves the detail route across window size changes', async () => {
+  const original = {
+    window: Dimensions.get('window'),
+    screen: Dimensions.get('screen'),
+  };
+  const resize = (width: number) => {
+    const frame = { width, height: 800, scale: 1, fontScale: 1 };
+    return act(() => Dimensions.set({ window: frame, screen: frame }));
+  };
+  try {
+    await resize(600);
+    const result = await open();
+    await act(() =>
+      useSettingsStore
+        .getState()
+        .updateSettings({ largeScreenLayoutMode: 'auto' }),
+    );
+    await testRouter.push('/answer/a');
+    const key = routes(result).at(-1)?.key;
+    if (!key) throw new Error('Missing detail route');
+    expect(nativeScreen(key)).toBeTruthy();
+    await resize(1100);
+    expect(screen.getByTestId('adaptive-divider')).toBeVisible();
+    expect(screen.getByText('answer a')).toBeVisible();
+    expect(routes(result).at(-1)?.key).toBe(key);
+    await resize(600);
+    expect(nativeScreen(key)).toBeTruthy();
+    await testRouter.back();
+    expect(screen.getByText('home')).toBeVisible();
+  } finally {
+    await act(() => Dimensions.set(original));
+  }
 });

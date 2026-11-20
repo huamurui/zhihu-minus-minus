@@ -215,6 +215,7 @@ function blockText(block: ZhihuBlock): string {
 
 interface FlowViewProps {
   flow: RichTextFlow;
+  manualImages: boolean;
   contentWidth: number;
   configJson: string;
   fontSize: number;
@@ -240,6 +241,7 @@ function flowMeasureKey(
 
 const NativeFlow = React.memo(function NativeFlow({
   flow,
+  manualImages,
   contentWidth,
   configJson,
   fontSize,
@@ -252,6 +254,23 @@ const NativeFlow = React.memo(function NativeFlow({
   onAction,
   onMeasured,
 }: FlowViewProps) {
+  const [requested, setRequested] = useState<{
+    flow: RichTextFlow;
+    ids: ReadonlySet<string>;
+  } | null>(null);
+  const attachments = useMemo(
+    () =>
+      manualImages
+        ? flow.attachments.map((item) =>
+            item.kind === 'image' &&
+            item.role !== 'avatar' &&
+            !(requested?.flow === flow && requested.ids.has(item.id))
+              ? { ...item, url: undefined }
+              : item,
+          )
+        : flow.attachments,
+    [flow, manualImages, requested],
+  );
   const flowJson = useMemo(
     () =>
       JSON.stringify({
@@ -260,7 +279,7 @@ const NativeFlow = React.memo(function NativeFlow({
         text: flow.text,
         spans: flow.spans,
         paragraphs: flow.paragraphs,
-        attachments: flow.attachments,
+        attachments,
         // Source mapping remains in JS; neither native backend consumes it.
         decorations:
           options.decorations === false
@@ -271,7 +290,7 @@ const NativeFlow = React.memo(function NativeFlow({
                 kind: options.decorationKind || decoration.kind,
               })),
       }),
-    [flow, linkColor, options.decorationKind, options.decorations],
+    [attachments, flow, linkColor, options.decorationKind, options.decorations],
   );
   const measureKey = flowMeasureKey(flow, contentWidth, configJson);
   const geometryKey = useMemo(
@@ -353,8 +372,30 @@ const NativeFlow = React.memo(function NativeFlow({
           onSelection(eventPayload(raw), flow);
       }}
       onAction={(raw) => {
-        if (mounted.current && currentInput.current.flow === flow)
-          onAction(eventPayload(raw), flow);
+        if (!mounted.current || currentInput.current.flow !== flow) return;
+        const event = eventPayload(raw);
+        if (event.flowId !== flow.id || event.textVersion !== flow.textVersion)
+          return;
+        if (
+          manualImages &&
+          (event.kind === 'attachment' ||
+            event.kind === 'attachmentLongPress') &&
+          attachments.some(
+            (item) =>
+              item.id === event.id && item.kind === 'image' && !item.url,
+          )
+        ) {
+          if (event.kind === 'attachment') {
+            setRequested((previous) => ({
+              flow,
+              ids: new Set(previous?.flow === flow ? previous.ids : []).add(
+                event.id,
+              ),
+            }));
+          }
+          return;
+        }
+        onAction(event, flow);
       }}
     />
   );
@@ -402,6 +443,7 @@ function FormulaBlock({
 }
 
 interface BlockViewProps {
+  manualImages: boolean;
   enableSegmentTap?: boolean;
   block: ZhihuBlock;
   width: number;
@@ -477,6 +519,7 @@ function NativeParagraph(props: BlockViewProps) {
           <NativeFlow
             key={part.flow.id}
             flow={part.flow}
+            manualImages={props.manualImages}
             contentWidth={props.width}
             configJson={configJson}
             fontSize={fontSize}
@@ -525,6 +568,7 @@ function useLongImageCrop(
 function NativeBlock(props: BlockViewProps) {
   const {
     block,
+    manualImages,
     width,
     fontSize,
     lineHeight,
@@ -537,6 +581,18 @@ function NativeBlock(props: BlockViewProps) {
     onImage,
     onImageLongPress,
   } = props;
+  const [requestedImageUri, setRequestedImageUri] = useState<string | null>(
+    null,
+  );
+  const imageUri =
+    block.type === 'image'
+      ? block.resource.offlineUri || block.resource.url
+      : null;
+  const deferImage =
+    block.type === 'image' &&
+    block.role !== 'avatar' &&
+    manualImages &&
+    requestedImageUri !== imageUri;
   const [failedImageUri, setFailedImageUri] = useState<string | null>(null);
   const [naturalImageSize, setNaturalImageSize] = useState<{
     uri: string;
@@ -555,7 +611,7 @@ function NativeBlock(props: BlockViewProps) {
       ? (block.resource.originalUrl ?? block.resource.url)
       : null;
   const longImage = useLongImageCrop(
-    longImageUrl,
+    deferImage ? null : longImageUrl,
     PixelRatio.getPixelSizeForLayoutSize(width),
   );
   const textStyle = { color: textColor, fontSize, lineHeight };
@@ -583,10 +639,14 @@ function NativeBlock(props: BlockViewProps) {
       return (
         <View style={[styles.block, { width }]}>
           <Pressable
-            onPress={() => onImage?.(uri)}
-            onLongPress={() => onImageLongPress?.(uri)}
-            accessibilityRole="imagebutton"
-            accessibilityLabel={block.alt || '正文图片'}
+            onPress={() =>
+              deferImage ? setRequestedImageUri(uri) : onImage?.(uri)
+            }
+            onLongPress={deferImage ? undefined : () => onImageLongPress?.(uri)}
+            accessibilityRole={deferImage ? 'button' : 'imagebutton'}
+            accessibilityLabel={
+              deferImage ? '点击加载图片' : block.alt || '正文图片'
+            }
             style={
               block.role === 'avatar'
                 ? {
@@ -598,7 +658,22 @@ function NativeBlock(props: BlockViewProps) {
                 : undefined
             }
           >
-            {failedImageUri === uri ? (
+            {deferImage ? (
+              <View
+                style={[
+                  styles.deferredImage,
+                  {
+                    width: imageWidth,
+                    height: longImageUrl
+                      ? imageWidth * LONG_IMAGE_CROP_ASPECT
+                      : imageHeight,
+                    backgroundColor: surfaceColor,
+                  },
+                ]}
+              >
+                <Text style={{ color: secondaryColor }}>点击加载图片</Text>
+              </View>
+            ) : failedImageUri === uri ? (
               <View
                 style={[
                   styles.imageFallback,
@@ -732,7 +807,7 @@ function NativeBlock(props: BlockViewProps) {
             pointerEvents="none"
             style={[styles.videoCover, { backgroundColor: surfaceColor }]}
           >
-            {block.poster ? (
+            {block.poster && !manualImages ? (
               <Image
                 testID="rich-content-video-cover"
                 source={getCachedImageSource(
@@ -785,7 +860,7 @@ function NativeBlock(props: BlockViewProps) {
           >
             {block.url}
           </Text>
-          {block.image ? (
+          {block.image && !manualImages ? (
             <Image
               source={getCachedImageSource(block.image.url)}
               style={{ width: width - 26, height: 120 }}
@@ -1148,6 +1223,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
 }: ZhihuNativeContentProps & { interactive?: boolean }) {
   const dimensions = useWindowDimensions();
   const settings = useSettingsStore();
+  const manualImages = settings.imageLoadingMode === 'manual';
   const themeColors = useRuntimeThemeColors();
   const textColor = themeColors.text;
   const secondaryColor = themeColors.textSecondary;
@@ -1626,6 +1702,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
               <NativeFlow
                 key={part.flow.id}
                 flow={part.flow}
+                manualImages={manualImages}
                 contentWidth={width}
                 configJson={configJson}
                 fontSize={fontSize}
@@ -1642,6 +1719,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
               <NativeBlock
                 key={part.block.id}
                 block={part.block}
+                manualImages={manualImages}
                 enableSegmentTap={enableSegmentTap}
                 width={availableWidth}
                 fontSize={fontSize}
@@ -1682,6 +1760,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
             <ScrollView>
               {footnote?.blocks.map((block) => (
                 <NativeBlock
+                  manualImages={manualImages}
                   key={block.id}
                   block={block}
                   enableSegmentTap={enableSegmentTap}
@@ -1746,6 +1825,12 @@ const styles = StyleSheet.create({
     minHeight: 140,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 8,
+  },
+  deferredImage: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
     borderRadius: 8,
   },
   longImage: { borderRadius: 8, overflow: 'hidden' },

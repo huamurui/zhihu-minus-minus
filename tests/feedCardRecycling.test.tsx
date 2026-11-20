@@ -216,6 +216,7 @@ jest.mock('../src/utils/toast', () => ({ showToast: jest.fn() }));
 beforeEach(() => {
   jest.clearAllMocks();
   mockSessionVersion = 1;
+  useSettingsStore.setState({ imageLoadingMode: 'auto' });
 });
 
 const baseItem: FeedItem = {
@@ -308,6 +309,28 @@ test('recycled feed images switch sources without replaying the Android fade', a
     second.image,
   ]);
   expect(images().map((image) => image.props.fadeDuration)).toEqual([0, 0]);
+});
+
+test('manual image loading reveals only the selected thumbnail when feed cells are recycled', async () => {
+  useSettingsStore.setState({ imageLoadingMode: 'manual' });
+  const first = {
+    ...baseItem,
+    author: { ...baseItem.author, avatar: 'https://example.test/avatar.jpg' },
+    image: 'https://example.test/first.jpg',
+  };
+  const host = await render(<FeedCard item={first} />);
+  const sources = () =>
+    host.container
+      .queryAll((node) => node.type === 'Image')
+      .map((node) => node.props.source?.uri);
+  expect(sources()).toEqual([first.author.avatar]);
+  await fireEvent.press(host.getByLabelText('加载缩略图'));
+  expect(sources()).toEqual([first.author.avatar, first.image]);
+  expect(mockPush).not.toHaveBeenCalled();
+
+  await host.rerender(<FeedCard item={{ ...first, id: 'next' }} />);
+  expect(sources()).toEqual([first.author.avatar]);
+  expect(host.getByLabelText('加载缩略图')).toBeVisible();
 });
 
 test('an anonymous author without an identity cannot open an empty profile route', async () => {

@@ -12,6 +12,7 @@ import {
 } from 'react';
 import {
   KeyboardAvoidingView,
+  type ModalProps,
   Platform,
   Pressable,
   ScrollView,
@@ -59,6 +60,12 @@ interface BottomSheetProps {
 
 const ENTER_DURATION = 220;
 const EXIT_DURATION = 180;
+// An iPhone native modal would otherwise rotate a landscape window to portrait.
+const sheetOrientations: ModalProps['supportedOrientations'] = [
+  'portrait',
+  'portrait-upside-down',
+  'landscape',
+];
 
 function ScrollableContent({ children }: React.PropsWithChildren) {
   return (
@@ -209,6 +216,8 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
 
     return (
       <PaneModal
+        windowOverlayInTwoPanes
+        supportedOrientations={sheetOrientations}
         visible={mounted}
         transparent
         animationType="none"
@@ -221,6 +230,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
         }}
       >
         <KeyboardAvoidingView
+          onAccessibilityEscape={requestClose}
           enabled={keyboardAvoiding}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.overlay}

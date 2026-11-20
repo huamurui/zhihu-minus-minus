@@ -171,6 +171,7 @@ export default React.memo(function ZhihuDOMContent({
   const fontSizeScale = fontSizeOverride ?? settings.fontSizeScale;
   const lineHeightScale = lineHeightOverride ?? settings.lineHeightScale;
   const removeImageWatermark = settings.removeImageWatermark;
+  const manualImages = settings.imageLoadingMode === 'manual';
   const metrics = useMemo(
     () => createRichContentMetrics(fontSizeScale, lineHeightScale),
     [fontSizeScale, lineHeightScale],
@@ -303,6 +304,26 @@ export default React.memo(function ZhihuDOMContent({
           margin: 10px 0;
           cursor: pointer;
         }
+        .zhihu-content .zhihu-load-image {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          vertical-align: middle;
+          box-sizing: border-box;
+          max-width: 100%;
+          width: 100%;
+          height: 3em;
+          margin: 10px 0;
+          padding: 0;
+          border: 0;
+          border-radius: 12px;
+          background-color: ${themeColors.backgroundSecondary};
+          color: ${themeColors.textSecondary};
+          font: inherit;
+          cursor: pointer;
+          overflow: hidden;
+        }
+        .zhihu-load-image::after { content: '点击加载图片'; }
         .zhihu-content figure {
           margin: 15px 0;
           text-align: center;
@@ -478,7 +499,30 @@ export default React.memo(function ZhihuDOMContent({
         const linkCardInfoStr = ${serializeInlineScriptValue(linkCardInfoStr || '{}')};
 
         const container = document.getElementById('content');
-        container.innerHTML = htmlContent;
+        const manualImages = ${manualImages};
+        const deferredSources = new WeakMap();
+        if (manualImages) {
+          // Template contents stay inert. The sanitizer already excludes srcset;
+          // defer each body's src before it reaches the live document.
+          const template = document.createElement('template');
+          template.innerHTML = htmlContent;
+          template.content.querySelectorAll('img').forEach(img => {
+            if (img.matches('.zhihu-video-cover, .zhihu-link-card-image')) {
+              img.remove();
+              return;
+            }
+            const src = img.getAttribute('src') || '';
+            const eeimg = img.getAttribute('eeimg');
+            const isAvatar = ${variant === 'daily'} && img.classList.contains('avatar');
+            if (isAvatar || src.includes('zhihu.com/equation') || eeimg === '1' || eeimg === '2') return;
+            deferredSources.set(img, src);
+            img.removeAttribute('src');
+            img.removeAttribute('srcset');
+          });
+          container.appendChild(template.content);
+        } else {
+          container.innerHTML = htmlContent;
+        }
         // Give the icon its own hit target without adding characters to the
         // source range. Text inside an enclosing link keeps its normal action.
         const commentMarkers = new WeakMap();
@@ -604,7 +648,7 @@ export default React.memo(function ZhihuDOMContent({
           }
 
           const image = getLinkCardImage(display) || getImageUrl(anchor.getAttribute('data-draft-cover'));
-          if (image) {
+          if (image && !manualImages) {
             const imageNode = document.createElement('img');
             imageNode.className = 'zhihu-link-card-image';
             imageNode.src = image;
@@ -617,7 +661,7 @@ export default React.memo(function ZhihuDOMContent({
         // Process images
         const images = container.querySelectorAll('img');
         images.forEach((img) => {
-          const src = img.getAttribute('src') || '';
+          const src = deferredSources.get(img) || img.getAttribute('src') || '';
           const eeimg = img.getAttribute('eeimg');
           const isFormula = src.includes('zhihu.com/equation') || eeimg === '1' || eeimg === '2';
           const alt = img.getAttribute('alt') || '';
@@ -629,7 +673,7 @@ export default React.memo(function ZhihuDOMContent({
             img.parentNode?.replaceChild(textNode, img);
           } else if (!isFormula) {
             const originalToken = img.getAttribute('data-original-token');
-            let actualSrc = img.getAttribute('data-actualsrc') || img.getAttribute('data-original') || src;
+            let actualSrc = img.getAttribute('data-actualsrc') || img.getAttribute('data-original') || img.getAttribute('data-original-src') || src;
 
             if (${removeImageWatermark ? 'true' : 'false'} && actualSrc && originalToken) {
               const cleanToken = originalToken.trim();
@@ -639,18 +683,38 @@ export default React.memo(function ZhihuDOMContent({
               }
             }
 
-            if (actualSrc) {
-              actualSrc = actualSrc.trim();
-              if (actualSrc.startsWith('//')) actualSrc = 'https:' + actualSrc;
-              img.setAttribute('src', actualSrc);
-            }
-
             const rawwidth = img.getAttribute('data-rawwidth');
             const rawheight = img.getAttribute('data-rawheight');
             if (rawwidth && rawheight) {
               img.setAttribute('width', rawwidth);
               img.setAttribute('height', rawheight);
               img.style.aspectRatio = rawwidth + ' / ' + rawheight;
+            }
+            if (actualSrc) {
+              actualSrc = actualSrc.trim();
+              if (actualSrc.startsWith('//')) actualSrc = 'https:' + actualSrc;
+              if (deferredSources.has(img)) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'zhihu-load-image';
+                button.setAttribute('aria-label', alt ? '点击加载图片：' + alt : '点击加载图片');
+                const width = Number(img.getAttribute('width'));
+                const height = Number(img.getAttribute('height'));
+                if (width > 0 && height > 0) {
+                  button.style.width = width + 'px';
+                  button.style.height = 'auto';
+                  button.style.aspectRatio = width + ' / ' + height;
+                }
+                button.addEventListener('click', event => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  img.setAttribute('src', actualSrc);
+                  button.replaceWith(img);
+                }, { once: true });
+                img.replaceWith(button);
+              } else {
+                img.setAttribute('src', actualSrc);
+              }
             }
           }
         });
@@ -1005,6 +1069,7 @@ export default React.memo(function ZhihuDOMContent({
     return { documentIdentity, source: { html } };
   }, [
     safeHtmlContent,
+    manualImages,
     removeImageWatermark,
     segmentTapEnabled,
     segmentSourceTexts,
@@ -1014,6 +1079,7 @@ export default React.memo(function ZhihuDOMContent({
     metrics,
     headingStyles,
     dailyStyles,
+    variant,
     typographyOptions?.lineBreak,
     typographyOptions?.justify,
     typographyOptions?.autoSpacing,
