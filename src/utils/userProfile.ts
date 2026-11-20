@@ -100,6 +100,29 @@ export function getNextPageOffset(nextUrl: string | null | undefined) {
   }
 }
 
+/**
+ * 拼接 offset 分页的各页，按 id 去重，保留首次出现的位置。
+ * 个人主页接口偶尔返回"双倍页"：offset=80&limit=20 返回 39 条，后 20 条与下一页相同，
+ * paging.next 仍指向 offset=100，不去重会出现重复卡片和重复的列表 key。
+ */
+export function flattenUniquePages<T extends { id?: string | number }>(
+  pages: readonly { data?: readonly T[] | null }[] | undefined,
+): T[] {
+  const seen = new Set<string>();
+  const items: T[] = [];
+  for (const page of pages ?? []) {
+    for (const item of page.data ?? []) {
+      if (item.id != null) {
+        const key = String(item.id);
+        if (seen.has(key)) continue;
+        seen.add(key);
+      }
+      items.push(item);
+    }
+  }
+  return items;
+}
+
 export interface RecentActivityCursor {
   offset: number;
   pageNum: number;

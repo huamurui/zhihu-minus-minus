@@ -828,6 +828,46 @@ test('switching member routes resets visited tabs and the native pager', async (
   await host.unmount();
 });
 
+test('a double page from the server does not repeat answers from the next page', async () => {
+  mockRoute.tab = 'answers';
+  const answer = (id: string) => ({
+    ...votedAnswer,
+    id,
+    question: { ...votedAnswer.question, id: `q-${id}`, title: `问题 ${id}` },
+  });
+  // offset=0&limit=20 answered with its own item plus the whole next page,
+  // and paging.next still points at the next page.
+  jest
+    .mocked(getMemberRelations)
+    .mockResolvedValueOnce({
+      data: [answer('own'), answer('next-1'), answer('next-2')],
+      paging: {
+        ...emptyPage.paging,
+        is_end: false,
+        next: 'https://www.zhihu.com/api/v4/members/demo/answers?offset=20&limit=20',
+      },
+    })
+    .mockResolvedValueOnce({
+      ...emptyPage,
+      data: [answer('next-1'), answer('next-2')],
+    });
+  const host = await render(screen());
+  await flushQueries();
+  await act(async () => {
+    await mockListProps.get('回答')?.query.fetchNextPage();
+  });
+  await flushQueries();
+
+  const list = mockListProps.get('回答');
+  expect(list?.query.pageCount).toBe(2);
+  expect(list?.query.data.map((item) => (item as { id: string }).id)).toEqual([
+    'own',
+    'next-1',
+    'next-2',
+  ]);
+  await host.unmount();
+});
+
 test('creation cards of different types retain distinct list keys when their IDs coincide', async () => {
   mockRoute.tab = 'creations';
   client.setQueryData(['me'], member);

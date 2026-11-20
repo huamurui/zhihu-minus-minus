@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { parseZhihuUrl } from '../src/utils/url';
 import {
+  flattenUniquePages,
   getNextPageOffset,
   getNextRecentActivityCursor,
   getRecentActivityReadBoundary,
@@ -58,6 +59,35 @@ test('reads pagination offsets through URLSearchParams', () => {
     undefined,
   );
   assert.equal(getNextPageOffset(undefined), undefined);
+});
+
+test('joins a double page with the next page without repeating items', () => {
+  // offset=80&limit=20 returned 19 of its own items plus the 20 of offset=100,
+  // while paging.next still pointed at offset=100.
+  const own = Array.from({ length: 19 }, (_, index) => ({ id: `a${index}` }));
+  const next = Array.from({ length: 20 }, (_, index) => ({ id: `b${index}` }));
+  const items = flattenUniquePages([
+    { data: [...own, ...next] },
+    { data: next.map((item) => ({ ...item })) },
+    { data: [{ id: 'c0' }, { id: 7 }, { id: '7' }] },
+  ]);
+
+  assert.deepEqual(
+    items.map((item) => item.id),
+    [...own, ...next, { id: 'c0' }, { id: 7 }].map((item) => item.id),
+  );
+  // The first occurrence is kept.
+  assert.equal(items[19], next[0]);
+});
+
+test('keeps items without an id and tolerates missing pages', () => {
+  const anonymous = { title: 'no id' } as { id?: string; title: string };
+  assert.deepEqual(flattenUniquePages([{ data: [anonymous, anonymous] }]), [
+    anonymous,
+    anonymous,
+  ]);
+  assert.deepEqual(flattenUniquePages([{ data: null }, {}]), []);
+  assert.deepEqual(flattenUniquePages(undefined), []);
 });
 
 test('reads recent activity timestamp cursors and page numbers', () => {
