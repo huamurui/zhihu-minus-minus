@@ -4,7 +4,10 @@ import { useContentActionBarColor } from '@/components/ContentActionBarColor';
 import { useThemeColor } from '@/components/Themed';
 import { formatCount } from '@/utils/formatCount';
 
-/** A count in the lower-right corner of a fixed-size action target. */
+/**
+ * An action icon with its count to the right, like the vote capsule's count.
+ * At least 44 wide; a count widens the target instead of overlapping the icon.
+ */
 export function ActionIconCount({
   children,
   count,
@@ -19,14 +22,16 @@ export function ActionIconCount({
   const hasCount = count !== undefined && Number.isFinite(count) && count >= 0;
 
   return (
-    <View style={styles.container} accessible={false}>
-      <View style={styles.icon}>{children}</View>
+    <View
+      style={[styles.container, hasCount && styles.withCount]}
+      accessible={false}
+    >
+      {children}
       {hasCount ? (
         <Text
+          testID="action-icon-count"
           accessible={false}
           numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.7}
           maxFontSizeMultiplier={1.2}
           style={[styles.count, { color: color ?? actionColor }]}
         >
@@ -37,18 +42,28 @@ export function ActionIconCount({
   );
 }
 
+/** Button style for an ActionIconCount target: 44 square, wider with a count. */
+export const ACTION_ICON_COUNT_BUTTON = {
+  minWidth: 44,
+  height: 44,
+  paddingHorizontal: 0,
+  paddingVertical: 0,
+} as const;
+
 const styles = StyleSheet.create({
-  container: { width: 44, height: 44 },
-  icon: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  container: {
+    minWidth: 44,
+    height: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  withCount: { paddingHorizontal: 8 },
   count: {
-    position: 'absolute',
-    left: 16,
-    right: 0,
-    bottom: 3,
-    fontSize: 10,
-    lineHeight: 12,
+    marginLeft: 4,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '600',
-    textAlign: 'center',
     includeFontPadding: false,
   },
 });
