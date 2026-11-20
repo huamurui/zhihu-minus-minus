@@ -5,6 +5,7 @@ import {
   forwardRef,
   useCallback,
   useEffect,
+  useEffectEvent,
   useImperativeHandle,
   useMemo,
   useRef,
@@ -141,8 +142,8 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
 
     useImperativeHandle(ref, () => ({ close: requestClose }), [requestClose]);
 
-    useEffect(() => {
-      if (visible) {
+    const animateVisibilityChange = useEffectEvent((show: boolean) => {
+      if (show) {
         notifyOnDismiss.current = false;
         closing.current = false;
         mountedRef.current = true;
@@ -158,7 +159,13 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       } else if (mountedRef.current) {
         animateClosed(false);
       }
-    }, [animateClosed, backdropOpacity, translateY, visible, windowHeight]);
+    });
+
+    useEffect(() => {
+      // Sample the current window height for each transition. Resizing an open
+      // sheet must not restart its entrance or interrupt a pending dismissal.
+      animateVisibilityChange(visible);
+    }, [visible]);
 
     const panGesture = useMemo(
       () =>

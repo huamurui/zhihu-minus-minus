@@ -16,6 +16,7 @@ import {
   StyleSheet,
   Text,
 } from 'react-native';
+import { withSpring } from 'react-native-reanimated';
 import { createAnswerSelectionComment } from '../src/api/zhihu/comment';
 import { uploadImage } from '../src/api/zhihu/image';
 import { AppDialog } from '../src/components/overlays/AppDialog';
@@ -37,6 +38,7 @@ import { useSettingsStore } from '../src/store/useSettingsStore';
 
 let mockFinishAnimation: (finished: boolean) => void;
 let mockFocused = true;
+let mockWindowHeight = 800;
 
 jest.mock('../src/api/zhihu/comment', () => ({
   createAnswerSelectionComment: jest.fn(),
@@ -65,7 +67,12 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
   __esModule: true,
-  default: () => ({ width: 1200, height: 800, scale: 2, fontScale: 1 }),
+  default: () => ({
+    width: 1200,
+    height: mockWindowHeight,
+    scale: 2,
+    fontScale: 1,
+  }),
 }));
 jest.mock('react-native-gesture-handler', () => {
   const gesture = {
@@ -83,26 +90,53 @@ jest.mock('react-native-gesture-handler', () => {
 });
 jest.mock('react-native-reanimated', () => {
   const react = jest.requireActual<typeof import('react')>('react');
+  type MockTiming = { target: number; callback: (finished: boolean) => void };
+  function useSharedValue(initial: number) {
+    const [shared] = react.useState(() => {
+      let value = initial;
+      let pending: MockTiming | undefined;
+      const finish = (finished: boolean) => {
+        const animation = pending;
+        pending = undefined;
+        animation?.callback(finished);
+      };
+      return {
+        get value() {
+          return value;
+        },
+        set value(next: number | MockTiming) {
+          // Assigning to an animating shared value cancels its previous animation.
+          finish(false);
+          if (typeof next === 'number') {
+            value = next;
+          } else {
+            value = next.target;
+            pending = next;
+            mockFinishAnimation = finish;
+          }
+        },
+      };
+    });
+    return shared;
+  }
   return {
     __esModule: true,
     default: { View: jest.requireActual('react-native').View },
-    useSharedValue: (value: number) => react.useRef({ value }).current,
+    useSharedValue,
     useAnimatedStyle: (style: () => object) => style(),
-    withSpring: (value: number) => value,
+    withSpring: jest.fn((value: number) => value),
     withTiming: (
       value: number,
       _config: unknown,
       callback?: (finished: boolean) => void,
-    ) => {
-      if (callback) mockFinishAnimation = callback;
-      return value;
-    },
+    ) => (callback ? { target: value, callback } : value),
     runOnJS: (callback: () => void) => callback,
   };
 });
 
 beforeEach(() => {
   mockFocused = true;
+  mockWindowHeight = 800;
   useSettingsStore.setState({ largeScreenLayoutMode: 'single' });
   jest.spyOn(Animated, 'timing').mockImplementation(() => ({
     start: (callback) => callback?.({ finished: true }),
@@ -342,6 +376,46 @@ test('iOS completes a requested sheet dismissal once even when navigation hides 
   await host.rerender(view(true));
   expect(host.queryByText('菜单')).toBeNull();
   expect(afterClose).toHaveBeenCalledTimes(1);
+});
+
+test('resizing an open sheet preserves it and reopening still plays its entrance', async () => {
+  const onClose = jest.fn();
+  const view = (visible: boolean) => (
+    <BottomSheet visible={visible} title="菜单" onClose={onClose}>
+      <Text>内容</Text>
+    </BottomSheet>
+  );
+  const host = await render(view(true));
+  jest.mocked(withSpring).mockClear();
+  mockWindowHeight = 550;
+  await host.rerender(view(true));
+  expect(withSpring).not.toHaveBeenCalled();
+  expect(host.getByText('内容')).toBeOnTheScreen();
+
+  await host.rerender(view(false));
+  await act(() => mockFinishAnimation(true));
+  await host.rerender(view(true));
+  expect(withSpring).toHaveBeenCalledTimes(1);
+  expect(host.getByText('内容')).toBeOnTheScreen();
+});
+
+test('iOS finishes a sheet dismissal once when the window resizes during its exit', async () => {
+  jest.replaceProperty(Platform, 'OS', 'ios');
+  useSettingsStore.setState({ largeScreenLayoutMode: 'dual' });
+  const onClose = jest.fn();
+  const view = () => (
+    <BottomSheet visible title="菜单" onClose={onClose}>
+      <Text>内容</Text>
+    </BottomSheet>
+  );
+  const host = await render(view());
+  await fireEvent.press(host.getByLabelText('关闭'));
+  mockWindowHeight = 550;
+  await host.rerender(view());
+  expect(onClose).not.toHaveBeenCalled();
+  await act(() => mockFinishAnimation(true));
+  expect(onClose).toHaveBeenCalledTimes(1);
+  expect(host.queryByText('菜单')).toBeNull();
 });
 
 test.each([
