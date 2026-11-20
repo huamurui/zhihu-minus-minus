@@ -176,11 +176,17 @@ export function prepareNativeParts(
     gradual ? previouslyMounted || FIRST_BATCH_SIZE : Infinity,
     gradual && !previouslyMounted ? { viewport } : undefined,
   );
+  let prepared = first;
   return {
     first,
-    next: (previous: NativePartBatch) =>
-      read(previous, NEXT_BATCH_SIZE, {
-        until: performance.now() + FRAME_WORK_MS,
-      }),
+    next(previous: NativePartBatch) {
+      // A frame can retry the same committed prefix before React publishes its tail.
+      if (previous === prepared && !prepared.done) {
+        prepared = read(previous, NEXT_BATCH_SIZE, {
+          until: performance.now() + FRAME_WORK_MS,
+        });
+      }
+      return prepared;
+    },
   };
 }

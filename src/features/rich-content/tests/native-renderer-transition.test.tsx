@@ -690,6 +690,7 @@ describe('Native V2 renderer staging transitions', () => {
     await containerLayout(320);
     const [native] = currentViews();
     expect(currentViews()).toHaveLength(1);
+    expect(native.selectable).toBe(true);
     expect((JSON.parse(native.flowJson) as RichTextFlow).text).toBe(
       Array(count).fill(text).join('\n'),
     );
@@ -1360,6 +1361,37 @@ describe('Native V2 renderer staging transitions', () => {
     const visible = screen.getByTestId(`native-flow-${flowId(cell)}`);
     expect(visible).toBeVisible();
     expect(visible).toHaveStyle({ width: cell.contentWidth, height: 139 });
+  });
+
+  it('remeasures captions when the container resizes within the same integer text width', async () => {
+    const full = jest.fn();
+    await render(
+      <ZhihuNativeContent
+        content='<p>开头</p><figure><img src="https://example.com/cover.jpg"><figcaption>图注</figcaption></figure>'
+        objectId="nested-integer-width"
+        type="article"
+        options={{ integerMeasure: true }}
+        renderFallback={() => null}
+        onLayoutReady={full}
+      />,
+    );
+    await containerLayout(320);
+    const [top, caption] = currentViews();
+    await heightEvent(top);
+    await heightEvent(caption);
+    expect(full).toHaveBeenCalledTimes(1);
+
+    await containerLayout(321);
+    const [resizedTop, resizedCaption] = currentViews();
+    expect(resizedTop.layoutKey).toBe(top.layoutKey);
+    expect(resizedCaption.contentWidth).toBe(321);
+    await heightEvent(caption);
+    expect(full).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('native-content-placeholder')).toBeVisible();
+
+    await heightEvent(resizedCaption);
+    expect(full).toHaveBeenCalledTimes(2);
+    expect(screen.getByText('图注')).toBeVisible();
   });
 
   it('keeps the first prefix readable while a native formula in the last batch is still measuring', async () => {

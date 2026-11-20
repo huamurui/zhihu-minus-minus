@@ -1487,13 +1487,21 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
     ],
   );
   const documentLayoutPrefix = `${normalized.document.id}:${revision}`;
-  const documentGeometryKey = `${documentLayoutPrefix}:${width}:${configJson}`;
+  // Integer measurement can keep the text width fixed while captions and
+  // other blocks resize. Reuse only the still-valid top-level flow heights.
+  const textGeometry = useMemo(
+    () => ({
+      key: `${documentLayoutPrefix}:${width}:${configJson}`,
+      flows: new Map<string, string>(),
+    }),
+    [documentLayoutPrefix, width, configJson],
+  );
   // A suspended render may prepare a new geometry while the visible one is
   // still receiving native events. Each owns its measurements until commit.
   const geometry = useMemo(
     () => ({
-      key: documentGeometryKey,
-      flows: new Map<string, string>(),
+      key: `${textGeometry.key}:${availableWidth}`,
+      flows: textGeometry.flows,
       firstNested: new Set<RichTextFlow>(),
       tailNested: new Set<RichTextFlow>(),
       bodyMeasured: false,
@@ -1501,7 +1509,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
       revealed: false,
       notified: false,
     }),
-    [documentGeometryKey],
+    [textGeometry, availableWidth],
   );
   const [revealedLayout, setRevealedLayout] = useState<typeof geometry | null>(
     null,

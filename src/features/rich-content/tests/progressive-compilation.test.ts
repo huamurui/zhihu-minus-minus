@@ -110,6 +110,28 @@ it('pauses at a nested block and resumes with the same source coordinates', () =
   expect(read.mock.calls).toEqual([['首🙂'], ['尾'], ['脚注']]);
 });
 
+it('reuses a prepared batch when two frames resume the same committed prefix', () => {
+  const { document } = normalizeZhihuDocument('<hr>'.repeat(24), {
+    documentId: 'retried-frames',
+  });
+  const compiled = prepareNativeParts(document, options, true, 0, false, {
+    width: 320,
+    height: 640,
+    fontScale: 1,
+  });
+  let batch = compiled.first;
+  expect(batch.done).toBe(false);
+  while (!batch.done) {
+    const next = compiled.next(batch);
+    expect(next).not.toBe(batch);
+    expect(compiled.next(batch)).toBe(next);
+    batch = next;
+  }
+  expect(batch.groups.flat()).toEqual([
+    ...compileZhihuDocumentParts(document, options),
+  ]);
+});
+
 it('keeps a long sequence of paragraphs selectable across the whole flow', () => {
   const paragraphs = Array.from({ length: 300 }, (_, index) => `段落${index}`);
   const html = paragraphs
