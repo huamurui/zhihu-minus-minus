@@ -9,6 +9,7 @@ import type {
   ZhihuTableRow,
 } from './document';
 import { walkZhihuDocument } from './documentTraversal';
+import { segmentCommentCount } from './segmentHighlight';
 import { videoPlaybackHtml } from './videoHtml';
 import { getSafeRichContentUrl } from './webviewSecurity';
 
@@ -83,8 +84,14 @@ function inlineRunHtml(run: ZhihuInlineRun, paragraphId?: string): string {
     case 'emphasis':
       return `<em>${inlineHtml(run.children, paragraphId)}</em>`;
     case 'underline':
-    case 'segmentHighlight':
       return `<u>${inlineHtml(run.children, paragraphId)}</u>`;
+    case 'segmentHighlight': {
+      const children = inlineHtml(run.children, paragraphId);
+      const marker =
+        (segmentCommentCount(run) ?? 0) > 0 ? ' segment-comments' : '';
+      if (!paragraphId) return `<u class="${marker.trim()}">${children}</u>`;
+      return `<span class="segment-interactable${marker}"${attribute('data-pid', paragraphId)}${attribute('data-segment-node-id', run.id)}>${children}</span>`;
+    }
     case 'strikethrough':
       return `<s>${inlineHtml(run.children, paragraphId)}</s>`;
     case 'highlight':
@@ -119,7 +126,9 @@ function inlineRunHtml(run: ZhihuInlineRun, paragraphId?: string): string {
       // payloads/targets remain in the document and are validated by the host.
       if (!paragraphId || paragraphId !== run.paragraphId) return children;
       const liked = run.segInfo?.is_like || run.masterSegInfo?.is_like;
-      return `<span class="segment-interactable${liked ? ' segment-liked' : ''}"${attribute('data-pid', paragraphId)}${attribute('data-segment-node-id', run.id)}>${children}</span>`;
+      const marker =
+        (segmentCommentCount(run) ?? 0) > 0 ? ' segment-comments' : '';
+      return `<span class="segment-interactable${liked ? ' segment-liked' : ''}${marker}"${attribute('data-pid', paragraphId)}${attribute('data-segment-node-id', run.id)}>${children}</span>`;
     }
     case 'lineBreak':
       return '<br>';

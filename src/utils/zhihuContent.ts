@@ -14,3 +14,23 @@ export function buildZhihuImageHtml(image: UploadedImage): string {
     : image.originalSrc || image.src;
   return `<a class="comment_img" href="${imageUrl}" data-width="${image.width}" data-height="${image.height}">[图片]</a>`;
 }
+
+/** Links embedded in comments may load images only from Zhihu's image CDN. */
+export function getCommentImageUrl(value: string | undefined): string | null {
+  if (!value) return null;
+  try {
+    const parsed = new URL(value.startsWith('//') ? `https:${value}` : value);
+    if (
+      !/^https?:$/.test(parsed.protocol) ||
+      !/(?:^|\.)zhimg\.com$/i.test(parsed.hostname) ||
+      parsed.username ||
+      parsed.password ||
+      parsed.port
+    )
+      return null;
+    parsed.protocol = 'https:';
+    return parsed.href;
+  } catch {
+    return null;
+  }
+}

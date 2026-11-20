@@ -73,6 +73,7 @@ import type {
   RichTextFlow,
   RichTextSelectionMapping,
 } from '../richText';
+import { segmentCommentIcon } from '../segmentCommentIcon';
 import type { RichContentLoadingPhase, RichContentObjectType } from '../types';
 import { NativeTable } from './NativeTable';
 
@@ -401,6 +402,7 @@ function FormulaBlock({
 }
 
 interface BlockViewProps {
+  enableSegmentTap?: boolean;
   block: ZhihuBlock;
   width: number;
   fontSize: number;
@@ -429,7 +431,13 @@ function isEmptyParagraph(block: ZhihuBlock | undefined): boolean {
 }
 
 function NativeParagraph(props: BlockViewProps) {
-  const { block, fontSize, lineHeight, followsEmptyParagraph } = props;
+  const {
+    block,
+    fontSize,
+    lineHeight,
+    followsEmptyParagraph,
+    enableSegmentTap,
+  } = props;
   const compiled = useMemo(
     () =>
       compileZhihuDocument(
@@ -439,9 +447,10 @@ function NativeParagraph(props: BlockViewProps) {
           lineHeight,
           paragraphSpacing: 0,
           continuesEmptyParagraph: followsEmptyParagraph,
+          enableSegmentTap,
         },
       ),
-    [block, fontSize, lineHeight, followsEmptyParagraph],
+    [block, fontSize, lineHeight, followsEmptyParagraph, enableSegmentTap],
   );
   const configJson = useMemo(() => {
     const config: unknown = JSON.parse(props.configJson);
@@ -1177,6 +1186,8 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
   );
   const { fontSize, lineHeight } = metrics.body;
   const scaledEm = fontSize * dimensions.fontScale;
+  const enableSegmentTap =
+    type !== 'answer' || settings.enableSegmentTap !== false;
   const width =
     options.integerMeasure && availableWidth > 0
       ? Math.max(scaledEm, Math.floor(availableWidth / scaledEm) * scaledEm)
@@ -1208,6 +1219,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
     const result = compileZhihuDocument(normalized.document, {
       fontSize,
       lineHeight,
+      enableSegmentTap,
       paragraphSpacing: RICH_CONTENT_PARAGRAPH_SPACING,
     });
     if (!document) return result;
@@ -1241,7 +1253,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
             },
       ),
     };
-  }, [document, fontSize, lineHeight, normalized.document]);
+  }, [document, fontSize, lineHeight, normalized.document, enableSegmentTap]);
   const documentRevision = useRef({
     content,
     contentArray,
@@ -1311,6 +1323,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
         linkColor,
         justify: options.justify ?? false,
         fontScale: dimensions.fontScale,
+        commentIcon: segmentCommentIcon,
       }),
     [
       fontSize,
@@ -1629,6 +1642,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
               <NativeBlock
                 key={part.block.id}
                 block={part.block}
+                enableSegmentTap={enableSegmentTap}
                 width={availableWidth}
                 fontSize={fontSize}
                 lineHeight={lineHeight}
@@ -1670,6 +1684,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
                 <NativeBlock
                   key={block.id}
                   block={block}
+                  enableSegmentTap={enableSegmentTap}
                   width={Math.min(availableWidth, dimensions.width - 80)}
                   fontSize={fontSize}
                   lineHeight={lineHeight}

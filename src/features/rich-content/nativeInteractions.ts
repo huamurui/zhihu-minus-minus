@@ -14,11 +14,10 @@ import type {
   ZhihuDocument,
   ZhihuInlineRun,
   ZhihuParagraphBlock,
-  ZhihuSegmentHighlightRun,
-  ZhihuSegmentRun,
 } from './document';
 import { walkZhihuDocument } from './documentTraversal';
 import type { RichTextFlow, RichTextParagraph } from './richText';
+import type { SegmentDecorationRange } from './segmentHighlight';
 import type { RichContentObjectType } from './types';
 
 export interface NativeAnswerSegmentContext {
@@ -84,18 +83,12 @@ interface SourceLeaf {
   readonly text: string;
 }
 
-interface SourceAnnotation {
-  readonly run: ZhihuSegmentRun | ZhihuSegmentHighlightRun;
-  readonly start: number;
-  readonly end: number;
-}
-
 interface SourceParagraph {
   readonly block: ZhihuParagraphBlock;
   readonly pid: string;
   readonly text: string;
   readonly leaves: readonly SourceLeaf[];
-  readonly annotations: readonly SourceAnnotation[];
+  readonly annotations: readonly SegmentDecorationRange[];
 }
 
 /** Keep barriers in document order so two flows cannot jump over a media block. */
@@ -118,7 +111,7 @@ function sourceParagraphs(document: ZhihuDocument): (SourceParagraph | null)[] {
       return null;
     let text = '';
     const leaves: SourceLeaf[] = [];
-    const annotations: SourceAnnotation[] = [];
+    const annotations: SegmentDecorationRange[] = [];
     const nodeIds = new Set<string>();
     function append(runs: readonly ZhihuInlineRun[]): boolean {
       for (const run of runs) {
@@ -173,6 +166,18 @@ function matchesApiSource(
     matches.length === 0 ||
     (matches.length === 1 && matches[0].text === paragraph.text)
   );
+}
+
+/** Plain, unambiguous source paragraphs for exact WebView hit targets. */
+export function getWebViewSegmentParagraphs(document: ZhihuDocument) {
+  const paragraphs = new Map<
+    string,
+    Pick<SourceParagraph, 'text' | 'annotations'>
+  >();
+  for (const paragraph of sourceParagraphs(document)) {
+    if (paragraph?.annotations.length) paragraphs.set(paragraph.pid, paragraph);
+  }
+  return paragraphs;
 }
 
 function resolveHtmlHighlight(

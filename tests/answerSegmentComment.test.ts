@@ -3,7 +3,9 @@ import apiClient from '../src/api/client';
 import {
   createAnswerComment,
   createAnswerSegmentComment,
+  createAnswerSelectionComment,
   createCommentV5,
+  isValidAnswerCommentSelection,
   parseAnswerSegmentCommentContext,
   parseAnswerSegmentCommentTarget,
 } from '../src/api/zhihu/comment';
@@ -101,6 +103,89 @@ describe('answer segment-comment route context', () => {
       ).toBeNull();
     },
   );
+});
+
+describe('comments on a fresh answer selection', () => {
+  const selection = {
+    text: ' 乙😀 ',
+    startParagraphId: 'p-one',
+    endParagraphId: 'p-one',
+    startOffset: 2,
+    endOffset: 7,
+  };
+
+  it('creates a new same-paragraph discussion without a thread ID', async () => {
+    await expect(
+      createAnswerSelectionComment('42', selection, '<p>留言</p>'),
+    ).resolves.toEqual({ id: '500' });
+    expect(post.mock.calls).toEqual([
+      [
+        '/comment_v5/answers/42/segment/comment',
+        {
+          content: '<p>留言</p>',
+          segment: {
+            content: ' 乙😀 ',
+            position: {
+              start: { paragraph_id: 'p-one', offset: 2 },
+              end: { paragraph_id: 'p-one', offset: 7 },
+            },
+          },
+        },
+      ],
+    ]);
+  });
+
+  it('keeps the original text and paragraph-relative UTF-16 endpoints across paragraphs', async () => {
+    const acrossParagraphs = {
+      ...selection,
+      text: ' 前\n中间一段\n😀 ',
+      endParagraphId: 'p-three',
+      startOffset: 15,
+      endOffset: 3,
+    };
+    await createAnswerSelectionComment('42', acrossParagraphs, '<p>留言</p>');
+    expect(post.mock.calls[0]?.[1]).toEqual({
+      content: '<p>留言</p>',
+      segment: {
+        content: acrossParagraphs.text,
+        position: {
+          start: { paragraph_id: 'p-one', offset: 15 },
+          end: { paragraph_id: 'p-three', offset: 3 },
+        },
+      },
+    });
+  });
+
+  it.each([
+    { endOffset: 6 },
+    { startOffset: -1 },
+    { endOffset: Number.MAX_SAFE_INTEGER + 1 },
+    { startOffset: 0.5 },
+    { text: '  \n  ' },
+    { text: ' 乙\uD83D  ' },
+    { text: ' 乙\uFFFC  ' },
+    { startParagraphId: ' p-one' },
+    { endParagraphId: '' },
+    { endParagraphId: 'p-two', endOffset: 100 },
+    { text: '甲\n😀', endParagraphId: 'p-two', endOffset: 1 },
+  ])('rejects invalid source positions before sending (%j)', async (change) => {
+    const invalid = { ...selection, ...change };
+    expect(isValidAnswerCommentSelection('42', invalid)).toBe(false);
+    await expect(
+      createAnswerSelectionComment('42', invalid, '<p>留言</p>'),
+    ).rejects.toThrow('有效的原文位置');
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it('rejects a missing target and empty comments', async () => {
+    await expect(
+      createAnswerSelectionComment('0', selection, '<p>留言</p>'),
+    ).rejects.toThrow('有效的原文位置');
+    await expect(
+      createAnswerSelectionComment('42', selection, ' '),
+    ).rejects.toThrow('请输入评论内容');
+    expect(post).not.toHaveBeenCalled();
+  });
 });
 
 describe('answer segment-comment posting adapter', () => {

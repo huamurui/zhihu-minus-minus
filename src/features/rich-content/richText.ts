@@ -49,6 +49,7 @@ export interface RichTextDecoration extends ZhihuTextRange {
   readonly thickness?: number;
   readonly offset?: number;
   readonly actionId?: string;
+  readonly hasComments?: true;
 }
 
 export interface RichTextAttachment extends ZhihuTextRange {

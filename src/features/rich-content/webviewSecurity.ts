@@ -1,7 +1,12 @@
 import { type ChildNode, Element, isTag, isText } from 'domhandler';
 import { DomUtils, parseDocument } from 'htmlparser2';
 import { getZhihuVideoRoute } from '@/utils/zhihuVideoRoute';
+import { parseZhihuSegmentHighlight } from './segmentHighlight';
 import { videoPlaybackHtml } from './videoHtml';
+import {
+  decorateWebViewSegments,
+  type WebViewSegmentParagraphs,
+} from './webviewSegments';
 
 const CONTENT_TAGS = new Set(
   'a abbr b blockquote br caption code col colgroup dd del details div dl dt em figcaption figure h1 h2 h3 h4 h5 h6 hr i img kbd li mark ol p pre q s section small span strong sub summary sup table tbody td th thead tfoot tr u ul video source'.split(
@@ -103,7 +108,10 @@ function safeStyle(value: string): string {
 }
 
 /** Keep Zhihu's content dialect while excluding executable page capabilities. */
-export function sanitizeRichContentHtml(html: string): string {
+export function sanitizeRichContentHtml(
+  html: string,
+  segmentParagraphs?: WebViewSegmentParagraphs,
+): string {
   const clean = (nodes: readonly ChildNode[]): ChildNode[] =>
     nodes.flatMap((node): ChildNode[] => {
       if (isText(node)) return [node];
@@ -159,6 +167,13 @@ export function sanitizeRichContentHtml(html: string): string {
       const classes = (node.attribs.class ?? '')
         .split(/\s+/)
         .filter((name) => name && name !== 'zhihu-empty-paragraph');
+      if (
+        classes.includes('highlight-wrap') &&
+        (parseZhihuSegmentHighlight(node.attribs)?.reaction?.commentCount ??
+          0) > 0
+      ) {
+        classes.push('segment-comments');
+      }
       if (node.name === 'p') {
         const elements = children.filter(isTag);
         const whitespaceOnly = children.every(
@@ -182,6 +197,10 @@ export function sanitizeRichContentHtml(html: string): string {
           // when dispatching rather than rewriting that lookup identity here.
           if (safe) node.attribs[name] = value.trim();
           else delete node.attribs[name];
+        } else if (name === 'data-url' && node.name === 'sup') {
+          const safe = getSafeRichContentUrl(value);
+          if (safe) node.attribs[name] = safe;
+          else delete node.attribs[name];
         } else if (IMAGE_URL_ATTRIBUTES.has(name)) {
           const safe = getSafeRichContentUrl(value, true);
           if (safe) node.attribs[name] = safe;
@@ -202,7 +221,10 @@ export function sanitizeRichContentHtml(html: string): string {
     });
   // This serializer encodes all non-ASCII characters. Keep Chinese/emoji as
   // UTF-8 so sanitizing a long answer does not multiply its bridge payload.
-  return DomUtils.getOuterHTML(clean(parseDocument(html).children)).replace(
+  const nodes = clean(parseDocument(html).children);
+  if (segmentParagraphs?.size)
+    decorateWebViewSegments(nodes, segmentParagraphs);
+  return DomUtils.getOuterHTML(nodes).replace(
     /&#x([\da-f]+);/gi,
     (entity: string, digits: string) => {
       const codePoint = Number.parseInt(digits, 16);

@@ -362,10 +362,12 @@ jest.mock('../src/features/rich-content', () => {
     isRichTextNativeAvailable: () => true,
     ZhihuContent: ({
       content,
+      selectable,
       onLayoutReady,
       renderPlaceholder,
     }: {
       content: string;
+      selectable: boolean;
       onLayoutReady: () => void;
       renderPlaceholder?: (phase: RichContentLoadingPhase) => ReactNode;
     }) => {
@@ -378,7 +380,7 @@ jest.mock('../src/features/rich-content', () => {
         return renderPlaceholder?.(mockContentLoadingPhase) ?? null;
       return react.createElement(
         native.Text,
-        { testID: 'answer-body' },
+        { testID: 'answer-body', selectable },
         content,
       );
     },
@@ -647,6 +649,7 @@ test('mounts a cached neighboring body before focus without starting detail, col
 
 test('reports only the focused answer after its body layout is ready', async () => {
   const host = await renderAnswer();
+  expect(host.getByTestId('answer-body')).toHaveProp('selectable', false);
   expect(useAnswerDetailRead).toHaveBeenLastCalledWith(
     '84',
     '7',
@@ -661,6 +664,7 @@ test('reports only the focused answer after its body layout is ready', async () 
     undefined,
   );
   await host.rerender(host.page(true, true));
+  expect(host.getByTestId('answer-body')).toHaveProp('selectable', true);
   expect(useAnswerDetailRead).toHaveBeenLastCalledWith(
     '84',
     '7',
@@ -668,6 +672,7 @@ test('reports only the focused answer after its body layout is ready', async () 
     undefined,
   );
   await host.rerender(host.page(false, true));
+  expect(host.getByTestId('answer-body')).toHaveProp('selectable', false);
   expect(useAnswerDetailRead).toHaveBeenLastCalledWith(
     '84',
     '7',

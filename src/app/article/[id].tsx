@@ -38,6 +38,7 @@ import { ActionIconCount } from '@/components/ActionIconCount';
 import { AnswerEndorsements } from '@/components/AnswerEndorsements';
 import { BouncyButton } from '@/components/BouncyButton';
 import { CollectionButton } from '@/components/CollectionButton';
+import { CommentBubbleIcon } from '@/components/CommentBubbleIcon';
 import {
   CONTENT_ACTION_BAR_HEIGHT,
   ContentActionBar,
@@ -54,7 +55,7 @@ import { ReadingProgressNotice } from '@/components/ReadingProgressNotice';
 import { SegmentedVoteCapsule } from '@/components/SegmentedVoteCapsule';
 import { ShareMenu } from '@/components/ShareMenu';
 import { StableAvatar } from '@/components/StableAvatar';
-import { Text, ThemedIcon, useThemeColor, View } from '@/components/Themed';
+import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { TitleTransitionTarget } from '@/features/adaptive-layout/TitleTransition';
@@ -663,11 +664,7 @@ export default function ArticleDetail() {
                       : undefined
                   }
                 >
-                  <ThemedIcon
-                    name="chatbubble-outline"
-                    size={20}
-                    colorType="secondary"
-                  />
+                  <CommentBubbleIcon size={20} />
                 </ActionIconCount>
               </ContentActionButton>
               <MoreActionsButton

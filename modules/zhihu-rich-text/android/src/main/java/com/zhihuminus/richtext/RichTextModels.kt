@@ -1,6 +1,7 @@
 package com.zhihuminus.richtext
 
 import android.graphics.Color
+import androidx.core.graphics.PathParser
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -25,6 +26,28 @@ internal data class FlowData(
   }
 }
 
+internal class CommentIcon private constructor(
+  pathData: String,
+  val viewBoxSize: Float,
+  val size: Float,
+  val insetX: Float,
+  val offsetY: Float
+) {
+  val path by lazy(LazyThreadSafetyMode.NONE) {
+    runCatching { PathParser.createPathFromPathData(pathData) }.getOrNull()
+  }
+
+  companion object {
+    fun parse(json: JSONObject): CommentIcon? {
+      val path = (json.opt("path") as? String)?.takeIf { it.isNotBlank() } ?: return null
+      val viewBoxSize = json.number("viewBoxSize").toFloat()
+      val size = json.number("size").toFloat()
+      if (!viewBoxSize.isFinite() || viewBoxSize <= 0 || !size.isFinite() || size <= 0) return null
+      return CommentIcon(path, viewBoxSize, size, json.number("insetX", 0.0).toFloat(), json.number("offsetY", 0.0).toFloat())
+    }
+  }
+}
+
 internal data class TextConfig(
   val fontSize: Float = 17f,
   val lineHeight: Float = 28f,
@@ -33,7 +56,8 @@ internal data class TextConfig(
   val secondaryColor: Int = Color.rgb(112, 117, 123),
   val linkColor: Int = Color.rgb(23, 91, 199),
   val justify: Boolean = false,
-  val textAlign: String = "left"
+  val textAlign: String = "left",
+  val commentIcon: CommentIcon? = null
 ) {
   companion object {
     fun parse(value: String): TextConfig = runCatching {
@@ -46,7 +70,8 @@ internal data class TextConfig(
         parseColor(json.optString("secondaryColor"), Color.rgb(112, 117, 123)),
         parseColor(json.optString("linkColor"), Color.rgb(23, 91, 199)),
         json.optBoolean("justify", false),
-        json.optString("textAlign", "left").takeIf { it == "center" || it == "right" } ?: "left"
+        json.optString("textAlign", "left").takeIf { it == "center" || it == "right" } ?: "left",
+        json.optJSONObject("commentIcon")?.let(CommentIcon::parse)
       )
     }.getOrDefault(TextConfig())
   }

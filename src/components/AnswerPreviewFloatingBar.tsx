@@ -9,6 +9,7 @@ import {
 import type { ZhihuPreviewAnswerMetadata } from '@/api/zhihu/nextRender';
 import { ActionIconCount } from '@/components/ActionIconCount';
 import { CollectionButton } from '@/components/CollectionButton';
+import { CommentBubbleIcon } from '@/components/CommentBubbleIcon';
 import {
   CONTENT_ACTION_BAR_HEIGHT,
   ContentActionBar,
@@ -19,7 +20,7 @@ import { ContentActionButton } from '@/components/ContentActionButton';
 import { MoreActionsButton } from '@/components/MoreActionsButton';
 import { SegmentedVoteCapsule } from '@/components/SegmentedVoteCapsule';
 import { useIsLiquidGlassActive } from '@/components/surfaces/FloatingSurface';
-import { ThemedIcon, useRuntimeThemeColors, View } from '@/components/Themed';
+import { useRuntimeThemeColors, View } from '@/components/Themed';
 import { usePaneDimensions } from '@/features/adaptive-layout/PaneContext';
 import { usePaneRouter as useRouter } from '@/features/adaptive-layout/usePaneRouter';
 
@@ -130,11 +131,7 @@ export function AnswerPreviewFloatingBar({
                   answer.comment_count > 0 ? answer.comment_count : undefined
                 }
               >
-                <ThemedIcon
-                  name="chatbubble-outline"
-                  size={20}
-                  colorType="secondary"
-                />
+                <CommentBubbleIcon size={20} />
               </ActionIconCount>
             </ContentActionButton>
             <MoreActionsButton

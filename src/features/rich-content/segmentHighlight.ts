@@ -1,7 +1,52 @@
 import type {
   ZhihuSegmentHighlightMetadata,
   ZhihuSegmentHighlightReaction,
+  ZhihuSegmentHighlightRun,
+  ZhihuSegmentRun,
 } from './document';
+
+export function segmentCommentCount(
+  run: ZhihuSegmentRun | ZhihuSegmentHighlightRun,
+): number | undefined {
+  const reaction =
+    run.type === 'segment'
+      ? run.segInfo?.is_like
+        ? run.segInfo
+        : (run.masterSegInfo ?? run.segInfo)
+      : undefined;
+  const count =
+    run.type === 'segmentHighlight'
+      ? run.highlight?.reaction?.commentCount
+      : reaction?.comment_count;
+  return typeof count === 'number' && Number.isSafeInteger(count) && count >= 0
+    ? count
+    : undefined;
+}
+
+export interface SegmentDecorationRange {
+  readonly start: number;
+  readonly end: number;
+  readonly run: ZhihuSegmentRun | ZhihuSegmentHighlightRun;
+}
+
+/** Prefer current API counts for identical ranges and paint each terminal position once. */
+export function segmentCommentMarkers(
+  ranges: readonly SegmentDecorationRange[],
+) {
+  const byRange = new Map<string, SegmentDecorationRange>();
+  for (const range of ranges) {
+    if (segmentCommentCount(range.run) === undefined) continue;
+    const key = `${range.start}:${range.end}`;
+    if (range.run.type === 'segment' || !byRange.has(key))
+      byRange.set(key, range);
+  }
+  const byEnd = new Map<number, SegmentDecorationRange>();
+  for (const range of byRange.values()) {
+    if ((segmentCommentCount(range.run) ?? 0) > 0 && !byEnd.has(range.end))
+      byEnd.set(range.end, range);
+  }
+  return byEnd;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

@@ -1,4 +1,3 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { FlashList } from '@shopify/flash-list';
 import {
   useInfiniteQuery,
@@ -11,10 +10,10 @@ import {
   useNavigation,
   useRouter,
 } from 'expo-router';
-import type { ComponentProps } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
 import { getNotifications, markAllNotificationsRead } from '@/api/zhihu';
+import { ActionIcon, type ActionIconName } from '@/components/ActionIcon';
 import { BouncyButton } from '@/components/BouncyButton';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { StableAvatar } from '@/components/StableAvatar';
@@ -29,8 +28,6 @@ import type {
 import { formatCompactTime } from '@/utils/date';
 import { getNotificationBody, getNotificationPath } from '@/utils/notification';
 import { refreshInfiniteQuery } from '@/utils/query';
-
-type NotificationIconName = ComponentProps<typeof Ionicons>['name'];
 
 function getNotificationContent(
   content: ZhihuNotificationItem['content'],
@@ -104,7 +101,9 @@ export default function NotificationScreen() {
 
   const notifications = data?.pages.flatMap((page) => page.data) || [];
 
-  const getIconConfig = (item: ZhihuNotificationItem) => {
+  const getIconConfig = (
+    item: ZhihuNotificationItem,
+  ): { name: ActionIconName; color: string; bg: string } => {
     const type = item.type;
     const verb = getNotificationContent(item.content)?.verb || '';
     if (
@@ -115,7 +114,7 @@ export default function NotificationScreen() {
     ) {
       const dangerColor = Colors[colorScheme].danger;
       return {
-        name: 'heart' as NotificationIconName,
+        name: 'heart',
         color: dangerColor,
         bg: isDark ? 'rgba(255, 77, 79, 0.15)' : 'rgba(255, 77, 79, 0.1)',
       };
@@ -126,7 +125,7 @@ export default function NotificationScreen() {
       type.includes('COMMENT')
     ) {
       return {
-        name: 'chatbubble-ellipses' as NotificationIconName,
+        name: 'comment-bubble',
         color: primaryColor,
         bg: `${primaryColor}1a`,
       };
@@ -134,7 +133,7 @@ export default function NotificationScreen() {
     if (verb.includes('关注') || type === 'FOLLOW_USER') {
       const successColor = Colors[colorScheme].success;
       return {
-        name: 'person-add' as NotificationIconName,
+        name: 'person-add',
         color: successColor,
         bg: isDark ? 'rgba(46, 204, 113, 0.15)' : 'rgba(46, 204, 113, 0.1)',
       };
@@ -142,13 +141,13 @@ export default function NotificationScreen() {
     if (verb.includes('邀请') || type.includes('INVITE')) {
       const warningColor = Colors[colorScheme].warning;
       return {
-        name: 'mail-open' as NotificationIconName,
+        name: 'mail-open',
         color: warningColor,
         bg: isDark ? 'rgba(255, 152, 0, 0.15)' : 'rgba(255, 152, 0, 0.1)',
       };
     }
     return {
-      name: 'notifications' as NotificationIconName,
+      name: 'notifications',
       color: Colors[colorScheme].textSecondary,
       bg: Colors[colorScheme].backgroundTertiary,
     };
@@ -182,7 +181,11 @@ export default function NotificationScreen() {
           className="w-[52px] h-[52px] rounded-full justify-center items-center"
           style={{ backgroundColor: iconConfig.bg }}
         >
-          <Ionicons name={iconConfig.name} size={28} color={iconConfig.color} />
+          <ActionIcon
+            name={iconConfig.name}
+            size={28}
+            color={iconConfig.color}
+          />
         </View>
 
         <View className="ml-[15px] flex-1 bg-transparent">

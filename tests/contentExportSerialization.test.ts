@@ -13,6 +13,7 @@ import {
   serializeExportMarkdown,
 } from '../src/features/content-export/serializers';
 import type { ExportSource } from '../src/features/content-export/types';
+import { normalizeZhihuDocument } from '../src/features/rich-content/normalization/normalizeZhihuDocument';
 
 jest.mock('../src/features/rich-content', () => ({
   ...jest.requireActual('../src/features/rich-content/presentation'),
@@ -588,6 +589,77 @@ test('footnote references and backlinks use generated IDs, including repeated an
   expect(markdown).toContain('[^note-1][^note-1]');
   expect(markdown).toContain('[^note-1]: 脚注第一段\n    \n    脚注第二段');
 });
+
+test('exports URL-only citations and redacts both the link and its generated label', () => {
+  const { document } = normalizeZhihuDocument(
+    '<p>示例<sup data-numero="1" data-text="" data-url="https://example.org/source?utm_source=tracking">[1]</sup><sup data-numero="2" data-url="https://example.org/other?token=private">[2]</sup></p>',
+    { documentId: 'footnote-example' },
+  );
+  const input = { ...source([]), document };
+  const html = main(serializeExportHtml(input, options));
+  expect(html).toContain('role="doc-noteref">[1]</a>');
+  expect(html).toContain('href="https://example.org/source"');
+  expect(html).toContain('>https://example.org/source</a>');
+  const markdown = serializeExportMarkdown(input, options);
+  expect(markdown).toContain('](<https://example.org/source>)');
+  for (const content of [html, markdown]) {
+    expect(content).toContain('来源链接未导出');
+    expect(content).not.toMatch(/暂无定义|tracking|private/);
+  }
+});
+
+test('redacts URL labels split across formatting while keeping descriptive link styling', () => {
+  const { document } = normalizeZhihuDocument(
+    '<p><a href="https://example.org/source#export-demo"><strong>https://example.org/</strong><em>source#export-demo</em></a>' +
+      '<a href="https://example.org/private?token=synthetic"><code>https://example.org/private?token=synthetic</code></a>' +
+      '<a href="https://example.org/source#export-demo"><strong>资料说明</strong></a></p>',
+    { documentId: 'styled-link-labels' },
+  );
+  const input = { ...source([]), document };
+  const html = main(serializeExportHtml(input, options));
+  const markdown = serializeExportMarkdown(input, options);
+  for (const output of [html, markdown]) {
+    expect(output).not.toMatch(/export-demo|synthetic/);
+    expect(output).toContain('来源链接未导出');
+  }
+  expect(html).toContain('>https://example.org/source</a>');
+  expect(html).toContain('<strong>资料说明</strong>');
+  expect(markdown).toContain(
+    '[https://example\\.org/source](<https://example.org/source>)',
+  );
+  expect(markdown).toContain('[**资料说明**](<https://example.org/source>)');
+});
+
+test.each([
+  {
+    format: 'HTML',
+    render: serializeExportHtml,
+    publicLabel: '>https://example.org/Read</a>',
+    descriptiveLabel: '<strong>阅读说明</strong>',
+  },
+  {
+    format: 'Markdown',
+    render: serializeExportMarkdown,
+    publicLabel: '[https://example\\.org/Read](<https://example.org/Read>)',
+    descriptiveLabel: '[**阅读说明**](<https://example.org/Read>)',
+  },
+])(
+  'redacts normalized mixed-case URL labels in $format',
+  ({ render, publicLabel, descriptiveLabel }) => {
+    const { document } = normalizeZhihuDocument(
+      '<p><a href="https://EXAMPLE.org/private?token=inlineFixture"><strong>https://EXAMPLE.org/</strong><em>private?token=inlineFixture</em></a></p>' +
+        '<p><a href="https://Example.ORG/Read?utm_source=trackingFixture">https://Example.ORG/Read?utm_source=trackingFixture</a></p>' +
+        '<a data-draft-type="link-card" href="https://EXample.org/card?token=cardFixture" data-draft-title="https://EXample.org/card?token=cardFixture"></a>' +
+        '<p><a href="https://Example.ORG/Read?utm_source=trackingFixture"><strong>阅读说明</strong></a></p>',
+      { documentId: 'mixed-case-url-labels' },
+    );
+    const output = render({ ...source([]), document }, options);
+    expect(output).not.toMatch(/inlineFixture|trackingFixture|cardFixture/);
+    expect(output.match(/来源链接未导出/g)).toHaveLength(2);
+    expect(output).toContain(publicLabel);
+    expect(output).toContain(descriptiveLabel);
+  },
+);
 
 test('footnotes referenced only inside an HTML table remain visible in Markdown', () => {
   const complex = table(true);

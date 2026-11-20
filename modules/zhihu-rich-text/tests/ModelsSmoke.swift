@@ -17,6 +17,10 @@ struct ModelsSmoke {
     expect(richTextRange(["start": true, "end": 3], in: text) == nil, "JSON booleans are not numeric offsets")
     expect(richTextRange(["start": -1, "end": 3], in: text) == nil, "Negative offsets are rejected")
     expect(richTextRange(["start": 0, "end": 7], in: text) == nil, "Out-of-bounds offsets are rejected")
+    let marked = "甲\n😀\n\n" as NSString
+    expect(richTextDecorationRange(["start": 0, "end": 6], in: marked) == NSRange(location: 0, length: 4), "A marker trailing newlines ends after the final visible composed glyph")
+    expect(richTextDecorationRange(["start": 4, "end": 6], in: marked) == nil, "A newline-only range has no marker")
+    expect(richTextDecorationRange(["start": 2, "end": 4], in: marked) == NSRange(location: 2, length: 2), "Text-only marker ranges are unchanged")
     expect(!validRichTextRange(NSRange(location: NSNotFound, length: 1), in: text), "NSNotFound is rejected without overflow")
     expect(!validRichTextRange(NSRange(location: 1, length: Int.max), in: text), "Oversized ranges are rejected without overflow")
 

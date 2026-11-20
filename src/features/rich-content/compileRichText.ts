@@ -19,6 +19,11 @@ import type {
   RichTextSourceRange,
   RichTextSpan,
 } from './richText';
+import { segmentUnderlineOffset } from './segmentCommentIcon';
+import {
+  type SegmentDecorationRange,
+  segmentCommentMarkers,
+} from './segmentHighlight';
 
 export interface RichTextCompilationOptions {
   fontSize: number;
@@ -26,6 +31,7 @@ export interface RichTextCompilationOptions {
   paragraphSpacing?: number;
   /** A separately rendered container child can continue its preceding blank. */
   continuesEmptyParagraph?: boolean;
+  enableSegmentTap?: boolean;
 }
 
 interface FlowBuilder {
@@ -102,10 +108,17 @@ export function compileZhihuDocument(
     lineHeight / fontSize,
   );
   let builder = newBuilder();
+  let segmentRanges: SegmentDecorationRange[] = [];
   let flowSerial = 0;
 
   function flush(): void {
     if (builder.text.length) {
+      const markers = segmentCommentMarkers(segmentRanges);
+      builder.decorations = builder.decorations.map((decoration) =>
+        markers.get(decoration.end)?.run.id === decoration.nodeId
+          ? { ...decoration, hasComments: true }
+          : decoration,
+      );
       const identity = JSON.stringify({
         text: builder.text,
         spans: builder.spans,
@@ -123,6 +136,7 @@ export function compileZhihuDocument(
       });
     }
     builder = newBuilder();
+    segmentRanges = [];
   }
 
   function append(
@@ -256,6 +270,7 @@ export function compileZhihuDocument(
         });
       }
       if (run.type === 'segment' || run.type === 'segmentHighlight') {
+        segmentRanges.push({ start, end, run });
         builder.decorations.push({
           id: `${run.id}:decoration`,
           nodeId: run.id,
@@ -263,8 +278,8 @@ export function compileZhihuDocument(
           end,
           kind: 'dashed',
           thickness: 1.2,
-          offset: 3,
-          actionId: run.id,
+          offset: segmentUnderlineOffset,
+          ...(options.enableSegmentTap !== false && { actionId: run.id }),
         });
       }
     }

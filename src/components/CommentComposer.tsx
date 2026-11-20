@@ -36,6 +36,7 @@ interface SelectedImage {
 }
 
 interface CommentComposerProps {
+  autoFocus?: boolean;
   useGlass?: boolean;
   colorScheme: 'light' | 'dark';
   borderColor: string;
@@ -52,6 +53,7 @@ interface CommentComposerProps {
 }
 
 export function CommentComposer({
+  autoFocus,
   useGlass = false,
   colorScheme,
   borderColor,
@@ -349,6 +351,7 @@ export function CommentComposer({
         </BouncyButton>
         <TextInput
           ref={inputRef}
+          autoFocus={autoFocus}
           className="flex-1 min-h-[40px] max-h-[100px] px-2 py-2.5"
           style={{
             color: foreground,

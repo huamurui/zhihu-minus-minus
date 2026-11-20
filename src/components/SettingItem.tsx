@@ -1,6 +1,6 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import React from 'react';
 import { View as RNView, StyleSheet } from 'react-native';
+import { ActionIcon, type ActionIconName } from '@/components/ActionIcon';
 import { BouncyButton } from '@/components/BouncyButton';
 import { Text, useThemeColor } from '@/components/Themed';
 
@@ -58,7 +58,7 @@ export function SettingItem({
   stacked = false,
 }: {
   label: string;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: ActionIconName;
   children: React.ReactNode;
   colorScheme: 'light' | 'dark';
   /** 控件放到标签下方整行，用于放不下一行的选项组。 */
@@ -80,7 +80,7 @@ export function SettingItem({
               },
             ]}
           >
-            <Ionicons name={icon} size={16} color={textColor} />
+            <ActionIcon name={icon} size={16} color={textColor} />
           </RNView>
         )}
         <Text style={styles.settingLabel}>{label}</Text>

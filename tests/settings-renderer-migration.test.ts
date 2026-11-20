@@ -30,7 +30,7 @@ beforeEach(() => {
   jest.mocked(SecureStore.getItemAsync).mockResolvedValue(null);
 });
 
-test('defaults to tiqian-super-mini with visual feedback and filtering enabled in settings version 21', () => {
+test('defaults to tiqian-super-mini with visual feedback and filtering enabled in settings version 22', () => {
   expect(useSettingsStore.getState().richContentRenderer).toBe('native-v2');
   expect(useSettingsStore.getState().enablePressFeedback).toBe(true);
   expect(useSettingsStore.getState().enableLocalFeedFilter).toBe(true);
@@ -39,7 +39,20 @@ test('defaults to tiqian-super-mini with visual feedback and filtering enabled i
   expect(useSettingsStore.getState().filterEnableQuality).toBe(false);
   expect(useSettingsStore.getState().filterBlockLabeled).toBe(false);
   expect(useSettingsStore.getState().filterRegexPatterns).toEqual([]);
-  expect(useSettingsStore.persist.getOptions().version).toBe(21);
+  expect(useSettingsStore.persist.getOptions().version).toBe(22);
+});
+
+test('allows opting out of segment taps and keeps previous installs enabled', async () => {
+  expect(useSettingsStore.getState().enableSegmentTap).toBe(true);
+  expect((await migrate({}, 21)).enableSegmentTap).toBe(true);
+  expect(
+    (await migrate({ enableSegmentTap: false }, 21)).enableSegmentTap,
+  ).toBe(false);
+  useSettingsStore.getState().updateSettings({ enableSegmentTap: false });
+  const persisted = jest
+    .mocked(SecureStore.setItemAsync)
+    .mock.calls.at(-1)?.[1];
+  expect(persisted && JSON.parse(persisted).state.enableSegmentTap).toBe(false);
 });
 
 test('leaves the double-tap action unset until the user picks one', () => {
@@ -169,7 +182,7 @@ test('hydrates legacy settings and writes back only the new renderer field', asy
       fontSizeScale: 1.3,
       enablePressFeedback: true,
     },
-    version: 21,
+    version: 22,
   });
   expect(JSON.parse(persistedJson).state).not.toHaveProperty('useWebView');
 });
@@ -322,7 +335,7 @@ test('persists and restores sanitized custom regex rules together with a disable
       enableLocalFeedFilter: false,
       filterRegexPatterns: expectedPatterns,
     },
-    version: 21,
+    version: 22,
   });
   useSettingsStore.setState({
     enableLocalFeedFilter: true,

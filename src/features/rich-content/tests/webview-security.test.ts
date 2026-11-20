@@ -2,8 +2,10 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { isTag, type Node } from 'domhandler';
 import { DomUtils, parseDocument } from 'htmlparser2';
+import { compileZhihuDocument } from '../compileRichText';
 import type { ZhihuDocument } from '../document';
 import { serializeZhihuDocumentHtml } from '../documentHtml';
+import { getWebViewSegmentParagraphs } from '../nativeInteractions';
 import { normalizeZhihuDocument } from '../normalization/normalizeZhihuDocument';
 import {
   getSafeRichContentUrl,
@@ -209,6 +211,10 @@ test.each([
   'https://link.zhihu.com/?target=javascript%3Athrow%201',
 ])('rejects an unsafe content URL %s', (url) => {
   expect(getSafeRichContentUrl(url)).toBeUndefined();
+  const [reference] = parseDocument(
+    sanitizeRichContentHtml(`<sup data-numero="1" data-url="${url}">1</sup>`),
+  ).children;
+  expect(isTag(reference) && reference.attribs['data-url']).toBeUndefined();
 });
 
 test('keeps safe links, resources and inert image data while validating redirect destinations', () => {
@@ -483,3 +489,120 @@ test('semantic documents retain text, paragraph identity and media protocols wit
   expect(html).not.toMatch(/javascript:|NaN|Infinity/);
   expect(JSON.parse(serializeInlineScriptValue(sanitized))).toBe(sanitized);
 });
+
+test('marks the exact end of a commented source range across formatted WebView text leaves', () => {
+  const html =
+    '<p data-pid="one">前<b>甲<i>😀</i></b><a href="/people/u">乙后</a><span class="highlight-wrap" data-highlight-comment-count="0">零</span><span class="highlight-wrap">未知</span></p>';
+  const { document } = normalizeZhihuDocument(html, {
+    documentId: 'answer:42',
+    segmentInfos: [
+      {
+        pid: 'one',
+        text: '前甲😀乙后零未知',
+        marks: [
+          {
+            start_index: 1,
+            end_index: 5,
+            seg_info: { is_like: false, like_count: 1, comment_count: 2 },
+          },
+        ],
+      },
+    ],
+  });
+  for (const serialized of [
+    sanitizeRichContentHtml(html, getWebViewSegmentParagraphs(document)),
+    sanitizeRichContentHtml(
+      serializeZhihuDocumentHtml(document),
+      getWebViewSegmentParagraphs(document),
+    ),
+  ]) {
+    const nodes = parseDocument(serialized).children;
+    expect(DomUtils.textContent(nodes)).toBe('前甲😀乙后零未知');
+    expect(
+      DomUtils.findAll((node) => node.name === 'a', nodes)
+        .map((link) => DomUtils.textContent(link))
+        .join(''),
+    ).toBe('乙后');
+    const marked = DomUtils.findAll(
+      (node) =>
+        node.attribs.class?.split(' ').includes('segment-comments') === true,
+      nodes,
+    );
+    expect(marked).toHaveLength(1);
+    expect(DomUtils.textContent(marked[0])).toMatch(/乙$/);
+  }
+});
+
+test.each([0, 2])(
+  'uses the current API count %i for an exactly matching HTML underline',
+  (count) => {
+    const html =
+      '<p data-pid="one"><span class="highlight-wrap" data-highlight-comment-count="1">范围</span></p>';
+    const { document } = normalizeZhihuDocument(html, {
+      documentId: 'answer:42',
+      segmentInfos: [
+        {
+          pid: 'one',
+          text: '范围',
+          marks: [
+            {
+              start_index: 0,
+              end_index: 2,
+              seg_info: { is_like: false, like_count: 1, comment_count: count },
+            },
+          ],
+        },
+      ],
+    });
+    const index = getWebViewSegmentParagraphs(document);
+    for (const source of [html, serializeZhihuDocumentHtml(document)]) {
+      const nodes = parseDocument(
+        sanitizeRichContentHtml(source, index),
+      ).children;
+      const marked = DomUtils.findAll(
+        (node) =>
+          node.attribs.class?.split(' ').includes('segment-comments') === true,
+        nodes,
+      );
+      expect(marked).toHaveLength(count > 0 ? 1 : 0);
+    }
+  },
+);
+
+test.each([0, 2])(
+  'keeps a single terminal marker when an outer commented range and an inner range with %i comments end together',
+  (innerCount) => {
+    const html = `<p data-pid="one"><span class="highlight-wrap" data-highlight-comment-count="3">甲<span class="highlight-wrap" data-highlight-comment-count="${innerCount}">乙</span></span></p>`;
+    const { document } = normalizeZhihuDocument(html, {
+      documentId: 'answer:42',
+    });
+    const paragraphs = getWebViewSegmentParagraphs(document);
+    const range = paragraphs
+      .get('one')
+      ?.annotations.find((mark) => mark.start === (innerCount ? 1 : 0));
+    expect(range?.run.id).toBeDefined();
+    for (const source of [html, serializeZhihuDocumentHtml(document)]) {
+      const nodes = parseDocument(
+        sanitizeRichContentHtml(source, paragraphs),
+      ).children;
+      const marked = DomUtils.findAll(
+        (node) =>
+          node.attribs.class?.split(' ').includes('segment-comments') === true,
+        nodes,
+      );
+      expect(marked).toHaveLength(1);
+      expect(marked[0].attribs['data-segment-node-id']).toBe(range?.run.id);
+      expect(DomUtils.textContent(marked[0])).toBe('乙');
+    }
+    const part = compileZhihuDocument(document, {
+      fontSize: 17,
+      lineHeight: 26,
+    }).parts[0];
+    if (part.type !== 'flow') throw new Error('Expected flow');
+    expect(
+      part.flow.decorations
+        .filter((decoration) => decoration.hasComments)
+        .map((decoration) => decoration.nodeId),
+    ).toEqual([range?.run.id]);
+  },
+);

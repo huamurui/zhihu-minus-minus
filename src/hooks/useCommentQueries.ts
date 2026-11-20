@@ -2,20 +2,60 @@ import {
   type InfiniteData,
   type QueryKey,
   useInfiniteQuery,
+  useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   type AnswerSegmentCommentTarget,
+  type CommentItem,
   getAnswerCommentsV5,
   getArticleCommentsV5,
   getChildCommentsV5,
+  getCommentStickers,
   getPinCommentsV5,
   getQuestionCommentsV5,
   getSegmentComments,
   type ZhihuCommentResponse,
 } from '@/api/zhihu';
+import { parseCommentContent } from '@/utils/commentContent';
 import { refreshInfiniteQuery } from '@/utils/query';
+
+function containsSticker(content: string | undefined): boolean {
+  // HTML may encode the opening bracket with a numeric or a named entity.
+  if (!content || !(content.includes('[') || content.includes('&')))
+    return false;
+  return parseCommentContent(content).some(
+    (part) => part.kind === 'placeholder',
+  );
+}
+
+/** One shared catalogue for comment lists and replies. Plain comments render immediately. */
+export function useCommentStickers(
+  comments: CommentItem[],
+  parent?: CommentItem,
+) {
+  const parentContent = parent?.content;
+  const enabled = useMemo(
+    () =>
+      containsSticker(parentContent) ||
+      comments.some(
+        (comment) =>
+          containsSticker(comment.content) ||
+          comment.child_comments
+            ?.slice(0, 2)
+            .some((child) => containsSticker(child.content)),
+      ),
+    [comments, parentContent],
+  );
+  return useQuery({
+    queryKey: ['comment-stickers', '1114161698310770688'],
+    queryFn: ({ signal }) => getCommentStickers(signal),
+    enabled,
+    staleTime: 24 * 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
+  }).data;
+}
 
 // V5 cursors can be opaque strings; preserve their URL encoding for the API.
 function nextCommentOffset(page: ZhihuCommentResponse) {
@@ -51,15 +91,18 @@ function useCommentQuery({
       return next && !pageParams.includes(next) ? next : undefined;
     },
   });
-  const seen = new Set<string>();
-  const comments = (
-    query.data?.pages.flatMap((page) => page.data || []) || []
-  ).filter((comment) => {
-    const id = String(comment.id);
-    if (seen.has(id)) return false;
-    seen.add(id);
-    return true;
-  });
+  const pages = query.data?.pages;
+  const comments = useMemo(() => {
+    const seen = new Set<string>();
+    return (pages?.flatMap((page) => page.data || []) || []).filter(
+      (comment) => {
+        const id = String(comment.id);
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      },
+    );
+  }, [pages]);
 
   const refresh = async () => {
     setRefreshing(true);

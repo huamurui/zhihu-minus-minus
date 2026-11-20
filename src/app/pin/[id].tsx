@@ -16,6 +16,7 @@ import { getPin } from '@/api/zhihu/pin';
 import { getContentVoteCount, getContentVoteState } from '@/api/zhihu/voters';
 import { ActionIconCount } from '@/components/ActionIconCount';
 import { BouncyButton } from '@/components/BouncyButton';
+import { CommentBubbleIcon } from '@/components/CommentBubbleIcon';
 import {
   CONTENT_ACTION_BAR_HEIGHT,
   ContentActionBar,
@@ -33,7 +34,7 @@ import { SegmentedVoteCapsule } from '@/components/SegmentedVoteCapsule';
 import { ShareMenu } from '@/components/ShareMenu';
 import { RetainedAvatar } from '@/components/StableAvatar';
 import { useIsLiquidGlassActive } from '@/components/surfaces/FloatingSurface';
-import { Text, ThemedIcon, useThemeColor, View } from '@/components/Themed';
+import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import {
@@ -436,11 +437,7 @@ export default function PinDetailScreen() {
                 <ActionIconCount
                   count={pin.comment_count > 0 ? pin.comment_count : undefined}
                 >
-                  <ThemedIcon
-                    name="chatbubble-outline"
-                    size={20}
-                    colorType="secondary"
-                  />
+                  <CommentBubbleIcon size={20} />
                 </ActionIconCount>
               </ContentActionButton>
               <MoreActionsButton

@@ -168,7 +168,7 @@ describe('feed context-menu preview transitions', () => {
   });
 
   it('opens once per visible session and closes toward the latest measured frame', async () => {
-    const props = {
+    const props: React.ComponentProps<typeof CustomContextMenu> = {
       visible: true,
       onClose: jest.fn(),
       previewContent: React.createElement(Text, null, '预览正文'),
@@ -287,7 +287,7 @@ describe('feed context-menu preview transitions', () => {
     async (change) => {
       const action = jest.fn();
       const onClose = jest.fn();
-      const props = {
+      const props: React.ComponentProps<typeof CustomContextMenu> = {
         visible: true,
         contentIdentity: 'answer:first',
         onClose,

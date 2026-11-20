@@ -1,7 +1,7 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import type { VoteContentType } from '@/api/zhihu/voters';
 import { BouncyButton } from '@/components/BouncyButton';
 import { CollectionButton } from '@/components/CollectionButton';
+import { CommentBubbleIcon } from '@/components/CommentBubbleIcon';
 import { DownvoteButton } from '@/components/DownvoteButton';
 import { LikeButton } from '@/components/LikeButton';
 import { MoreActionsButton } from '@/components/MoreActionsButton';
@@ -77,11 +77,7 @@ export function FeedCardActionRow({
             onPress={onComments}
             className="flex-row items-center bg-transparent ml-2 py-1 px-3 rounded-full"
           >
-            <Ionicons
-              name="chatbubble-outline"
-              size={16}
-              color={secondaryColor}
-            />
+            <CommentBubbleIcon size={16} color={secondaryColor} />
             <Text type="secondary" className="ml-1 text-xs font-semibold">
               {commentCount > 0 ? commentCount : '0'}
             </Text>

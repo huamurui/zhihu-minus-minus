@@ -13,6 +13,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.huamu013.ZhihuMinusMinus",
       "infoPlist": {
+        "CFBundleDevelopmentRegion": "zh-Hans",
+        "CFBundleLocalizations": ["zh-Hans"],
         "ITSAppUsesNonExemptEncryption": false
       }
     },

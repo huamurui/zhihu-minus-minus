@@ -16,25 +16,21 @@ const OPTIONS: {
   value: DoubleTapAction;
   label: string;
   description: string;
-  icon: keyof typeof Ionicons.glyphMap;
 }[] = [
   {
     value: 'off',
     label: '关闭',
     description: '双击正文不执行任何操作',
-    icon: 'close-circle-outline',
   },
   {
     value: 'like',
     label: '点赞',
     description: '双击正文点赞，已点赞不会取消',
-    icon: 'heart-outline',
   },
   {
     value: 'comments',
     label: '打开评论区',
     description: '双击正文进入评论区',
-    icon: 'chatbubble-outline',
   },
 ];
 
