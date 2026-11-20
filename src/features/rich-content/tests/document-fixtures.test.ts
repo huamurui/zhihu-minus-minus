@@ -289,6 +289,41 @@ describe('stored Zhihu dialect fixtures through Native V2 normalization', () => 
     expect(copiedText).not.toContain('暂无定义');
   });
 
+  it('renders all six URL-only citations from the captured reference format', () => {
+    const { document, diagnostics } = normalizeZhihuDocument(
+      string(fixture('url-only-footnotes-001').content),
+      { documentId: 'fixture:url-only-footnotes' },
+    );
+    const references = [...walkZhihuDocument(document)].filter(
+      (node) => node.type === 'footnoteReference',
+    );
+    expect(references).toHaveLength(6);
+    expect(document.footnotes).toHaveLength(6);
+    expect(diagnostics).toEqual([]);
+    const parts = compileZhihuDocument(document, {
+      fontSize: 17,
+      lineHeight: 26,
+    }).parts;
+    const flows = parts.filter((part) => part.type === 'flow');
+    for (const [index, reference] of references.entries()) {
+      const number = index + 1;
+      const url = `https://example.org/references/${number}`;
+      expect(document.footnotes?.[index]).toMatchObject({
+        id: reference.definitionId,
+        label: String(number),
+        blocks: [
+          {
+            type: 'paragraph',
+            children: [
+              { type: 'link', url, children: [{ type: 'text', text: url }] },
+            ],
+          },
+        ],
+      });
+      expect(flows.some(({ flow }) => flow.text.includes(url))).toBe(true);
+    }
+  });
+
   it('recognizes the heavy fixture editor-only card and projects its canonical link, description and nested image metadata', () => {
     const envelope = object(fixture('question-feed-card-heavy').target);
     const html = string(envelope.content);

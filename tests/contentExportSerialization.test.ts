@@ -13,6 +13,7 @@ import {
   serializeExportMarkdown,
 } from '../src/features/content-export/serializers';
 import type { ExportSource } from '../src/features/content-export/types';
+import { normalizeZhihuDocument } from '../src/features/rich-content/normalization/normalizeZhihuDocument';
 
 jest.mock('../src/features/rich-content', () => ({
   ...jest.requireActual('../src/features/rich-content/presentation'),
@@ -587,6 +588,24 @@ test('footnote references and backlinks use generated IDs, including repeated an
   const markdown = serializeExportMarkdown(withNotes, options);
   expect(markdown).toContain('[^note-1][^note-1]');
   expect(markdown).toContain('[^note-1]: 脚注第一段\n    \n    脚注第二段');
+});
+
+test('exports URL-only citations and redacts both the link and its generated label', () => {
+  const { document } = normalizeZhihuDocument(
+    '<p>示例<sup data-numero="1" data-text="" data-url="https://example.org/source?utm_source=tracking">[1]</sup><sup data-numero="2" data-url="https://example.org/other?token=private">[2]</sup></p>',
+    { documentId: 'footnote-example' },
+  );
+  const input = { ...source([]), document };
+  const html = main(serializeExportHtml(input, options));
+  expect(html).toContain('role="doc-noteref">[1]</a>');
+  expect(html).toContain('href="https://example.org/source"');
+  expect(html).toContain('>https://example.org/source</a>');
+  const markdown = serializeExportMarkdown(input, options);
+  expect(markdown).toContain('](<https://example.org/source>)');
+  for (const content of [html, markdown]) {
+    expect(content).toContain('来源链接未导出');
+    expect(content).not.toMatch(/暂无定义|tracking|private/);
+  }
 });
 
 test('footnotes referenced only inside an HTML table remain visible in Markdown', () => {

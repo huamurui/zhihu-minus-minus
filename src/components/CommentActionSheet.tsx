@@ -1,5 +1,6 @@
 import { ActionSheet } from '@/components/overlays/ActionSheet';
 import { copyToClipboard } from '@/utils/clipboard';
+import { parseCommentContent } from '@/utils/commentContent';
 import { showToast } from '@/utils/toast';
 
 interface CommentActionSheetProps {
@@ -11,16 +12,6 @@ interface CommentActionSheetProps {
   onClose: () => void;
 }
 
-function extractCommentText(htmlContent: string): string {
-  const imageRegex =
-    /<a[^>]+class="comment_img"[^>]*href="([^"]+)"[^>]*>.*?<\/a>|<a[^>]+href="([^"]+)"[^>]*class="comment_img"[^>]*>.*?<\/a>/gi;
-
-  return htmlContent
-    .replace(imageRegex, '[图片]')
-    .replace(/<[^>]+>/g, '')
-    .trim();
-}
-
 export function CommentActionSheet({
   visible,
   htmlContent,
@@ -29,7 +20,11 @@ export function CommentActionSheet({
   onDelete,
   onClose,
 }: CommentActionSheetProps) {
-  const commentText = htmlContent ? extractCommentText(htmlContent) : '';
+  const commentText = htmlContent
+    ? parseCommentContent(htmlContent)
+        .map((part) => part.text)
+        .join('')
+    : '';
   if (!htmlContent || !authorName || !commentText) return null;
 
   const options = [

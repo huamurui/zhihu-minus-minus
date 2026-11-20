@@ -1,4 +1,7 @@
+import axios from 'axios';
+import type { TextSelectionInfo } from '@/features/rich-content';
 import { normalizeCommentTags } from '@/utils/commentIdentity';
+import { getCommentImageUrl } from '@/utils/zhihuContent';
 import apiClient from '../client';
 import type { ZhihuVoteResponse } from './voters';
 
@@ -274,16 +277,45 @@ export function parseAnswerSegmentCommentTarget(
     : null;
 }
 
+function isTextOffset(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
 function segmentTextOffset(value: unknown): number | null {
   const offset =
     typeof value === 'string' && /^(?:0|[1-9]\d*)$/.test(value)
       ? Number(value)
       : value;
-  return typeof offset === 'number' &&
-    Number.isSafeInteger(offset) &&
-    offset >= 0
-    ? offset
-    : null;
+  return isTextOffset(offset) ? offset : null;
+}
+
+function isParagraphId(value: unknown): value is string {
+  return typeof value === 'string' && !!value && value.trim() === value;
+}
+
+export function isValidAnswerCommentSelection(
+  answerId: string,
+  selection: unknown,
+): selection is TextSelectionInfo {
+  const source = segmentRouteRecord(selection);
+  if (
+    typeof answerId !== 'string' ||
+    !/^[1-9]\d*$/.test(answerId) ||
+    !source ||
+    typeof source.text !== 'string' ||
+    !source.text.trim() ||
+    /[\uD800-\uDFFF\uFFFC]/u.test(source.text) ||
+    !isParagraphId(source.startParagraphId) ||
+    !isParagraphId(source.endParagraphId) ||
+    !isTextOffset(source.startOffset) ||
+    !isTextOffset(source.endOffset)
+  )
+    return false;
+  // Both renderers join source paragraphs with a newline. Everything after
+  // that boundary starts at offset zero in the final paragraph.
+  return source.startParagraphId === source.endParagraphId
+    ? source.endOffset - source.startOffset === source.text.length
+    : source.text[source.text.length - source.endOffset - 1] === '\n';
 }
 
 /** A posting context must carry the exact single-paragraph UTF-16 source slice. */
@@ -298,28 +330,20 @@ export function parseAnswerSegmentCommentContext(
     (route.type !== 'answer' && route.type !== 'answers')
   )
     return null;
-  const startOffset = segmentTextOffset(route.startOffset);
-  const endOffset = segmentTextOffset(route.endOffset);
-  if (
-    typeof route.text !== 'string' ||
-    !route.text.trim() ||
-    /[\uD800-\uDFFF]/u.test(route.text) ||
-    route.text.includes('\uFFFC') ||
-    typeof route.pid !== 'string' ||
-    !route.pid.trim() ||
-    route.pid !== route.pid.trim() ||
-    startOffset === null ||
-    endOffset === null ||
-    endOffset <= startOffset ||
-    endOffset - startOffset !== route.text.length
-  )
-    return null;
+  const selection = {
+    text: route.text,
+    startParagraphId: route.pid,
+    endParagraphId: route.pid,
+    startOffset: segmentTextOffset(route.startOffset),
+    endOffset: segmentTextOffset(route.endOffset),
+  };
+  if (!isValidAnswerCommentSelection(target.answerId, selection)) return null;
   return {
     ...target,
-    segmentText: route.text,
-    paragraphId: route.pid,
-    startOffset,
-    endOffset,
+    segmentText: selection.text,
+    paragraphId: selection.startParagraphId,
+    startOffset: selection.startOffset,
+    endOffset: selection.endOffset,
   };
 }
 
@@ -345,27 +369,58 @@ export async function createAnswerSegmentComment(
     !/^[1-9]\d*$/.test(String(replyToCommentId))
   )
     throw new Error('回复目标无效');
+  return postAnswerSelectionComment(
+    verified.answerId,
+    {
+      text: verified.segmentText,
+      startParagraphId: verified.paragraphId,
+      endParagraphId: verified.paragraphId,
+      startOffset: verified.startOffset,
+      endOffset: verified.endOffset,
+    },
+    content,
+    replyToCommentId,
+  );
+}
+
+export async function createAnswerSelectionComment(
+  answerId: string,
+  selection: TextSelectionInfo,
+  content: string,
+): Promise<CreateCommentResponse> {
+  if (!isValidAnswerCommentSelection(answerId, selection))
+    throw new Error('选区缺少有效的原文位置，请返回正文重新选择');
+  if (!content.trim()) throw new Error('请输入评论内容');
+  return postAnswerSelectionComment(answerId, selection, content);
+}
+
+async function postAnswerSelectionComment(
+  answerId: string,
+  selection: TextSelectionInfo,
+  content: string,
+  replyToCommentId?: string | number,
+): Promise<CreateCommentResponse> {
   const payload = {
     content,
     ...(replyToCommentId !== undefined && {
       reply_comment_id: replyToCommentId,
     }),
     segment: {
-      content: verified.segmentText,
+      content: selection.text,
       position: {
         start: {
-          paragraph_id: verified.paragraphId,
-          offset: verified.startOffset,
+          paragraph_id: selection.startParagraphId,
+          offset: selection.startOffset,
         },
         end: {
-          paragraph_id: verified.paragraphId,
-          offset: verified.endOffset,
+          paragraph_id: selection.endParagraphId,
+          offset: selection.endOffset,
         },
       },
     },
   };
   const response = await apiClient.post<CreateCommentResponse>(
-    `/comment_v5/answers/${encodeURIComponent(verified.answerId)}/segment/comment`,
+    `/comment_v5/answers/${encodeURIComponent(answerId)}/segment/comment`,
     payload,
   );
   return response.data;
@@ -620,6 +675,43 @@ type CommentRecord = Record<string, unknown>;
 
 const isCommentRecord = (value: unknown): value is CommentRecord =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
+
+export type CommentStickers = Readonly<Record<string, string>>;
+
+/** This public catalogue includes small inline PNGs as well as CDN URLs. */
+export async function getCommentStickers(
+  signal?: AbortSignal,
+): Promise<CommentStickers> {
+  const response = await axios.get<unknown>(
+    'https://www.zhihu.com/api/v4/sticker-groups/1114161698310770688',
+    { signal, timeout: 10000, withCredentials: false },
+  );
+  const body = response.data;
+  const group = isCommentRecord(body) ? body.data : null;
+  if (!isCommentRecord(group) || !Array.isArray(group.stickers)) {
+    throw new Error('评论表情目录暂不可用');
+  }
+  const result: Record<string, string> = {};
+  for (const entry of group.stickers) {
+    if (!isCommentRecord(entry)) continue;
+    const { placeholder, static_image_url: source } = entry;
+    if (
+      typeof placeholder !== 'string' ||
+      !/^\[[^\s[\]<>]{1,32}\]$/.test(placeholder) ||
+      typeof source !== 'string'
+    )
+      continue;
+    // Only the fixed first-party catalogue may supply PNG data. User-authored HTML cannot.
+    const url = source.startsWith('data:')
+      ? source.length <= 256 * 1024 &&
+        /^data:image\/png;base64,iVBORw0KGgo[A-Za-z0-9+/]*={0,2}$/.test(source)
+        ? source
+        : null
+      : getCommentImageUrl(source);
+    if (url) result[placeholder] = url;
+  }
+  return result;
+}
 
 const normalizeAuthor = (value: unknown): CommentAuthor | undefined => {
   if (!isCommentRecord(value)) return undefined;

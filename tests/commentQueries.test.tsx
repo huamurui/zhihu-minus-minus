@@ -87,6 +87,9 @@ test('answer comments use V5 sorting and opaque cursors, deduplicate overlaps an
     { initialProps: { orderBy: 'score' as 'score' | 'ts' }, wrapper },
   );
   await waitFor(() => expect(host.result.current.hasNextPage).toBe(true));
+  const initialComments = host.result.current.comments;
+  await host.rerender({ orderBy: 'score' });
+  expect(host.result.current.comments).toBe(initialComments);
   expect(getAnswerCommentsV5).toHaveBeenLastCalledWith(
     'answer',
     20,

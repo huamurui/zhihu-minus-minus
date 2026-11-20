@@ -19,6 +19,7 @@ import { CollectionSelectorModal } from '@/components/CollectionSelectorModal';
 import { CollectionToastOverlay } from '@/components/CollectionToastOverlay';
 import { DoubleTapActionSheet } from '@/components/DoubleTapActionSheet';
 import { GradientMaskOverlay } from '@/components/GradientMaskOverlay';
+import { ScreenOverlayHost } from '@/components/overlays/ScreenOverlay';
 import { useRuntimeThemeColors } from '@/components/Themed';
 import { UpdateChecker } from '@/components/UpdateChecker';
 import { VerificationModal } from '@/components/VerificationModal';
@@ -53,6 +54,10 @@ export const unstable_settings = {
   anchor: '(tabs)',
   initialRouteName: '(tabs)',
 };
+
+const screenLayout = ({ children }: React.PropsWithChildren) => (
+  <ScreenOverlayHost>{children}</ScreenOverlayHost>
+);
 
 function RootLayout() {
   useQueryConnectivity(queryClient);
@@ -201,6 +206,7 @@ function RootLayout() {
                 }}
               />
               <Stack
+                screenLayout={screenLayout}
                 screenOptions={{
                   headerStyle: {
                     backgroundColor: appThemeColors.backgroundSecondary,

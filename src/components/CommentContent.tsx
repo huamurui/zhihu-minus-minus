@@ -1,102 +1,132 @@
-import React, { useState } from 'react';
-import { Image } from 'react-native';
+import { useRouter } from 'expo-router';
+import React, { useMemo, useState } from 'react';
+import { Image, Text as NativeText } from 'react-native';
+import type { CommentStickers } from '@/api/zhihu/comment';
 import { BouncyButton } from '@/components/BouncyButton';
 import { ImagePreviewModal } from '@/components/ImagePreviewModal';
+import { parseCommentContent } from '@/utils/commentContent';
 import { getCachedImageSource } from '@/utils/imageSource';
 import { Text, useThemeColor, View } from './Themed';
 
 interface CommentContentProps {
   htmlContent: string;
+  stickers?: CommentStickers;
   width: number;
 }
 
-const CommentContentComponent: React.FC<CommentContentProps> = ({
+function CommentImage({
+  url,
+  label,
+  size,
+  inline = false,
+}: {
+  url: string;
+  label: string;
+  size: number;
+  inline?: boolean;
+}) {
+  const [failedUrl, setFailedUrl] = useState<string>();
+  if (url === failedUrl)
+    return inline ? <NativeText>{label}</NativeText> : <Text>{label}</Text>;
+  return (
+    <Image
+      accessibilityLabel={label}
+      fadeDuration={0}
+      source={getCachedImageSource(url)}
+      style={{ width: size, height: size }}
+      resizeMode={inline ? 'contain' : 'cover'}
+      onError={() => setFailedUrl(url)}
+    />
+  );
+}
+
+export const CommentContent = React.memo(function CommentContent({
   htmlContent,
-}) => {
-  const textColor = useThemeColor({}, 'text');
-
-  const [viewerVisible, setViewerVisible] = useState(false);
-  const [activeImage, setActiveImage] = useState<string | null>(null);
-
-  // 1. 解析出所有的 HTML 标签，提取出 comment_img 的超链接，并将它们从主文本中拆分
-  // 匹配形式：<a href="URL" class="comment_img"...>查看图片</a>
-  // 考虑到 class 和 href 顺序不固定，或者有些其他微小差异，采用更宽泛的正则，但一定要捞到 comment_img
-  const imageRegex =
-    /<a[^>]+class="comment_img"[^>]*href="([^"]+)"[^>]*>.*?<\/a>|<a[^>]+href="([^"]+)"[^>]*class="comment_img"[^>]*>.*?<\/a>/gi;
-
-  // 提取图片链接
-  const imageUrls: string[] = [];
-  let match: RegExpExecArray | null;
-
-  // 循环匹配所有图片链接
-  // biome-ignore lint/suspicious/noAssignInExpressions: safe to use inside regex matching loops
-  while ((match = imageRegex.exec(htmlContent)) !== null) {
-    const url = match[1] || match[2];
-    if (url) {
-      imageUrls.push(url);
-    }
-  }
-
-  // 2. 清理正文中的图片标签，保留纯净文本，并去除其他 HTML 标签以便显示
-  const textWithoutImages = htmlContent.replace(imageRegex, '');
-  const cleanText = textWithoutImages
-    .replace(/<[^>]+>/g, '') // 移除非图片的其他所有 HTML 标签
-    .trim();
-
-  const handleOpenImage = (url: string) => {
-    setActiveImage(url);
-    setViewerVisible(true);
-  };
+  stickers,
+  width,
+}: CommentContentProps) {
+  const router = useRouter();
+  const linkColor = useThemeColor({}, 'link');
+  const [gallery, setGallery] = useState<{
+    urls: string[];
+    initialIndex: number;
+  } | null>(null);
+  const parts = useMemo(() => parseCommentContent(htmlContent), [htmlContent]);
+  const images = parts.filter((part) => part.kind === 'image');
+  const inline = parts.filter((part) => part.kind !== 'image');
 
   return (
     <View className="bg-transparent w-full">
-      {/* 渲染纯文本 */}
-      {cleanText ? (
-        <Text
-          className="text-[15px] leading-5 mb-2"
-          style={{ color: textColor }}
-        >
-          {cleanText}
+      {inline.some((part) => part.text.trim()) && (
+        <Text className="text-[15px] leading-5 mb-2">
+          {inline.map((part) => {
+            if (part.kind === 'text') return part.text;
+            if (part.kind === 'mention')
+              return (
+                <NativeText
+                  key={part.offset}
+                  accessibilityRole="link"
+                  style={{ color: linkColor }}
+                  onPress={(event) => {
+                    event.stopPropagation();
+                    router.push({
+                      pathname: '/user/[id]',
+                      params: { id: part.member },
+                    });
+                  }}
+                >
+                  {part.text}
+                </NativeText>
+              );
+            const url =
+              part.kind === 'placeholder' ? stickers?.[part.text] : part.url;
+            if (!url) return part.text;
+            return (
+              <CommentImage
+                key={part.offset}
+                url={url}
+                label={part.text}
+                size={20}
+                inline
+              />
+            );
+          })}
         </Text>
-      ) : null}
-
-      {/* 评论配图（紧凑网格展示） */}
-      {imageUrls.length > 0 && (
+      )}
+      {images.length > 0 && (
         <View className="flex-row flex-wrap gap-2 my-1.5 bg-transparent">
-          {imageUrls.map((url, idx) => (
+          {images.map((image, index) => (
             <BouncyButton
-              // biome-ignore lint/suspicious/noArrayIndexKey: 同一条评论可以重复引用同一张图,url 不唯一,复合 key 才能保证不撞。
-              key={`${url}-${idx}`}
-              onPress={() => handleOpenImage(url)}
+              key={image.offset}
+              accessibilityRole="button"
+              accessibilityLabel={`查看评论图片 ${index + 1}`}
+              onPress={(event) => {
+                event.stopPropagation();
+                // FlashList may recycle this comment while its viewer is open.
+                setGallery({
+                  urls: images.map((part) => part.url),
+                  initialIndex: index,
+                });
+              }}
               className="rounded-2xl overflow-hidden bg-gray-100 dark:bg-gray-800/60 border border-gray-200/40 dark:border-gray-700/40"
             >
-              <Image
-                fadeDuration={0}
-                source={getCachedImageSource(url)}
-                style={
-                  imageUrls.length === 1
-                    ? { width: 130, height: 130 }
-                    : { width: 88, height: 88 }
-                }
-                resizeMode="cover"
+              <CommentImage
+                url={image.url}
+                label={image.text}
+                size={Math.min(width, images.length === 1 ? 130 : 88)}
               />
             </BouncyButton>
           ))}
         </View>
       )}
-
-      {/* 图片灯箱 */}
-      <ImagePreviewModal
-        visible={viewerVisible && Boolean(activeImage)}
-        imageUrls={activeImage ? [activeImage] : imageUrls}
-        initialIndex={
-          activeImage ? Math.max(0, imageUrls.indexOf(activeImage)) : 0
-        }
-        onClose={() => setViewerVisible(false)}
-      />
+      {gallery && (
+        <ImagePreviewModal
+          visible
+          imageUrls={gallery.urls}
+          initialIndex={gallery.initialIndex}
+          onClose={() => setGallery(null)}
+        />
+      )}
     </View>
   );
-};
-
-export const CommentContent = React.memo(CommentContentComponent);
-CommentContent.displayName = 'CommentContent';
+});

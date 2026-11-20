@@ -537,11 +537,12 @@ export function normalizeZhihuDocument(
           referencedFootnotes.add(number);
           // Zhihu reference nodes carry their definition in attributes rather
           // than a separate footnotes section (see the formula/table fixture).
-          const definitionText = nonempty(node.attribs['data-text']);
+          const definitionUrl = safeUrl(node.attribs['data-url']);
+          if (node.attribs['data-url'] && !definitionUrl)
+            diagnostic('unsafe-url', 'footnote-source');
+          const definitionText =
+            nonempty(node.attribs['data-text']) ?? definitionUrl;
           if (definitionText && !footnotes.has(number)) {
-            const definitionUrl = safeUrl(node.attribs['data-url']);
-            if (node.attribs['data-url'] && !definitionUrl)
-              diagnostic('unsafe-url', 'footnote-source');
             const textRun: ZhihuInlineRun = {
               id: id('footnote-text'),
               type: 'text',

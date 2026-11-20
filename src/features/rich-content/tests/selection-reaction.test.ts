@@ -31,6 +31,7 @@ function createContext() {
   });
   const refresh = jest.fn();
   const notifySuccess = jest.fn();
+  const notifyError = jest.fn();
   return {
     options: createSelectionReactionOptions({
       getSource: () => source,
@@ -38,7 +39,7 @@ function createContext() {
       clearSelection,
       refresh,
       notifySuccess,
-      notifyError: jest.fn(),
+      notifyError,
     }),
     snapshot: { source, selection: selectionA },
     replaceSource: () => {
@@ -51,6 +52,7 @@ function createContext() {
     clearSelection,
     refresh,
     notifySuccess,
+    notifyError,
   };
 }
 
@@ -88,9 +90,11 @@ it('ignores completion after the content source changes', () => {
   const context = createContext();
   context.replaceSource();
   context.options.onSuccess({ success: true }, context.snapshot);
+  context.options.onError(new Error('rejected'), context.snapshot);
   expect(context.clearSelection).not.toHaveBeenCalled();
   expect(context.refresh).not.toHaveBeenCalled();
   expect(context.notifySuccess).not.toHaveBeenCalled();
+  expect(context.notifyError).not.toHaveBeenCalled();
 });
 
 it('clears the submitted selection when it is still current', () => {

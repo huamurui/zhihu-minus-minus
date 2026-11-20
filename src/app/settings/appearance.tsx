@@ -82,6 +82,7 @@ export default function AppearanceSettings() {
     surfaceStyle,
     richContentRenderer,
     removeImageWatermark,
+    enableSegmentTap,
     answerReadingMode,
     unreadBadgeStyle,
     updateSettings,
@@ -211,6 +212,20 @@ export default function AppearanceSettings() {
               value={removeImageWatermark}
               onValueChange={(value) =>
                 updateSettings({ removeImageWatermark: value })
+              }
+            />
+          </SettingItem>
+          <SettingItem
+            label="点击划线查看评论"
+            icon="chatbubble-outline"
+            colorScheme={colorScheme}
+          >
+            <ThemedSwitch
+              accessibilityLabel="点击划线查看评论"
+              accessibilityHint="控制单击回答划线时是否打开段落菜单，长按仍可选字"
+              value={enableSegmentTap}
+              onValueChange={(value) =>
+                updateSettings({ enableSegmentTap: value })
               }
             />
           </SettingItem>

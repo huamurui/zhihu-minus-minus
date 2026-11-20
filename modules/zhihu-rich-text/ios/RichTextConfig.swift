@@ -1,4 +1,31 @@
+import SDWebImageSVGCoder
 import UIKit
+
+struct RichTextCommentIcon {
+  let image: UIImage
+  let size: CGFloat
+  let insetX: CGFloat
+  let offsetY: CGFloat
+  private static let templates = NSCache<NSString, UIImage>()
+
+  init?(_ value: Any?) {
+    guard let spec = value as? RichTextSpec, let path = spec["path"] as? String, !path.isEmpty,
+          path.rangeOfCharacter(from: CharacterSet(charactersIn: "\"<>&")) == nil else { return nil }
+    let box = richTextNumber(spec["viewBoxSize"], fallback: 0)
+    guard box > 0 else { return nil }
+    let svg = #"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 \#(box) \#(box)" width="\#(box)" height="\#(box)"><path d="\#(path)"/></svg>"#
+    if let cached = Self.templates.object(forKey: svg as NSString) {
+      image = cached
+    } else {
+      guard let template = SDImageSVGCoder.shared.decodedImage(with: Data(svg.utf8), options: nil) else { return nil }
+      Self.templates.setObject(template, forKey: svg as NSString)
+      image = template
+    }
+    size = CGFloat(richTextNumber(spec["size"], fallback: 7.5)).clamped(1, 32)
+    insetX = CGFloat(richTextNumber(spec["insetX"], fallback: 0)).clamped(-32, 32)
+    offsetY = CGFloat(richTextNumber(spec["offsetY"], fallback: -1)).clamped(-32, 32)
+  }
+}
 
 struct RichTextConfig {
   var fontSize: CGFloat = 17
@@ -9,6 +36,7 @@ struct RichTextConfig {
   var linkColor = UIColor(red: 23 / 255, green: 91 / 255, blue: 199 / 255, alpha: 1)
   var justify = false
   var textAlign = "left"
+  var commentIcon: RichTextCommentIcon?
 
   static func parse(_ json: String) -> RichTextConfig {
     var config = RichTextConfig()
@@ -21,6 +49,7 @@ struct RichTextConfig {
     config.secondaryColor = richTextColor(object["secondaryColor"], fallback: config.secondaryColor)
     config.linkColor = richTextColor(object["linkColor"], fallback: config.linkColor)
     config.justify = object["justify"] as? Bool ?? false
+    config.commentIcon = RichTextCommentIcon(object["commentIcon"])
     let align = object["textAlign"] as? String ?? "left"
     config.textAlign = ["center", "right"].contains(align) ? align : "left"
     return config

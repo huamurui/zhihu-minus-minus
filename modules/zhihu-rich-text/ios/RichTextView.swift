@@ -216,6 +216,7 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
     let baseFont = UIFontMetrics(forTextStyle: .body).scaledFont(for: UIFont.systemFont(ofSize: config.fontSize), compatibleWith: traitCollection)
     let scale = baseFont.pointSize / config.fontSize
     manager.scale = scale
+    manager.commentIcon = config.commentIcon
     manager.quoteColor = config.secondaryColor
     textView.font = baseFont
     textView.textColor = config.textColor
@@ -299,7 +300,9 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
         range: range, kind: spec["kind"] as? String ?? "solid",
         color: richTextColor(spec["color"], fallback: config.linkColor),
         thickness: max(0.5, CGFloat(richTextNumber(spec["thickness"], fallback: 1.2)) * scale),
-        offset: CGFloat(richTextNumber(spec["offset"], fallback: 3)) * scale
+        offset: CGFloat(richTextNumber(spec["offset"], fallback: 3)) * scale,
+        hasComments: spec["hasComments"] as? Bool == true,
+        actionId: spec["actionId"] as? String
       )
     }
     for spec in flow.attachments {
@@ -487,17 +490,23 @@ public final class RichTextView: ExpoView, UITextViewDelegate, UIGestureRecogniz
   private func action(at point: CGPoint) -> (spec: RichTextSpec, kind: String)? {
     guard let flow, manager.numberOfGlyphs > 0 else { return nil }
     let location = CGPoint(x: point.x - textView.textContainerInset.left + textView.contentOffset.x, y: point.y - textView.textContainerInset.top + textView.contentOffset.y)
-    let glyph = manager.glyphIndex(for: location, in: container)
-    guard glyph < manager.numberOfGlyphs,
-          manager.boundingRect(forGlyphRange: NSRange(location: glyph, length: 1), in: container).contains(location) else { return nil }
-    let character = manager.characterIndexForGlyph(at: glyph)
+    let marker = manager.commentMarker(at: location).flatMap { id in flow.decorations.first { $0["actionId"] as? String == id } }
+    let character: Int
+    if let marker, let range = richTextRange(marker, in: flow.text) {
+      character = NSMaxRange(range) - 1
+    } else {
+      let glyph = manager.glyphIndex(for: location, in: container)
+      guard glyph < manager.numberOfGlyphs,
+            manager.boundingRect(forGlyphRange: NSRange(location: glyph, length: 1), in: container).contains(location) else { return nil }
+      character = manager.characterIndexForGlyph(at: glyph)
+    }
     let groups: [([RichTextSpec], String)] = [
       (flow.attachments.filter { spec in
         guard let range = richTextRange(spec, in: flow.text), range.length == 1 else { return false }
         return flow.text.character(at: range.location) == 0xfffc
       }, "attachment"),
-      (flow.decorations.filter { $0["actionId"] as? String != nil }, "segment"),
-      (flow.spans.filter { $0["kind"] as? String == "link" }, "link")
+      (flow.spans.filter { $0["kind"] as? String == "link" }, "link"),
+      (marker.map { [$0] } ?? flow.decorations.filter { $0["actionId"] as? String != nil }, "segment")
     ]
     for (specs, kind) in groups {
       if let spec = specs.first(where: { spec in

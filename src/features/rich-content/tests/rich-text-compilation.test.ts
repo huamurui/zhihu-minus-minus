@@ -284,6 +284,64 @@ describe('Text Flow Island compilation and source ranges', () => {
     );
   });
 
+  it('marks only positive comment counts and disables segment taps without changing selectable text or link hits', () => {
+    const { document } = normalizeZhihuDocument(
+      '<p data-pid="one"><a href="https://example.com">甲😀</a><span class="highlight-wrap" data-highlight-comment-count="8">乙</span><span class="highlight-wrap" data-highlight-comment-count="2">丙</span><span class="highlight-wrap">丁</span></p>',
+      {
+        documentId: 'answer:42',
+        segmentInfos: [
+          {
+            pid: 'one',
+            text: '甲😀乙丙丁',
+            marks: [
+              {
+                start_index: 0,
+                end_index: 3,
+                seg_info: { is_like: false, like_count: 1, comment_count: 1 },
+              },
+              {
+                start_index: 3,
+                end_index: 4,
+                seg_info: { is_like: true, like_count: 1, comment_count: 0 },
+              },
+            ],
+          },
+        ],
+      },
+    );
+    for (const enableSegmentTap of [false, true]) {
+      const first = compileZhihuDocument(document, {
+        fontSize: 17,
+        lineHeight: 26,
+        enableSegmentTap,
+      }).parts[0];
+      if (first.type !== 'flow') throw new Error('expected flow');
+      const { flow } = first;
+      expect(
+        flow.decorations
+          .filter((d) => d.hasComments)
+          .map(({ start, end }) => [start, end]),
+      ).toEqual([
+        [0, 3],
+        [4, 5],
+      ]);
+      expect(
+        flow.decorations.every((d) => Boolean(d.actionId) === enableSegmentTap),
+      ).toBe(true);
+      expect(flow.spans).toContainEqual(
+        expect.objectContaining({ kind: 'link', start: 0, end: 3 }),
+      );
+      expect(getRichTextSelectionText(flow, 0, flow.text.length)).toBe(
+        '甲😀乙丙丁',
+      );
+      expect(mapRichTextSelection(flow, 1, 4)).toMatchObject({
+        text: '😀乙',
+        start: { offset: 1 },
+        end: { offset: 4 },
+      });
+    }
+  });
+
   it('maps generated list markers away from business paragraph coordinates', () => {
     const flow = firstFlow(
       '<ol start="3"><li><p data-pid="one">列表</p></li></ol>',

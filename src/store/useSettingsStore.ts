@@ -142,6 +142,8 @@ export interface AppSettings {
   richContentRenderer: RichContentRenderer;
   /** 正文图片加载作者上传的原文件（知乎提供时），不带知乎水印。 */
   removeImageWatermark: boolean;
+  /** 允许单击回答中的划线打开段落菜单。 */
+  enableSegmentTap: boolean;
   /** 点击回答卡片后的阅读方式；列表入口始终使用普通卡片。 */
   answerReadingMode: AnswerReadingMode;
   /**
@@ -235,6 +237,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   borderRadius: 12,
   richContentRenderer: 'native-v2',
   removeImageWatermark: true,
+  enableSegmentTap: true,
   answerReadingMode: 'detail',
   doubleTapAction: undefined,
   enablePrivateMessaging: false,
@@ -312,6 +315,9 @@ export const useSettingsStore = create<SettingsState>()(
           if (typeof nextSettings.removeImageWatermark !== 'boolean') {
             nextSettings.removeImageWatermark = true;
           }
+          if (typeof nextSettings.enableSegmentTap !== 'boolean') {
+            nextSettings.enableSegmentTap = true;
+          }
           if (
             nextSettings.doubleTapAction !== undefined &&
             !isValidDoubleTapAction(nextSettings.doubleTapAction)
@@ -377,7 +383,7 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'zhihu-settings-storage',
       storage: createJSONStorage(() => settingsStorage),
-      version: 21,
+      version: 22,
       migrate: (rawPersistedState: unknown, version: number) => {
         const persistedState =
           normalizePersistedSettingsState(rawPersistedState);
@@ -555,6 +561,10 @@ export const useSettingsStore = create<SettingsState>()(
         persistedState.removeImageWatermark =
           typeof persistedState.removeImageWatermark === 'boolean'
             ? persistedState.removeImageWatermark
+            : true;
+        persistedState.enableSegmentTap =
+          typeof persistedState.enableSegmentTap === 'boolean'
+            ? persistedState.enableSegmentTap
             : true;
 
         return persistedState as unknown as SettingsState;

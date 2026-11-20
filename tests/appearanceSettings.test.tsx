@@ -134,6 +134,7 @@ jest.mock('../src/store/useSettingsStore', () => ({
       lineHeightScale: 1.5,
       richContentRenderer: 'native-v2',
       answerReadingMode: 'detail',
+      enableSegmentTap: true,
       unreadBadgeStyle: 'count',
       updateSettings: jest.fn(set),
     })),
@@ -390,4 +391,14 @@ test('selects a quieter unread badge style', async () => {
   expect(useSettingsStore.getState().unreadBadgeStyle).toBe('dot');
   await fireEvent.press(host.getByText('不显示'));
   expect(useSettingsStore.getState().unreadBadgeStyle).toBe('hidden');
+});
+
+test('switches off the answer segment menu from reading settings', async () => {
+  const host = await render(<AppearanceSettings />);
+  await fireEvent(
+    host.getByLabelText('点击划线查看评论'),
+    'valueChange',
+    false,
+  );
+  expect(useSettingsStore.getState().enableSegmentTap).toBe(false);
 });

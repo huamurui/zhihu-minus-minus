@@ -53,6 +53,9 @@ import { ZhihuContent } from '@/features/rich-content';
 - 链接的 `kind` 保留普通链接、@ 提及和 # 话题语义；图片的 `role` 区分正文图与日报作者头像，可选 `layout` 保留结构化正文的 normal/small 布局。
 - `unsupported` 保留来源类型和纯文本 fallback，便于后续规范化测试识别遗漏；不把任意字符串并入 `type` 联合。
 - 脚注定义只存于 `document.footnotes`，行内 `footnoteReference.definitionId` 指向定义的节点 ID。展示编号 `label` 与节点 ID 分开，允许多次引用同一定义。
+- 回答划线在已知评论数大于零时绘制与回答工具栏同形的空心 SVG 评论图标。底栏和正文的线宽分别由 `src/constants/commentBubble.ts` 中的 `toolbarWeight` 和 `markerWeight` 控制。三端正文共用 `segmentCommentIcon.ts`，其中 `size` 控制尺寸，`insetX` 控制从末字边缘向内的距离，`offsetY` 控制图框上边缘相对划线的垂直偏移。图标不占正文字符或选区偏移。“点击划线查看评论”控制单击段落菜单，长按选字和正文链接独立工作。
+- 回答的选区操作显示在当前阅读窗格的浮层。点“评论”会保留选中的原文和首尾段落的 UTF-16 偏移，在编辑器点发布后写入该选区的讨论。切换回答或离开页面时会收起操作。
+- 知乎脚注的 `data-text` 可为空。原生和 WebView 优先显示脚注说明，缺少说明时显示可打开的安全来源 URL。导出时链接及其 URL 文字共用导出过滤规则。脱敏案例 `url-only-footnotes-001` 保留了六条引用的属性结构，正文与来源地址均已替换。
 
 Block AST 表达内容语义，不规定逐段 cell 或 FlashList 布局。`compileZhihuDocument` 已将连续的标题、段落、简单引用/列表编成共享UTF-16 buffer，并输出text/paragraph spans、独立decoration、inline attachment和source map。媒体/表格形成flow边界；同一flow可跨段选择，跨媒体选择尚未实现。`mapRichTextSelection` 把flow全局范围映回段落源位置，生成换行/列表符号不推进源偏移，U+FFFC复制时替换为语义文本。
 
@@ -132,6 +135,8 @@ HTML `video` / `source`、`video-box` 和想法 `video` 分段保留安全封面
 同一对象正文再次返回时，已测量的正文和高度保留可见，新正文在隐藏层完成当前宽度与所有顶层flow测量后直接替换，不重复显示首次加载占位。等价的想法分段数组也复用原有正文。等待替换时停用旧正文的选择与业务动作，过期候选不会覆盖更新版本；更换对象仍独立走首载流程。详情页回答ID列表到达时保持React Pager与当前正文实例，按回答ID保持当前页。实现与验证边界见[二次加载记录](./docs/renderer-v2-experiment-03-native-flow.md#2026-10-01正文二次加载与-ci-类型修复)。
 
 原生回答在正文就绪提交后主动测量ScrollView的内容View，将实际总高与当前正文来源配对；同高度替换也能重新测量，不再依赖必然产生新的contentSize事件。来源、聚焦状态或测量请求变化时拒绝旧结果，首载placeholder不能认证正文高度。关闭阅读进度期间，这些测量仍供自绘滚动条使用，不触发自动滚动或存储读写。普通后端继续使用原有contentSize路径，持久数据格式不变。
+
+回答中有已知正数评论的划线在末端显示小对话气泡。原生将气泡绘成文本装饰，WebView 使用无文本的伪元素，选字和复制沿用原始正文。“外观与阅读 → 正文排版 → 点击划线查看评论”可关闭划线的单击菜单，保留长按选字、图片和链接操作。设置 v22 默认沿用已有的单击行为。
 
 真实回答中的知识点业务菜单接受两类精确验证的标记：当前 `segment_infos` 的段落ID、范围、源切片文本和现有reaction IDs均匹配；或者HTML `highlight-wrap`具有完整当前回答target、反应/片段ID和位置，且包裹内容对应唯一源段落。点击嵌套的HTML划线时，优先复用当前API中唯一且完全同范围的标记，使缺少HTML互动属性的划线仍能打开喜欢、评论和复制菜单；不能跨越明确的目标、位置或跨段冲突，也不能借用邻近范围。未能通过上述校验的标记仅提供本地复制与安全来源链接；跨段显示文本只在target和片段ID集合一致时用于本地复制。文章、想法和问题不调用回答专属reaction接口。
 

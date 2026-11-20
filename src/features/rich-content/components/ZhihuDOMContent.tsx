@@ -19,6 +19,11 @@ import {
   RICH_CONTENT_LIST_ITEM_SPACING,
   RICH_CONTENT_PARAGRAPH_SPACING,
 } from '../presentation';
+import {
+  segmentCommentIcon,
+  segmentCommentMaskUrl,
+  segmentUnderlineOffset,
+} from '../segmentCommentIcon';
 import type { RichContentTypographyOptions } from '../types';
 import { videoPlaybackHtml } from '../videoHtml';
 import {
@@ -26,13 +31,17 @@ import {
   sanitizeRichContentHtml,
   serializeInlineScriptValue,
 } from '../webviewSecurity';
+import type { WebViewSegmentParagraphs } from '../webviewSegments';
 
 export type { TextSelectionInfo } from '../bridge';
 
 export interface ZhihuDOMContentProps {
   htmlContent: string;
   contentArray?: readonly ZhihuContentSegment[];
-  segmentInfosStr?: string;
+  segmentParagraphs?: WebViewSegmentParagraphs;
+  /** JSON-encoded [pid, sourceText] pairs from answer segment metadata. */
+  segmentSourceTexts?: string;
+  segmentTapEnabled?: boolean;
   linkCardInfoStr?: string;
   colorScheme: 'light' | 'dark';
   onImagePress: (src: string) => void;
@@ -110,7 +119,9 @@ function contentSegmentsToHtml(
 export default React.memo(function ZhihuDOMContent({
   htmlContent,
   contentArray,
-  segmentInfosStr,
+  segmentParagraphs,
+  segmentSourceTexts = '[]',
+  segmentTapEnabled = true,
   linkCardInfoStr,
   onImagePress,
   onImageLongPress,
@@ -149,8 +160,9 @@ export default React.memo(function ZhihuDOMContent({
     () =>
       sanitizeRichContentHtml(
         contentArray ? contentSegmentsToHtml(contentArray) : htmlContent,
+        segmentParagraphs,
       ),
-    [contentArray, htmlContent],
+    [contentArray, htmlContent, segmentParagraphs],
   );
 
   const themeColors = useRuntimeThemeColors();
@@ -421,7 +433,20 @@ export default React.memo(function ZhihuDOMContent({
           text-decoration: underline dashed;
           text-decoration-style: dashed;
           text-decoration-color: ${primaryColor}40;
-          cursor: pointer;
+          cursor: ${segmentTapEnabled ? 'pointer' : 'auto'};
+        }
+        .segment-comments::after {
+          content: '';
+          display: inline-block;
+          width: ${segmentCommentIcon.size}px;
+          height: ${segmentCommentIcon.size}px;
+          margin-inline-start: -${segmentCommentIcon.size + segmentCommentIcon.insetX}px;
+          margin-inline-end: ${segmentCommentIcon.insetX}px;
+          vertical-align: baseline;
+          transform: translateY(${segmentUnderlineOffset + segmentCommentIcon.size + segmentCommentIcon.offsetY}px);
+          background: ${primaryColor};
+          -webkit-mask: url("${segmentCommentMaskUrl}") center / contain no-repeat;
+          mask: url("${segmentCommentMaskUrl}") center / contain no-repeat;
         }
         .segment-liked {
           text-decoration: underline dashed;
@@ -451,11 +476,51 @@ export default React.memo(function ZhihuDOMContent({
           ));
         }
         const htmlContent = ${serializeInlineScriptValue(safeHtmlContent)};
-        const segmentInfosStr = ${serializeInlineScriptValue(segmentInfosStr || '[]')};
         const linkCardInfoStr = ${serializeInlineScriptValue(linkCardInfoStr || '{}')};
 
         const container = document.getElementById('content');
         container.innerHTML = htmlContent;
+
+        // Index the source before references, link cards and KaTeX rewrite the DOM.
+        // A null entry is a boundary that a server-addressable selection cannot cross.
+        const selectionSources = [];
+        const sourceIndex = new Map();
+        const pidCounts = new Map();
+        const apiSources = new Map();
+        for (const [pid, text] of JSON.parse(${serializeInlineScriptValue(segmentSourceTexts)})) {
+          apiSources.set(pid, apiSources.has(pid) ? null : text);
+        }
+        const nonSourceInline = ':not(a,abbr,b,code,del,em,i,kbd,mark,s,small,span,strong,sub,sup,u),[hidden],[data-draft-type="reference"],sup[data-numero],sup[data-text],[data-draft-type="link-card"],.LinkCard,.zhihu-link-card,.zhihu-video,.katex,.katex-error';
+        function hiddenSource(el) {
+          return el.hidden || (el.style.display && window.getComputedStyle(el).display.toLowerCase() === 'none');
+        }
+        function invalidSourceContent(el) {
+          return el.querySelector(nonSourceInline) || Array.from(el.querySelectorAll('[style]')).some(hiddenSource);
+        }
+        container.querySelectorAll('p[data-pid],h1[data-pid],h2[data-pid],h3[data-pid],h4[data-pid],h5[data-pid],h6[data-pid]').forEach(function(el) {
+          const pid = el.getAttribute('data-pid');
+          pidCounts.set(pid, (pidCounts.get(pid) || 0) + 1);
+        });
+        function recordSelectionSources(parent) {
+          for (const el of parent.childNodes) {
+            if (el.nodeType === 3 && !el.textContent.trim()) continue;
+            if (el.tagName === 'P') {
+              const pid = el.getAttribute('data-pid');
+              if (pid && pid === pid.trim() && pidCounts.get(pid) === 1 &&
+                  (!apiSources.has(pid) || apiSources.get(pid) === el.textContent) &&
+                  !hiddenSource(el) && !invalidSourceContent(el)) {
+                sourceIndex.set(el, selectionSources.length);
+                selectionSources.push({ el, pid, text: el.textContent });
+                continue;
+              }
+            } else if (['BLOCKQUOTE', 'DIV', 'SECTION'].includes(el.tagName) && !hiddenSource(el)) {
+              recordSelectionSources(el);
+              continue;
+            }
+            selectionSources.push(null);
+          }
+        }
+        if (pidCounts.size) recordSelectionSources(container);
 
         function getLinkCardInfo(href) {
           let info;
@@ -581,51 +646,9 @@ export default React.memo(function ZhihuDOMContent({
           }
         });
 
-        // Process segments
-        try {
-          const segmentInfos = JSON.parse(segmentInfosStr);
-          if (segmentInfos && segmentInfos.length > 0) {
-            const paragraphs = container.querySelectorAll('p[data-pid]');
-            paragraphs.forEach((p) => {
-              const pid = p.getAttribute('data-pid');
-              if (!pid) return;
-              // Semantic documents already mark the precise ranges. Avoid
-              // decorating the whole paragraph or dispatching a guessed mark.
-              if (p.querySelector('[data-segment-node-id]')) return;
-
-              const segment = segmentInfos.find(s => s.pid === pid);
-              if (!segment) return;
-
-              const marks = segment.marks;
-              if (!marks || marks.length === 0) return;
-
-              let interaction = null;
-              for (const mark of marks) {
-                if (mark.seg_info?.is_like) { interaction = mark.seg_info; break; }
-                if (mark.master_seg_info?.is_like) { interaction = mark.master_seg_info; break; }
-              }
-              if (!interaction) {
-                interaction = marks[0].seg_info || marks[0].master_seg_info;
-              }
-
-              if (
-                interaction &&
-                (interaction.like_count > 0 || interaction.comment_count > 0 || interaction.is_like)
-              ) {
-                p.classList.add('segment-interactable');
-                if (interaction.is_like) {
-                  p.classList.add('segment-liked');
-                }
-              }
-            });
-          }
-        } catch (_) {
-          // Invalid optional metadata cannot block layout or reveal its contents.
-        }
-
         // Process footnotes
         try {
-          const footnotes = container.querySelectorAll('sup[data-text]');
+          const footnotes = container.querySelectorAll('sup[data-numero], sup[data-text]');
           if (footnotes.length > 0) {
             const footnoteList = document.createElement('div');
             footnoteList.style.marginTop = '40px';
@@ -640,16 +663,29 @@ export default React.memo(function ZhihuDOMContent({
             title.style.color = '${textColor}';
             footnoteList.appendChild(title);
 
-            footnotes.forEach((sup) => {
-              const text = sup.getAttribute('data-text');
+            const definitions = new Map();
+            footnotes.forEach((sup, index) => {
               const numero = sup.getAttribute('data-numero') || sup.innerText.replace('[', '').replace(']', '');
+              if (!numero) return;
+              const url = sup.getAttribute('data-url');
+              const text = (sup.getAttribute('data-text') || '').trim() || url;
+              let definition = definitions.get(numero);
+              if (!definition) {
+                definition = { id: 'footnote-' + (definitions.size + 1), refId: 'ref-' + (index + 1) };
+                definitions.set(numero, definition);
+              }
+              if (text && !definition.text) Object.assign(definition, { text, url });
+              sup.id = 'ref-' + (index + 1);
+              const reference = document.createElement('a');
+              reference.href = '#' + definition.id;
+              reference.style.color = '${primaryColor}';
+              reference.textContent = '[' + numero + ']';
+              sup.replaceChildren(reference);
+            });
 
-              const footnoteId = 'footnote-' + numero;
-              const refId = 'ref-' + numero;
-              sup.id = refId;
-
+            definitions.forEach(({ id, refId, text, url }, numero) => {
               const item = document.createElement('div');
-              item.id = footnoteId;
+              item.id = id;
               item.style.marginBottom = '8px';
               item.style.lineHeight = '1.5';
               item.style.color = '${themeColors.textSecondary}';
@@ -660,15 +696,16 @@ export default React.memo(function ZhihuDOMContent({
               backlink.style.fontWeight = 'bold';
               backlink.textContent = '[' + numero + ']';
               item.appendChild(backlink);
-              item.appendChild(document.createTextNode(' ' + (text || '')));
-
+              if (url) {
+                const source = document.createElement('a');
+                source.href = url;
+                source.textContent = text;
+                item.appendChild(document.createTextNode(' '));
+                item.appendChild(source);
+              } else {
+                item.appendChild(document.createTextNode(' ' + (text || '[脚注 ' + numero + ' 暂无定义]')));
+              }
               footnoteList.appendChild(item);
-
-              const reference = document.createElement('a');
-              reference.href = '#' + footnoteId;
-              reference.style.color = '${primaryColor}';
-              reference.textContent = '[' + numero + ']';
-              sup.replaceChildren(reference);
             });
 
             container.appendChild(footnoteList);
@@ -792,6 +829,7 @@ export default React.memo(function ZhihuDOMContent({
             return;
           }
           let target = e.target;
+          let segmentTarget = null;
           const videoTarget = findVideoTarget(target);
           if (videoTarget) {
             e.preventDefault();
@@ -823,34 +861,29 @@ export default React.memo(function ZhihuDOMContent({
               }
             }
             if (target.tagName === 'A') {
-              e.preventDefault();
               const href = target.getAttribute('href');
+              if (href && href.startsWith('#') && document.getElementById(href.slice(1))) return;
+              e.preventDefault();
               if (href) {
                 postBridgeMessage({ type: 'link', href });
                 return;
               }
             }
-            if ((target.tagName === 'P' || target.tagName === 'SPAN') && target.classList.contains('segment-interactable')) {
-              const pid = target.getAttribute('data-pid');
-              if (pid) {
-                const nodeId = target.getAttribute('data-segment-node-id');
-                postBridgeMessage({ type: 'segment', pid, ...(nodeId ? { nodeId } : {}) });
-                return;
-              }
+            if (${segmentTapEnabled} && !segmentTarget && (target.tagName === 'P' || target.tagName === 'SPAN') && target.classList.contains('segment-interactable')) {
+              segmentTarget = target;
             }
             target = target.parentElement;
+          }
+          if (segmentTarget) {
+            const pid = segmentTarget.getAttribute('data-pid');
+            const nodeId = segmentTarget.getAttribute('data-segment-node-id');
+            if (pid && nodeId) postBridgeMessage({ type: 'segment', pid, nodeId });
           }
         });
 
         // Text selection detection
-        function findParagraph(node) {
-          while (node && node !== container) {
-            if (node.nodeType === 1 && node.getAttribute && node.getAttribute('data-pid') && !node.getAttribute('data-segment-node-id')) {
-              return node;
-            }
-            node = node.parentElement || node.parentNode;
-          }
-          return null;
+        function paragraphAt(node) {
+          return (node.nodeType === 1 ? node : node.parentElement)?.closest('p');
         }
 
         function getTextOffset(paragraph, targetNode, targetOffset) {
@@ -860,6 +893,25 @@ export default React.memo(function ZhihuDOMContent({
           prefix.selectNodeContents(paragraph);
           prefix.setEnd(targetNode, targetOffset);
           return prefix.toString().length;
+        }
+
+        function readSourceSelection(range) {
+          const startP = paragraphAt(range.startContainer);
+          const endP = paragraphAt(range.endContainer);
+          const first = sourceIndex.get(startP);
+          const last = sourceIndex.get(endP);
+          if (first === undefined || last === undefined || first > last) return null;
+          const startOffset = getTextOffset(startP, range.startContainer, range.startOffset);
+          const endOffset = getTextOffset(endP, range.endContainer, range.endOffset);
+          const parts = [];
+          for (let i = first; i <= last; i++) {
+            const source = selectionSources[i];
+            if (!source || source.text !== source.el.textContent || invalidSourceContent(source.el)) return null;
+            parts.push(source.text.slice(i === first ? startOffset : 0, i === last ? endOffset : undefined));
+          }
+          const text = parts.join('\\n');
+          if (!text.trim() || /[\\uD800-\\uDFFF\\uFFFC]/u.test(text)) return null;
+          return { text, startParagraphId: selectionSources[first].pid, endParagraphId: selectionSources[last].pid, startOffset, endOffset };
         }
 
         var selectionTimeout;
@@ -873,28 +925,7 @@ export default React.memo(function ZhihuDOMContent({
               postBridgeMessage({ type: 'selection', info: null });
               return;
             }
-            var text = selection.toString();
-            var range = selection.getRangeAt(0);
-            var startP = findParagraph(range.startContainer);
-            var endP = findParagraph(range.endContainer);
-            if (startP && endP) {
-              var startPid = startP.getAttribute('data-pid');
-              var endPid = endP.getAttribute('data-pid');
-              var sOff = getTextOffset(startP, range.startContainer, range.startOffset);
-              var eOff = getTextOffset(endP, range.endContainer, range.endOffset);
-              postBridgeMessage({
-                type: 'selection',
-                info: {
-                  text: text,
-                  startParagraphId: startPid,
-                  endParagraphId: endPid,
-                  startOffset: sOff,
-                  endOffset: eOff
-                }
-              });
-            } else {
-              postBridgeMessage({ type: 'selection', info: null });
-            }
+            postBridgeMessage({ type: 'selection', info: readSourceSelection(selection.getRangeAt(0)) });
           }, 300);
         });
 
@@ -956,7 +987,8 @@ export default React.memo(function ZhihuDOMContent({
   }, [
     safeHtmlContent,
     removeImageWatermark,
-    segmentInfosStr,
+    segmentTapEnabled,
+    segmentSourceTexts,
     linkCardInfoStr,
     textColor,
     primaryColor,
@@ -1070,7 +1102,8 @@ export default React.memo(function ZhihuDOMContent({
               }
               break;
             case 'segment':
-              onSegmentPress?.(data.pid, data.nodeId);
+              if (segmentTapEnabled && data.nodeId)
+                onSegmentPress?.(data.pid, data.nodeId);
               break;
             case 'selection':
               {

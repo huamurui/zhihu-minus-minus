@@ -60,6 +60,18 @@ export function escapeExportMarkdown(value: string): string {
   return value.replace(/([\\`*_{}[\]()<>#+.!|~$-])/g, '\\$1');
 }
 
+/** URL-only citations must redact their visible label along with the href. */
+export function exportLinkLabel(
+  url: string,
+  safeUrl: string | undefined,
+  label: string,
+  escapeText: (text: string) => string,
+): string {
+  return safeUrl !== url && label === escapeText(url)
+    ? escapeText(safeUrl ?? '来源链接未导出')
+    : label;
+}
+
 export function resolveExportImage(
   resource: ZhihuImageResource,
   options: ExportRenderOptions,

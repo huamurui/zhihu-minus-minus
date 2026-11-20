@@ -6,6 +6,7 @@ import {
   type ParamListBase,
 } from 'expo-router/react-navigation';
 import {
+  type ContextType,
   createContext,
   useCallback,
   useContext,
@@ -24,6 +25,15 @@ export const PaneContext = createContext<{
 
 /** Modal contents use window dimensions but retain their originating visibility. */
 export const PaneVisibilityContext = createContext(true);
+export const ModalOriginPaneContext =
+  createContext<ContextType<typeof PaneContext>>(null);
+
+/** A native modal has window bounds but still belongs to its presenting route. */
+export function useOriginPane() {
+  const pane = useContext(PaneContext);
+  const modalOrigin = useContext(ModalOriginPaneContext);
+  return pane ?? modalOrigin;
+}
 
 /** Page controls use their pane's bounds, while full-screen overlays use the window. */
 export function usePaneDimensions(): ReturnType<typeof useWindowDimensions> {
@@ -52,7 +62,7 @@ export function useIsTwoPaneLayout(): boolean {
 /** Both visible panes can be active even though the stack has one focused route. */
 export function usePaneActive(): boolean {
   const focused = useIsFocused();
-  const pane = useContext(PaneContext);
+  const pane = useOriginPane();
   const navigation = useContext(NavigationContext);
   const route = useContext(NavigationRouteContext);
   const visible = usePaneVisible();

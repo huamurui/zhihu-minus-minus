@@ -2,6 +2,16 @@
   "version": 2,
   "cases": [
     {
+      "id": "url-only-footnotes-001",
+      "file": "./cases/url-only-footnotes-001.json",
+      "contentPath": "content",
+      "sourceType": "answer",
+      "collectedAt": "2026-11-20",
+      "traits": ["capture-derived", "footnote-metadata", "url-only"],
+      "expected": { "paragraphs": 6 },
+      "expectedMetadata": { "type": "answer" }
+    },
+    {
       "id": "ios-dense-inline-formulas-001",
       "file": "./cases/ios-dense-inline-formulas-001.json",
       "contentPath": "content",

@@ -29,6 +29,7 @@ import { AnswerEndorsements } from '@/components/AnswerEndorsements';
 import { AnswerLoadingPlaceholder } from '@/components/AnswerLoadingPlaceholder';
 import { BouncyButton } from '@/components/BouncyButton';
 import { CollectionButton } from '@/components/CollectionButton';
+import { CommentBubbleIcon } from '@/components/CommentBubbleIcon';
 import {
   CONTENT_ACTION_BAR_HEIGHT,
   ContentActionBar,
@@ -46,7 +47,7 @@ import { ReadingScrollIndicator } from '@/components/ReadingScrollIndicator';
 import { SegmentedVoteCapsule } from '@/components/SegmentedVoteCapsule';
 import { ShareMenu } from '@/components/ShareMenu';
 import { RetainedAvatar } from '@/components/StableAvatar';
-import { Text, ThemedIcon, useThemeColor, View } from '@/components/Themed';
+import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { usePaneDimensions } from '@/features/adaptive-layout/PaneContext';
@@ -700,6 +701,7 @@ export const AnswerDetailView = ({
                 />
                 <InitialContentReveal key={id} ready={contentLayoutReady}>
                   <ZhihuContent
+                    selectable={isFocused}
                     suppressDoubleTapSelection={isDoubleTapEnabled}
                     content={answer?.content || ''}
                     segmentInfos={answer?.segment_infos}
@@ -833,11 +835,7 @@ export const AnswerDetailView = ({
                     : undefined
                 }
               >
-                <ThemedIcon
-                  name="chatbubble-outline"
-                  size={20}
-                  colorType="secondary"
-                />
+                <CommentBubbleIcon size={20} />
               </ActionIconCount>
             </ContentActionButton>
             <MoreActionsButton

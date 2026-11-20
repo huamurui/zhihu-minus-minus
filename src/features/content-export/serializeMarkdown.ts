@@ -15,6 +15,7 @@ import {
   type ExportSerializationContext,
   escapeExportHtml,
   escapeExportMarkdown as escapeText,
+  exportLinkLabel,
   exportListStart,
   exportTableSpan,
   resolveExportImage,
@@ -61,7 +62,8 @@ function code(value: string): string {
 
 function link(url: string, label: string): string {
   const safe = getSafeExportUrl(url);
-  return safe ? `[${label}](<${safe}>)` : label;
+  const text = exportLinkLabel(url, safe, label, escapeText);
+  return safe ? `[${text}](<${safe}>)` : text;
 }
 
 function image(

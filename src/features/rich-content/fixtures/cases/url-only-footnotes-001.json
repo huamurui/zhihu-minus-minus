@@ -1,0 +1,5 @@
+{
+  "type": "answer",
+  "id": "sanitized-url-only-footnotes",
+  "content": "<p>第一条资料<sup data-text=\"\" data-url=\"https://example.org/references/1\" data-draft-node=\"inline\" data-draft-type=\"reference\" data-numero=\"1\">[1]</sup>。</p><p>第二条资料<sup data-text=\"\" data-url=\"https://example.org/references/2\" data-draft-node=\"inline\" data-draft-type=\"reference\" data-numero=\"2\">[2]</sup>。</p><p>第三条资料<sup data-text=\"\" data-url=\"https://example.org/references/3\" data-draft-node=\"inline\" data-draft-type=\"reference\" data-numero=\"3\">[3]</sup>。</p><p>第四条资料<sup data-text=\"\" data-url=\"https://example.org/references/4\" data-draft-node=\"inline\" data-draft-type=\"reference\" data-numero=\"4\">[4]</sup>。</p><p>第五条资料<sup data-text=\"\" data-url=\"https://example.org/references/5\" data-draft-node=\"inline\" data-draft-type=\"reference\" data-numero=\"5\">[5]</sup>。</p><p>第六条资料<sup data-text=\"\" data-url=\"https://example.org/references/6\" data-draft-node=\"inline\" data-draft-type=\"reference\" data-numero=\"6\">[6]</sup>。</p>"
+}

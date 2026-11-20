@@ -4,16 +4,22 @@ import { Animated, Platform, Text } from 'react-native';
 import { AppDialog } from '../src/components/overlays/AppDialog';
 import { BottomSheet } from '../src/components/overlays/BottomSheet';
 import {
+  ScreenOverlay,
+  ScreenOverlayHost,
+} from '../src/components/overlays/ScreenOverlay';
+import {
   PaneContext,
   PaneVisibilityContext,
+  usePaneActive,
   usePaneDimensions,
   usePaneVisible,
 } from '../src/features/adaptive-layout/PaneContext';
 import { PaneModal } from '../src/features/adaptive-layout/PaneModal';
 
 let mockFinishAnimation: (finished: boolean) => void;
+let mockFocused = true;
 
-jest.mock('expo-router', () => ({ useIsFocused: () => true }));
+jest.mock('expo-router', () => ({ useIsFocused: () => mockFocused }));
 jest.mock('@expo/vector-icons/Ionicons', () => () => null);
 jest.mock('../src/components/BouncyButton', () => ({
   BouncyButton: jest.requireActual('react-native').Pressable,
@@ -68,6 +74,7 @@ jest.mock('react-native-reanimated', () => {
 });
 
 beforeEach(() => {
+  mockFocused = true;
   jest.spyOn(Animated, 'timing').mockImplementation(() => ({
     start: (callback) => callback?.({ finished: true }),
     stop: jest.fn(),
@@ -87,6 +94,50 @@ function DimensionsProbe() {
   const visible = usePaneVisible();
   return <Text>{`${width}:${visible}`}</Text>;
 }
+
+function ModalSelectionProbe() {
+  const active = usePaneActive();
+  const { width } = usePaneDimensions();
+  return <Text>{`${width}:${active}`}</Text>;
+}
+
+test('a visible pane beside the focused detail keeps its modal selection active at window size', async () => {
+  mockFocused = false;
+  const host = await render(
+    <PaneContext.Provider value={{ width: 360, height: 800, visible: true }}>
+      <PaneModal>
+        <ModalSelectionProbe />
+      </PaneModal>
+    </PaneContext.Provider>,
+  );
+  expect(host.getByText('1200:true')).toBeOnTheScreen();
+});
+
+test('a new selection replaces the previous reader until another selection is made', async () => {
+  const first = {};
+  const next = {};
+  const page = (owner: object, showNext: boolean) => (
+    <ScreenOverlayHost>
+      <ScreenOverlay owner={owner}>
+        <Text>第一处选区</Text>
+      </ScreenOverlay>
+      {showNext && (
+        <ScreenOverlay owner={next}>
+          <Text>第二处选区</Text>
+        </ScreenOverlay>
+      )}
+    </ScreenOverlayHost>
+  );
+  const host = await render(page(first, false));
+  expect(host.getByText('第一处选区')).toBeOnTheScreen();
+  await host.rerender(page(first, true));
+  expect(host.queryByText('第一处选区')).toBeNull();
+  expect(host.getByText('第二处选区')).toBeOnTheScreen();
+  await host.rerender(page(first, false));
+  expect(host.queryByText('第一处选区')).toBeNull();
+  await host.rerender(page({}, false));
+  expect(host.getByText('第一处选区')).toBeOnTheScreen();
+});
 
 test('a hidden pane suspends its dialog and restores its scroll position without closing it', async () => {
   const onClose = jest.fn();

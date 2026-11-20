@@ -5,23 +5,26 @@ import { type Href, useRouter } from 'expo-router';
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
-import { ActivityIndicator, Image, Linking, StyleSheet } from 'react-native';
+import { Image, Linking, StyleSheet } from 'react-native';
 import {
   getAnswer,
   reactAnswerSegment,
   unreactAnswerSegment,
 } from '@/api/zhihu/answer';
 import { getArticle } from '@/api/zhihu/article';
+import { isValidAnswerCommentSelection } from '@/api/zhihu/comment';
 import { getPin } from '@/api/zhihu/pin';
 import { getQuestion } from '@/api/zhihu/question';
 import { BouncyButton } from '@/components/BouncyButton';
 import { ImageActionBottomSheet } from '@/components/ImageActionBottomSheet';
 import { ImagePreviewModal } from '@/components/ImagePreviewModal';
 import { ActionSheet } from '@/components/overlays/ActionSheet';
+import { ScreenOverlay } from '@/components/overlays/ScreenOverlay';
 import {
   Text,
   useRuntimeThemeColors,
@@ -29,6 +32,7 @@ import {
   View,
 } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
+import { usePaneActive } from '@/features/adaptive-layout/PaneContext';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type {
   ZhihuSegmentInfo,
@@ -43,21 +47,16 @@ import {
   parseZhihuUrl,
 } from '@/utils/url';
 import { getZhihuErrorStatus } from '@/utils/zhihuError';
-import type {
-  ZhihuDocument,
-  ZhihuInlineRun,
-  ZhihuLinkCardBlock,
-} from '../document';
+import type { ZhihuDocument, ZhihuLinkCardBlock } from '../document';
 import { serializeZhihuDocumentHtml } from '../documentHtml';
-import {
-  getZhihuDocumentPreviewImages,
-  walkZhihuDocument,
-} from '../documentTraversal';
+import { getZhihuDocumentPreviewImages } from '../documentTraversal';
 import {
   getNativeHighlightDisplayText,
+  getWebViewSegmentParagraphs,
   resolveNativeAnswerSegment,
   resolveNativeAnswerSelection,
 } from '../nativeInteractions';
+import { normalizeZhihuDocument } from '../normalization/normalizeZhihuDocument';
 import type { RichTextFlow } from '../richText';
 import { createSelectionReactionOptions } from '../selectionReaction';
 import type {
@@ -65,6 +64,8 @@ import type {
   RichContentRenderer,
   ZhihuContentProps,
 } from '../types';
+import { SelectionActions } from './SelectionActions';
+import { SelectionCommentSheet } from './SelectionCommentSheet';
 import ZhihuDOMContent, { type TextSelectionInfo } from './ZhihuDOMContent';
 import {
   isRichTextNativeAvailable,
@@ -321,22 +322,6 @@ interface ActiveSegment {
   endIndex: number;
 }
 
-/** DOM segment spans are emitted only for source text with inline formatting. */
-function sourceInlineText(runs: readonly ZhihuInlineRun[]): string | undefined {
-  let text = '';
-  for (const run of runs) {
-    const value =
-      'children' in run
-        ? sourceInlineText(run.children)
-        : run.type === 'text' || run.type === 'inlineCode'
-          ? run.text
-          : undefined;
-    if (value === undefined) return undefined;
-    text += value;
-  }
-  return text;
-}
-
 export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
   ({
     content,
@@ -360,6 +345,8 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
     variant = 'default',
   }) => {
     const colorScheme = useColorScheme();
+    const paneActive = usePaneActive();
+    const selectionEnabled = selectable && paneActive;
     const settings = useSettingsStore();
     const fontSizeScale = fontSizeOverride ?? settings.fontSizeScale;
     const lineHeightScale = lineHeightOverride ?? settings.lineHeightScale;
@@ -383,6 +370,34 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
           : undefined,
       [document, selectedRenderer],
     );
+    const segmentTapEnabled =
+      type !== 'answer' || settings.enableSegmentTap !== false;
+    const webSegmentDocument = useMemo(() => {
+      if (selectedRenderer !== 'webview' && isRichTextNativeAvailable())
+        return undefined;
+      if (document) return document;
+      if (
+        type !== 'answer' ||
+        !content ||
+        (!segmentInfos?.length && !content.includes('highlight-wrap'))
+      )
+        return undefined;
+      return normalizeZhihuDocument(content, {
+        documentId: `${type}:${objectId}`,
+        segmentInfos,
+      }).document;
+    }, [selectedRenderer, document, type, content, segmentInfos, objectId]);
+    const webSegmentParagraphs = useMemo(
+      () =>
+        webSegmentDocument && getWebViewSegmentParagraphs(webSegmentDocument),
+      [webSegmentDocument],
+    );
+    // Counts can change without invalidating the source of an open selection.
+    const segmentSourceTexts = useMemo(
+      () =>
+        JSON.stringify(segmentInfos?.map(({ pid, text }) => [pid, text]) ?? []),
+      [segmentInfos],
+    );
     const documentImages = useMemo(
       () =>
         document
@@ -391,9 +406,6 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
       [document],
     );
     const themeColors = useRuntimeThemeColors();
-    const textSecondaryColor = useThemeColor({}, 'textSecondary');
-    const contentBorderColor = useThemeColor({}, 'contentBorder');
-    const inverseTextColor = themeColors.onPrimary;
     const surfaceColor = useThemeColor({}, 'surface');
     const router = useRouter();
 
@@ -405,6 +417,13 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
       text: string;
       sourceUrl?: string;
     } | null>(null);
+    useEffect(() => {
+      if (!segmentTapEnabled) {
+        setModalVisible(false);
+        setActiveSegment(null);
+        setNativeHighlight(null);
+      }
+    }, [segmentTapEnabled]);
     const [viewerVisible, setViewerVisible] = useState(false);
     const [viewerImage, setViewerImage] = useState<string | null>(null);
     const [viewerImages, setViewerImages] = useState<string[]>([]);
@@ -430,14 +449,6 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
       },
       [router],
     );
-
-    const segmentMap = useMemo(() => {
-      const map = new Map<string, ZhihuSegmentInfo>();
-      segmentInfos?.forEach((info) => {
-        map.set(info.pid, info);
-      });
-      return map;
-    }, [segmentInfos]);
 
     const toggleSegmentLikeMutation = useMutation({
       mutationFn: async ({
@@ -468,8 +479,8 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
       },
       onSuccess: (result, { answerId, segment }) => {
         if (
-          interactionSource.current.objectId !== answerId ||
-          interactionSource.current.type !== 'answer'
+          activeSource.current?.objectId !== answerId ||
+          activeSource.current.type !== 'answer'
         )
           return;
         onRefresh?.();
@@ -502,24 +513,6 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         showToast('操作失败，请重试');
       },
     });
-
-    const findActiveInteraction = useCallback(
-      (segment: ZhihuSegmentInfo | null | undefined) => {
-        const marks = segment?.marks;
-        if (!marks || marks.length === 0) return null;
-        for (const mark of marks) {
-          if (mark.seg_info?.is_like) return { ...mark.seg_info, mark };
-          if (mark.master_seg_info?.is_like)
-            return { ...mark.master_seg_info, mark };
-        }
-        for (const mark of marks) {
-          if (mark.master_seg_info) return { ...mark.master_seg_info, mark };
-        }
-        const firstInfo = marks[0].seg_info || marks[0].master_seg_info;
-        return firstInfo ? { ...firstInfo, mark: marks[0] } : null;
-      },
-      [],
-    );
 
     const handlePress = useCallback(
       (
@@ -557,7 +550,6 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
       [type],
     );
 
-    const primaryColor = useThemeColor({}, 'primary');
     const onImagePressCallback = useCallback(
       (
         src: string,
@@ -575,54 +567,6 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
     const onImageLongPressCallback = useCallback((src: string) => {
       setActionSheetUrl(src);
     }, []);
-    const onSegmentPressCallback = useCallback(
-      (pid: string, nodeId?: string) => {
-        if (document) {
-          const runs = [...walkZhihuDocument(document)].filter(
-            (node) =>
-              node.type === 'segment' &&
-              node.paragraphId === pid &&
-              (nodeId === undefined || node.id === nodeId),
-          );
-          // Older PID-only events must not guess among several mark ranges.
-          if (runs.length !== 1 || runs[0].type !== 'segment') return;
-          const run = runs[0];
-          const text = sourceInlineText(run.children);
-          if (!text?.trim()) return;
-          const resolved = resolveNativeAnswerSegment(
-            {
-              nodeId: run.id,
-              paragraphId: pid,
-              start: run.range.start,
-              end: run.range.end,
-              text,
-              segment: run,
-            },
-            { objectId, type, segmentInfos, document },
-          );
-          if (resolved)
-            handlePress(pid, resolved.segment, resolved.interaction);
-          else setNativeHighlight({ text });
-          return;
-        }
-        const segment = segmentMap.get(pid);
-        if (segment) {
-          const interaction = findActiveInteraction(segment);
-          if (interaction) {
-            handlePress(pid, segment, interaction);
-          }
-        }
-      },
-      [
-        document,
-        objectId,
-        type,
-        segmentInfos,
-        segmentMap,
-        findActiveInteraction,
-        handlePress,
-      ],
-    );
     const onNativeSegmentPressCallback = useCallback(
       (action: ZhihuNativeSegmentAction, document: ZhihuDocument) => {
         if (document.id !== `${type}:${objectId}`) return;
@@ -655,6 +599,34 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
       },
       [objectId, type, segmentInfos, handlePress],
     );
+    const onSegmentPressCallback = useCallback(
+      (pid: string, nodeId?: string) => {
+        if (!segmentTapEnabled || !nodeId || !webSegmentDocument) return;
+        const paragraph = webSegmentParagraphs?.get(pid);
+        const mark = paragraph?.annotations.find(
+          ({ run }) => run.id === nodeId,
+        );
+        if (!mark || !paragraph) return;
+        const { run, start, end } = mark;
+        onNativeSegmentPressCallback(
+          {
+            paragraphId: pid,
+            nodeId: run.id,
+            start,
+            end,
+            text: paragraph.text.slice(start, end),
+            segment: run,
+          },
+          webSegmentDocument,
+        );
+      },
+      [
+        segmentTapEnabled,
+        webSegmentParagraphs,
+        webSegmentDocument,
+        onNativeSegmentPressCallback,
+      ],
+    );
     const renderNativeLinkCard = useCallback(
       (card: ZhihuLinkCardBlock) => (
         <LinkCard
@@ -680,45 +652,49 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
     // --- Segment reaction from text selection ---
     const [textSelection, setTextSelection] =
       useState<TextSelectionInfo | null>(null);
-    const interactionSource = useRef({
-      content,
-      contentArray,
-      document,
-      objectId,
-      type,
-      selectedRenderer,
-    });
-
-    useEffect(() => {
-      const previous = interactionSource.current;
-      if (
-        previous.content === content &&
-        previous.contentArray === contentArray &&
-        previous.document === document &&
-        previous.objectId === objectId &&
-        previous.type === type &&
-        previous.selectedRenderer === selectedRenderer
-      )
-        return;
-      interactionSource.current = {
+    // Focusing the composer collapses the system selection. Keep the original
+    // excerpt for the draft until the reader closes it or changes answers.
+    const [commentSelection, setCommentSelection] =
+      useState<TextSelectionInfo | null>(null);
+    const contentSource = useMemo(
+      () => ({
         content,
         contentArray,
         document,
         objectId,
         type,
         selectedRenderer,
-      };
+      }),
+      [content, contentArray, document, objectId, type, selectedRenderer],
+    );
+    const selectionSource = useMemo(
+      () => ({ ...contentSource, selectionEnabled, segmentSourceTexts }),
+      [contentSource, selectionEnabled, segmentSourceTexts],
+    );
+    const activeSource = useRef<typeof selectionSource | null>(null);
+    useLayoutEffect(() => {
+      activeSource.current = selectionSource;
       setTextSelection(null);
+      setCommentSelection(null);
+      return () => {
+        activeSource.current = null;
+      };
+    }, [selectionSource]);
+    const previousContentSource = useRef(contentSource);
+    useEffect(() => {
+      if (previousContentSource.current === contentSource) return;
+      previousContentSource.current = contentSource;
       setModalVisible(false);
       setActiveSegment(null);
       setNativeHighlight(null);
-    }, [content, contentArray, document, objectId, type, selectedRenderer]);
+    }, [contentSource]);
 
     const onTextSelectedCallback = useCallback(
       (info: TextSelectionInfo | null) => {
-        setTextSelection(info);
+        if (activeSource.current === selectionSource && selectionEnabled)
+          setTextSelection(info);
       },
-      [],
+      [selectionSource, selectionEnabled],
     );
     const onNativeTextSelectedCallback = useCallback(
       (
@@ -727,7 +703,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         document: ZhihuDocument,
       ) => {
         if (document.id !== `${type}:${objectId}`) return;
-        setTextSelection(
+        onTextSelectedCallback(
           resolveNativeAnswerSelection(selection, flow, {
             objectId,
             type,
@@ -736,14 +712,14 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
           }),
         );
       },
-      [objectId, type, segmentInfos],
+      [objectId, type, segmentInfos, onTextSelectedCallback],
     );
 
     const currentTextSelection = useRef(textSelection);
     currentTextSelection.current = textSelection;
     const createReactionMutation = useMutation(
       createSelectionReactionOptions({
-        getSource: () => interactionSource.current,
+        getSource: () => activeSource.current,
         getSelection: () => currentTextSelection.current,
         clearSelection: () => setTextSelection(null),
         refresh: onRefresh,
@@ -753,9 +729,12 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
     );
     const renderWebViewContent = () => (
       <ZhihuDOMContent
+        key={`${type}:${objectId}`}
         htmlContent={documentHtml ?? content ?? ''}
         contentArray={document ? undefined : contentArray}
-        segmentInfosStr={JSON.stringify(segmentInfos)}
+        segmentParagraphs={webSegmentParagraphs}
+        segmentSourceTexts={segmentSourceTexts}
+        segmentTapEnabled={segmentTapEnabled}
         linkCardInfoStr={JSON.stringify(linkCardInfo || {})}
         colorScheme={colorScheme}
         onReady={onLayoutReady}
@@ -764,7 +743,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         onLinkPress={handleInternalLink}
         onSegmentPress={onSegmentPressCallback}
         onTextSelected={type === 'answer' ? onTextSelectedCallback : undefined}
-        selectable={selectable}
+        selectable={selectionEnabled}
         suppressDoubleTapSelection={suppressDoubleTapSelection}
         variant={variant}
         fontSizeScale={fontSizeScale}
@@ -791,10 +770,12 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
             onLinkPress={handleInternalLink}
             onImagePress={onImagePressCallback}
             onImageLongPress={onImageLongPressCallback}
-            onSegmentPress={onNativeSegmentPressCallback}
+            onSegmentPress={
+              segmentTapEnabled ? onNativeSegmentPressCallback : undefined
+            }
             onSelectionChange={onNativeTextSelectedCallback}
             renderLinkCard={renderNativeLinkCard}
-            selectable={selectable}
+            selectable={selectionEnabled}
             suppressDoubleTapSelection={suppressDoubleTapSelection}
             renderFallback={renderWebViewContent}
             renderPlaceholder={renderPlaceholder}
@@ -963,80 +944,61 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
           onClose={() => setActionSheetUrl(null)}
         />
 
-        {textSelection && type === 'answer' && (
-          <View
-            className="mt-3 rounded-2xl overflow-hidden"
-            style={[
-              {
-                backgroundColor: surfaceColor,
-                borderWidth: StyleSheet.hairlineWidth,
-                borderColor: contentBorderColor,
-              },
-            ]}
-          >
-            <View className="px-4 pt-3 pb-2 bg-transparent">
-              <Text type="secondary" className="text-xs mb-1.5">
-                已选中文字
-              </Text>
-              <Text
-                className="text-[15px] leading-5"
-                numberOfLines={2}
-                style={{ fontStyle: 'italic' }}
-              >
-                "{textSelection.text}"
-              </Text>
-            </View>
-            <View
-              className="flex-row items-center justify-between px-4 py-2.5 bg-transparent"
-              style={{
-                borderTopWidth: StyleSheet.hairlineWidth,
-                borderTopColor: contentBorderColor,
-              }}
-            >
-              <BouncyButton
-                className="flex-row items-center p-2 rounded-full bg-transparent"
-                onPress={() => setTextSelection(null)}
-              >
-                <Ionicons
-                  name="close-circle-outline"
-                  size={18}
-                  color={textSecondaryColor}
-                />
-                <Text type="secondary" className="text-sm ml-1">
-                  取消
-                </Text>
-              </BouncyButton>
-              <BouncyButton
-                className="flex-row items-center rounded-full px-4 py-1.5"
-                style={{
-                  backgroundColor: primaryColor,
+        {commentSelection && type === 'answer' && selectionEnabled && (
+          <SelectionCommentSheet
+            answerId={objectId}
+            selection={commentSelection}
+            onClose={() => setCommentSelection(null)}
+            onPosted={() => {
+              if (activeSource.current !== selectionSource) return;
+              setCommentSelection(null);
+              onRefresh?.();
+              showToast('已发布划线评论');
+            }}
+          />
+        )}
+        {!commentSelection &&
+          textSelection &&
+          type === 'answer' &&
+          selectionEnabled && (
+            <ScreenOverlay owner={textSelection}>
+              <SelectionActions
+                text={textSelection.text}
+                pending={createReactionMutation.isPending}
+                onComment={
+                  isValidAnswerCommentSelection(objectId, textSelection)
+                    ? () => {
+                        if (
+                          activeSource.current !== selectionSource ||
+                          currentTextSelection.current !== textSelection
+                        )
+                          return;
+                        setCommentSelection(textSelection);
+                        setTextSelection(null);
+                      }
+                    : undefined
+                }
+                onCancel={() => {
+                  if (
+                    activeSource.current === selectionSource &&
+                    currentTextSelection.current === textSelection
+                  )
+                    setTextSelection(null);
                 }}
-                onPress={() => {
-                  if (textSelection)
+                onLike={() => {
+                  if (
+                    activeSource.current === selectionSource &&
+                    currentTextSelection.current === textSelection
+                  ) {
                     createReactionMutation.mutate({
-                      source: interactionSource.current,
+                      source: selectionSource,
                       selection: textSelection,
                     });
+                  }
                 }}
-                disabled={createReactionMutation.isPending}
-              >
-                {createReactionMutation.isPending ? (
-                  <ActivityIndicator size="small" color={inverseTextColor} />
-                ) : (
-                  <>
-                    <Ionicons name="heart" size={16} color={inverseTextColor} />
-                    <Text
-                      className="text-sm font-bold ml-1"
-                      style={{ color: inverseTextColor }}
-                    >
-                      赞同
-                    </Text>
-                  </>
-                )}
-              </BouncyButton>
-            </View>
-          </View>
-        )}
+              />
+            </ScreenOverlay>
+          )}
       </View>
     );
   },

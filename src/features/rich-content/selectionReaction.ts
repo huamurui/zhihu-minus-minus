@@ -13,7 +13,7 @@ interface SelectionReactionInput {
 }
 
 interface SelectionReactionCallbacks {
-  getSource: () => SelectionReactionSource;
+  getSource: () => SelectionReactionSource | null;
   getSelection: () => TextSelectionInfo | null;
   clearSelection: () => void;
   refresh?: () => void;
@@ -47,6 +47,8 @@ export function createSelectionReactionOptions(
       callbacks.refresh?.();
       callbacks.notifySuccess();
     },
-    onError: callbacks.notifyError,
+    onError: (_error: unknown, { source }: SelectionReactionInput) => {
+      if (callbacks.getSource() === source) callbacks.notifyError();
+    },
   };
 }

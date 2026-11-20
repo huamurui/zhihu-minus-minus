@@ -15,6 +15,7 @@ import {
   createSerializationContext,
   type ExportSerializationContext,
   escapeExportHtml as escapeText,
+  exportLinkLabel,
   exportListStart,
   exportTableSpan,
   resolveExportImage,
@@ -80,9 +81,10 @@ function formula(
 
 function link(url: string, label: string): string {
   const safe = getSafeExportUrl(url);
+  const text = exportLinkLabel(url, safe, label, escapeText);
   return safe
-    ? `<a href="${escapeText(safe)}" rel="noreferrer noopener">${label}</a>`
-    : label;
+    ? `<a href="${escapeText(safe)}" rel="noreferrer noopener">${text}</a>`
+    : text;
 }
 
 function inline(
@@ -129,11 +131,14 @@ function inline(
         case 'footnoteReference': {
           const noteId = context.footnoteIds.get(run.definitionId);
           if (!noteId) return `<sup>[${escapeText(run.label)}：脚注缺失]</sup>`;
+          const label = /^\[.*\]$/.test(run.label)
+            ? run.label
+            : `[${run.label}]`;
           const refId = `ref-${++context.referenceCount}`;
           const references = context.references.get(noteId) ?? [];
           references.push(refId);
           context.references.set(noteId, references);
-          return `<sup id="${refId}"><a href="#${noteId}" role="doc-noteref">[${escapeText(run.label)}]</a></sup>`;
+          return `<sup id="${refId}"><a href="#${noteId}" role="doc-noteref">${escapeText(label)}</a></sup>`;
         }
         default:
           return assertExportNever(run);

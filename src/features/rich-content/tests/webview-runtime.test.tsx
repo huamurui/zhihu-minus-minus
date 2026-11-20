@@ -2,6 +2,7 @@ import vm from 'node:vm';
 import { act, render } from '@testing-library/react-native';
 import { isTag } from 'domhandler';
 import { parseDocument } from 'htmlparser2';
+import { JSDOM } from 'jsdom';
 import type { WebViewProps } from 'react-native-webview';
 import ZhihuDOMContent, {
   type ZhihuDOMContentProps,
@@ -407,11 +408,12 @@ test('toggles selection without reloading and rejects delayed events and scripts
   expect(onTextSelected).toHaveBeenLastCalledWith(info);
 });
 
-test('builds untrusted footnote labels and definitions as text nodes', async () => {
+test('renders URL-only footnotes once and treats untrusted metadata as text', async () => {
   const { html } = await renderPage();
   interface Element {
     style: Record<string, string>;
     textContent: string;
+    href?: string;
     innerText: string;
     id: string;
     children: Element[];
@@ -443,6 +445,12 @@ test('builds untrusted footnote labels and definitions as text nodes', async () 
   const footnote = createElement();
   footnote.getAttribute = (name) =>
     name === 'data-text' ? rawText : name === 'data-numero' ? rawLabel : null;
+  const sourceUrl = 'https://example.org/source';
+  const urlReferences = [createElement(), createElement()];
+  for (const node of urlReferences) {
+    node.getAttribute = (name) =>
+      name === 'data-url' ? sourceUrl : name === 'data-numero' ? '2' : null;
+  }
   const createTextNode = jest.fn((text: string) => {
     const node = createElement();
     node.textContent = text;
@@ -451,8 +459,10 @@ test('builds untrusted footnote labels and definitions as text nodes', async () 
   const container = {
     innerHTML: '',
     querySelectorAll: (selector: string) =>
-      selector === 'sup[data-text]' ? [footnote] : [],
-    appendChild: jest.fn(),
+      selector === 'sup[data-numero], sup[data-text]'
+        ? [footnote, ...urlReferences]
+        : [],
+    appendChild: jest.fn<void, [Element]>(),
     addEventListener: jest.fn(),
   };
   vm.runInNewContext(inlineScript(html), {
@@ -468,89 +478,172 @@ test('builds untrusted footnote labels and definitions as text nodes', async () 
   expect(createTextNode).toHaveBeenCalledWith(` ${rawText}`);
   expect(footnote.children[0].textContent).toBe(`[${rawLabel}]`);
   expect(container.appendChild).toHaveBeenCalledTimes(1);
+  const [, , urlDefinition] = container.appendChild.mock.calls[0][0].children;
+  expect(urlDefinition.children.at(-1)).toMatchObject({
+    href: sourceUrl,
+    textContent: sourceUrl,
+  });
+  expect(urlReferences.map((node) => node.children[0].href)).toEqual([
+    `#${urlDefinition.id}`,
+    `#${urlDefinition.id}`,
+  ]);
+  expect(urlReferences[0].id).not.toBe(urlReferences[1].id);
 });
 
-test('maps element selection boundaries through a DOM range and clears selections outside source paragraphs', async () => {
-  const { html } = await renderPage();
-  const postMessage = jest.fn();
-  const timers: (() => void)[] = [];
-  const listeners = new Map<string, () => void>();
-  const container = {
-    innerHTML: '',
-    querySelectorAll: () => [],
-    addEventListener: jest.fn(),
-  };
-  const paragraph = {
-    nodeType: 1,
-    getAttribute: (name: string) => (name === 'data-pid' ? 'one' : null),
-    parentElement: container,
-  };
-  const textNode = { nodeType: 3, parentElement: paragraph };
-  let endContainer: object = textNode;
-  const prefixes: { target: object; offset: number }[] = [];
-  const document = {
-    getElementById: () => container,
-    addEventListener: (type: string, callback: () => void) =>
-      listeners.set(type, callback),
-    createRange: () => ({
-      selectNodeContents: jest.fn(),
-      setEnd: (target: object, offset: number) =>
-        prefixes.push({ target, offset }),
-      toString: () => (prefixes.at(-1)?.target === paragraph ? '甲' : '甲乙丙'),
-    }),
-  };
-  vm.runInNewContext(inlineScript(html), {
-    document,
-    window: {
-      __zhihuSelectionDocumentIdentity: JSON.parse(bridgeMessage(html, {}))
-        .documentIdentity,
-      __zhihuTextSelectable: true,
-      __zhihuSelectionRevision: 0,
-      ReactNativeWebView: { postMessage },
-      addEventListener: jest.fn(),
-      getSelection: () => ({
-        isCollapsed: false,
-        rangeCount: 1,
-        toString: () => '乙丙',
-        getRangeAt: () => ({
-          startContainer: paragraph,
-          startOffset: 1,
-          endContainer,
-          endOffset: 2,
-        }),
-      }),
-    },
-    setTimeout: (callback: () => void) => timers.push(callback),
-    clearTimeout: jest.fn(),
+function selectionRuntime(
+  html: string,
+  renderMathInElement?: (container: Element) => void,
+) {
+  const dom = new JSDOM('<div id="content"></div>', {
+    runScripts: 'outside-only',
   });
-  listeners.get('selectionchange')?.();
-  timers.pop()?.();
-  expect(prefixes).toEqual([
-    { target: paragraph, offset: 1 },
-    { target: textNode, offset: 2 },
-  ]);
-  expect(JSON.parse(postMessage.mock.calls.at(-1)?.[0] as string)).toEqual({
-    documentIdentity: JSON.parse(bridgeMessage(html, {})).documentIdentity,
-    selectionRevision: 0,
-    type: 'selection',
-    info: {
-      text: '乙丙',
+  const { window } = dom;
+  const { document } = window;
+  const postMessage = jest.fn();
+  let lastTimer = () => {};
+  Object.assign(window, {
+    __zhihuSelectionDocumentIdentity: JSON.parse(bridgeMessage(html, {}))
+      .documentIdentity,
+    __zhihuTextSelectable: true,
+    __zhihuSelectionRevision: 0,
+    ReactNativeWebView: { postMessage },
+    renderMathInElement,
+    setTimeout: (fn: () => void) => {
+      lastTimer = fn;
+      return 1;
+    },
+    clearTimeout: () => {},
+  });
+  vm.runInContext(inlineScript(html), dom.getInternalVMContext());
+  function select(
+    start: Node,
+    startOffset: number,
+    end: Node,
+    endOffset: number,
+  ) {
+    const range = document.createRange();
+    range.setStart(start, startOffset);
+    range.setEnd(end, endOffset);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    document.dispatchEvent(new window.Event('selectionchange'));
+    lastTimer();
+    return JSON.parse(postMessage.mock.calls.at(-1)?.[0] as string).info;
+  }
+  return { document, select, close: () => window.close() };
+}
+
+test('maps styled and element boundaries to the original UTF-16 text within and across paragraphs', async () => {
+  const { html } = await renderPage({
+    htmlContent:
+      '<p data-pid="one"><span>甲</span><strong>乙😀 </strong></p><blockquote><p data-pid="two"><a href="https://example.com"> 丙丁</a></p></blockquote>',
+  });
+  const { document, select, close } = selectionRuntime(html);
+  try {
+    const paragraphs = document.querySelectorAll('p');
+    const first = paragraphs[0];
+    const lastText = document.querySelector('p a')?.firstChild;
+    const bold = first.querySelector('strong')?.firstChild;
+    if (!bold || !lastText) throw new Error('Expected selectable text');
+    expect(select(first, 1, bold, 3)).toEqual({
+      text: '乙😀',
       startParagraphId: 'one',
       endParagraphId: 'one',
       startOffset: 1,
-      endOffset: 3,
-    },
+      endOffset: 4,
+    });
+    expect(select(bold, 1, lastText, 2)).toEqual({
+      text: '😀 \n 丙',
+      startParagraphId: 'one',
+      endParagraphId: 'two',
+      startOffset: 2,
+      endOffset: 2,
+    });
+    expect(select(bold, 2, bold, 3)).toBeNull();
+    expect(select(bold, 0, document.body, 1)).toBeNull();
+  } finally {
+    close();
+  }
+});
+
+test('rejects ranges with ambiguous paragraph IDs, media boundaries and rewritten source offsets', async () => {
+  const { html } = await renderPage({
+    htmlContent: [
+      '<p data-pid="begin">开始</p><figure><img src="https://example.com/a.jpg"></figure><p data-pid="afterMedia">后面</p>',
+      '<p data-pid="dupe">同名</p><p data-pid="dupe">重复</p>',
+      '<p data-pid="foot"><sup data-numero="1" data-text="说明">[1]</sup>脚注后</p>',
+      '<p data-pid="image">开头<img src="https://example.com/a.jpg">结尾</p>',
+      '<p data-pid="math">$x$ 公式后</p>',
+    ].join(''),
   });
-  endContainer = container;
-  listeners.get('selectionchange')?.();
-  timers.pop()?.();
-  expect(postMessage).toHaveBeenLastCalledWith(
-    bridgeMessage(html, {
-      type: 'selection',
-      info: null,
-      selectionRevision: 0,
-    }),
-  );
+  const { document, select, close } = selectionRuntime(html, (container) => {
+    const math = container.querySelector('[data-pid="math"]');
+    if (math) math.innerHTML = '<span class="katex">x</span> 公式后';
+  });
+  function paragraph(pid: string) {
+    const node = document.querySelector(`p[data-pid="${pid}"]`);
+    if (!node?.firstChild || !node.lastChild)
+      throw new Error('Expected test paragraph');
+    return { first: node.firstChild, last: node.lastChild };
+  }
+  try {
+    expect(
+      select(paragraph('begin').first, 0, paragraph('afterMedia').last, 2),
+    ).toBeNull();
+    for (const pid of ['dupe', 'foot', 'math']) {
+      const { last } = paragraph(pid);
+      expect(select(last, 0, last, 2)).toBeNull();
+    }
+    const image = paragraph('image');
+    expect(select(image.first, 0, image.last, 2)).toBeNull();
+  } finally {
+    close();
+  }
+});
+
+test('only accepts exact unique API source text and treats hidden content as a selection boundary', async () => {
+  const { html } = await renderPage({
+    htmlContent: [
+      '<p data-pid="start">起点</p>',
+      '<p data-pid="stale">甲乙</p>',
+      '<p data-pid="end">终点</p>',
+      '<p data-pid="duplicate">同段</p>',
+      '<p data-pid="hiddenInline">甲<span style="display: none !important">隐藏</span>乙</p>',
+      '<p data-pid="beforeHidden">前段</p>',
+      '<div style="display:none"><p data-pid="hiddenBlock">隐藏段落</p></div>',
+      '<p data-pid="last">末尾</p>',
+    ].join(''),
+    segmentSourceTexts: JSON.stringify([
+      ['start', '起点'],
+      ['stale', '前甲乙'],
+      ['duplicate', '同段'],
+      ['duplicate', '同段'],
+    ]),
+  });
+  const { document, select, close } = selectionRuntime(html);
+  function text(pid: string, end = false) {
+    const paragraph = document.querySelector(`p[data-pid="${pid}"]`);
+    const node = end ? paragraph?.lastChild : paragraph?.firstChild;
+    if (!node) throw new Error('Expected paragraph source text');
+    return node;
+  }
+  try {
+    for (const pid of ['start', 'end', 'last'])
+      expect(select(text(pid), 0, text(pid), 2)).toMatchObject({
+        startParagraphId: pid,
+        endOffset: 2,
+      });
+    for (const pid of ['stale', 'duplicate', 'hiddenBlock'])
+      expect(select(text(pid), 0, text(pid), 2)).toBeNull();
+    expect(
+      select(text('hiddenInline'), 0, text('hiddenInline', true), 1),
+    ).toBeNull();
+    expect(select(text('start'), 0, text('end'), 2)).toBeNull();
+    expect(select(text('beforeHidden'), 0, text('last'), 2)).toBeNull();
+  } finally {
+    close();
+  }
 });
 
 test('prevents content navigation from replacing the rendering document', async () => {
@@ -717,3 +810,68 @@ test('formula scripts and fonts are inline with no CDN dependency', async () => 
     if (isTag(script)) expect(script.attribs.src).toBeUndefined();
   expect(html).toContain('data:font/woff2;base64,');
 });
+
+test.each([true, false])(
+  'honors segment taps = %s and preserves links within a marked passage',
+  async (segmentTapEnabled) => {
+    const { html, props } = await renderPage({ segmentTapEnabled });
+    const postMessage = jest.fn();
+    const container = {
+      innerHTML: '',
+      querySelectorAll: () => [],
+      addEventListener: jest.fn(),
+    };
+    vm.runInNewContext(inlineScript(html), {
+      document: {
+        getElementById: () => container,
+        addEventListener: jest.fn(),
+      },
+      window: {
+        ReactNativeWebView: { postMessage },
+        addEventListener: jest.fn(),
+      },
+      setTimeout: jest.fn(),
+    });
+    const click = container.addEventListener.mock.calls.find(
+      ([event]) => event === 'click',
+    )?.[1];
+    const span = {
+      tagName: 'SPAN',
+      parentElement: container,
+      classList: {
+        contains: (name: string) => name === 'segment-interactable',
+      },
+      getAttribute: (name: string) => (name === 'data-pid' ? 'p' : 'n'),
+    };
+    click({ target: span });
+    expect(postMessage).toHaveBeenCalledTimes(segmentTapEnabled ? 1 : 0);
+    const segmentMessage = bridgeMessage(html, {
+      type: 'segment',
+      pid: 'p',
+      nodeId: 'n',
+    });
+    if (segmentTapEnabled)
+      expect(postMessage).toHaveBeenCalledWith(segmentMessage);
+    await act(() =>
+      mockWebViewProps.onMessage?.({
+        nativeEvent: { data: segmentMessage },
+      } as Parameters<NonNullable<WebViewProps['onMessage']>>[0]),
+    );
+    expect(props.onSegmentPress).toHaveBeenCalledTimes(
+      segmentTapEnabled ? 1 : 0,
+    );
+    const link = {
+      tagName: 'A',
+      classList: { contains: () => false },
+      getAttribute: () => 'https://example.com/',
+      parentElement: container,
+    };
+    click({
+      target: { ...span, parentElement: link },
+      preventDefault: jest.fn(),
+    });
+    expect(postMessage).toHaveBeenLastCalledWith(
+      bridgeMessage(html, { type: 'link', href: 'https://example.com/' }),
+    );
+  },
+);

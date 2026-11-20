@@ -46,6 +46,8 @@ iOS完整Simulator app已在iOS27 SDK、deployment target15.1下构建通过；�
 
 `configJson` 支持 `fontSize`、`lineHeight`、`paragraphSpacing`、`textColor`、`secondaryColor`、`linkColor`、`justify` 和 `textAlign`（left/center/right）。尺寸按React Native布局单位传入：Android为dp，iOS为pt。文本、段距和附件应用各自系统字体缩放；`contentWidth`不乘字体缩放。`selectable` 控制系统选择。
 
+`configJson.commentIcon` 提供评论图标的 SVG 填充路径、方形 viewBox 尺寸和布局参数。仅带 `hasComments` 的范围装饰绘制该图标，绘制和命中均以末字的实际位置为准。
+
 JS props还必须提供 `layoutKey`，代表本次字体/宽度/配置输入。更新key会调度重测；高度去重包含key，原生posted measurement会核对当前key和generation，避免旧测量覆盖新布局。宿主应使用紧凑稳定key，不把整篇flow JSON重复塞入事件。
 
 事件均附带 `flowId`、`textVersion`：
