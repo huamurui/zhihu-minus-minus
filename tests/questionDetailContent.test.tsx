@@ -7,7 +7,10 @@ import type { ZhihuContentProps } from '../src/features/rich-content';
 import { createRichContentMetrics } from '../src/features/rich-content/presentation';
 import { useSettingsStore } from '../src/store/useSettingsStore';
 
-const mockRichContent = jest.fn((_props: ZhihuContentProps) => null);
+const mockRichContent = jest.fn(
+  ({ renderPlaceholder }: ZhihuContentProps) =>
+    renderPlaceholder?.('text-layout') ?? null,
+);
 
 jest.mock('../src/features/rich-content', () => ({
   RICH_CONTENT_BODY_FONT_SIZE: jest.requireActual(
@@ -59,4 +62,16 @@ test('the expanded description keeps the reading size and line height settings',
       lineHeightScale: initial.lineHeightScale,
     });
   }
+});
+
+test('the summary stays in place of the expanded body until its layout is ready', async () => {
+  // Without it the renderer shows grey placeholder bars for a few frames.
+  const host = await render(
+    <QuestionDetailContent
+      content="<p>合成问题描述</p>"
+      questionId="q1"
+      summary="合成摘要"
+    />,
+  );
+  expect(host.getByText('合成摘要')).toBeVisible();
 });
