@@ -44,7 +44,7 @@ export function AnswerPreviewQuestionHeader({
     hasAuthenticationCookie(state.cookies),
   );
   const sessionVersion = useAuthStore(() => getAuthSessionVersion());
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const [menuVisible, setMenuVisible] = useState(false);
   const {
     data: question,
@@ -143,7 +143,10 @@ export function AnswerPreviewQuestionHeader({
                   summary={summary}
                 />
               ) : (
-                <QuestionDetailSummary text={summary} />
+                <QuestionDetailSummary
+                  text={summary}
+                  truncate={Boolean(question.detail)}
+                />
               )}
               {question.detail ? (
                 <ContentActionButton

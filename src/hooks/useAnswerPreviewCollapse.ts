@@ -1,150 +1,138 @@
 import type { FlashListRef } from '@shopify/flash-list';
-import { type RefObject, useCallback, useEffect, useRef } from 'react';
+import { type RefObject, useCallback, useLayoutEffect, useRef } from 'react';
+import type { ZhihuReadingPreviewItem } from '@/api/zhihu/nextRender';
 
-/** No scroll event for this long after the programmatic scroll means it has settled. */
 const SCROLL_SETTLE_MS = 120;
-/** Give the animated scroll this long to emit its first event. */
 const SCROLL_START_MS = 250;
-/** Collapse anyway if the scroll never settles (e.g. the user keeps dragging). */
 const SCROLL_MAX_MS = 1200;
-/** Keep re-anchoring while FlashList re-measures the collapsed card. */
 const ANCHOR_WINDOW_MS = 600;
 
+interface Anchor {
+  id: string;
+  /** Distance from the viewport top to the start of this answer. */
+  viewportTop: number;
+  until: number;
+}
+
 interface PendingCollapse {
-  index: number;
-  collapse: () => void;
+  finish: () => void;
   settleTimer: ReturnType<typeof setTimeout>;
   maxTimer: ReturnType<typeof setTimeout>;
 }
 
-interface Anchor {
-  index: number;
-  /** Distance from the viewport top to the anchored card's top. */
-  offsetFromViewport: number;
-  until: number;
+type PreviewList = FlashListRef<ZhihuReadingPreviewItem>;
+
+/** FlashList layouts exclude its header and top padding; scroll offsets include both. */
+function cardTop(list: PreviewList, id: string): number | undefined {
+  const index = list.props.data?.findIndex(
+    (item) => item.type === 'answer' && item.id === id,
+  );
+  if (index === undefined || index < 0) return undefined;
+  const layout = list.getLayout(index);
+  return layout && layout.y + list.getFirstItemOffset();
 }
 
-/**
- * Collapsing an expanded answer in place pulls the content under the reader's
- * eyes. Instead, scroll smoothly back to the answer's start, then collapse it
- * once the scroll settles: the top of the card, which the collapsed preview
- * keeps, stays put and only the content below it changes.
- */
-export function useAnswerPreviewCollapse<T>({
+/** Scroll to the top of a long answer before shrinking the content below it. */
+export function useAnswerPreviewCollapse({
   listRef,
   scope,
   viewOffset,
 }: {
-  listRef: RefObject<FlashListRef<T> | null>;
+  listRef: RefObject<PreviewList | null>;
   scope: string;
-  /** Distance from the list top at which a card's start should rest. */
   viewOffset: number;
 }) {
   const pending = useRef<PendingCollapse | null>(null);
   const anchor = useRef<Anchor | null>(null);
+  const scrollY = useRef<number | null>(null);
 
-  const clearPending = useCallback(() => {
+  const cancel = useCallback(() => {
+    anchor.current = null;
     if (!pending.current) return;
     clearTimeout(pending.current.settleTimer);
     clearTimeout(pending.current.maxTimer);
     pending.current = null;
   }, []);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: scope changes must drop work queued for the previous list.
-  useEffect(() => {
-    anchor.current = null;
-    return clearPending;
-  }, [scope, clearPending]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a different list must never inherit a pending scroll.
+  useLayoutEffect(() => {
+    scrollY.current = null;
+    return cancel;
+  }, [scope, cancel]);
 
-  const collapseAnchored = useCallback(
-    (index: number, applyCollapse: () => void) => {
-      const list = listRef.current;
-      const layout = list?.getLayout(index);
-      if (list && layout) {
-        anchor.current = {
-          index,
-          offsetFromViewport: layout.y - list.getAbsoluteLastScrollOffset(),
-          until: Date.now() + ANCHOR_WINDOW_MS,
-        };
-      }
-      applyCollapse();
-    },
-    [listRef],
-  );
-
-  const finish = useCallback(() => {
-    const current = pending.current;
-    if (!current) return;
-    clearPending();
-    collapseAnchored(current.index, current.collapse);
-  }, [clearPending, collapseAnchored]);
-
-  const collapse = useCallback(
-    (index: number, applyCollapse: () => void) => {
-      clearPending();
-      const list = listRef.current;
-      const layout = list?.getLayout(index);
-      if (!list || !layout) {
-        applyCollapse();
-        return;
-      }
-      // Layouts exclude the list's top padding; scroll offsets include it.
-      const top =
-        layout.y +
-        list.getFirstItemOffset() -
-        list.getAbsoluteLastScrollOffset();
-      if (top >= viewOffset) {
-        // The answer's start is already on screen; only content below changes.
-        collapseAnchored(index, applyCollapse);
-        return;
-      }
-      pending.current = {
-        index,
-        collapse: applyCollapse,
-        settleTimer: setTimeout(finish, SCROLL_START_MS),
-        maxTimer: setTimeout(finish, SCROLL_MAX_MS),
-      };
-      list.scrollToIndex({
-        index,
-        animated: true,
-        // FlashList 2 adds this offset to the target scroll position.
-        viewOffset: -viewOffset,
-      });
-    },
-    [clearPending, collapseAnchored, finish, listRef, viewOffset],
-  );
-
-  const onScroll = useCallback(() => {
-    const current = pending.current;
-    if (!current) return;
-    clearTimeout(current.settleTimer);
-    current.settleTimer = setTimeout(finish, SCROLL_SETTLE_MS);
-  }, [finish]);
-
-  /** Pass to FlashList `onScrollBeginDrag`: the reader now owns the scroll. */
-  const onScrollBeginDrag = useCallback(() => {
-    anchor.current = null;
-    const current = pending.current;
-    if (!current) return;
-    clearPending();
-    current.collapse();
-  }, [clearPending]);
-
-  /** Pass to FlashList `onCommitLayoutEffect`. */
   const onCommitLayout = useCallback(() => {
     const current = anchor.current;
     const list = listRef.current;
     if (!current || !list) return;
-    if (Date.now() > current.until) {
+    const top = cardTop(list, current.id);
+    if (Date.now() > current.until || top === undefined) {
       anchor.current = null;
       return;
     }
-    const layout = list.getLayout(current.index);
-    if (!layout) return;
-    const target = layout.y - current.offsetFromViewport;
-    if (Math.abs(list.getAbsoluteLastScrollOffset() - target) > 1)
+    const target = Math.max(0, top - current.viewportTop);
+    if (
+      Math.abs(
+        (scrollY.current ?? list.getAbsoluteLastScrollOffset()) - target,
+      ) > 1
+    ) {
+      scrollY.current = target;
       list.scrollToOffset({ offset: target, animated: false });
+    }
   }, [listRef]);
 
-  return { collapse, onScroll, onScrollBeginDrag, onCommitLayout };
+  const collapse = useCallback(
+    (id: string, applyCollapse: () => void) => {
+      cancel();
+      const list = listRef.current;
+      const top = list && cardTop(list, id);
+      if (!list || top == null) {
+        applyCollapse();
+        return;
+      }
+      const currentOffset =
+        scrollY.current ?? list.getAbsoluteLastScrollOffset();
+      scrollY.current = currentOffset;
+      const targetOffset = Math.max(0, top - viewOffset);
+      const needsScroll = currentOffset > targetOffset + 1;
+      const viewportTop = top - (needsScroll ? targetOffset : currentOffset);
+      const finish = () => {
+        cancel();
+        if (listRef.current !== list || cardTop(list, id) === undefined) return;
+        anchor.current = {
+          id,
+          viewportTop,
+          until: Date.now() + ANCHOR_WINDOW_MS,
+        };
+        // The header or the answer may have moved while the animation was running.
+        if (needsScroll) onCommitLayout();
+        applyCollapse();
+      };
+      if (!needsScroll) {
+        finish();
+        return;
+      }
+
+      pending.current = {
+        finish,
+        settleTimer: setTimeout(finish, SCROLL_START_MS),
+        maxTimer: setTimeout(finish, SCROLL_MAX_MS),
+      };
+      // The pressed card is already measured. A native offset scroll also lets
+      // a drag immediately interrupt it without a queued scrollToIndex jump.
+      list.scrollToOffset({ offset: targetOffset, animated: true });
+    },
+    [cancel, listRef, onCommitLayout, viewOffset],
+  );
+
+  const onScroll = useCallback((offset: number) => {
+    // FlashList reconstructs its offset with the latest header height, even
+    // when a header resize has not moved the native viewport.
+    if (Number.isFinite(offset)) scrollY.current = offset;
+    const current = pending.current;
+    if (!current) return;
+    clearTimeout(current.settleTimer);
+    current.settleTimer = setTimeout(current.finish, SCROLL_SETTLE_MS);
+  }, []);
+
+  return { collapse, onScroll, cancel, onCommitLayout };
 }

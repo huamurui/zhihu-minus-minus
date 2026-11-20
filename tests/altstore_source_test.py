@@ -77,6 +77,7 @@ class AltStoreSourceTests(unittest.TestCase):
         source = self.generate()
         app = source["apps"][0]
         version = app["versions"][0]
+        self.assertEqual(source["identifier"], "com.huamu013.ZhihuMinusMinus.source")
         self.assertEqual(app["name"], "知乎--")
         self.assertEqual(app["bundleIdentifier"], self.info["CFBundleIdentifier"])
         self.assertEqual(version["version"], "1.2.3")

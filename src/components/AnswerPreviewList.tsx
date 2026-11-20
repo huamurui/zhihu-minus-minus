@@ -67,6 +67,7 @@ import { getZhihuErrorMessage } from '@/utils/zhihuError';
 import { BouncyButton } from './BouncyButton';
 
 type PreviewItem = ZhihuReadingPreviewItem;
+const EMPTY_PREVIEW_ITEMS: PreviewItem[] = [];
 type PreviewAnswer = Exclude<PreviewItem, ZhihuPreviewLoginPrompt>;
 const initialContentIds = new WeakMap<StructuredContent, number>();
 let initialContentSequence = 0;
@@ -456,7 +457,7 @@ export function AnswerPreviewList({
       headerState.onScrollOffset(event.nativeEvent.contentOffset.y);
       floatingBar.onScroll(event);
       autoLoad.onScroll(event);
-      collapseAnswer.onScroll();
+      collapseAnswer.onScroll(event.nativeEvent.contentOffset.y);
     },
     [
       headerState.onScrollOffset,
@@ -535,20 +536,19 @@ export function AnswerPreviewList({
           return { scope, ids };
         });
       };
-      const index = expanded
-        ? -1
-        : query.items.findIndex(
-            (item) => item.type === 'answer' && item.id === id,
-          );
-      if (index < 0) applyExpanded();
-      else collapseAnswer.collapse(index, applyExpanded);
+      if (expanded) {
+        collapseAnswer.cancel();
+        applyExpanded();
+      } else {
+        collapseAnswer.collapse(id, applyExpanded);
+      }
     },
     [
       recordAnswer,
       scope,
       visibleScope,
       answerId,
-      query.items,
+      collapseAnswer.cancel,
       collapseAnswer.collapse,
     ],
   );
@@ -561,14 +561,50 @@ export function AnswerPreviewList({
       ?.question;
   const contextQuestionId =
     answerContext.scene === 'question_feed'
-      ? questionId || selectedQuestion?.id
-      : undefined;
+      ? questionId || query.feedQuestionId || selectedQuestion?.id
+      : query.feedQuestionId;
   const screenTitle = contextQuestionId
-    ? title || selectedQuestion?.title || '回答预览'
+    ? ((questionId === contextQuestionId ||
+        answerContext.scene === 'question_feed') &&
+        title) ||
+      (selectedQuestion?.id === contextQuestionId && selectedQuestion.title) ||
+      '回答预览'
     : floatingBar.activeAnswer?.question.title ||
       selectedQuestion?.title ||
       title ||
       '回答预览';
+
+  const allAnswersFailed =
+    query.selectedIsError && query.isError && query.items.length === 0;
+  let answerStatus: ReactNode = null;
+  if (query.selectedIsPending) {
+    answerStatus = (
+      <ActivityIndicator style={{ paddingVertical: 20 }} color={colors.link} />
+    );
+  } else if (allAnswersFailed) {
+    answerStatus = (
+      <>
+        <QueryErrorView
+          message={getZhihuErrorMessage(query.selectedError)}
+          onRetry={() => void refreshPreview()}
+        />
+        <BouncyButton
+          onPress={() => openDetail(answerId, questionId, title)}
+          className="items-center py-3"
+        >
+          <Text style={{ color: colors.link }}>进入所选回答详情</Text>
+        </BouncyButton>
+      </>
+    );
+  } else if (query.selectedIsError) {
+    answerStatus = (
+      <QueryErrorView
+        compact
+        message={`所选回答加载失败：${getZhihuErrorMessage(query.selectedError)}`}
+        onRetry={() => void query.refetchSelected()}
+      />
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -577,175 +613,148 @@ export function AnswerPreviewList({
         collapsed={headerState.collapsed}
         progress={headerState.headerProgress}
         onBack={() => router.back()}
-        onTitlePress={() =>
-          listRef.current?.scrollToOffset({ offset: 0, animated: true })
+        onTitlePress={() => {
+          collapseAnswer.cancel();
+          listRef.current?.scrollToOffset({ offset: 0, animated: true });
+        }}
+      />
+      <FlashList<PreviewItem>
+        key={scope}
+        ref={listRef}
+        // Cards change height as answers and images measure, and every
+        // correction redraws the indicator; the home feed hides it too.
+        showsVerticalScrollIndicator={false}
+        data={waitingForFirstAnswer ? EMPTY_PREVIEW_ITEMS : query.items}
+        onViewableItemsChanged={handleViewableItemsChanged}
+        viewabilityConfig={floatingBar.viewabilityConfig}
+        onScroll={handleScroll}
+        onScrollBeginDrag={collapseAnswer.cancel}
+        onScrollEndDrag={handleScrollEnd}
+        onMomentumScrollEnd={handleScrollEnd}
+        onCommitLayoutEffect={collapseAnswer.onCommitLayout}
+        scrollEventThrottle={16}
+        keyExtractor={(item) => `${item.type}:${item.id}`}
+        getItemType={(item) => item.type}
+        contentContainerStyle={{
+          paddingHorizontal: 6,
+          paddingTop: insets.top + navigationHeight + 4,
+          paddingBottom: actionBarBottom + CONTENT_ACTION_BAR_HEIGHT + 20,
+        }}
+        renderItem={({ item, index }) =>
+          item.type === 'login_prompt' ? (
+            <View
+              className="items-center p-3 rounded-2xl mb-2"
+              style={{ backgroundColor: colors.backgroundSecondary }}
+            >
+              <Text type="secondary" className="mb-3 text-center">
+                {item.description || '登录后继续阅读更多回答'}
+              </Text>
+              <BouncyButton onPress={() => router.push('/login')}>
+                <Text style={{ color: colors.link }}>去登录</Text>
+              </BouncyButton>
+            </View>
+          ) : (
+            <AnswerPreviewCard
+              item={item}
+              scope={scope}
+              sessionVersion={query.sessionVersion}
+              expanded={expandedIds.has(item.id)}
+              onExpandedChange={(expanded) => changeExpanded(item.id, expanded)}
+              onMore={() => setMenuState({ scope, item })}
+              onRefresh={() => refreshBody(item.id)}
+              showQuestion={shouldShowPreviewQuestion(
+                query.items,
+                index,
+                contextQuestionId,
+              )}
+              onQuestionTitleLayout={
+                !contextQuestionId && index === 0
+                  ? handleTitleLayout
+                  : undefined
+              }
+              onFooterRef={handleFooterRef}
+              onFooterLayout={handleFooterLayout}
+              onBodyLoader={autoLoad.registerLoader}
+            />
+          )
+        }
+        onEndReached={() => {
+          if (
+            !waitingForFirstAnswer &&
+            query.hasNextPage &&
+            !query.isFetching &&
+            !query.isError
+          )
+            void query.fetchNextPage({ cancelRefetch: false });
+        }}
+        onEndReachedThreshold={0.5}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshingScope === scope}
+            onRefresh={() => {
+              collapseAnswer.cancel();
+              setExpandedState({ scope, ids: new Set([answerId]) });
+              setRefreshingScope(scope);
+              const finishRefresh = () =>
+                setRefreshingScope((current) =>
+                  current === scope ? null : current,
+                );
+              void refreshPreview().then(finishRefresh, finishRefresh);
+            }}
+            tintColor={colors.link}
+            colors={[colors.link]}
+          />
+        }
+        ListHeaderComponent={
+          contextQuestionId || answerStatus ? (
+            <>
+              {contextQuestionId ? (
+                <AnswerPreviewQuestionHeader
+                  key={contextQuestionId}
+                  id={contextQuestionId}
+                  title={screenTitle}
+                  onTitleLayout={handleTitleLayout}
+                />
+              ) : null}
+              {answerStatus}
+            </>
+          ) : null
+        }
+        ListEmptyComponent={
+          !query.selectedIsError && !query.selectedIsPending ? (
+            <Text type="secondary" className="text-center py-10">
+              暂无可预览的回答
+            </Text>
+          ) : null
+        }
+        ListFooterComponent={
+          waitingForFirstAnswer || allAnswersFailed ? null : query.isPending ||
+            query.isFetchingNextPage ? (
+            <ActivityIndicator
+              style={{ paddingVertical: 20 }}
+              color={colors.link}
+            />
+          ) : query.isError ? (
+            <QueryErrorView
+              compact
+              message={`后续回答加载失败：${getZhihuErrorMessage(query.error)}`}
+              onRetry={() =>
+                void (query.isFetchNextPageError
+                  ? query.fetchNextPage()
+                  : query.refetch())
+              }
+            />
+          ) : query.paginationError ? (
+            <Text type="secondary" className="text-center py-5">
+              {query.paginationError}
+            </Text>
+          ) : query.items.length > 0 && !query.hasNextPage ? (
+            <Text type="secondary" className="text-center py-5">
+              没有更多回答了
+            </Text>
+          ) : null
         }
       />
-      {waitingForFirstAnswer ? (
-        <ActivityIndicator
-          style={{ marginTop: insets.top + navigationHeight + 40 }}
-          color={colors.link}
-        />
-      ) : query.selectedIsError && query.isError && query.items.length === 0 ? (
-        <View style={{ marginTop: insets.top + navigationHeight }}>
-          <QueryErrorView
-            message={getZhihuErrorMessage(query.selectedError)}
-            onRetry={() => void refreshPreview()}
-          />
-          <BouncyButton
-            onPress={() => openDetail(answerId, questionId, title)}
-            className="items-center py-3"
-          >
-            <Text style={{ color: colors.link }}>进入所选回答详情</Text>
-          </BouncyButton>
-        </View>
-      ) : (
-        <FlashList<PreviewItem>
-          key={scope}
-          ref={listRef}
-          // Cards change height as answers and images measure, and every
-          // correction redraws the indicator; the home feed hides it too.
-          showsVerticalScrollIndicator={false}
-          data={query.items}
-          onViewableItemsChanged={handleViewableItemsChanged}
-          viewabilityConfig={floatingBar.viewabilityConfig}
-          onScroll={handleScroll}
-          onScrollBeginDrag={collapseAnswer.onScrollBeginDrag}
-          onScrollEndDrag={handleScrollEnd}
-          onMomentumScrollEnd={handleScrollEnd}
-          onCommitLayoutEffect={collapseAnswer.onCommitLayout}
-          scrollEventThrottle={16}
-          keyExtractor={(item) => `${item.type}:${item.id}`}
-          getItemType={(item) => item.type}
-          contentContainerStyle={{
-            paddingHorizontal: 6,
-            paddingTop: insets.top + navigationHeight + 4,
-            paddingBottom: actionBarBottom + CONTENT_ACTION_BAR_HEIGHT + 20,
-          }}
-          renderItem={({ item, index }) =>
-            item.type === 'login_prompt' ? (
-              <View
-                className="items-center p-3 rounded-2xl mb-2"
-                style={{ backgroundColor: colors.backgroundSecondary }}
-              >
-                <Text type="secondary" className="mb-3 text-center">
-                  {item.description || '登录后继续阅读更多回答'}
-                </Text>
-                <BouncyButton onPress={() => router.push('/login')}>
-                  <Text style={{ color: colors.link }}>去登录</Text>
-                </BouncyButton>
-              </View>
-            ) : (
-              <AnswerPreviewCard
-                item={item}
-                scope={scope}
-                sessionVersion={query.sessionVersion}
-                expanded={expandedIds.has(item.id)}
-                onExpandedChange={(expanded) =>
-                  changeExpanded(item.id, expanded)
-                }
-                onMore={() => setMenuState({ scope, item })}
-                onRefresh={() => refreshBody(item.id)}
-                showQuestion={shouldShowPreviewQuestion(
-                  query.items,
-                  index,
-                  contextQuestionId,
-                )}
-                onQuestionTitleLayout={
-                  !contextQuestionId && index === 0
-                    ? handleTitleLayout
-                    : undefined
-                }
-                onFooterRef={handleFooterRef}
-                onFooterLayout={handleFooterLayout}
-                onBodyLoader={autoLoad.registerLoader}
-              />
-            )
-          }
-          onEndReached={() => {
-            if (query.hasNextPage && !query.isFetching && !query.isError)
-              void query.fetchNextPage({ cancelRefetch: false });
-          }}
-          onEndReachedThreshold={0.5}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshingScope === scope}
-              onRefresh={() => {
-                setExpandedState({ scope, ids: new Set([answerId]) });
-                setRefreshingScope(scope);
-                const finishRefresh = () =>
-                  setRefreshingScope((current) =>
-                    current === scope ? null : current,
-                  );
-                void refreshPreview().then(finishRefresh, finishRefresh);
-              }}
-              tintColor={colors.link}
-              colors={[colors.link]}
-            />
-          }
-          ListHeaderComponent={
-            contextQuestionId ||
-            query.selectedIsError ||
-            query.selectedIsPending ? (
-              <>
-                {contextQuestionId ? (
-                  <AnswerPreviewQuestionHeader
-                    key={contextQuestionId}
-                    id={contextQuestionId}
-                    title={screenTitle}
-                    onTitleLayout={handleTitleLayout}
-                  />
-                ) : null}
-                {query.selectedIsPending ? (
-                  <ActivityIndicator
-                    style={{ paddingVertical: 20 }}
-                    color={colors.link}
-                  />
-                ) : query.selectedIsError ? (
-                  <QueryErrorView
-                    compact
-                    message={`所选回答加载失败：${getZhihuErrorMessage(query.selectedError)}`}
-                    onRetry={() => void query.refetchSelected()}
-                  />
-                ) : null}
-              </>
-            ) : null
-          }
-          ListEmptyComponent={
-            !query.selectedIsError && !query.selectedIsPending ? (
-              <Text type="secondary" className="text-center py-10">
-                暂无可预览的回答
-              </Text>
-            ) : null
-          }
-          ListFooterComponent={
-            query.isPending || query.isFetchingNextPage ? (
-              <ActivityIndicator
-                style={{ paddingVertical: 20 }}
-                color={colors.link}
-              />
-            ) : query.isError ? (
-              <QueryErrorView
-                compact
-                message={`后续回答加载失败：${getZhihuErrorMessage(query.error)}`}
-                onRetry={() =>
-                  void (query.isFetchNextPageError
-                    ? query.fetchNextPage()
-                    : query.refetch())
-                }
-              />
-            ) : query.paginationError ? (
-              <Text type="secondary" className="text-center py-5">
-                {query.paginationError}
-              </Text>
-            ) : query.items.length > 0 && !query.hasNextPage ? (
-              <Text type="secondary" className="text-center py-5">
-                没有更多回答了
-              </Text>
-            ) : null
-          }
-        />
-      )}
       <AnswerPreviewFloatingBar
         answer={floatingBar.activeAnswer}
         visible={floatingBar.visible}

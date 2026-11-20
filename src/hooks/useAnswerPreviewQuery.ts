@@ -10,6 +10,8 @@ import {
   buildZhihuNextRenderUrl,
   getAnswerPreviewContinuation,
   getNextRender,
+  validateZhihuRenderUrl,
+  type ZhihuAnswerPreviewItem,
   type ZhihuNextRenderScene,
   type ZhihuPlainPreviewAnswer,
   type ZhihuReadingPreviewItem,
@@ -32,6 +34,35 @@ export interface AnswerPreviewQueryOptions {
   sessionId?: string;
   cursor?: string;
   enabled?: boolean;
+}
+
+/** An opaque cursor may also explicitly name the collection served by this feed. */
+function readFeedQuestionId(
+  next: string | undefined,
+  answerId: string,
+): string | undefined {
+  if (!next) return undefined;
+  try {
+    const params = new URL(validateZhihuRenderUrl(next, '/next-render'))
+      .searchParams;
+    const single = (name: string) => {
+      const values = params.getAll(name);
+      return values.length === 1 ? values[0] : undefined;
+    };
+    const id = single('collection_id');
+    if (
+      single('scenes') === 'question_feed' &&
+      single('collection_type') === 'question' &&
+      id &&
+      /^[\w-]+$/.test(id) &&
+      (!params.has('id') || single('id') === answerId) &&
+      (!params.has('type') || single('type') === 'answer')
+    )
+      return id;
+  } catch {
+    // Pagination owns errors for invalid cursors; the header stays optional.
+  }
+  return undefined;
 }
 
 export function useAnswerPreviewQuery({
@@ -142,6 +173,14 @@ export function useAnswerPreviewQuery({
     enabled: enabled && Boolean(answerId),
     staleTime: 5 * 60 * 1000,
   });
+  const firstNext =
+    !query.isPlaceholderData && query.data?.pageParams[0] === initialUrl
+      ? query.data.pages[0]?.paging.next
+      : undefined;
+  const feedQuestionId = useMemo(
+    () => readFeedQuestionId(firstNext, answerId),
+    [firstNext, answerId],
+  );
   const selectedAnswer = useMemo(() => {
     if (
       !selected.data ||
@@ -172,14 +211,22 @@ export function useAnswerPreviewQuery({
     sessionVersion,
   ]);
   const items = useMemo<ZhihuReadingPreviewItem[]>(() => {
-    const latestItems = new Map<
-      string,
-      NonNullable<typeof query.data>['pages'][number]['data'][number]
-    >();
+    const latestItems = new Map<string, ZhihuAnswerPreviewItem>();
     for (const page of query.data?.pages ?? [])
       for (const item of page.data) {
         if (item.type === 'answer' && item.id === answerId) continue;
-        latestItems.set(`${item.type}:${item.id}`, item);
+        const key = `${item.type}:${item.id}`;
+        const first = latestItems.get(key);
+        // An overlapping page may repeat a shorter preview. Keep the body's
+        // cache identity and loaded continuations until its first page refreshes.
+        latestItems.set(
+          key,
+          first?.type === 'answer' &&
+            first.structuredContent.segments.length > 0 &&
+            item.type === 'answer'
+            ? { ...item, structuredContent: first.structuredContent }
+            : item,
+        );
       }
     if (!selectedAnswer) return [...latestItems.values()];
     return [selectedAnswer, ...latestItems.values()];
@@ -190,6 +237,7 @@ export function useAnswerPreviewQuery({
     : undefined;
   return {
     ...query,
+    feedQuestionId,
     items,
     queryKey,
     sessionVersion,

@@ -6,6 +6,7 @@ import { hasAuthenticationCookie } from '@/api/client';
 import { type FeedItem, getVoteSuccessMessage, voteContent } from '@/api/zhihu';
 import { FeedCardActionRow } from '@/components/FeedCardActionRow';
 import type { ActionSheetOption } from '@/components/overlays/ActionSheet';
+import { useIsTwoPaneLayout } from '@/features/adaptive-layout/PaneContext';
 import {
   useTitleTransition,
   useTitleTransitionSource,
@@ -14,6 +15,7 @@ import { usePaneRouter as useRouter } from '@/features/adaptive-layout/usePaneRo
 import { useContentActions } from '@/hooks/useContentActions';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useCollectionStore } from '@/store/useCollectionStore';
+import { useSettingsStore } from '@/store/useSettingsStore';
 import { seedAnswerPreviewEntry } from '@/utils/answerPreviewEntry';
 import {
   type AnswerReadingContext,
@@ -134,6 +136,14 @@ const FeedCardComponent = ({
   const router = useRouter();
   const transitionTitle = useTitleTransition();
   const titleRef = useRef<ViewInstance>(null);
+  // A preview list fades in as a whole and has no title for the card's title
+  // to land on; a two-pane selection always opens the answer detail.
+  const answerReadingMode = useSettingsStore(
+    (state) => state.answerReadingMode,
+  );
+  const twoPane = useIsTwoPaneLayout();
+  const answerOpensPreviewList =
+    answerReadingMode === 'preview-list' && !twoPane;
   const queryClient = useQueryClient();
   const { cookies } = useAuthStore();
   const [menuVisible, setMenuVisible] = useState(false);
@@ -434,7 +444,7 @@ const FeedCardComponent = ({
         onPress={() => {
           if (
             Platform.OS === 'android' &&
-            (item.type === 'answers' ||
+            ((item.type === 'answers' && !answerOpensPreviewList) ||
               item.type === 'questions' ||
               (item.type === 'articles' && !isGuest))
           ) {

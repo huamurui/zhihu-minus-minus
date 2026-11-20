@@ -14,10 +14,20 @@ const THEMED_TEXT_BASE_LINE_HEIGHT_SCALE = 1.5;
  */
 export const QUESTION_DETAIL_TEXT_STYLE = { fontSize: 14, lineHeight: 22 };
 
-/** 收起时的问题描述摘要，最多三行。 */
-export function QuestionDetailSummary({ text }: { text: string }) {
+/** 有正文可展开时，摘要最多显示三行。 */
+export function QuestionDetailSummary({
+  text,
+  truncate = true,
+}: {
+  text: string;
+  truncate?: boolean;
+}) {
   return (
-    <Text type="secondary" numberOfLines={3} style={QUESTION_DETAIL_TEXT_STYLE}>
+    <Text
+      type="secondary"
+      numberOfLines={truncate ? 3 : undefined}
+      style={QUESTION_DETAIL_TEXT_STYLE}
+    >
       {text}
     </Text>
   );

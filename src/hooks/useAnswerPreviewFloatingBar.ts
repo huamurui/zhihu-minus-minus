@@ -40,7 +40,6 @@ export function useAnswerPreviewFloatingBar({
   const epoch = useMemo(
     () => ({
       scope,
-      activeId: null as string | null,
       viewableIds: [] as string[],
       footers: new Map<string, FooterView>(),
       scrollY: 0,
@@ -63,20 +62,25 @@ export function useAnswerPreviewFloatingBar({
   currentEpoch.current = epoch;
   currentInputs.current = inputs;
   const mounted = useRef(true);
-  const [active, setActive] = useState({ epoch, id: null as string | null });
-  const [visibility, setVisibility] = useState({ epoch, visible: false });
+  const [bar, setBar] = useState({
+    epoch,
+    id: null as string | null,
+    visible: false,
+  });
   const viewabilityConfig = useMemo(
     () => ({ viewAreaCoveragePercentThreshold: 20 }),
     [],
   );
 
-  const setVisible = useCallback(
-    (visible: boolean) => {
+  const updateBar = useCallback(
+    (id: string | null, visible: boolean) => {
       if (!mounted.current || currentEpoch.current !== epoch) return;
-      setVisibility((previous) =>
-        previous.epoch === epoch && previous.visible === visible
+      setBar((previous) =>
+        previous.epoch === epoch &&
+        previous.id === id &&
+        previous.visible === visible
           ? previous
-          : { epoch, visible },
+          : { epoch, id, visible },
       );
     },
     [epoch],
@@ -84,31 +88,21 @@ export function useAnswerPreviewFloatingBar({
 
   const measureFooters = useCallback(
     (force = false) => {
-      if (
-        !mounted.current ||
-        currentEpoch.current !== epoch ||
-        currentInputs.current !== inputs
-      )
-        return;
-      const snapshot = inputs;
-      const activeAnswer = snapshot.items.find(
-        (item): item is PreviewAnswer =>
-          item.type === 'answer' && item.id === epoch.activeId,
-      );
+      if (!mounted.current || currentEpoch.current !== epoch) return;
+      const snapshot = currentInputs.current;
+      const firstId = epoch.viewableIds[0] ?? null;
       const views = epoch.viewableIds.map((id) => ({
         id,
         view: epoch.footers.get(id),
       }));
       if (
         epoch.scrollY <= 300 ||
-        !activeAnswer ||
-        !snapshot.expandedIds.has(activeAnswer.id) ||
-        !views.length ||
+        !views.some(({ id }) => snapshot.expandedIds.has(id)) ||
         views.some(({ view }) => !view) ||
         snapshot.bottom <= snapshot.top
       ) {
         epoch.sequence += 1;
-        setVisible(false);
+        updateBar(firstId, false);
         return;
       }
 
@@ -120,6 +114,10 @@ export function useAnswerPreviewFloatingBar({
       let remaining = views.length;
       let anyVisible = false;
       let invalid = false;
+      // FlashList includes rows behind the fixed header and may deliver
+      // viewability after the previous answer has already scrolled away.
+      let nearestY = Infinity;
+      let nearestId: string | null = null;
       for (const { id, view } of views) {
         if (!view) continue;
         view.measureInWindow((_x, y, width, footerHeight) => {
@@ -139,15 +137,26 @@ export function useAnswerPreviewFloatingBar({
             footerHeight <= 0
           ) {
             invalid = true;
-          } else if (y + footerHeight > snapshot.top && y < snapshot.bottom) {
-            anyVisible = true;
+          } else if (y + footerHeight > snapshot.top) {
+            if (y < snapshot.bottom) anyVisible = true;
+            if (y < nearestY) {
+              nearestY = y;
+              nearestId = id;
+            }
           }
           remaining -= 1;
-          if (remaining === 0) setVisible(!invalid && !anyVisible);
+          if (remaining === 0) {
+            const visible =
+              !invalid &&
+              !anyVisible &&
+              nearestId !== null &&
+              snapshot.expandedIds.has(nearestId);
+            updateBar(nearestId ?? firstId, visible);
+          }
         });
       }
     },
-    [epoch, inputs, setVisible],
+    [epoch, updateBar],
   );
 
   const onViewableItemsChanged = useCallback(
@@ -158,16 +167,10 @@ export function useAnswerPreviewFloatingBar({
         .map((entry) => entry.item)
         .filter((item): item is PreviewAnswer => item.type === 'answer');
       epoch.viewableIds = [...new Set(answers.map((answer) => answer.id))];
-      epoch.activeId = answers[0]?.id ?? null;
-      setActive((previous) =>
-        previous.epoch === epoch && previous.id === epoch.activeId
-          ? previous
-          : { epoch, id: epoch.activeId },
-      );
-      setVisible(false);
+      updateBar(epoch.viewableIds[0] ?? null, false);
       measureFooters(true);
     },
-    [epoch, measureFooters, setVisible],
+    [epoch, measureFooters, updateBar],
   );
 
   const updateScroll = useCallback(
@@ -197,10 +200,11 @@ export function useAnswerPreviewFloatingBar({
       if (currentEpoch.current !== epoch) return;
       if (view) epoch.footers.set(id, view);
       else epoch.footers.delete(id);
-      setVisible(false);
+      if (!epoch.viewableIds.includes(id)) return;
+      updateBar(epoch.viewableIds[0] ?? null, false);
       measureFooters(true);
     },
-    [epoch, measureFooters, setVisible],
+    [epoch, measureFooters, updateBar],
   );
 
   const onFooterLayout = useCallback(
@@ -217,21 +221,18 @@ export function useAnswerPreviewFloatingBar({
   }, [epoch]);
 
   useEffect(() => {
-    measureFooters(true);
-  }, [measureFooters]);
+    if (currentInputs.current === inputs) measureFooters(true);
+  }, [inputs, measureFooters]);
 
   const activeAnswer =
-    active.epoch === epoch
+    bar.epoch === epoch
       ? (items.find(
           (item): item is PreviewAnswer =>
-            item.type === 'answer' && item.id === active.id,
+            item.type === 'answer' && item.id === bar.id,
         ) ?? null)
       : null;
   const visible = Boolean(
-    visibility.epoch === epoch &&
-      visibility.visible &&
-      activeAnswer &&
-      expandedIds.has(activeAnswer.id),
+    bar.visible && activeAnswer && expandedIds.has(activeAnswer.id),
   );
 
   return {
