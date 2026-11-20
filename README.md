@@ -110,7 +110,7 @@ https://github.com/huamurui/zhihu-minus-minus/releases/latest/download/altstore-
 
 1. `git clone` 本仓库。
 2. 安装环境（参考下方的 **快速开始**）。
-3. 使用自己的 Apple ID 在 Xcode 中进行签名并编译到真机。
+3. 在本地 `app.json` 中将 `expo.ios.bundleIdentifier` 改为自己专用的 Bundle ID，再用自己的 Apple ID 签名并编译到真机。
 
 ```bash
 npm run prebuild -- --platform ios
@@ -141,6 +141,8 @@ npm ci
 
 2. **生成原生项目目录**
 
+如果要在自己的 iPhone 或 iPad 上运行，先在本地 `app.json` 中把 `expo.ios.bundleIdentifier` 改为个人专用的 ID，例如 `com.yourname.ZhihuMinusMinus`（用自己的 GitHub 用户名替换 `yourname`）。这样可以避免 Xcode 为你的团队注册仓库默认的 ID。提交 PR 时请排除这项本地改动。
+
 ```bash
 npm run prebuild
 ```
@@ -161,7 +163,7 @@ npm run android
 npm run ios
 ```
 
-⬇️ 在真实的 iOS 物理设备（iPhone / iPad）上编译并运行。
+在 iPhone 或 iPad 上编译并运行。如果已经生成过 `ios/`，后来才修改 Bundle ID，先运行 `npm run prebuild -- --platform ios --no-clean` 同步到 Xcode 工程。
 
 ```
 npx expo run:ios --device

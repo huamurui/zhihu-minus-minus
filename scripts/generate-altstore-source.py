@@ -12,6 +12,8 @@ from zipfile import BadZipFile, ZipFile
 
 
 SOURCE_FILENAME = "altstore-source.json"
+# Subscribers use the published source identifier independently of the IPA's bundle ID.
+SOURCE_IDENTIFIER = "com.huamu013.ZhihuMinusMinus.source"
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -178,7 +180,7 @@ def generate_source(ipa_path, config, repository, commit, date):
         raise ValueError("Invalid app display name")
     return {
         "name": "Zhihu--",
-        "identifier": f"{bundle_id}.source",
+        "identifier": SOURCE_IDENTIFIER,
         "sourceURL": f"{website}/releases/latest/download/{SOURCE_FILENAME}",
         "subtitle": "轻量、无广告的第三方知乎客户端",
         "website": website,

@@ -78,7 +78,9 @@ Android 构建内存由 [`withAndroidBuildMemory`](../plugins/withAndroidBuildMe
 npm run ios
 ```
 
-首次或修改原生依赖后：
+在自己的 iPhone 或 iPad 上开发时，先在本地 `app.json` 中修改 `expo.ios.bundleIdentifier`。例如使用 `com.yourname.ZhihuMinusMinus`，将 `yourname` 换成自己的 GitHub 用户名，避免 Xcode 为你的团队注册仓库默认的 ID。个人 Bundle ID 只保留在本地。
+
+首次真机构建或修改原生依赖后运行以下命令。如果已有 `ios/` 且只改了 Bundle ID，第一条命令可加上 `--no-clean` 以保留本地 Xcode 工程设置。
 
 ```bash
 npm run prebuild -- --platform ios
