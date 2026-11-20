@@ -1,10 +1,12 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
 import type React from 'react';
 import { Profiler } from 'react';
+import { Platform } from 'react-native';
 import { type FeedItem, voteContent } from '../src/api/zhihu';
 import type { CollectionButton } from '../src/components/CollectionButton';
 import { CreationCard } from '../src/components/CreationCard';
 import { FeedCard } from '../src/components/FeedCard';
+import { useSettingsStore } from '../src/store/useSettingsStore';
 import { seedAnswerPreviewEntry } from '../src/utils/answerPreviewEntry';
 import type {
   AnswerReadingContext,
@@ -28,6 +30,9 @@ let mockShareMenuProps: MenuProps;
 const mockUseContentActions = jest.fn();
 const mockCopy = jest.fn();
 const mockPush = jest.fn();
+const mockTransitionTitle = jest.fn(
+  (_ref: unknown, _id: string, _text: string, open: () => void) => open(),
+);
 const mockSetQueryData = jest.fn();
 let mockSessionVersion = 1;
 const mockCollectionButton = jest.fn(
@@ -60,6 +65,10 @@ jest.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ setQueryData: mockSetQueryData }),
 }));
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
+jest.mock('../src/features/adaptive-layout/TitleTransition', () => ({
+  ...jest.requireActual('../src/features/adaptive-layout/TitleTransition'),
+  useTitleTransition: () => mockTransitionTitle,
+}));
 jest.mock('@expo/vector-icons/Ionicons', () => () => null);
 jest.mock('../src/components/CollectionButton', () => {
   const react = jest.requireActual<typeof import('react')>('react');
@@ -130,7 +139,14 @@ jest.mock('../src/components/BouncyButton', () => ({
 jest.mock('../src/components/FeedCardPreview', () => ({
   FeedCardPreview: () => null,
 }));
-jest.mock('../src/components/FeedExcerpt', () => ({ FeedExcerpt: () => null }));
+jest.mock('../src/components/FeedExcerpt', () => ({
+  FeedExcerpt: ({ html }: { html?: string }) =>
+    html
+      ? jest
+          .requireActual('react')
+          .createElement(jest.requireActual('react-native').Text, null, html)
+      : null,
+}));
 jest.mock('../src/components/ShareMenu', () => ({
   ShareMenu: (props: MenuProps) => {
     mockShareMenuProps = props;
@@ -819,3 +835,39 @@ test.each([
     });
   },
 );
+
+describe('the Android title flight into an answer', () => {
+  beforeEach(() => {
+    jest.replaceProperty(Platform, 'OS', 'android');
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+    useSettingsStore.setState({ answerReadingMode: 'detail' });
+  });
+
+  test('flies the title into the answer detail', async () => {
+    useSettingsStore.setState({ answerReadingMode: 'detail' });
+    const host = await render(
+      <FeedCard item={{ ...baseItem, excerpt: '合成摘要' }} />,
+    );
+    // The card body: an answer title without a question opens directly.
+    await fireEvent.press(host.getByText('合成摘要'));
+    expect(mockTransitionTitle).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pathname: '/answer/[id]' }),
+    );
+  });
+
+  test('opens a preview list without a flight, since nothing there receives it', async () => {
+    useSettingsStore.setState({ answerReadingMode: 'preview-list' });
+    const host = await render(
+      <FeedCard item={{ ...baseItem, excerpt: '合成摘要' }} />,
+    );
+    // The card body: an answer title without a question opens directly.
+    await fireEvent.press(host.getByText('合成摘要'));
+    expect(mockTransitionTitle).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pathname: '/answer/[id]' }),
+    );
+  });
+});
