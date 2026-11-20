@@ -2,7 +2,7 @@ import {
   compileZhihuDocumentParts,
   type RichTextCompilationOptions,
 } from './compileRichText';
-import type { ZhihuDocument } from './document';
+import type { ZhihuBlock, ZhihuDocument } from './document';
 import { walkZhihuDocument } from './documentTraversal';
 import { RICH_CONTENT_UNKNOWN_IMAGE_HEIGHT } from './presentation';
 import type { RichTextPart } from './richText';
@@ -20,6 +20,33 @@ export interface NativePartBatch {
 const EMPTY_BATCH: NativePartBatch = { groups: [], count: 0, done: false };
 // Fixed boundaries preserve mounted views when a metadata refresh recompiles the prefix.
 const GROUP_SIZE = 12;
+
+// The compiler folds list and quote prose, including text-only footnotes,
+// into the surrounding selectable flow. Only a standalone block ends it.
+function hasStandaloneBlock(block: ZhihuBlock): boolean {
+  switch (block.type) {
+    case 'paragraph':
+    case 'heading':
+      return false;
+    case 'quote':
+      return block.blocks.some(hasStandaloneBlock);
+    case 'list':
+      return block.items.some((item) => item.blocks.some(hasStandaloneBlock));
+    default:
+      return true;
+  }
+}
+
+export function shouldPrepareNativePartsProgressively(
+  document: ZhihuDocument,
+  sourceLength: number,
+): boolean {
+  if (document.blocks.length < 12 && sourceLength < 6000) return false;
+  return (
+    document.blocks.some(hasStandaloneBlock) ||
+    !!document.footnotes?.some((note) => note.blocks.some(hasStandaloneBlock))
+  );
+}
 
 function append(
   previous: NativePartBatch,

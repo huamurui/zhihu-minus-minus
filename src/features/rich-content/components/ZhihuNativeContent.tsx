@@ -2,6 +2,7 @@ import * as Clipboard from 'expo-clipboard';
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -62,6 +63,7 @@ import { DAILY_AVATAR_SIZE, type RichContentVariant } from '../imagePolicy';
 import {
   type NativePartBatch,
   prepareNativeParts,
+  shouldPrepareNativePartsProgressively,
 } from '../nativePartPreparation';
 import {
   normalizeZhihuContentSegments,
@@ -238,6 +240,7 @@ interface FlowViewProps {
   onSelection: (event: FlowEvent, flow: RichTextFlow) => void;
   onAction: (event: ActionEvent, flow: RichTextFlow) => void;
   onMeasured?: (flow: RichTextFlow) => void;
+  pendingNested?: Set<RichTextFlow>;
 }
 
 const measuredFlowHeights = new Map<string, number>();
@@ -263,6 +266,7 @@ const NativeFlow = React.memo(function NativeFlow({
   onSelection,
   onAction,
   onMeasured,
+  pendingNested,
 }: FlowViewProps) {
   const flowJson = useMemo(
     () =>
@@ -301,10 +305,22 @@ const NativeFlow = React.memo(function NativeFlow({
       ? { key: measureKey, geometryKey, height, verified: false }
       : null;
   });
-  const currentInput = useRef({ flow, measureKey });
-  currentInput.current = { flow, measureKey };
+  const verifiedGeometry =
+    measuredHeight?.verified === true &&
+    measuredHeight.geometryKey === geometryKey;
+  const currentInput = useRef({ flow, measureKey, onMeasured, pendingNested });
+  useLayoutEffect(() => {
+    currentInput.current = { flow, measureKey, onMeasured, pendingNested };
+    // These views are discovered as the block renders, with its actual cell or
+    // caption width. Register at commit, before any native layout event arrives.
+    if (!pendingNested || verifiedGeometry) return;
+    pendingNested.add(flow);
+    return () => {
+      pendingNested.delete(flow);
+    };
+  }, [flow, measureKey, onMeasured, pendingNested, verifiedGeometry]);
   const mounted = useRef(true);
-  useEffect(() => {
+  useLayoutEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
@@ -357,7 +373,9 @@ const NativeFlow = React.memo(function NativeFlow({
               measuredFlowHeights.keys().next().value || '',
             );
           measuredFlowHeights.set(measureKey, event.height);
-          onMeasured?.(flow);
+          const current = currentInput.current;
+          current.pendingNested?.delete(current.flow);
+          current.onMeasured?.(current.flow);
         }
       }}
       onSelectionChange={(raw) => {
@@ -436,6 +454,8 @@ interface BlockViewProps {
   renderLinkCard?: (card: ZhihuLinkCardBlock) => React.ReactNode;
   textAlign?: 'left' | 'center' | 'right';
   followsEmptyParagraph?: boolean;
+  pendingNested?: Set<RichTextFlow>;
+  onNestedMeasured?: () => void;
 }
 
 function isEmptyParagraph(block: ZhihuBlock | undefined): boolean {
@@ -499,6 +519,8 @@ function NativeParagraph(props: BlockViewProps) {
             linkColor={props.linkColor}
             onSelection={(event, flow) => props.onFlowSelection?.(event, flow)}
             onAction={props.onFlowAction}
+            pendingNested={props.pendingNested}
+            onMeasured={props.onNestedMeasured}
           />
         ) : null,
       )}
@@ -1003,7 +1025,7 @@ export const ZhihuNativeContent = React.memo(function ZhihuNativeContent(
     () => JSON.stringify(props.contentArray),
     [props.contentArray],
   );
-  const source = useRef({
+  const committedSource = useRef({
     identity,
     content: props.content,
     arraySignature,
@@ -1011,23 +1033,27 @@ export const ZhihuNativeContent = React.memo(function ZhihuNativeContent(
     document: props.document,
     revision: 0,
   });
+  let source = committedSource.current;
   if (
-    source.current.identity !== identity ||
-    source.current.content !== props.content ||
-    source.current.arraySignature !== arraySignature ||
-    source.current.document !== props.document
+    source.identity !== identity ||
+    source.content !== props.content ||
+    source.arraySignature !== arraySignature ||
+    source.document !== props.document
   ) {
-    source.current = {
+    source = {
       identity,
       content: props.content,
       arraySignature,
       contentArray: props.contentArray,
       document: props.document,
-      revision: source.current.revision + 1,
+      revision: source.revision + 1,
     };
   }
+  useLayoutEffect(() => {
+    committedSource.current = source;
+  }, [source]);
   // Equivalent JSON from a fresh response must not invalidate native layout.
-  const contentArray = source.current.contentArray;
+  const contentArray = source.contentArray;
   const input = useMemo(
     () => ({
       content: props.content,
@@ -1050,12 +1076,10 @@ export const ZhihuNativeContent = React.memo(function ZhihuNativeContent(
       props.linkCardInfo,
     ],
   );
-  const revision = source.current.revision;
+  const revision = source.revision;
   const [ready, setReady] = useState<ReadyNativeDocument | null>(null);
   const displayed = ready?.identity === identity ? ready : null;
   const replacing = displayed !== null && displayed.revision !== revision;
-  const current = useRef({ identity, revision });
-  current.current = { identity, revision };
 
   useEffect(() => {
     setReady((previous) =>
@@ -1069,8 +1093,8 @@ export const ZhihuNativeContent = React.memo(function ZhihuNativeContent(
 
   const rememberVisible = useCallback(() => {
     if (
-      current.current.identity !== identity ||
-      current.current.revision !== revision
+      committedSource.current.identity !== identity ||
+      committedSource.current.revision !== revision
     )
       return;
     setReady((previous) =>
@@ -1083,8 +1107,8 @@ export const ZhihuNativeContent = React.memo(function ZhihuNativeContent(
 
   const onReady = useCallback(() => {
     if (
-      current.current.identity !== identity ||
-      current.current.revision !== revision
+      committedSource.current.identity !== identity ||
+      committedSource.current.revision !== revision
     )
       return;
     // A refresh is completely measured offscreen before its first visible frame.
@@ -1110,8 +1134,8 @@ export const ZhihuNativeContent = React.memo(function ZhihuNativeContent(
         const visible = !replacing || !latest;
         const interactive = latest && visible;
         const isCurrent = () =>
-          current.current.identity === layer.identity &&
-          current.current.revision === layer.revision;
+          committedSource.current.identity === layer.identity &&
+          committedSource.current.revision === layer.revision;
         return (
           <View
             key={`${layer.identity}:${layer.revision}`}
@@ -1129,6 +1153,7 @@ export const ZhihuNativeContent = React.memo(function ZhihuNativeContent(
             <NativeDocumentContent
               {...props}
               {...layer.input}
+              revision={layer.revision}
               initialContentWidth={
                 measuredHostWidth.current?.windowWidth === windowWidth
                   ? measuredHostWidth.current.width
@@ -1179,6 +1204,7 @@ export const ZhihuNativeContent = React.memo(function ZhihuNativeContent(
 
 /** Native V2 text flows with React Native media boundaries. */
 const NativeDocumentContent = React.memo(function NativeDocumentContent({
+  revision,
   content,
   contentArray,
   document,
@@ -1206,7 +1232,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
   onLayoutReady,
   initialContentWidth,
   interactive = true,
-}: ZhihuNativeContentProps & { interactive?: boolean }) {
+}: ZhihuNativeContentProps & { revision: number; interactive?: boolean }) {
   const dimensions = useWindowDimensions();
   const settings = useSettingsStore();
   const themeColors = useRuntimeThemeColors();
@@ -1279,10 +1305,9 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
   const gradual = useMemo(
     () =>
       progressive &&
-      (normalized.document.blocks.length >= 12 || content.length >= 6000) &&
-      // Continuous prose is one selectable native flow; keep its original gate.
-      normalized.document.blocks.some(
-        (block) => block.type !== 'paragraph' && block.type !== 'heading',
+      shouldPrepareNativePartsProgressively(
+        normalized.document,
+        content.length,
       ),
     [progressive, normalized.document, content.length],
   );
@@ -1330,40 +1355,6 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
   }, [compiled]);
   const batch =
     continuation?.compiled === compiled ? continuation.batch : compiled.first;
-  const currentBatch = useRef(batch);
-  currentBatch.current = batch;
-  useEffect(() => {
-    committedPartCount.current = batch.count;
-  }, [batch]);
-  const documentRevision = useRef({
-    content,
-    contentArray,
-    document,
-    objectId,
-    type,
-    variant,
-    version: 0,
-  });
-  if (
-    documentRevision.current.content !== content ||
-    documentRevision.current.contentArray !== contentArray ||
-    documentRevision.current.document !== document ||
-    documentRevision.current.objectId !== objectId ||
-    documentRevision.current.type !== type ||
-    documentRevision.current.variant !== variant
-  ) {
-    documentRevision.current = {
-      content,
-      contentArray,
-      document,
-      objectId,
-      type,
-      variant,
-      version: documentRevision.current.version + 1,
-    };
-  }
-  const currentCompilation = useRef(compiled);
-  currentCompilation.current = compiled;
   const getGallery = useMemo(() => {
     let images: ReturnType<typeof getZhihuDocumentPreviewImages> | undefined;
     return () =>
@@ -1381,13 +1372,6 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
     },
     [onImagePress, getGallery],
   );
-  const measuredFlowsRef = useRef(new Map<string, string>());
-  const measuredBodyKeyRef = useRef<string | null>(null);
-  const [revealedLayout, setRevealedLayout] = useState<{ key: string } | null>(
-    null,
-  );
-  const revealedGeometryRef = useRef<string | null>(null);
-  const notifiedLayoutRef = useRef<string | null>(null);
   const getSegment = useMemo(() => {
     let segments:
       | Map<string, ZhihuSegmentRun | ZhihuSegmentHighlightRun>
@@ -1426,28 +1410,45 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
       dimensions.fontScale,
     ],
   );
-  const documentLayoutPrefix = `${normalized.document.id}:${documentRevision.current.version}`;
+  const documentLayoutPrefix = `${normalized.document.id}:${revision}`;
   const documentGeometryKey = `${documentLayoutPrefix}:${width}:${configJson}`;
-  const geometrySourceRef = useRef(documentGeometryKey);
-  const measuredEndRef = useRef<string | null>(null);
-  if (geometrySourceRef.current !== documentGeometryKey) {
-    geometrySourceRef.current = documentGeometryKey;
-    revealedGeometryRef.current = null;
-    measuredFlowsRef.current = new Map();
-    measuredBodyKeyRef.current = null;
-    measuredEndRef.current = null;
-    notifiedLayoutRef.current = null;
-  }
+  // A suspended render may prepare a new geometry while the visible one is
+  // still receiving native events. Each owns its measurements until commit.
+  const geometry = useMemo(
+    () => ({
+      key: documentGeometryKey,
+      flows: new Map<string, string>(),
+      firstNested: new Set<RichTextFlow>(),
+      tailNested: new Set<RichTextFlow>(),
+      bodyMeasured: false,
+      endMeasured: false,
+      revealed: false,
+      notified: false,
+    }),
+    [documentGeometryKey],
+  );
+  const [revealedLayout, setRevealedLayout] = useState<typeof geometry | null>(
+    null,
+  );
+  const committed = useRef({ compiled, batch, geometry });
+  useLayoutEffect(() => {
+    committed.current = { compiled, batch, geometry };
+    committedPartCount.current = batch.count;
+  }, [compiled, batch, geometry]);
 
+  const initialParts = useMemo(
+    () => (compiled.first.done ? null : new Set(compiled.first.groups.flat())),
+    [compiled],
+  );
   const firstMeasurements = useMemo(
     () =>
       pendingFlowMeasurements(
         compiled.first,
-        measuredFlowsRef.current,
+        geometry.flows,
         width,
         configJson,
       ),
-    [compiled, width, configJson],
+    [compiled, geometry, width, configJson],
   );
   const completeMeasurements = useMemo(
     () =>
@@ -1455,87 +1456,85 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
         ? null
         : batch === compiled.first
           ? firstMeasurements
-          : pendingFlowMeasurements(
-              batch,
-              measuredFlowsRef.current,
-              width,
-              configJson,
-            ),
-    [batch, compiled, firstMeasurements, width, configJson],
+          : pendingFlowMeasurements(batch, geometry.flows, width, configJson),
+    [batch, compiled, firstMeasurements, geometry, width, configJson],
   );
   const measurements = useRef({
     first: firstMeasurements,
     complete: completeMeasurements,
   });
-  measurements.current = {
-    first: firstMeasurements,
-    complete: completeMeasurements,
-  };
+  useLayoutEffect(() => {
+    // Native may have measured the visible tree since React started this render.
+    for (const key of geometry.flows.values()) {
+      firstMeasurements.pending.delete(key);
+      completeMeasurements?.pending.delete(key);
+    }
+    measurements.current = {
+      first: firstMeasurements,
+      complete: completeMeasurements,
+    };
+  }, [geometry, firstMeasurements, completeMeasurements]);
 
   const checkLayout = useCallback(() => {
     if (
-      currentCompilation.current !== compiled ||
-      geometrySourceRef.current !== documentGeometryKey ||
+      committed.current.compiled !== compiled ||
+      committed.current.geometry !== geometry ||
       measuredContainerWidthRef.current !== availableWidth ||
       availableWidth <= 0
     )
       return;
 
     const { first, complete } = measurements.current;
-    if (revealedGeometryRef.current !== documentGeometryKey) {
+    if (!geometry.revealed) {
       const firstMeasured = first.hasText
         ? first.pending.size === 0
-        : measuredBodyKeyRef.current === documentGeometryKey;
-      if (!firstMeasured) return;
-      revealedGeometryRef.current = documentGeometryKey;
-      setRevealedLayout({ key: documentGeometryKey });
+        : geometry.bodyMeasured;
+      if (!firstMeasured || geometry.firstNested.size > 0) return;
+      geometry.revealed = true;
+      setRevealedLayout(geometry);
       onFirstContentLayout?.();
     }
 
     if (
       complete?.pending.size === 0 &&
-      notifiedLayoutRef.current !== documentGeometryKey &&
-      (compiled.first.done || measuredEndRef.current === documentGeometryKey)
+      geometry.firstNested.size === 0 &&
+      geometry.tailNested.size === 0 &&
+      !geometry.notified &&
+      (compiled.first.done || geometry.endMeasured)
     ) {
-      notifiedLayoutRef.current = documentGeometryKey;
+      geometry.notified = true;
       onLayoutReady?.();
     }
-  }, [
-    compiled,
-    documentGeometryKey,
-    availableWidth,
-    onFirstContentLayout,
-    onLayoutReady,
-  ]);
+  }, [compiled, geometry, availableWidth, onFirstContentLayout, onLayoutReady]);
+
+  useLayoutEffect(checkLayout, [checkLayout]);
 
   const onFlowMeasured = useCallback(
     (flow: RichTextFlow) => {
       if (
-        currentCompilation.current !== compiled ||
-        geometrySourceRef.current !== documentGeometryKey
+        committed.current.compiled !== compiled ||
+        committed.current.geometry !== geometry
       )
         return;
       const key = flowMeasureKey(flow, width, configJson);
-      measuredFlowsRef.current.set(flow.id, key);
+      geometry.flows.set(flow.id, key);
       measurements.current.first.pending.delete(key);
       measurements.current.complete?.pending.delete(key);
       checkLayout();
     },
-    [compiled, documentGeometryKey, width, configJson, checkLayout],
+    [compiled, geometry, width, configJson, checkLayout],
   );
   const initialLayoutReady =
-    measuredContainerWidth === availableWidth &&
-    revealedGeometryRef.current === documentGeometryKey &&
-    revealedLayout?.key === documentGeometryKey;
+    measuredContainerWidth === availableWidth && revealedLayout === geometry;
   useEffect(() => {
     if (!initialLayoutReady || pauseProgressiveTail || batch.done) return;
     let active = true;
     const frame = requestAnimationFrame(() => {
       if (
         !active ||
-        geometrySourceRef.current !== documentGeometryKey ||
-        currentCompilation.current !== compiled ||
-        currentBatch.current !== batch
+        committed.current.geometry !== geometry ||
+        committed.current.compiled !== compiled ||
+        committed.current.batch !== batch
       )
         return;
       setContinuation({ compiled, batch: compiled.next(batch) });
@@ -1544,13 +1543,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
       active = false;
       cancelAnimationFrame(frame);
     };
-  }, [
-    batch,
-    compiled,
-    documentGeometryKey,
-    initialLayoutReady,
-    pauseProgressiveTail,
-  ]);
+  }, [batch, compiled, geometry, initialLayoutReady, pauseProgressiveTail]);
   // A known width hint can start native layout, but still needs confirmation
   // from this container. Content-only layouts don't wait for media downloads.
   const loadingPhase: RichContentLoadingPhase =
@@ -1580,7 +1573,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
   );
   const handleSelection = useCallback(
     (event: FlowEvent, flow: RichTextFlow) => {
-      if (currentCompilation.current !== compiled) return;
+      if (committed.current.compiled !== compiled) return;
       if (event.flowId !== flow.id || event.textVersion !== flow.textVersion)
         return;
       if (event.start === -1 && event.end === -1) {
@@ -1612,7 +1605,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
   );
   const handleAction = useCallback(
     (event: ActionEvent, flow: RichTextFlow) => {
-      if (currentCompilation.current !== compiled) return;
+      if (committed.current.compiled !== compiled) return;
       if (event.flowId !== flow.id || event.textVersion !== flow.textVersion)
         return;
       if (event.kind === 'link') {
@@ -1708,6 +1701,12 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
           options={options}
           onFlowAction={handleAction}
           onFlowSelection={handleSelection}
+          pendingNested={
+            !initialParts || initialParts.has(part)
+              ? geometry.firstNested
+              : geometry.tailNested
+          }
+          onNestedMeasured={checkLayout}
           renderLinkCard={renderLinkCard}
         />
       ),
@@ -1723,6 +1722,9 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
       handleSelection,
       handleAction,
       onFlowMeasured,
+      geometry,
+      initialParts,
+      checkLayout,
       enableSegmentTap,
       availableWidth,
       textColor,
@@ -1751,8 +1753,8 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
       key={`${documentLayoutPrefix}:${configJson}`}
       onLayout={(event) => {
         if (
-          currentCompilation.current !== compiled ||
-          geometrySourceRef.current !== documentGeometryKey
+          committed.current.compiled !== compiled ||
+          committed.current.geometry !== geometry
         )
           return;
         const available = event.nativeEvent.layout.width;
@@ -1795,11 +1797,11 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
           onLayout={(event) => {
             if (
               event.nativeEvent.layout.width !== availableWidth ||
-              currentCompilation.current !== compiled ||
-              geometrySourceRef.current !== documentGeometryKey
+              committed.current.compiled !== compiled ||
+              committed.current.geometry !== geometry
             )
               return;
-            measuredBodyKeyRef.current = documentGeometryKey;
+            geometry.bodyMeasured = true;
             checkLayout();
           }}
           accessibilityElementsHidden={!initialLayoutReady}
@@ -1828,7 +1830,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
           ))}
           {batch.done && !compiled.first.done ? (
             <View
-              key={documentGeometryKey}
+              key={geometry.key}
               testID="native-content-end"
               accessible={false}
               collapsable={false}
@@ -1836,11 +1838,11 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
               onLayout={({ nativeEvent: { layout } }) => {
                 if (
                   layout.width !== availableWidth ||
-                  currentCompilation.current !== compiled ||
-                  geometrySourceRef.current !== documentGeometryKey
+                  committed.current.compiled !== compiled ||
+                  committed.current.geometry !== geometry
                 )
                   return;
-                measuredEndRef.current = documentGeometryKey;
+                geometry.endMeasured = true;
                 checkLayout();
               }}
             />

@@ -3,9 +3,51 @@ import {
   mapRichTextSelection,
 } from '../compileRichText';
 import type { ZhihuDocument, ZhihuParagraphBlock } from '../document';
+import {
+  prepareNativeParts,
+  shouldPrepareNativePartsProgressively,
+} from '../nativePartPreparation';
 import { normalizeZhihuDocument } from '../normalization/normalizeZhihuDocument';
 
 const options = { fontSize: 17, lineHeight: 25.5 };
+
+it.each([
+  [
+    'nested prose',
+    '<blockquote><ul><li><p>引文</p></li></ul></blockquote>',
+    false,
+  ],
+  [
+    'text-only footnote',
+    '<section class="footnotes"><ol><li data-numero="1"><p>脚注</p></li></ol></section>',
+    false,
+  ],
+  [
+    'divider inside a quoted list',
+    '<blockquote><ul><li>引文<hr>后文</li></ul></blockquote>',
+    true,
+  ],
+  [
+    'divider inside a footnote',
+    '<section class="footnotes"><ol><li data-numero="1"><p>脚注</p><hr><p>续</p></li></ol></section>',
+    true,
+  ],
+] as const)('uses actual flow boundaries for %s', (_name, tail, expected) => {
+  const html = `<p>${'首屏'.repeat(3500)}</p>${tail}`;
+  const { document } = normalizeZhihuDocument(html, { documentId: 'mixed' });
+  const gradual = shouldPrepareNativePartsProgressively(document, html.length);
+  expect(gradual).toBe(expected);
+  const parts = [...compileZhihuDocumentParts(document, options)];
+  expect(parts.some((part) => part.type === 'block')).toBe(expected);
+  const { first } = prepareNativeParts(document, options, gradual, 0, false, {
+    width: 320,
+    height: 640,
+    fontScale: 1,
+  });
+  // A preloaded neighbor can pause its tail indefinitely. A document with just
+  // one selectable flow must already be complete when that flow is measured.
+  expect(first.done).toBe(!expected);
+});
 
 it('pauses at a nested block and resumes with the same source coordinates', () => {
   const read = jest.fn((text: string) => text);

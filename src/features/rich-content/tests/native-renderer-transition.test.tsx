@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { Suspense, startTransition, useState } from 'react';
 import { Dimensions, type LayoutChangeEvent, Text } from 'react-native';
 import type {
   RichTextHeightEventData,
@@ -449,6 +450,80 @@ describe('Native V2 renderer staging transitions', () => {
     await heightEvent(view);
     await containerLayout(view.contentWidth);
     expect(onLayoutReady).toHaveBeenCalledTimes(1);
+  });
+
+  it('finishes the committed body while a replacement text layout is suspended', async () => {
+    const frames: FrameRequestCallback[] = [];
+    const request = jest
+      .spyOn(globalThis, 'requestAnimationFrame')
+      .mockImplementation((callback) => frames.push(callback));
+    const cancel = jest
+      .spyOn(globalThis, 'cancelAnimationFrame')
+      .mockImplementation(() => {});
+    const never = new Promise<void>(() => {});
+    const pendingRender = jest.fn();
+    const initial = {
+      onFirstContentLayout: jest.fn(),
+      onLayoutReady: jest.fn(),
+    };
+    const pending = {
+      onFirstContentLayout: jest.fn(),
+      onLayoutReady: jest.fn(),
+    };
+    let changeFont: (() => void) | undefined;
+    function PendingLayout({ active }: { active: boolean }) {
+      if (active) {
+        pendingRender();
+        throw never;
+      }
+      return null;
+    }
+    function Reader() {
+      const [larger, setLarger] = useState(false);
+      changeFont = () => setLarger(true);
+      return (
+        <Suspense fallback={<Text>等待字号变化</Text>}>
+          <ZhihuNativeContent
+            type="answer"
+            objectId="concurrent-progressive-layout"
+            content={`<p>可读正文</p>${'<hr>'.repeat(16)}<img src="https://example.test/end.jpg" alt="最后一张配图" />`}
+            fontSizeScale={larger ? 1.25 : 1}
+            progressive
+            renderFallback={() => null}
+            {...(larger ? pending : initial)}
+          />
+          <PendingLayout active={larger} />
+        </Suspense>
+      );
+    }
+    try {
+      await render(<Reader />);
+      await containerLayout(320);
+      await heightEvent(currentViews()[0]);
+      expect(initial.onFirstContentLayout).toHaveBeenCalledTimes(1);
+      expect(frames).toHaveLength(1);
+      expect(screen.queryByLabelText('最后一张配图')).toBeNull();
+
+      await act(() => startTransition(() => changeFont?.()));
+      expect(pendingRender).toHaveBeenCalled();
+      expect(screen.getByText('可读正文')).toBeVisible();
+      for (let count = 0; count < 20 && frames.length; count++) {
+        const frame = frames.shift();
+        await act(() => frame?.(performance.now()));
+      }
+      expect(screen.getByLabelText('最后一张配图')).toBeVisible();
+      expect(initial.onLayoutReady).not.toHaveBeenCalled();
+      await fireEvent(screen.getByTestId('native-content-end'), 'layout', {
+        nativeEvent: { layout: { width: 320 } },
+      });
+      expect(initial.onLayoutReady).toHaveBeenCalledTimes(1);
+      expect(initial.onFirstContentLayout).toHaveBeenCalledTimes(1);
+      expect(pending.onLayoutReady).not.toHaveBeenCalled();
+      expect(pending.onFirstContentLayout).not.toHaveBeenCalled();
+    } finally {
+      request.mockRestore();
+      cancel.mockRestore();
+    }
   });
 
   it('reveals a long document before its tail, then resumes without remounting the visible text', async () => {
@@ -1198,5 +1273,142 @@ describe('Native V2 renderer staging transitions', () => {
     expect(screen.queryByTestId('native-content-placeholder')).toBeNull();
     expect(currentViews()).toHaveLength(0);
     expect(onLayoutReady).not.toHaveBeenCalled();
+  });
+  it('waits for native heights inside captions, display formulas and table cells at the confirmed width', async () => {
+    const first = jest.fn();
+    const full = jest.fn();
+    const content = [
+      '<figure><img src="https://example.com/illustration.jpg"><figcaption>图片说明</figcaption></figure>',
+      '<img eeimg="2" src="https://example.com/formula.svg" alt="a+b">',
+      '<table><caption>表说明</caption><tbody><tr><td><blockquote><p>表中说明</p></blockquote></td></tr></tbody></table>',
+    ].join('');
+    await render(
+      <ZhihuNativeContent
+        content={content}
+        type="article"
+        objectId="nested-first"
+        onFirstContentLayout={first}
+        onLayoutReady={full}
+        renderFallback={() => null}
+      />,
+    );
+    await containerLayout(320);
+    const old = currentViews();
+    expect(
+      old
+        .map((view) => (JSON.parse(view.flowJson) as RichTextFlow).text)
+        .sort(),
+    ).toEqual(['图片说明', '\uFFFC', '表说明', '表中说明'].sort());
+    await bodyLayout(320);
+    expect(first).not.toHaveBeenCalled();
+    expect(full).not.toHaveBeenCalled();
+    await containerLayout(420);
+    await bodyLayout(420);
+    for (const view of old) await heightEvent(view);
+    expect(first).not.toHaveBeenCalled();
+    const updated = currentViews();
+    expect(updated.map((view) => view.contentWidth)).not.toEqual(
+      old.map((view) => view.contentWidth),
+    );
+    const cell = updated.find(
+      (view) => (JSON.parse(view.flowJson) as RichTextFlow).text === '表中说明',
+    );
+    if (!cell) throw new Error('Missing nested cell');
+    expect(cell.contentWidth).toBeLessThan(420);
+    for (const view of updated.filter((view) => view !== cell))
+      await heightEvent(view, { height: 137 });
+    expect(first).not.toHaveBeenCalled();
+    await heightEvent(cell, { height: 139 });
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(full).toHaveBeenCalledTimes(1);
+    const visible = screen.getByTestId(`native-flow-${flowId(cell)}`);
+    expect(visible).toBeVisible();
+    expect(visible).toHaveStyle({ width: cell.contentWidth, height: 139 });
+  });
+
+  it('keeps the first prefix readable while a native formula in the last batch is still measuring', async () => {
+    const props = {
+      content: [
+        `<p>${'首段'.repeat(3200)}</p>`,
+        '<hr>',
+        '<img eeimg="2" src="https://example.com/last.svg" alt="x+y">',
+      ].join(''),
+      type: 'article' as const,
+      objectId: 'nested-tail',
+      progressive: true,
+      onFirstContentLayout: jest.fn(),
+      onLayoutReady: jest.fn(),
+      renderFallback: () => null,
+    };
+    const renderer = await render(
+      <ZhihuNativeContent {...props} pauseProgressiveTail />,
+    );
+    await containerLayout(320);
+    expect(currentViews()).toHaveLength(1);
+    await heightEvent(currentViews()[0]);
+    expect(props.onFirstContentLayout).toHaveBeenCalledTimes(1);
+    await renderer.rerender(<ZhihuNativeContent {...props} />);
+    const marker = await screen.findByTestId('native-content-end');
+    await fireEvent(marker, 'layout', {
+      nativeEvent: { layout: { width: 320 } },
+    });
+    expect(currentViews()).toHaveLength(2);
+    expect(props.onLayoutReady).not.toHaveBeenCalled();
+    await heightEvent(currentViews()[1], { height: 111 });
+    expect(props.onLayoutReady).toHaveBeenCalledTimes(1);
+    expect(props.onFirstContentLayout).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores superseded nested heights after the top-level flow of a new document has measured', async () => {
+    const callbacks = {
+      onFirstContentLayout: jest.fn(),
+      onLayoutReady: jest.fn(),
+    };
+    const content = (label: string) =>
+      `<p>开头</p><figure><img src="https://example.com/cover.jpg"><figcaption>${label}</figcaption></figure>`;
+    const renderer = await render(
+      <ZhihuNativeContent
+        type="article"
+        objectId="nested-source"
+        content={content('旧图注')}
+        renderFallback={() => null}
+        {...callbacks}
+      />,
+    );
+    await containerLayout(320);
+    const oldCaption = currentViews().find(
+      (view) => (JSON.parse(view.flowJson) as RichTextFlow).text === '旧图注',
+    );
+    if (!oldCaption) throw new Error('Missing old caption');
+    await renderer.rerender(
+      <ZhihuNativeContent
+        type="article"
+        objectId="nested-source"
+        content={content('新图注')}
+        renderFallback={() => null}
+        {...callbacks}
+      />,
+    );
+    await containerLayout(320);
+    await bodyLayout(320);
+    const current = currentViews();
+    const caption = current.find(
+      (view) => (JSON.parse(view.flowJson) as RichTextFlow).text === '新图注',
+    );
+    const top = current.find(
+      (view) => (JSON.parse(view.flowJson) as RichTextFlow).text === '开头',
+    );
+    if (!caption || !top) throw new Error('Missing current flows');
+    await heightEvent(top);
+    await heightEvent(oldCaption, { height: 500 });
+    expect(callbacks.onFirstContentLayout).not.toHaveBeenCalled();
+    expect(callbacks.onLayoutReady).not.toHaveBeenCalled();
+    await heightEvent(caption, { height: 140 });
+    expect(screen.getByText('新图注')).toBeVisible();
+    expect(screen.getByTestId(`native-flow-${flowId(caption)}`)).toHaveStyle({
+      height: 140,
+    });
+    expect(callbacks.onFirstContentLayout).toHaveBeenCalledTimes(1);
+    expect(callbacks.onLayoutReady).toHaveBeenCalledTimes(1);
   });
 });
