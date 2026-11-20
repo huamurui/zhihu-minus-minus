@@ -115,9 +115,42 @@ test('keeps several short paragraphs and a small remainder fully visible without
   );
   expect(host.getByText('丁')).toBeVisible();
   expect(host.getByText('发布于 2026-10-18')).toBeVisible();
-  expect(StyleSheet.flatten(viewport.props.style).maxHeight).toBeUndefined();
+  expect(
+    StyleSheet.flatten(viewport.props.style).maxHeight,
+  ).toBeGreaterThanOrEqual(previewHeight + 24);
   expect(host.queryByTestId('collapsible-rich-content-toggle')).toBeNull();
   expect(host.queryByTestId('collapsible-rich-content-fade')).toBeNull();
+  await host.unmount();
+});
+
+test('keeps a collapsed row bounded while the renderer replaces a short placeholder with a tall body', async () => {
+  const host = await render(
+    <CollapsibleRichContent
+      contentKey="async-body"
+      expanded={false}
+      onExpandedChange={jest.fn()}
+    >
+      <Text>正文</Text>
+    </CollapsibleRichContent>,
+  );
+  const viewport = host.getByTestId('collapsible-rich-content-viewport');
+  const body = host.getByTestId('collapsible-rich-content-body');
+  const previewHeight = StyleSheet.flatten(viewport.props.style).maxHeight;
+  await fireEvent(body, 'layout', layout(80));
+  expect(host.queryByText('展开回答')).toBeNull();
+
+  // Native layout applies the current viewport constraint to the new body
+  // before JS receives its height. FlashList sees that first layout too.
+  const loadedHeight = 2400;
+  const beforeNotification = StyleSheet.flatten(viewport.props.style).maxHeight;
+  expect(Math.min(loadedHeight, beforeNotification ?? Infinity)).toBe(
+    previewHeight,
+  );
+  await fireEvent(body, 'layout', layout(loadedHeight));
+  expect(StyleSheet.flatten(viewport.props.style).maxHeight).toBe(
+    previewHeight,
+  );
+  expect(host.getByText('展开回答')).toBeVisible();
   await host.unmount();
 });
 
