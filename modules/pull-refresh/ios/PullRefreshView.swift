@@ -1,13 +1,12 @@
 import ExpoModulesCore
-import QuartzCore
 import UIKit
 
 public final class PullRefreshView: ExpoView, UIGestureRecognizerDelegate {
   private let onPull = EventDispatcher()
   private let onRefreshTriggered = EventDispatcher()
   private let pullGesture: UIPanGestureRecognizer
-  private let progressFeedback = UIImpactFeedbackGenerator(style: .light)
-  private let thresholdFeedback = UIImpactFeedbackGenerator(style: .rigid)
+  private let feedback = PullHapticFeedback()
+  private var detents = PullHapticDetents()
 
   private weak var childView: UIView?
   private var threshold: CGFloat = 76
@@ -18,8 +17,6 @@ public final class PullRefreshView: ExpoView, UIGestureRecognizerDelegate {
   private var hapticsEnabled = true
   private var refreshing = false
   private var refreshLatched = false
-  private var thresholdHapticArmed = true
-  private var lastHapticAt = 0.0
   private var isPulling = false
 
   public required init(appContext: AppContext? = nil) {
@@ -35,7 +32,15 @@ public final class PullRefreshView: ExpoView, UIGestureRecognizerDelegate {
   }
 
   deinit {
+    feedback.cancelRoll()
     pullGesture.isEnabled = false
+  }
+
+  public override func didMoveToWindow() {
+    super.didMoveToWindow()
+    if window == nil {
+      feedback.cancelRoll()
+    }
   }
 
   public override func layoutSubviews() {
@@ -47,25 +52,33 @@ public final class PullRefreshView: ExpoView, UIGestureRecognizerDelegate {
 
   func setPullEnabled(_ enabled: Bool) {
     pullEnabled = enabled
-    if !enabled && !refreshing && pullOffset > 0 {
+    if !enabled {
       isPulling = false
-      animatePull(to: 0)
+      feedback.cancelRoll()
+      if !refreshing && pullOffset > 0 {
+        animatePull(to: 0)
+      }
     }
   }
 
   func setHapticsEnabled(_ enabled: Bool) {
     hapticsEnabled = enabled
     if !enabled {
-      lastHapticAt = 0
+      feedback.cancelRoll()
     }
+  }
+
+  func setHapticTickPositions(_ positions: [Double]) {
+    detents = PullHapticDetents(positions: positions)
+    detents.align(to: Double(pullOffset / threshold))
   }
 
   func setRefreshing(_ value: Bool) {
     guard refreshing != value else { return }
 
     refreshing = value
-    thresholdHapticArmed = !value
-    lastHapticAt = 0
+    isPulling = false
+    feedback.cancelRoll()
     if value {
       refreshLatched = true
       animatePull(to: holdDistance)
@@ -111,8 +124,8 @@ public final class PullRefreshView: ExpoView, UIGestureRecognizerDelegate {
     switch gesture.state {
     case .began:
       isPulling = true
-      progressFeedback.prepare()
-      thresholdFeedback.prepare()
+      if hapticsEnabled { feedback.prepare() }
+      fallthrough
 
     case .changed:
       guard isPulling else { return }
@@ -123,11 +136,13 @@ public final class PullRefreshView: ExpoView, UIGestureRecognizerDelegate {
     case .ended:
       guard isPulling else { return }
       isPulling = false
+      feedback.cancelRoll()
       settleAfterRelease()
 
     case .cancelled, .failed:
       guard isPulling else { return }
       isPulling = false
+      feedback.cancelRoll()
       animatePull(to: 0)
 
     default:
@@ -179,7 +194,6 @@ public final class PullRefreshView: ExpoView, UIGestureRecognizerDelegate {
     guard pullEnabled, !refreshing, !refreshLatched else { return }
 
     if pullOffset >= threshold {
-      emitThresholdHapticIfNeeded()
       refreshLatched = true
       animatePull(to: holdDistance)
       onRefreshTriggered()
@@ -208,51 +222,20 @@ public final class PullRefreshView: ExpoView, UIGestureRecognizerDelegate {
 
   private func updatePullOffset(_ offset: CGFloat, dragging: Bool) {
     pullOffset = min(max(offset, 0), maxPullDistance)
-    updateProgressHaptic(dragging: dragging)
-
-    if pullOffset < threshold * thresholdRearmProgress {
-      thresholdHapticArmed = true
+    let progress = Double(pullOffset / threshold)
+    if dragging && hapticsEnabled && !refreshing {
+      let crossed = detents.cross(to: progress)
+      feedback.play(PullHapticDetents.pulses(for: crossed))
+    } else {
+      detents.align(to: progress)
     }
-    emitThresholdHapticIfNeeded()
 
     childView?.transform = CGAffineTransform(translationX: 0, y: pullOffset)
     onPull([
       "offset": Double(pullOffset),
-      "progress": Double(max(pullOffset / threshold, 0)),
+      "progress": progress,
       "dragging": dragging
     ])
-  }
-
-  private func emitThresholdHapticIfNeeded() {
-    guard !refreshing, thresholdHapticArmed, pullOffset >= threshold else { return }
-
-    thresholdHapticArmed = false
-    guard hapticsEnabled else { return }
-    emitImpact(thresholdFeedback, intensity: 0.78)
-  }
-
-  private func updateProgressHaptic(dragging: Bool) {
-    guard dragging, hapticsEnabled, !refreshing, pullOffset >= 2, pullOffset < threshold else {
-      if !dragging || pullOffset < 2 { lastHapticAt = 0 }
-      return
-    }
-
-    let progress = min(max(pullOffset / threshold, 0), 1)
-    // iOS 的 Taptic Engine 会合并过密的 impact；留出更大的间隔能让每一拍更稳定。
-    let interval = 0.085 - Double(progress) * 0.025
-    let now = CACurrentMediaTime()
-    guard lastHapticAt == 0 || now - lastHapticAt >= interval else { return }
-
-    emitImpact(progressFeedback, intensity: 0.14 + progress * 0.38)
-    lastHapticAt = now
-  }
-
-  private func emitImpact(_ feedback: UIImpactFeedbackGenerator, intensity: CGFloat) {
-    // prepare() 的有效窗口有限，不能只依赖手势 began 时的那一次准备。
-    feedback.prepare()
-    feedback.impactOccurred(intensity: intensity)
-    // 为下一次脉冲预热，避免连续下拉时出现随机丢拍。
-    feedback.prepare()
   }
 
   private func constrainDistances() {
@@ -265,5 +248,4 @@ public final class PullRefreshView: ExpoView, UIGestureRecognizerDelegate {
   private let extraDragResistance: CGFloat = 0.28
   private let resetDuration: TimeInterval = 0.22
   private let holdDuration: TimeInterval = 0.16
-  private let thresholdRearmProgress: CGFloat = 0.99
 }

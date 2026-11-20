@@ -13,9 +13,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 import {
+  PULL_HAPTIC_TICK_POSITIONS,
   type PullRefreshNativeEvent,
   PullRefreshNativeView,
-} from '@/modules/zhihu-pull-refresh';
+} from '@/modules/pull-refresh';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { PullToRefreshProps } from './PullToRefresh.types';
 
@@ -161,6 +162,7 @@ export function PullToRefresh({
       <AnimatedPullRefreshNativeView
         enabled={enabled}
         hapticsEnabled={hapticsEnabled}
+        hapticTickPositions={PULL_HAPTIC_TICK_POSITIONS}
         holdDistance={REFRESH_HOLD_DISTANCE}
         maxPullDistance={MAX_PULL_DISTANCE}
         onPull={pullHandler}

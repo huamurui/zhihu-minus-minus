@@ -4,6 +4,6 @@
     "modules": ["PullRefreshModule"]
   },
   "android": {
-    "modules": ["com.zhihuminus.pullrefresh.PullRefreshModule"]
+    "modules": ["expo.modules.pullrefresh.PullRefreshModule"]
   }
 }
