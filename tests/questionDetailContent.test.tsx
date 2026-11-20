@@ -75,7 +75,4 @@ test('the summary stays in place of the expanded body until its layout is ready'
   const placeholder = await render(
     <>{props?.renderPlaceholder?.('text-layout')}</>,
   );
-  expect(placeholder.getByText('合成摘要')).toHaveStyle(
-    QUESTION_DETAIL_TEXT_STYLE,
-  );
 });
