@@ -62,11 +62,15 @@ function code(value: string): string {
 
 function link(
   url: string,
-  label: string,
-  runs?: readonly ZhihuInlineRun[],
+  label: string | readonly ZhihuInlineRun[],
+  context: ExportSerializationContext,
 ): string {
   const safe = getSafeExportUrl(url);
-  const text = exportLinkLabel(url, safe, label, escapeText, runs);
+  const content = exportLinkLabel(url, safe, label);
+  const text =
+    typeof content === 'string'
+      ? escapeText(content)
+      : inline(content, context);
   return safe ? `[${text}](<${safe}>)` : text;
 }
 
@@ -138,7 +142,7 @@ function inline(
         case 'inlineImage':
           return image(run.resource, run.alt ?? '', context);
         case 'link':
-          return link(run.url, inline(run.children, context), run.children);
+          return link(run.url, run.children, context);
         case 'inlineFormula':
           return formula(run.formula, false, context);
         case 'segment':
@@ -310,14 +314,14 @@ function serializeBlock(
     case 'video':
       return [
         block.poster ? image(block.poster, '视频封面', context) : '',
-        `${link(block.url, escapeText(block.title || '视频'))}（视频请在原文观看）`,
+        `${link(block.url, block.title || '视频', context)}（视频请在原文观看）`,
       ]
         .filter(Boolean)
         .join('\n\n');
     case 'linkCard':
       return [
         block.image ? image(block.image, '', context) : '',
-        link(block.url, escapeText(block.title || '链接')),
+        link(block.url, block.title || '链接', context),
         block.description ? escapeText(block.description) : '',
       ]
         .filter(Boolean)
@@ -349,7 +353,7 @@ export function serializeExportMarkdown(
     source.publishedAt ? `发布时间：${escapeText(source.publishedAt)}` : '',
     source.updatedAt ? `更新时间：${escapeText(source.updatedAt)}` : '',
     getSafeExportUrl(source.sourceUrl)
-      ? link(source.sourceUrl, '查看原文')
+      ? link(source.sourceUrl, '查看原文', context)
       : '',
   ]
     .filter(Boolean)

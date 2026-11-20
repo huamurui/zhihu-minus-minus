@@ -630,6 +630,37 @@ test('redacts URL labels split across formatting while keeping descriptive link 
   expect(markdown).toContain('[**资料说明**](<https://example.org/source>)');
 });
 
+test.each([
+  {
+    format: 'HTML',
+    render: serializeExportHtml,
+    publicLabel: '>https://example.org/Read</a>',
+    descriptiveLabel: '<strong>阅读说明</strong>',
+  },
+  {
+    format: 'Markdown',
+    render: serializeExportMarkdown,
+    publicLabel: '[https://example\\.org/Read](<https://example.org/Read>)',
+    descriptiveLabel: '[**阅读说明**](<https://example.org/Read>)',
+  },
+])(
+  'redacts normalized mixed-case URL labels in $format',
+  ({ render, publicLabel, descriptiveLabel }) => {
+    const { document } = normalizeZhihuDocument(
+      '<p><a href="https://EXAMPLE.org/private?token=inlineFixture"><strong>https://EXAMPLE.org/</strong><em>private?token=inlineFixture</em></a></p>' +
+        '<p><a href="https://Example.ORG/Read?utm_source=trackingFixture">https://Example.ORG/Read?utm_source=trackingFixture</a></p>' +
+        '<a data-draft-type="link-card" href="https://EXample.org/card?token=cardFixture" data-draft-title="https://EXample.org/card?token=cardFixture"></a>' +
+        '<p><a href="https://Example.ORG/Read?utm_source=trackingFixture"><strong>阅读说明</strong></a></p>',
+      { documentId: 'mixed-case-url-labels' },
+    );
+    const output = render({ ...source([]), document }, options);
+    expect(output).not.toMatch(/inlineFixture|trackingFixture|cardFixture/);
+    expect(output.match(/来源链接未导出/g)).toHaveLength(2);
+    expect(output).toContain(publicLabel);
+    expect(output).toContain(descriptiveLabel);
+  },
+);
+
 test('footnotes referenced only inside an HTML table remain visible in Markdown', () => {
   const complex = table(true);
   const noteReference: ZhihuBlock = {

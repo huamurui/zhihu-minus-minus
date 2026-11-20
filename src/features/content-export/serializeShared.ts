@@ -4,7 +4,11 @@ import type {
   ZhihuImageResource,
   ZhihuInlineRun,
 } from '@/features/rich-content';
-import { getSafeExportImageUrl, getSafePreparedAsset } from './safeUrl';
+import {
+  getSafeExportImageUrl,
+  getSafeExportUrl,
+  getSafePreparedAsset,
+} from './safeUrl';
 import type { ExportRenderOptions } from './types';
 
 export interface ExportSerializationContext {
@@ -72,19 +76,34 @@ function plainLinkLabel(runs: readonly ZhihuInlineRun[]): string {
     .join('');
 }
 
-/** Compare source text before HTML/Markdown styling or escaping can obscure a URL. */
+/** Apply the export URL policy to visible URLs before formatting or escaping. */
 export function exportLinkLabel(
   url: string,
   safeUrl: string | undefined,
-  label: string,
-  escapeText: (text: string) => string,
-  runs?: readonly ZhihuInlineRun[],
-): string {
-  if (safeUrl === url) return label;
-  const urlOnly = runs
-    ? plainLinkLabel(runs).trim() === url
-    : label.trim() === escapeText(url);
-  return urlOnly ? escapeText(safeUrl ?? '来源链接未导出') : label;
+  label: string | readonly ZhihuInlineRun[],
+): string | readonly ZhihuInlineRun[] {
+  const text = (
+    typeof label === 'string' ? label : plainLinkLabel(label)
+  ).trim();
+  const unavailable = '来源链接未导出';
+  const destinationLabel = safeUrl === url ? label : (safeUrl ?? unavailable);
+  if (text === url) return destinationLabel;
+  if (!/^(?:https?:\/\/|\/)/i.test(text) || text.includes('\uFFFC'))
+    return label;
+
+  // The normalizer may already have canonicalized the href (e.g. host case)
+  // or unwrapped a redirect. Check the URL that would actually be printed.
+  let href: string;
+  try {
+    href = new URL(text, 'https://www.zhihu.com').href;
+  } catch {
+    return label;
+  }
+  if (href === url) return destinationLabel;
+  // A URL followed by explanatory text is a descriptive label.
+  if (/\s/.test(text)) return label;
+  const safeText = getSafeExportUrl(text);
+  return href === safeText ? label : (safeText ?? unavailable);
 }
 
 export function resolveExportImage(

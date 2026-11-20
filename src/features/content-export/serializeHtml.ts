@@ -81,11 +81,15 @@ function formula(
 
 function link(
   url: string,
-  label: string,
-  runs?: readonly ZhihuInlineRun[],
+  label: string | readonly ZhihuInlineRun[],
+  context: ExportSerializationContext,
 ): string {
   const safe = getSafeExportUrl(url);
-  const text = exportLinkLabel(url, safe, label, escapeText, runs);
+  const content = exportLinkLabel(url, safe, label);
+  const text =
+    typeof content === 'string'
+      ? escapeText(content)
+      : inline(content, context);
   return safe
     ? `<a href="${escapeText(safe)}" rel="noreferrer noopener">${text}</a>`
     : text;
@@ -121,7 +125,7 @@ function inline(
         case 'inlineImage':
           return image(run.resource, run.alt ?? '', context, 'inline');
         case 'link':
-          return link(run.url, inline(run.children, context), run.children);
+          return link(run.url, run.children, context);
         case 'inlineFormula':
           return `<span class="inline-formula">${formula(run.formula, false, context)}</span>`;
         case 'segment':
@@ -215,9 +219,9 @@ export function serializeExportHtmlBlock(
     case 'code':
       return `<pre><code>${escapeText(block.text)}</code></pre>`;
     case 'video':
-      return `<figure class="video">${block.poster ? image(block.poster, '视频封面', context, 'block') : ''}<figcaption>${link(block.url, escapeText(block.title || '视频'))}（视频请在原文观看）</figcaption></figure>`;
+      return `<figure class="video">${block.poster ? image(block.poster, '视频封面', context, 'block') : ''}<figcaption>${link(block.url, block.title || '视频', context)}（视频请在原文观看）</figcaption></figure>`;
     case 'linkCard':
-      return `<aside class="link-card">${block.image ? image(block.image, '', context, 'block') : ''}<p>${link(block.url, escapeText(block.title || '链接'))}</p>${block.description ? `<p>${escapeText(block.description)}</p>` : ''}</aside>`;
+      return `<aside class="link-card">${block.image ? image(block.image, '', context, 'block') : ''}<p>${link(block.url, block.title || '链接', context)}</p>${block.description ? `<p>${escapeText(block.description)}</p>` : ''}</aside>`;
     case 'divider':
       return '<hr>';
     case 'table':
@@ -322,7 +326,7 @@ export function serializeExportHtml(
       : '',
     source.updatedAt ? `<p>更新时间：${escapeText(source.updatedAt)}</p>` : '',
     getSafeExportUrl(source.sourceUrl)
-      ? `<p>${link(source.sourceUrl, '查看原文')}</p>`
+      ? `<p>${link(source.sourceUrl, '查看原文', context)}</p>`
       : '',
   ].join('');
   const notices = [
