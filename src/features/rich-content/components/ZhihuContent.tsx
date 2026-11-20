@@ -334,6 +334,9 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
     onRefresh,
     renderer,
     renderPlaceholder,
+    progressive,
+    pauseProgressiveTail,
+    onFirstContentLayout,
     onLayoutReady,
     initialContentWidth,
     fontSizeScale: fontSizeOverride,
@@ -727,6 +730,10 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         notifyError: () => showToast('操作失败，请重试'),
       }),
     );
+    const handleWebViewReady = useCallback(() => {
+      onFirstContentLayout?.();
+      onLayoutReady?.();
+    }, [onFirstContentLayout, onLayoutReady]);
     const renderWebViewContent = () => (
       <ZhihuDOMContent
         key={`${type}:${objectId}`}
@@ -737,7 +744,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         segmentTapEnabled={segmentTapEnabled}
         linkCardInfoStr={JSON.stringify(linkCardInfo || {})}
         colorScheme={colorScheme}
-        onReady={onLayoutReady}
+        onReady={handleWebViewReady}
         onImagePress={(src) => onImagePressCallback(src, documentImages)}
         onImageLongPress={onImageLongPressCallback}
         onLinkPress={handleInternalLink}
@@ -779,6 +786,9 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
             suppressDoubleTapSelection={suppressDoubleTapSelection}
             renderFallback={renderWebViewContent}
             renderPlaceholder={renderPlaceholder}
+            progressive={progressive}
+            pauseProgressiveTail={pauseProgressiveTail}
+            onFirstContentLayout={onFirstContentLayout}
             onLayoutReady={onLayoutReady}
             initialContentWidth={initialContentWidth}
           />

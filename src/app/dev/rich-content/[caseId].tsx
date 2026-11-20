@@ -220,6 +220,7 @@ export default function RichContentFixtureDetailScreen() {
               linkCardInfo={fixture.linkCardInfo}
               objectId={fixture.objectId}
               type={fixture.rendererType}
+              progressive
               renderer={renderer}
               selectable={interactionsEnabled}
               variant={fixture.variant}

@@ -91,6 +91,11 @@ const mockCollectionButton = jest.fn(
 let mockSessionVersion = 1;
 let mockCookies = 'z_c0=synthetic-session';
 let mockLayoutReady: () => void;
+let mockFirstContentLayout: () => void;
+const mockProgressiveBody = jest.fn(
+  (_props: { progressive: boolean; pauseProgressiveTail: boolean }) => {},
+);
+const mockScrollIndicator = jest.fn((_props: { visible: boolean }) => null);
 let mockContentLoadingPhase: RichContentLoadingPhase | null = null;
 const mockPagerMount = jest.fn();
 let mockScreenAnswerIds = ['84'];
@@ -286,7 +291,8 @@ jest.mock('../src/components/ReadingProgressNotice', () => ({
   ReadingProgressNotice: () => null,
 }));
 jest.mock('../src/components/ReadingScrollIndicator', () => ({
-  ReadingScrollIndicator: () => null,
+  ReadingScrollIndicator: (props: { visible: boolean }) =>
+    mockScrollIndicator(props),
 }));
 jest.mock('../src/components/ShareMenu', () => ({
   ShareMenu: ({
@@ -364,14 +370,22 @@ jest.mock('../src/features/rich-content', () => {
       content,
       selectable,
       onLayoutReady,
+      onFirstContentLayout,
+      progressive,
+      pauseProgressiveTail,
       renderPlaceholder,
     }: {
       content: string;
       selectable: boolean;
       onLayoutReady: () => void;
+      onFirstContentLayout: () => void;
+      progressive: boolean;
+      pauseProgressiveTail: boolean;
       renderPlaceholder?: (phase: RichContentLoadingPhase) => ReactNode;
     }) => {
       mockLayoutReady = onLayoutReady;
+      mockFirstContentLayout = onFirstContentLayout;
+      mockProgressiveBody({ progressive, pauseProgressiveTail });
       react.useEffect(() => {
         mockBodyMount();
         return () => mockBodyUnmount();
@@ -679,6 +693,73 @@ test('reports only the focused answer after its body layout is ready', async () 
     false,
     undefined,
   );
+});
+
+test('a preloaded prefix becomes readable on focus while the footer, progress and scroll indicator wait for the full layout', async () => {
+  const detail = { ...answer, created_time_name: '文末发布时间' };
+  jest.mocked(getAnswer).mockResolvedValue(detail);
+  const host = await renderAnswer({ cachedAnswer: detail });
+  expect(mockProgressiveBody).toHaveBeenLastCalledWith({
+    progressive: true,
+    pauseProgressiveTail: true,
+  });
+
+  await act(() => mockFirstContentLayout());
+  expect(useAnswerDetailRead).toHaveBeenLastCalledWith(
+    '84',
+    '7',
+    false,
+    undefined,
+  );
+  expect(host.queryByText('发布于 文末发布时间')).toBeNull();
+  await host.rerender(host.page(true, true));
+  expect(mockProgressiveBody).toHaveBeenLastCalledWith({
+    progressive: true,
+    pauseProgressiveTail: false,
+  });
+  expect(useAnswerDetailRead).toHaveBeenLastCalledWith(
+    '84',
+    '7',
+    true,
+    undefined,
+  );
+  expect(mockReadingProgress).toHaveBeenLastCalledWith(
+    expect.objectContaining({ ready: false }),
+  );
+  expect(mockScrollIndicator).toHaveBeenLastCalledWith(
+    expect.objectContaining({ visible: false }),
+  );
+  expect(host.queryByText('发布于 文末发布时间')).toBeNull();
+
+  await act(() => mockLayoutReady());
+  expect(mockReadingProgress).toHaveBeenLastCalledWith(
+    expect.objectContaining({ ready: true }),
+  );
+  expect(mockScrollIndicator).toHaveBeenLastCalledWith(
+    expect.objectContaining({ visible: true }),
+  );
+  expect(host.getByText('发布于 文末发布时间')).toBeOnTheScreen();
+  expect(mockBodyMount).toHaveBeenCalledTimes(1);
+});
+
+test('keeps the answer footer hidden while a replacement of a partial body prepares', async () => {
+  const detail = { ...answer, created_time_name: '文末发布时间' };
+  const host = await renderAnswer({ cachedAnswer: detail });
+  await act(() => mockFirstContentLayout());
+  const oldComplete = mockLayoutReady;
+  const replacement = { ...detail, content: '<p>同一回答的新正文</p>' };
+  await act(() => {
+    host.queryClient.setQueryData(['answer-detail', answer.id], replacement);
+  });
+  await waitFor(() =>
+    expect(host.getByTestId('answer-body')).toHaveTextContent(
+      replacement.content,
+    ),
+  );
+  await act(() => oldComplete());
+  expect(host.queryByText('发布于 文末发布时间')).toBeNull();
+  await act(() => mockLayoutReady());
+  expect(host.getByText('发布于 文末发布时间')).toBeOnTheScreen();
 });
 
 test('a selected answer does not report while fetching or waiting for native layout', async () => {
@@ -1111,6 +1192,7 @@ test.each<Partial<AnswerDetail>>([
     expect(host.getByTestId('answer-body')).toHaveTextContent(
       guestAnswer.content,
     );
+    await act(() => mockLayoutReady());
     expect(host.getByText('当前仅展示游客可见的部分正文')).toBeOnTheScreen();
     expect(host.queryByText('正在获取回答…')).toBeNull();
     expect(getAnswer).not.toHaveBeenCalled();
@@ -1209,6 +1291,7 @@ test('replaces a signed-in answer with the new guest session content after switc
     guestAnswer.content,
   );
   expect(host.queryByText(signedInAnswer.content)).toBeNull();
+  await act(() => mockLayoutReady());
   expect(host.getByText('当前仅展示游客可见的部分正文')).toBeOnTheScreen();
   expect(getAnswer).not.toHaveBeenCalled();
   expect(getQuestionAnswers).not.toHaveBeenCalled();

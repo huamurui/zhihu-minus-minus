@@ -303,6 +303,33 @@ describe('source-paired actual Native reading measurements', () => {
     expect(host.scrollTo).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the saved position when scrolling to the end of a partially laid out replacement', async () => {
+    const host = await renderHost({
+      source: sourceA,
+      ready: true,
+      enabled: true,
+    });
+    await host.complete(0);
+    await act(() => jest.advanceTimersByTime(180));
+    await host.rerender({ source: sourceB, ready: false, enabled: true });
+    await act(() => {
+      host.result.current.onHostContentSizeChange(320, 1400);
+      host.result.current.onScroll(600);
+      host.result.current.commitProgress();
+      jest.advanceTimersByTime(1200);
+    });
+    expect(useProgressStore.getState().progress[contentKey]).toEqual(
+      savedEntry,
+    );
+
+    await host.rerender({ source: sourceB, ready: true, enabled: true });
+    await host.complete(1, 4200);
+    await act(() => host.result.current.commitProgress());
+    expect(useProgressStore.getState().progress[contentKey]).toEqual(
+      expect.objectContaining({ offset: 600, scrollableDistance: 3400 }),
+    );
+  });
+
   it('never restores a second time after an already-restored body is replaced', async () => {
     const host = await renderHost({
       source: sourceA,

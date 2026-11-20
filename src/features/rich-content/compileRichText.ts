@@ -10,7 +10,6 @@ import type {
   RichTextAttachment,
   RichTextCompilation,
   RichTextDecoration,
-  RichTextDiagnostic,
   RichTextFlow,
   RichTextParagraph,
   RichTextPart,
@@ -90,8 +89,18 @@ export function compileZhihuDocument(
   document: ZhihuDocument,
   options: RichTextCompilationOptions,
 ): RichTextCompilation {
-  const parts: RichTextPart[] = [];
-  const diagnostics: RichTextDiagnostic[] = [];
+  return {
+    documentId: document.id,
+    parts: [...compileZhihuDocumentParts(document, options)],
+    diagnostics: [],
+  };
+}
+
+/** Yield complete selection buffers and independent blocks in reading order. */
+export function* compileZhihuDocumentParts(
+  document: ZhihuDocument,
+  options: RichTextCompilationOptions,
+): Generator<RichTextPart, void> {
   const paragraphOffsets = new Map<string, number>();
   const fontSize =
     Number.isFinite(options.fontSize) && options.fontSize > 0
@@ -111,7 +120,7 @@ export function compileZhihuDocument(
   let segmentRanges: SegmentDecorationRange[] = [];
   let flowSerial = 0;
 
-  function flush(): void {
+  function* flush(): Generator<RichTextPart, void> {
     if (builder.text.length) {
       const markers = segmentCommentMarkers(segmentRanges);
       builder.decorations = builder.decorations.map((decoration) =>
@@ -126,14 +135,14 @@ export function compileZhihuDocument(
         decorations: builder.decorations,
         attachments: builder.attachments,
       });
-      parts.push({
+      yield {
         type: 'flow',
         flow: {
           id: `${document.id}:flow:${++flowSerial}`,
           textVersion: contentVersion(identity),
           ...builder,
         },
-      });
+      };
     }
     builder = newBuilder();
     segmentRanges = [];
@@ -366,16 +375,16 @@ export function compileZhihuDocument(
     });
   }
 
-  function compileBlocks(
+  function* compileBlocks(
     blocks: readonly ZhihuBlock[],
     context: ParagraphContext = {},
     previousEmptyParagraph = false,
-  ): void {
+  ): Generator<RichTextPart, void> {
     for (const block of blocks) {
       if (block.type === 'paragraph' || block.type === 'heading')
         compileParagraph(block, context, previousEmptyParagraph);
       else if (block.type === 'quote')
-        compileBlocks(block.blocks, {
+        yield* compileBlocks(block.blocks, {
           kind: 'quote',
           indent: (context.indent ?? 0) + fontSize,
           prefix: context.prefix,
@@ -393,9 +402,9 @@ export function compileZhihuDocument(
             },
             context,
           );
-        block.items.forEach((item, index) => {
+        for (const [index, item] of block.items.entries()) {
           const precedingParagraph = builder.paragraphs.at(-1);
-          compileBlocks(item.blocks, {
+          yield* compileBlocks(item.blocks, {
             kind: 'listItem',
             indent: (context.indent ?? 0) + fontSize * 1.2,
             // Containers share this marker; media does not consume it, and
@@ -419,10 +428,10 @@ export function compileZhihuDocument(
               // geometry must not rewrite the preceding text's paragraph gap.
               marginBottom: RICH_CONTENT_LIST_ITEM_SPACING,
             };
-        });
+        }
       } else {
-        flush();
-        parts.push({ type: 'block', block });
+        yield* flush();
+        yield { type: 'block', block };
       }
       // Runs are local to sibling paragraphs: media, containers and prose
       // start a new run, including when they split the native text flow.
@@ -431,15 +440,14 @@ export function compileZhihuDocument(
     }
   }
 
-  compileBlocks(document.blocks, {}, options.continuesEmptyParagraph);
+  yield* compileBlocks(document.blocks, {}, options.continuesEmptyParagraph);
   if (document.footnotes?.length) {
     for (const definition of document.footnotes)
-      compileBlocks(definition.blocks, {
+      yield* compileBlocks(definition.blocks, {
         prefix: { text: `[${definition.label}] `, consumed: false },
       });
   }
-  flush();
-  return { documentId: document.id, parts, diagnostics };
+  yield* flush();
 }
 
 function validSelection(
