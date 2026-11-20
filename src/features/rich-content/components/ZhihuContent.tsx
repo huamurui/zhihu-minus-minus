@@ -162,6 +162,8 @@ function getLinkCardImage(display: LinkCardDisplay | null): string | undefined {
 
 export const LinkCard: React.FC<LinkCardProps> = React.memo(
   ({ url, title, image, cardInfo, onPress, surfaceColor }) => {
+    const manualImages =
+      useSettingsStore((state) => state.imageLoadingMode) === 'manual';
     const metadata = useMemo(() => parseLinkCardMetadata(cardInfo), [cardInfo]);
     const display = asRecord(metadata?.display) as LinkCardDisplay | null;
     const displayTitle = getString(display?.title);
@@ -292,7 +294,7 @@ export const LinkCard: React.FC<LinkCardProps> = React.memo(
               </View>
             )}
           </View>
-          {fetchedImage && (
+          {fetchedImage && !manualImages && (
             <Image
               source={getCachedImageSource(fetchedImage)}
               className="w-full h-[120px] rounded-lg mt-2.5"

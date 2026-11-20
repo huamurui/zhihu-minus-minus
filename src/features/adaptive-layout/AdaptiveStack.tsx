@@ -54,6 +54,7 @@ import {
   getListPaneWidth,
   getVisiblePanes,
   PANE_DIVIDER_WIDTH,
+  shouldUseTwoPanes,
 } from './layout';
 import { PaneContext, usePaneDimensions } from './PaneContext';
 import { PaneDivider } from './PaneDivider';
@@ -94,7 +95,9 @@ type RetainedRoute = {
 };
 
 function StackContent(props: ContentProps) {
-  const enabled = useSettingsStore((s) => s.enableLargeScreenLayout);
+  const mode = useSettingsStore((s) => s.largeScreenLayoutMode);
+  const dimensions = useWindowDimensions();
+  const enabled = shouldUseTwoPanes(mode, dimensions.width);
   if (Platform.OS === 'ios' && !enabled) {
     // Expo Router passes its full navigation descriptors at runtime; the
     // standard navigator type exposes only their shared options/render subset.
@@ -111,19 +114,28 @@ function StackContent(props: ContentProps) {
       </IsWithinNativeNavigator.Provider>
     );
   }
-  return <AdaptiveStackContent {...props} />;
+  return (
+    <AdaptiveStackContent
+      {...props}
+      enabled={enabled}
+      dimensions={dimensions}
+    />
+  );
 }
 
-export function AdaptiveStackContent({
+function AdaptiveStackContent({
   state,
   descriptors,
   actions,
   dispatchNavigation,
   navigatorKey,
-}: ContentProps) {
-  const dimensions = useWindowDimensions();
+  enabled,
+  dimensions,
+}: ContentProps & {
+  enabled: boolean;
+  dimensions: ReturnType<typeof useWindowDimensions>;
+}) {
   const colors = useRuntimeThemeColors();
-  const enabled = useSettingsStore((s) => s.enableLargeScreenLayout);
   const savedRatio = useSettingsStore((s) => s.largeScreenListRatio);
   const [ratio, setRatio] = useState(savedRatio);
   const [measurement, setMeasurement] = useState<{

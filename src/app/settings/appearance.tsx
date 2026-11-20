@@ -82,6 +82,7 @@ export default function AppearanceSettings() {
     surfaceStyle,
     richContentRenderer,
     removeImageWatermark,
+    imageLoadingMode,
     enableSegmentTap,
     answerReadingMode,
     unreadBadgeStyle,
@@ -201,6 +202,22 @@ export default function AppearanceSettings() {
               </BouncyButton>
             );
           })}
+          <SettingItem
+            label="无图模式"
+            icon="image-outline"
+            colorScheme={colorScheme}
+          >
+            <ThemedSwitch
+              accessibilityLabel="无图模式"
+              accessibilityHint="列表缩略图和正文配图在点击后加载"
+              value={imageLoadingMode === 'manual'}
+              onValueChange={(enabled) =>
+                updateSettings({
+                  imageLoadingMode: enabled ? 'manual' : 'auto',
+                })
+              }
+            />
+          </SettingItem>
           <SettingItem
             label="去除图片水印"
             icon="image-outline"

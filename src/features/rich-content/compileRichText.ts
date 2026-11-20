@@ -227,6 +227,8 @@ export function compileZhihuDocument(
           start,
           end: start + 1,
           kind: run.type === 'inlineImage' ? 'image' : 'formula',
+          ...(run.type === 'inlineImage' &&
+            run.role === 'avatar' && { role: 'avatar' }),
           ...(resource && { url: resource.url }),
           ...(latex && { latex }),
           ...(alt && { alt }),

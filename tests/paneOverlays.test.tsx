@@ -8,7 +8,7 @@ import {
   within,
 } from '@testing-library/react-native';
 import * as ImagePicker from 'expo-image-picker';
-import type { PropsWithChildren } from 'react';
+import { type PropsWithChildren, useState } from 'react';
 import {
   Animated,
   DeviceEventEmitter,
@@ -16,6 +16,7 @@ import {
   StyleSheet,
   Text,
 } from 'react-native';
+import { withSpring } from 'react-native-reanimated';
 import { createAnswerSelectionComment } from '../src/api/zhihu/comment';
 import { uploadImage } from '../src/api/zhihu/image';
 import { AppDialog } from '../src/components/overlays/AppDialog';
@@ -33,9 +34,11 @@ import {
 } from '../src/features/adaptive-layout/PaneContext';
 import { PaneModal } from '../src/features/adaptive-layout/PaneModal';
 import { SelectionCommentSheet } from '../src/features/rich-content/components/SelectionCommentSheet';
+import { useSettingsStore } from '../src/store/useSettingsStore';
 
 let mockFinishAnimation: (finished: boolean) => void;
 let mockFocused = true;
+let mockWindowHeight = 800;
 
 jest.mock('../src/api/zhihu/comment', () => ({
   createAnswerSelectionComment: jest.fn(),
@@ -64,7 +67,12 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
   __esModule: true,
-  default: () => ({ width: 1200, height: 800, scale: 2, fontScale: 1 }),
+  default: () => ({
+    width: 1200,
+    height: mockWindowHeight,
+    scale: 2,
+    fontScale: 1,
+  }),
 }));
 jest.mock('react-native-gesture-handler', () => {
   const gesture = {
@@ -82,26 +90,54 @@ jest.mock('react-native-gesture-handler', () => {
 });
 jest.mock('react-native-reanimated', () => {
   const react = jest.requireActual<typeof import('react')>('react');
+  type MockTiming = { target: number; callback: (finished: boolean) => void };
+  function useSharedValue(initial: number) {
+    const [shared] = react.useState(() => {
+      let value = initial;
+      let pending: MockTiming | undefined;
+      const finish = (finished: boolean) => {
+        const animation = pending;
+        pending = undefined;
+        animation?.callback(finished);
+      };
+      return {
+        get value() {
+          return value;
+        },
+        set value(next: number | MockTiming) {
+          // Assigning to an animating shared value cancels its previous animation.
+          finish(false);
+          if (typeof next === 'number') {
+            value = next;
+          } else {
+            value = next.target;
+            pending = next;
+            mockFinishAnimation = finish;
+          }
+        },
+      };
+    });
+    return shared;
+  }
   return {
     __esModule: true,
     default: { View: jest.requireActual('react-native').View },
-    useSharedValue: (value: number) => react.useRef({ value }).current,
+    useSharedValue,
     useAnimatedStyle: (style: () => object) => style(),
-    withSpring: (value: number) => value,
+    withSpring: jest.fn((value: number) => value),
     withTiming: (
       value: number,
       _config: unknown,
       callback?: (finished: boolean) => void,
-    ) => {
-      if (callback) mockFinishAnimation = callback;
-      return value;
-    },
+    ) => (callback ? { target: value, callback } : value),
     runOnJS: (callback: () => void) => callback,
   };
 });
 
 beforeEach(() => {
   mockFocused = true;
+  mockWindowHeight = 800;
+  useSettingsStore.setState({ largeScreenLayoutMode: 'single' });
   jest.spyOn(Animated, 'timing').mockImplementation(() => ({
     start: (callback) => callback?.({ finished: true }),
     stop: jest.fn(),
@@ -139,6 +175,102 @@ test('a visible pane beside the focused detail keeps its modal selection active 
   );
   expect(host.getByText('1200:true')).toBeOnTheScreen();
 });
+
+test('iOS bottom sheets support the landscape presenting window', async () => {
+  jest.replaceProperty(Platform, 'OS', 'ios');
+  const host = await render(
+    <PaneContext.Provider value={{ width: 360, height: 800, visible: true }}>
+      <DimensionsProbe />
+      <BottomSheet visible onClose={jest.fn()}>
+        <DimensionsProbe />
+      </BottomSheet>
+    </PaneContext.Provider>,
+  );
+  expect(host.getByText('360:true')).toBeOnTheScreen();
+  expect(host.getByText('1200:true')).toBeOnTheScreen();
+  const modal = host.container.queryAll(
+    (node) => node.props.transparent && node.props.visible,
+  )[0];
+  expect(modal.props.supportedOrientations).toContain('landscape');
+});
+
+test.each(['route', 'global'] as const)(
+  'iOS %s sheet in dual-pane mode uses a window overlay and can open the next sheet after dismissal',
+  async (scope) => {
+    jest.replaceProperty(Platform, 'OS', 'ios');
+    useSettingsStore.setState({ largeScreenLayoutMode: 'dual' });
+    const closed = jest.fn();
+    function Sheets() {
+      const [step, setStep] = useState(1);
+      return (
+        <>
+          <BottomSheet
+            visible={step === 1}
+            title="第一个菜单"
+            onClose={() => {
+              closed();
+              setStep(2);
+            }}
+          >
+            <DimensionsProbe />
+          </BottomSheet>
+          <BottomSheet
+            visible={step === 2}
+            title="第二个菜单"
+            onClose={() => setStep(0)}
+          >
+            <Text>下一步</Text>
+          </BottomSheet>
+        </>
+      );
+    }
+    const host = await render(
+      <PaneContext.Provider
+        value={
+          scope === 'global'
+            ? null
+            : {
+                width: 360,
+                height: 800,
+                visible: true,
+                twoPane: true,
+              }
+        }
+      >
+        <Text>列表和详情</Text>
+        <Sheets />
+      </PaneContext.Provider>,
+    );
+    const overlays = () =>
+      host.container.queryAll((node) => node.type === 'RNSFullWindowOverlay');
+    expect(overlays()).toHaveLength(1);
+    expect(overlays()[0]).toHaveProp('accessibilityContainerViewIsModal', true);
+    expect(
+      host.container.queryAll((node) => node.type === 'RCTModalHostView'),
+    ).toHaveLength(0);
+    expect(host.getByText('1200:true')).toBeOnTheScreen();
+    if (scope === 'global') {
+      await act(() =>
+        useSettingsStore.setState({ largeScreenLayoutMode: 'single' }),
+      );
+      expect(overlays()).toHaveLength(1);
+      await act(() =>
+        useSettingsStore.setState({ largeScreenLayoutMode: 'dual' }),
+      );
+    }
+    await fireEvent.press(host.getByLabelText('关闭'));
+    expect(closed).not.toHaveBeenCalled();
+    await act(() => mockFinishAnimation(true));
+    expect(closed).toHaveBeenCalledTimes(1);
+    expect(host.queryByText('第一个菜单')).toBeNull();
+    expect(host.getByText('第二个菜单')).toBeOnTheScreen();
+    expect(overlays()).toHaveLength(1);
+    await fireEvent.press(host.getByLabelText('关闭'));
+    await act(() => mockFinishAnimation(true));
+    expect(overlays()).toHaveLength(0);
+    expect(host.getByText('列表和详情')).toBeOnTheScreen();
+  },
+);
 
 test('a new selection replaces the previous reader until another selection is made', async () => {
   const first = {};
@@ -197,10 +329,13 @@ test('a hidden pane suspends its dialog and restores its scroll position without
   expect(onClose).not.toHaveBeenCalled();
 });
 
-test('a hidden pane suspends and reopens its bottom sheet without requesting dismissal', async () => {
+test('a hidden pane removes its iOS sheet from the window without requesting dismissal', async () => {
+  jest.replaceProperty(Platform, 'OS', 'ios');
   const onClose = jest.fn();
   const view = (visible: boolean) => (
-    <PaneContext.Provider value={{ width: 360, height: 800, visible }}>
+    <PaneContext.Provider
+      value={{ width: 360, height: 800, visible, twoPane: true }}
+    >
       <BottomSheet visible title="菜单" onClose={onClose}>
         <DimensionsProbe />
       </BottomSheet>
@@ -210,10 +345,77 @@ test('a hidden pane suspends and reopens its bottom sheet without requesting dis
   expect(host.getByText('1200:true')).toBeTruthy();
   await host.rerender(view(false));
   expect(host.queryByText('菜单')).toBeNull();
+  expect(
+    host.container.queryAll((node) => node.type === 'RNSFullWindowOverlay'),
+  ).toHaveLength(0);
   await host.rerender(view(true));
   expect(host.getByText('菜单')).toBeTruthy();
   expect(host.getByText('1200:true')).toBeTruthy();
   expect(onClose).not.toHaveBeenCalled();
+});
+
+test('iOS completes a requested sheet dismissal once even when navigation hides the pane during its animation', async () => {
+  jest.replaceProperty(Platform, 'OS', 'ios');
+  const afterClose = jest.fn();
+  const view = (visible: boolean) => (
+    <PaneContext.Provider
+      value={{ width: 360, height: 800, twoPane: true, visible }}
+    >
+      <BottomSheet visible title="菜单" onClose={afterClose}>
+        <DimensionsProbe />
+      </BottomSheet>
+    </PaneContext.Provider>
+  );
+  const host = await render(view(true));
+  await fireEvent.press(host.getByLabelText('关闭'));
+  await host.rerender(view(false));
+  expect(afterClose).not.toHaveBeenCalled();
+  expect(host.queryByText('菜单')).toBeNull();
+  await act(() => mockFinishAnimation(true));
+  expect(afterClose).toHaveBeenCalledTimes(1);
+  await host.rerender(view(true));
+  expect(host.queryByText('菜单')).toBeNull();
+  expect(afterClose).toHaveBeenCalledTimes(1);
+});
+
+test('resizing an open sheet preserves it and reopening still plays its entrance', async () => {
+  const onClose = jest.fn();
+  const view = (visible: boolean) => (
+    <BottomSheet visible={visible} title="菜单" onClose={onClose}>
+      <Text>内容</Text>
+    </BottomSheet>
+  );
+  const host = await render(view(true));
+  jest.mocked(withSpring).mockClear();
+  mockWindowHeight = 550;
+  await host.rerender(view(true));
+  expect(withSpring).not.toHaveBeenCalled();
+  expect(host.getByText('内容')).toBeOnTheScreen();
+
+  await host.rerender(view(false));
+  await act(() => mockFinishAnimation(true));
+  await host.rerender(view(true));
+  expect(withSpring).toHaveBeenCalledTimes(1);
+  expect(host.getByText('内容')).toBeOnTheScreen();
+});
+
+test('iOS finishes a sheet dismissal once when the window resizes during its exit', async () => {
+  jest.replaceProperty(Platform, 'OS', 'ios');
+  useSettingsStore.setState({ largeScreenLayoutMode: 'dual' });
+  const onClose = jest.fn();
+  const view = () => (
+    <BottomSheet visible title="菜单" onClose={onClose}>
+      <Text>内容</Text>
+    </BottomSheet>
+  );
+  const host = await render(view());
+  await fireEvent.press(host.getByLabelText('关闭'));
+  mockWindowHeight = 550;
+  await host.rerender(view());
+  expect(onClose).not.toHaveBeenCalled();
+  await act(() => mockFinishAnimation(true));
+  expect(onClose).toHaveBeenCalledTimes(1);
+  expect(host.queryByText('菜单')).toBeNull();
 });
 
 test.each([
@@ -343,6 +545,8 @@ test.each(['ios', 'android'] as const)(
   async (platform) => {
     const previousPlatform = Platform.OS;
     Platform.OS = platform;
+    if (platform === 'android')
+      useSettingsStore.setState({ largeScreenLayoutMode: 'dual' });
     const onClose = jest.fn();
     try {
       const host = await render(

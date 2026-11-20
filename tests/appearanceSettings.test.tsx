@@ -393,6 +393,15 @@ test('selects a quieter unread badge style', async () => {
   expect(useSettingsStore.getState().unreadBadgeStyle).toBe('hidden');
 });
 
+test('switches between manual and automatic image loading from reading settings', async () => {
+  const host = await render(<AppearanceSettings />);
+  const toggle = host.getByLabelText('无图模式');
+  await fireEvent(toggle, 'valueChange', true);
+  expect(useSettingsStore.getState().imageLoadingMode).toBe('manual');
+  await fireEvent(toggle, 'valueChange', false);
+  expect(useSettingsStore.getState().imageLoadingMode).toBe('auto');
+});
+
 test('switches off the answer segment menu from reading settings', async () => {
   const host = await render(<AppearanceSettings />);
   await fireEvent(

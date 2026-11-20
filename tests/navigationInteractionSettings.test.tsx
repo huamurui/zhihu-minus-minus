@@ -30,18 +30,19 @@ beforeEach(() => {
   useSettingsStore.getState().resetSettings();
 });
 
-test('the single pane switch applies both changes immediately', async () => {
+test('layout mode starts automatic and applies each manual choice', async () => {
   const host = await render(<NavigationInteractionSettings />);
-  expect(host.getByText('双栏布局（试验性）')).toBeVisible();
-  expect(host.getByLabelText('启用双栏布局')).toHaveProp('value', false);
-
-  await fireEvent(host.getByLabelText('启用双栏布局'), 'valueChange', true);
-  expect(useSettingsStore.getState().enableLargeScreenLayout).toBe(true);
-  expect(host.getByLabelText('启用双栏布局')).toHaveProp('value', true);
-
-  await fireEvent(host.getByLabelText('启用双栏布局'), 'valueChange', false);
-  expect(useSettingsStore.getState().enableLargeScreenLayout).toBe(false);
-  expect(host.getByLabelText('启用双栏布局')).toHaveProp('value', false);
+  expect(host.getByRole('radio', { name: '自动' })).toBeChecked();
+  for (const [label, mode] of [
+    ['单栏', 'single'],
+    ['双栏', 'dual'],
+    ['自动', 'auto'],
+  ] as const) {
+    const option = host.getByRole('radio', { name: label });
+    await fireEvent.press(option);
+    expect(option).toBeChecked();
+    expect(useSettingsStore.getState().largeScreenLayoutMode).toBe(mode);
+  }
 });
 
 test('iOS liquid glass switch toggles useNativeIOSBottomTabs under dedicated material section', async () => {

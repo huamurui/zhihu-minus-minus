@@ -10,6 +10,7 @@ import ZhihuDOMContent, {
 
 let mockWebViewProps: WebViewProps;
 let mockRemoveImageWatermark = true;
+let mockImageLoadingMode: 'auto' | 'manual' = 'auto';
 const mockInjectJavaScript = jest.fn<void, [string]>();
 jest.mock('react-native-webview', () => {
   const { forwardRef, useImperativeHandle } =
@@ -40,12 +41,14 @@ jest.mock('../../../store/useSettingsStore', () => ({
     fontSizeScale: 1,
     lineHeightScale: 1.5,
     removeImageWatermark: mockRemoveImageWatermark,
+    imageLoadingMode: mockImageLoadingMode,
   }),
 }));
 
 beforeEach(() => {
   mockInjectJavaScript.mockClear();
   mockRemoveImageWatermark = true;
+  mockImageLoadingMode = 'auto';
 });
 
 async function renderPage(overrides: Partial<ZhihuDOMContentProps> = {}) {
@@ -493,6 +496,7 @@ test('renders URL-only footnotes once and treats untrusted metadata as text', as
 function selectionRuntime(
   html: string,
   renderMathInElement?: (container: Element) => void,
+  beforeLoad?: (document: Document) => void,
 ) {
   const dom = new JSDOM('<div id="content"></div>', {
     runScripts: 'outside-only',
@@ -514,6 +518,7 @@ function selectionRuntime(
     },
     clearTimeout: () => {},
   });
+  beforeLoad?.(document);
   vm.runInContext(inlineScript(html), dom.getInternalVMContext());
   function select(
     start: Node,
@@ -533,6 +538,65 @@ function selectionRuntime(
   }
   return { document, select, postMessage, close: () => window.close() };
 }
+
+test('manual WebView images are inert before insertion and load individually on tap', async () => {
+  mockImageLoadingMode = 'manual';
+  const first = 'https://example.com/actual.png';
+  const { html } = await renderPage({
+    variant: 'daily',
+    htmlContent: `<p><picture><source srcset="https://example.com/big.png 2x"><img alt="第一张" src="https://example.com/thumb.png" srcset="https://example.com/large.png 2x" data-actualsrc="${first}" data-rawwidth="640" data-rawheight="480"></picture></p><img data-original-src="https://example.com/other.png"><img class="avatar" src="https://example.com/avatar.png"><img eeimg="1" src="https://example.com/math.png">`,
+  });
+  const insertedSources: string[] = [];
+  const { document, postMessage, close } = selectionRuntime(
+    html,
+    undefined,
+    (doc) => {
+      const container = doc.getElementById('content');
+      if (!container) throw new Error('Missing content');
+      const append = container.appendChild.bind(container);
+      jest.spyOn(container, 'appendChild').mockImplementation((child) => {
+        if (child.nodeType === child.DOCUMENT_FRAGMENT_NODE) {
+          for (const img of (child as DocumentFragment).querySelectorAll(
+            'img[src], [srcset]',
+          )) {
+            insertedSources.push(
+              img.getAttribute('src') ?? img.getAttribute('srcset') ?? '',
+            );
+          }
+        }
+        return append(child);
+      });
+    },
+  );
+  try {
+    expect(insertedSources).toEqual([
+      'https://example.com/avatar.png',
+      'https://example.com/math.png',
+    ]);
+    expect(document.querySelectorAll('button')).toHaveLength(2);
+    const button = document.querySelector('button');
+    if (!button) throw new Error('Missing load button');
+    button.click();
+    expect(
+      document.querySelector('img[alt="第一张"]')?.getAttribute('src'),
+    ).toBe(first);
+    expect(document.querySelectorAll('button')).toHaveLength(1);
+    expect(document.querySelector('[srcset]')).toBeNull();
+    document.querySelector('button')?.click();
+    expect(
+      document.querySelector('img[src="https://example.com/other.png"]'),
+    ).not.toBeNull();
+    expect(postMessage).not.toHaveBeenCalledWith(
+      bridgeMessage(html, { type: 'image', src: first }),
+    );
+    document.querySelector<HTMLImageElement>('img[alt="第一张"]')?.click();
+    expect(postMessage).toHaveBeenCalledWith(
+      bridgeMessage(html, { type: 'image', src: first }),
+    );
+  } finally {
+    close();
+  }
+});
 
 test('maps styled and element boundaries to the original UTF-16 text within and across paragraphs', async () => {
   const { html } = await renderPage({
