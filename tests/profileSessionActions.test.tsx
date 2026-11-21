@@ -39,6 +39,20 @@ const mockAuthState = {
   logout: jest.fn(),
 };
 jest.mock('@expo/vector-icons/Ionicons', () => () => null);
+jest.mock('react-native-reanimated', () => {
+  const native = jest.requireActual('react-native');
+  return {
+    __esModule: true,
+    default: native.Animated,
+    useSharedValue: (value: unknown) => ({ value }),
+    useDerivedValue: (read: () => unknown) => ({ value: read() }),
+    useAnimatedStyle: (read: () => unknown) => read(),
+    useAnimatedScrollHandler: (handle: unknown) => handle,
+    useReducedMotion: () => false,
+    interpolate: () => 1,
+    Extrapolation: { CLAMP: 'clamp' },
+  };
+});
 jest.mock('../src/store/useAuthStore', () => ({
   getAuthSessionVersion: () => mockSession,
   useAuthStore: Object.assign(() => mockAuthState, {
@@ -68,7 +82,10 @@ jest.mock('@preeternal/react-native-cookie-manager', () => ({
   __esModule: true,
   default: { clearAllStores: () => mockClearCookies() },
 }));
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: mockPush }),
+  useIsFocused: () => true,
+}));
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));

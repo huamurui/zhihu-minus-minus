@@ -30,9 +30,13 @@ import { ImpactFeedbackStyle, impactAsync } from '@/utils/haptics';
 
 interface ProfileScreenProps {
   isActive?: boolean;
+  pagerSettled?: boolean;
 }
 
-export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
+export default function ProfileScreen({
+  isActive = true,
+  pagerSettled = true,
+}: ProfileScreenProps) {
   const colorScheme = useColorScheme();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -292,6 +296,7 @@ export default function ProfileScreen({ isActive = true }: ProfileScreenProps) {
   return (
     <>
       <MyProfileScrollView
+        cutoutEnabled={isActive && pagerSettled && !accountModalVisible}
         name={me?.name || (cookies ? '我的' : '点击登录')}
         avatarUri={me?.avatar_url}
         coverUrl={cookies && me ? member?.cover_url : undefined}

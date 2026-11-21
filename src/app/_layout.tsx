@@ -20,6 +20,7 @@ import { CollectionToastOverlay } from '@/components/CollectionToastOverlay';
 import { DoubleTapActionSheet } from '@/components/DoubleTapActionSheet';
 import { GradientMaskOverlay } from '@/components/GradientMaskOverlay';
 import { ScreenOverlayHost } from '@/components/overlays/ScreenOverlay';
+import { ProfileAvatarBridgeOverlay } from '@/components/profile/ProfileAvatarBridge';
 import { useRuntimeThemeColors } from '@/components/Themed';
 import { UpdateChecker } from '@/components/UpdateChecker';
 import { VerificationModal } from '@/components/VerificationModal';
@@ -329,6 +330,7 @@ function RootLayout() {
 
               {/* 全局状态栏和底部安全区渐变模糊遮罩 */}
               <GradientMaskOverlay isDark={isDark} />
+              <ProfileAvatarBridgeOverlay />
 
               {/* 全局状态栏控制 */}
               <StatusBar style={isDark ? 'light' : 'dark'} />
