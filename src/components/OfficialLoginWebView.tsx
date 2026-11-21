@@ -85,7 +85,13 @@ export function OfficialLoginWebView({
           }
         }}
         onNavigationStateChange={({ url, loading: pageLoading }) => {
-          if (mounted.current && !pageLoading && isZhihuHomepage(url)) {
+          // Android mobile sign-in may leave the homepage before it finishes.
+          const checkOnStart = Platform.OS === 'android' && mode === 'mobile';
+          if (
+            mounted.current &&
+            (!pageLoading || checkOnStart) &&
+            isZhihuHomepage(url)
+          ) {
             onLoginRedirect();
           }
         }}

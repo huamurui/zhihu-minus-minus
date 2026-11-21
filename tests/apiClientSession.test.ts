@@ -16,7 +16,7 @@ import {
   touchAnswerRead,
   touchAnswersRead,
 } from '../src/api/zhihu/lastRead';
-import type { ZhihuMeInfo } from '../src/api/zhihu/me';
+import { getMe, type ZhihuMeInfo } from '../src/api/zhihu/me';
 import {
   getAuthSessionVersion,
   saveAuthState,
@@ -557,6 +557,22 @@ test('a new login cannot write its response cookies into a saved account', () =>
   expect(state.accounts[0].cookies).toBe(COOKIE_A);
   useAuthStore.getState().addAccount(COOKIE_B, PROFILE_B);
   expect(useAuthStore.getState().accounts).toHaveLength(2);
+});
+
+test('background profile identification preserves the pending login and its profile request', async () => {
+  useAuthStore.getState().setCookies(COOKIE_B);
+  const loginSessionVersion = getAuthSessionVersion();
+  apiClient.defaults.adapter = async (config) => {
+    // The profile tab gets the same member before the login screen's response.
+    useAuthStore.getState().addAccount(COOKIE_B, PROFILE_B);
+    return response(config, PROFILE_B);
+  };
+  await expect(getMe()).resolves.toEqual(PROFILE_B);
+  expect(getAuthSessionVersion()).toBe(loginSessionVersion);
+  expect(useAuthStore.getState()).toMatchObject({
+    activeAccountIndex: 1,
+    accounts: [{ me: PROFILE_A }, { me: PROFILE_B }],
+  });
 });
 
 test('logging out an unverified new session preserves and restores saved accounts', () => {

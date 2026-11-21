@@ -17,6 +17,9 @@ const mockRouter = {
   canGoBack: jest.fn(() => true),
 };
 let mockSessionVersion = 0;
+const signedInCookies = {
+  z_c0: { name: 'z_c0', value: 'synthetic-session' },
+};
 const mockAuthState = {
   cookies: null as string | null,
   setCookies: jest.fn<void, [string]>(),
@@ -99,9 +102,7 @@ beforeEach(() => {
     mockAuthState.cookies = cookies;
     mockSessionVersion += 1;
   });
-  mockCookieGet.mockResolvedValue({
-    z_c0: { name: 'z_c0', value: 'synthetic-session' },
-  });
+  mockCookieGet.mockReset().mockResolvedValue(signedInCookies);
   mockGetMe.mockResolvedValue({ id: 'synthetic-member', name: '合成账号' });
   // A failed native synchronization may have cleared its cookie jar. Retry
   // must persist the captured in-memory session without reading that jar again.
@@ -362,4 +363,132 @@ test('QR sign-in finishes on the official homepage using only native cookies', a
   expect(mockAuthState.setCookies).toHaveBeenCalledTimes(1);
   expect(mockSaveAuthState).toHaveBeenCalledTimes(1);
   await host.unmount();
+});
+
+describe('Android mobile login redirects', () => {
+  const originalPlatform = Platform.OS;
+  const homepage = { url: 'https://www.zhihu.com/', loading: true };
+
+  beforeEach(() => {
+    Platform.OS = 'android';
+    jest.useFakeTimers();
+    mockSaveAuthState.mockReset().mockResolvedValue(true);
+  });
+
+  afterEach(() => {
+    Platform.OS = originalPlatform;
+    jest.useRealTimers();
+  });
+
+  test('captures on homepage navigation even if another page finishes the redirect', async () => {
+    const read = Promise.withResolvers<unknown>();
+    mockCookieGet.mockReturnValueOnce(read.promise);
+    const host = await render(<LoginScreen />);
+    const web = host.getByTestId('login-webview');
+    await fireEvent(web, 'navigationStateChange', homepage);
+    expect(mockCookieGet).toHaveBeenCalledTimes(1);
+    expect(mockRouter.back).not.toHaveBeenCalled();
+
+    await fireEvent(web, 'load', {
+      nativeEvent: { url: 'https://www.zhihu.com/follow', loading: false },
+    });
+    await act(() => read.resolve(signedInCookies));
+    expect(mockSaveAuthState).toHaveBeenCalledTimes(1);
+    expect(mockRouter.back).toHaveBeenCalledTimes(1);
+    await host.unmount();
+  });
+
+  test('retries an empty native store after the final homepage event', async () => {
+    mockCookieGet.mockResolvedValueOnce({});
+    const host = await render(<LoginScreen />);
+    await fireEvent(host.getByTestId('login-webview'), 'load', {
+      nativeEvent: homepage,
+    });
+    expect(mockCookieGet).toHaveBeenCalledTimes(1);
+    expect(mockRouter.back).not.toHaveBeenCalled();
+    await act(() => jest.advanceTimersByTimeAsync(60_000));
+    expect(mockAuthState.setCookies).toHaveBeenCalledTimes(1);
+    expect(mockSaveAuthState).toHaveBeenCalledTimes(1);
+    expect(mockRouter.back).toHaveBeenCalledTimes(1);
+    await host.unmount();
+  });
+
+  test('overlapping homepage notifications complete a single login', async () => {
+    const read = Promise.withResolvers<unknown>();
+    mockCookieGet.mockReturnValueOnce(read.promise);
+    const host = await render(<LoginScreen />);
+    const web = host.getByTestId('login-webview');
+    await fireEvent(web, 'navigationStateChange', homepage);
+    expect(mockCookieGet).toHaveBeenCalledTimes(1);
+    await fireEvent(web, 'load', { nativeEvent: homepage });
+    await fireEvent(web, 'navigationStateChange', {
+      ...homepage,
+      loading: false,
+    });
+    await act(() => read.resolve(signedInCookies));
+    await act(() => jest.advanceTimersByTimeAsync(60_000));
+    expect(mockCookieGet).toHaveBeenCalledTimes(1);
+    expect(mockAuthState.setCookies).toHaveBeenCalledTimes(1);
+    expect(mockSaveAuthState).toHaveBeenCalledTimes(1);
+    expect(mockRouter.back).toHaveBeenCalledTimes(1);
+    await host.unmount();
+  });
+
+  test('stops retrying if the native session never appears', async () => {
+    mockCookieGet.mockResolvedValue({});
+    const host = await render(<LoginScreen />);
+    await fireEvent(
+      host.getByTestId('login-webview'),
+      'navigationStateChange',
+      homepage,
+    );
+    await act(() => jest.advanceTimersByTimeAsync(60_000));
+    const reads = mockCookieGet.mock.calls.length;
+    expect(reads).toBeGreaterThan(1);
+    await act(() => jest.advanceTimersByTimeAsync(60_000));
+    expect(mockCookieGet).toHaveBeenCalledTimes(reads);
+    expect(mockAuthState.setCookies).not.toHaveBeenCalled();
+    expect(mockSaveAuthState).not.toHaveBeenCalled();
+    expect(mockRouter.back).not.toHaveBeenCalled();
+    await host.unmount();
+  });
+
+  test.each(['cancel', 'switch mode', 'change account', 'unmount'] as const)(
+    '%s stops pending cookie retries',
+    async (action) => {
+      mockCookieGet.mockResolvedValueOnce({});
+      const host = await render(<LoginScreen />);
+      await fireEvent(
+        host.getByTestId('login-webview'),
+        'navigationStateChange',
+        homepage,
+      );
+      expect(mockCookieGet).toHaveBeenCalledTimes(1);
+      switch (action) {
+        case 'cancel':
+          await fireEvent.press(host.getByText('取消'));
+          break;
+        case 'switch mode':
+          await fireEvent.press(host.getByText('扫码登录'));
+          expect(host.getByTestId('login-webview').props.contentMode).toBe(
+            'desktop',
+          );
+          break;
+        case 'change account':
+          mockSessionVersion += 1;
+          break;
+        case 'unmount':
+          await host.unmount();
+          break;
+      }
+      await act(() => jest.advanceTimersByTimeAsync(60_000));
+      expect(mockCookieGet).toHaveBeenCalledTimes(1);
+      expect(mockAuthState.setCookies).not.toHaveBeenCalled();
+      expect(mockSaveAuthState).not.toHaveBeenCalled();
+      expect(mockRouter.back).toHaveBeenCalledTimes(
+        action === 'cancel' ? 1 : 0,
+      );
+      if (action !== 'unmount') await host.unmount();
+    },
+  );
 });

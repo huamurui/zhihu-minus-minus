@@ -252,8 +252,17 @@ export const useAuthStore = create<AuthState>()(
 
       addAccount: (cookies, me) => {
         assertAuthStateReady();
-        advanceAuthSession();
-        const { accounts } = get();
+        const current = get();
+        // setCookies already selected this session. The profile tab may finish
+        // identifying it before the login screen's own request or native sync.
+        if (
+          cookies !== current.cookies ||
+          current.activeAccountIndex !== -1 ||
+          current.me !== null
+        ) {
+          advanceAuthSession();
+        }
+        const { accounts } = current;
         // 优先使用不可变的 id，后退到 url_token 或 name
         const id = me?.id || me?.url_token || me?.name;
         const existingIndex = accounts.findIndex(

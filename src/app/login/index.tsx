@@ -1,4 +1,3 @@
-import CookieManager from '@preeternal/react-native-cookie-manager';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -12,6 +11,7 @@ import {
 import { Text, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
+import { useLoginCookieCapture } from '@/hooks/useLoginCookieCapture';
 import {
   getAuthSessionVersion,
   saveAuthState,
@@ -107,7 +107,7 @@ export default function LoginScreen() {
     }
   };
 
-  const captureLogin = async () => {
+  const acceptLoginCookies = async (cookieString: string) => {
     if (
       abandonedRef.current ||
       capturingSessionRef.current ||
@@ -116,59 +116,44 @@ export default function LoginScreen() {
       return;
     capturingSessionRef.current = true;
     setCapturing(true);
-    const capturingVersion = getAuthSessionVersion();
     try {
-      // Read the official site's cookies, including HttpOnly, from the WebView's
-      // native store. The login page never needs to send credentials over JS.
-      const cookies = await CookieManager.get('https://www.zhihu.com', true);
-
-      if (abandonedRef.current || getAuthSessionVersion() !== capturingVersion)
+      useAuthStore.getState().setCookies(cookieString);
+      const loginSessionVersion = getAuthSessionVersion();
+      // Native writes are serialized and stop when this session changes.
+      try {
+        await syncNativeSessionCookies(cookieString);
+      } catch {
+        console.warn('⚠️ 无法同步原生登录会话');
+      }
+      if (
+        abandonedRef.current ||
+        getAuthSessionVersion() !== loginSessionVersion
+      )
         return;
 
-      if (cookies?.z_c0?.value) {
-        const cookieString = Object.values(cookies)
-          .map(({ name, value }) => `${name}=${value}`)
-          .join('; ');
-        useAuthStore.getState().setCookies(cookieString);
-        const loginSessionVersion = getAuthSessionVersion();
-        // Native writes are serialized and stop when this session changes.
-        try {
-          await syncNativeSessionCookies(cookieString);
-        } catch {
-          console.warn('⚠️ 无法同步原生登录会话');
-        }
+      try {
+        const me = await getMe();
         if (
           abandonedRef.current ||
           getAuthSessionVersion() !== loginSessionVersion
         )
           return;
-
-        // 🟢 预抓取用户信息，确保账号列表立即完整
-        try {
-          const me = await getMe();
-          if (
-            abandonedRef.current ||
-            getAuthSessionVersion() !== loginSessionVersion
-          )
-            return;
-          if (me) {
-            const authState = useAuthStore.getState();
-            authState.addAccount(authState.cookies || cookieString, me);
-          }
-        } catch {
-          if (
-            abandonedRef.current ||
-            getAuthSessionVersion() !== loginSessionVersion
-          )
-            return;
-          console.error('⚠️ 预抓取用户信息失败（不影响登录）');
+        if (me) {
+          const authState = useAuthStore.getState();
+          authState.addAccount(authState.cookies || cookieString, me);
         }
-
-        await persistAndFinishLogin(getAuthSessionVersion());
+      } catch {
+        if (
+          abandonedRef.current ||
+          getAuthSessionVersion() !== loginSessionVersion
+        )
+          return;
+        console.error('⚠️ 预抓取用户信息失败（不影响登录）');
       }
+
+      await persistAndFinishLogin(getAuthSessionVersion());
     } catch {
       if (!abandonedRef.current) {
-        console.error('❌ 获取 Cookie 失败');
         showToast('登录状态未更新，请先恢复已保存账号或稍后重试');
       }
     } finally {
@@ -176,6 +161,8 @@ export default function LoginScreen() {
       if (!abandonedRef.current) setCapturing(false);
     }
   };
+
+  const cookieCapture = useLoginCookieCapture(acceptLoginCookies);
 
   return (
     <View className="flex-1">
@@ -195,6 +182,7 @@ export default function LoginScreen() {
           className="p-2 rounded-full"
           onPress={() => {
             abandonedRef.current = true;
+            cookieCapture.cancel();
             if (router.canGoBack()) {
               router.back();
             } else {
@@ -212,6 +200,7 @@ export default function LoginScreen() {
           disabled={capturing || saveFailedVersion !== null}
           onPress={() => {
             if (!capturingSessionRef.current) {
+              cookieCapture.cancel();
               setLoginMode(loginMode === 'mobile' ? 'qr' : 'mobile');
             }
           }}
@@ -231,7 +220,15 @@ export default function LoginScreen() {
       <OfficialLoginWebView
         key={loginMode}
         mode={loginMode}
-        onLoginRedirect={captureLogin}
+        onLoginRedirect={() => {
+          if (
+            !abandonedRef.current &&
+            !capturingSessionRef.current &&
+            saveFailedVersion === null
+          ) {
+            cookieCapture.start();
+          }
+        }}
       />
     </View>
   );
