@@ -102,6 +102,9 @@ jest.mock('../src/components/CollectionToastOverlay', () => ({
 jest.mock('../src/components/DoubleTapActionSheet', () => ({
   DoubleTapActionSheet: () => null,
 }));
+jest.mock('../src/components/profile/ProfileAvatarBridge', () => ({
+  ProfileAvatarBridgeOverlay: () => null,
+}));
 jest.mock('../src/components/GradientMaskOverlay', () => ({
   GradientMaskOverlay: () => null,
 }));

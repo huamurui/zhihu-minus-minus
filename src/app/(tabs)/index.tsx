@@ -259,6 +259,7 @@ export default function HomeScreen() {
   const navigationBorderColor = useThemeColor({}, 'contentBorder');
   const indicatorBgColor = useThemeColor({}, 'primary_26');
   const [currentPage, setCurrentPage] = useState(initialPageIndex);
+  const [pagerSettled, setPagerSettled] = useState(true);
   const bottomActiveIndex =
     currentTabs[currentPage] === 'profile'
       ? (homeTabsCount > 0 ? 1 : 0) + (currentTabs.includes('publish') ? 1 : 0)
@@ -516,6 +517,9 @@ export default function HomeScreen() {
           initialPage={initialPageIndex}
           scrollEnabled={!recentMomentsInteracting}
           onPageScroll={pageScrollHandler}
+          onPageScrollStateChanged={(event) =>
+            setPagerSettled(event.nativeEvent.pageScrollState === 'idle')
+          }
           onPageSelected={(e) => {
             showChrome();
             setCurrentPage(e.nativeEvent.position);
@@ -550,7 +554,10 @@ export default function HomeScreen() {
                 ) : tab === 'publish' ? (
                   <PublishScreen />
                 ) : tab === 'profile' ? (
-                  <ProfileScreen isActive={isFocused && currentPage === idx} />
+                  <ProfileScreen
+                    isActive={isFocused && currentPage === idx}
+                    pagerSettled={pagerSettled}
+                  />
                 ) : (
                   <FeedList
                     ref={(element) => {
