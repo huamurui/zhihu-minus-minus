@@ -24,7 +24,10 @@ import {
 } from '@/api/zhihu';
 import { getAllContentCollectionStatus } from '@/api/zhihu/collection';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
-import { ActionIconCount } from '@/components/ActionIconCount';
+import {
+  ACTION_ICON_COUNT_BUTTON,
+  ActionIconCount,
+} from '@/components/ActionIconCount';
 import { AnswerEndorsements } from '@/components/AnswerEndorsements';
 import { AnswerLoadingPlaceholder } from '@/components/AnswerLoadingPlaceholder';
 import { BouncyButton } from '@/components/BouncyButton';
@@ -823,12 +826,7 @@ export const AnswerDetailView = ({
                   : undefined
               }
               disabled={!answer}
-              style={{
-                width: 44,
-                height: 44,
-                paddingHorizontal: 0,
-                paddingVertical: 0,
-              }}
+              style={ACTION_ICON_COUNT_BUTTON}
               onPress={() => router.push(`/comments/${id}?type=answer`)}
             >
               <ActionIconCount

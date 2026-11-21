@@ -7,7 +7,10 @@ import {
   withTiming,
 } from 'react-native-reanimated';
 import type { ZhihuPreviewAnswerMetadata } from '@/api/zhihu/nextRender';
-import { ActionIconCount } from '@/components/ActionIconCount';
+import {
+  ACTION_ICON_COUNT_BUTTON,
+  ActionIconCount,
+} from '@/components/ActionIconCount';
 import { CollectionButton } from '@/components/CollectionButton';
 import { CommentBubbleIcon } from '@/components/CommentBubbleIcon';
 import {
@@ -155,12 +158,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'transparent',
   },
-  action: {
-    width: 44,
-    height: 44,
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-  },
+  action: ACTION_ICON_COUNT_BUTTON,
   collapseInline: {
     width: 44,
     height: 44,
