@@ -64,8 +64,10 @@ import {
 } from '@/hooks/useAnswerDetailRead';
 import { useDoubleTapAction } from '@/hooks/useDoubleTapAction';
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
+import { useProgressiveTailInteraction } from '@/hooks/useProgressiveTailInteraction';
 import { useReadingContentMeasurement } from '@/hooks/useReadingContentMeasurement';
 import { useReadingProgress } from '@/hooks/useReadingProgress';
+import { useRichContentReadiness } from '@/hooks/useRichContentReadiness';
 import { getAuthSessionVersion, useAuthStore } from '@/store/useAuthStore';
 import { useCollectionStore } from '@/store/useCollectionStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
@@ -243,25 +245,18 @@ export const AnswerDetailView = ({
       shouldRenderBody,
     ],
   );
-  const [readyLayoutSource, setReadyLayoutSource] = React.useState<
-    typeof contentLayoutSource | null
-  >(null);
-  const latestLayoutSource = useRef(contentLayoutSource);
-  React.useLayoutEffect(() => {
-    latestLayoutSource.current = contentLayoutSource;
-  }, [contentLayoutSource]);
-  const handleContentLayoutReady = React.useCallback(() => {
-    if (latestLayoutSource.current === contentLayoutSource)
-      setReadyLayoutSource(contentLayoutSource);
-  }, [contentLayoutSource]);
+  const layout = useRichContentReadiness(contentLayoutSource);
+  const tail = useProgressiveTailInteraction(id);
+  const hasBody = shouldRenderBody && Boolean(answer);
   const contentLayoutReady =
-    shouldRenderBody &&
-    Boolean(answer) &&
-    (!waitForNativeLayout || readyLayoutSource === contentLayoutSource);
+    hasBody && (!waitForNativeLayout || layout.complete);
+  const contentReadable = hasBody && (!waitForNativeLayout || layout.readable);
+  const showContentFooter =
+    !answer?.content || !waitForNativeLayout || layout.complete;
   useAnswerDetailRead(
     id,
     answer?.question?.id != null ? String(answer.question.id) : questionId,
-    isFocused && contentLayoutReady,
+    isFocused && contentReadable,
     readSession,
   );
 
@@ -521,6 +516,7 @@ export const AnswerDetailView = ({
         <RawView collapsable={false} style={{ flex: 1 }}>
           <Reanimated.ScrollView
             ref={scrollViewRef}
+            {...tail.scrollInteractionHandlers}
             innerViewRef={
               // RN forwards a nullable React ref, but its public prop type omits null.
               contentViewRef as React.RefObject<NativeView>
@@ -699,7 +695,7 @@ export const AnswerDetailView = ({
                   enabled={isFocused && Boolean(answer)}
                   voteCount={answer?.voteup_count}
                 />
-                <InitialContentReveal key={id} ready={contentLayoutReady}>
+                <InitialContentReveal key={id} ready={contentReadable}>
                   <ZhihuContent
                     selectable={isFocused}
                     suppressDoubleTapSelection={isDoubleTapEnabled}
@@ -710,10 +706,15 @@ export const AnswerDetailView = ({
                     type="answer"
                     onRefresh={refetch}
                     renderPlaceholder={renderContentPlaceholder}
-                    onLayoutReady={handleContentLayoutReady}
+                    progressive
+                    canExpandProgressiveTail={tail.canExpandProgressiveTail}
+                    pauseProgressiveTail={!isFocused}
+                    onFirstContentLayout={layout.onFirstContentLayout}
+                    onLayoutReady={layout.onLayoutReady}
                   />
                 </InitialContentReveal>
-                {isGuest &&
+                {showContentFooter &&
+                isGuest &&
                 (answer?.content_need_truncated ||
                   answer?.answer_type?.toUpperCase() === 'PAID' ||
                   answer?.paid_info != null) ? (
@@ -730,35 +731,37 @@ export const AnswerDetailView = ({
                   </View>
                 ) : null}
                 {/* Meta info */}
-                <View
-                  style={{
-                    marginTop: 20,
-                    paddingTop: 12,
-                  }}
-                  className="bg-transparent"
-                >
-                  <Text
+                {showContentFooter && (
+                  <View
                     style={{
-                      fontSize: 12,
-                      color: Colors[colorScheme].textSecondary,
-                      opacity: 0.65,
+                      marginTop: 20,
+                      paddingTop: 12,
                     }}
+                    className="bg-transparent"
                   >
-                    {[
-                      answer?.created_time
-                        ? `发布于 ${formatDate(answer.created_time)}`
-                        : answer?.created_time_name
-                          ? `发布于 ${answer.created_time_name}`
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: Colors[colorScheme].textSecondary,
+                        opacity: 0.65,
+                      }}
+                    >
+                      {[
+                        answer?.created_time
+                          ? `发布于 ${formatDate(answer.created_time)}`
+                          : answer?.created_time_name
+                            ? `发布于 ${answer.created_time_name}`
+                            : null,
+                        answer?.updated_time
+                          ? `编辑于 ${formatDate(answer.updated_time)}`
                           : null,
-                      answer?.updated_time
-                        ? `编辑于 ${formatDate(answer.updated_time)}`
-                        : null,
-                      answer?.ip_info ? answer.ip_info : null,
-                    ]
-                      .filter(Boolean)
-                      .join('  ·  ')}
-                  </Text>
-                </View>
+                        answer?.ip_info ? answer.ip_info : null,
+                      ]
+                        .filter(Boolean)
+                        .join('  ·  ')}
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
           </Reanimated.ScrollView>

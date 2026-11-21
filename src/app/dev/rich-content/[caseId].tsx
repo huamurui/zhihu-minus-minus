@@ -19,6 +19,7 @@ import {
   ZhihuStructuredContent,
 } from '@/features/rich-content';
 import { getRichContentDevFixture } from '@/features/rich-content/dev/fixtures';
+import { useProgressiveTailInteraction } from '@/hooks/useProgressiveTailInteraction';
 import { useSettingsStore } from '@/store/useSettingsStore';
 
 export default function RichContentFixtureDetailScreen() {
@@ -42,6 +43,8 @@ export default function RichContentFixtureDetailScreen() {
   const [renderer, setRenderer] = useState<RichContentRenderer>(
     () => richContentRenderer,
   );
+  const mountKey = `${caseId}:${renderer}:${mountIndex}`;
+  const tail = useProgressiveTailInteraction(mountKey);
 
   const fixture = useMemo(
     () => (caseId ? getRichContentDevFixture(caseId) : null),
@@ -84,6 +87,7 @@ export default function RichContentFixtureDetailScreen() {
       <Stack.Screen options={{ title: '案例详情' }} />
       <ScrollView
         ref={scrollViewRef}
+        {...tail.scrollInteractionHandlers}
         contentContainerStyle={{ paddingBottom: insets.bottom + 36 }}
       >
         <RNView style={styles.header}>
@@ -205,7 +209,7 @@ export default function RichContentFixtureDetailScreen() {
         >
           {fixture.structuredContent ? (
             <ZhihuStructuredContent
-              key={`${fixture.id}:${rendererLabel}:${mountIndex}`}
+              key={mountKey}
               content={fixture.structuredContent}
               documentId={`fixture:${fixture.id}`}
               renderer={renderer === 'webview' ? 'blocks' : 'native-v2'}
@@ -213,13 +217,15 @@ export default function RichContentFixtureDetailScreen() {
             />
           ) : (
             <ZhihuContent
-              key={`${fixture.id}:${rendererLabel}:${mountIndex}`}
+              key={mountKey}
               content={fixture.content}
               contentArray={fixture.contentArray}
               segmentInfos={fixture.segmentInfos}
               linkCardInfo={fixture.linkCardInfo}
               objectId={fixture.objectId}
               type={fixture.rendererType}
+              progressive
+              canExpandProgressiveTail={tail.canExpandProgressiveTail}
               renderer={renderer}
               selectable={interactionsEnabled}
               variant={fixture.variant}

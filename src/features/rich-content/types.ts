@@ -40,7 +40,15 @@ export interface ZhihuContentProps {
   renderer?: RichContentRenderer;
   /** Keep a preview visible or describe the current native layout wait. */
   renderPlaceholder?: (phase: RichContentLoadingPhase) => ReactNode;
-  /** Native V2 has measured its current text layout and can reveal the body. */
+  /** Allow long detail bodies to reveal a measured prefix before the full layout. */
+  progressive?: boolean;
+  /** Unfocused neighboring answers can prepare their first batch and defer the rest. */
+  pauseProgressiveTail?: boolean;
+  /** Read immediately before each tail batch. Hosts stop expanding after the first reader interaction. */
+  canExpandProgressiveTail?: () => boolean;
+  /** The first batch is visible and usable. */
+  onFirstContentLayout?: () => void;
+  /** All blocks of the current body have completed initial layout. */
   onLayoutReady?: () => void;
   /** Exact inner width already known by the host; native layout still verifies it. */
   initialContentWidth?: number;

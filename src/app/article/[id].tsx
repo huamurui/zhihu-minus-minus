@@ -1,14 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { type RefObject, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -18,6 +11,7 @@ import {
   View as RawView,
   type ScrollViewInstance,
   StyleSheet,
+  type ViewInstance,
 } from 'react-native';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -58,11 +52,19 @@ import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
+import { usePaneDimensions } from '@/features/adaptive-layout/PaneContext';
 import { TitleTransitionTarget } from '@/features/adaptive-layout/TitleTransition';
-import { RICH_CONTENT_STALE_TIME, ZhihuContent } from '@/features/rich-content';
+import {
+  isRichTextNativeAvailable,
+  RICH_CONTENT_STALE_TIME,
+  ZhihuContent,
+} from '@/features/rich-content';
 import { useDoubleTapAction } from '@/hooks/useDoubleTapAction';
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
+import { useProgressiveTailInteraction } from '@/hooks/useProgressiveTailInteraction';
+import { useReadingContentMeasurement } from '@/hooks/useReadingContentMeasurement';
 import { useReadingProgress } from '@/hooks/useReadingProgress';
+import { useRichContentReadiness } from '@/hooks/useRichContentReadiness';
 import { getAuthSessionVersion, useAuthStore } from '@/store/useAuthStore';
 import { useCollectionStore } from '@/store/useCollectionStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
@@ -111,6 +113,7 @@ export default function ArticleDetail() {
 
   const scrollY = useRef(new Animated.Value(0)).current;
   const scrollViewRef = useRef<ScrollViewInstance>(null);
+  const contentViewRef = useRef<ViewInstance>(null);
 
   // 1. 获取日报详情
   const {
@@ -153,36 +156,46 @@ export default function ArticleDetail() {
   const authorAvatarUrl = author?.avatar_url;
 
   const articleContent = isDaily ? dailyData?.body : zhihuData?.content;
+  const { width, fontScale } = usePaneDimensions();
+  const fontSizeScale = useSettingsStore((state) => state.fontSizeScale);
+  const lineHeightScale = useSettingsStore((state) => state.lineHeightScale);
+  const renderer = useSettingsStore((state) => state.richContentRenderer);
+  const nativeGeometry = useMemo(
+    () =>
+      renderer === 'native-v2' && isRichTextNativeAvailable()
+        ? { width, fontScale, fontSizeScale, lineHeightScale }
+        : null,
+    [renderer, width, fontScale, fontSizeScale, lineHeightScale],
+  );
   const contentLayoutSource = useMemo(
     () => ({
       id: String(id ?? ''),
       isDaily,
       content: articleContent ?? '',
+      nativeGeometry,
     }),
-    [id, isDaily, articleContent],
+    [id, isDaily, articleContent, nativeGeometry],
   );
-  const [readyLayoutSource, setReadyLayoutSource] = useState<
-    typeof contentLayoutSource | null
-  >(null);
-  const latestLayoutSource = useRef(contentLayoutSource);
-  useLayoutEffect(() => {
-    latestLayoutSource.current = contentLayoutSource;
-  }, [contentLayoutSource]);
-
-  const handleContentLayoutReady = useCallback(() => {
-    if (latestLayoutSource.current === contentLayoutSource) {
-      setReadyLayoutSource(contentLayoutSource);
-    }
-  }, [contentLayoutSource]);
-
-  const contentLayoutReady =
-    Boolean(articleContent) && readyLayoutSource === contentLayoutSource;
+  const layout = useRichContentReadiness(contentLayoutSource);
+  const tail = useProgressiveTailInteraction(contentIdentity);
+  const contentLayoutReady = Boolean(articleContent) && layout.complete;
+  const showContentFooter =
+    !articleContent || !nativeGeometry || layout.complete;
 
   const readingProgress = useReadingProgress({
     contentKey: `${isDaily ? 'daily' : 'article'}:${String(id ?? '')}`,
     enabled: Boolean(id),
     ready: contentLayoutReady,
+    layoutSource: nativeGeometry ? contentLayoutSource : undefined,
     scrollRef: scrollViewRef,
+  });
+
+  const handleContentSizeChange = useReadingContentMeasurement({
+    enabled: Boolean(id && nativeGeometry),
+    ready: contentLayoutReady,
+    contentRef: contentViewRef,
+    beginMeasurement: readingProgress.beginContentMeasurement,
+    onContentSizeChange: readingProgress.onContentSizeChange,
   });
 
   const enableBrowseHistory = useSettingsStore((s) => s.enableBrowseHistory);
@@ -431,11 +444,15 @@ export default function ArticleDetail() {
         <RawView collapsable={false} style={{ flex: 1 }}>
           <Animated.ScrollView
             ref={scrollViewRef}
+            {...tail.scrollInteractionHandlers}
+            // RN forwards a nullable ref, but its public prop type omits null.
+            innerViewRef={contentViewRef as RefObject<ViewInstance>}
             className="flex-1"
             style={{
               backgroundColor: Colors[colorScheme].backgroundSecondary,
             }}
             scrollEventThrottle={16}
+            showsVerticalScrollIndicator={showContentFooter}
             onScroll={Animated.event(
               [{ nativeEvent: { contentOffset: { y: scrollY } } }],
               {
@@ -445,7 +462,7 @@ export default function ArticleDetail() {
               },
             )}
             onLayout={readingProgress.onLayout}
-            onContentSizeChange={readingProgress.onContentSizeChange}
+            onContentSizeChange={handleContentSizeChange}
             onScrollEndDrag={readingProgress.commitProgress}
             onMomentumScrollEnd={readingProgress.commitProgress}
             contentContainerStyle={{
@@ -534,20 +551,26 @@ export default function ArticleDetail() {
               {!isDaily && (
                 <AnswerEndorsements endorsements={zhihuData?.endorsements} />
               )}
-              <InitialContentReveal key={String(id)} ready={contentLayoutReady}>
+              <InitialContentReveal
+                key={String(id)}
+                ready={Boolean(articleContent) && layout.readable}
+              >
                 <ZhihuContent
                   suppressDoubleTapSelection={isDoubleTapEnabled}
                   content={articleContent}
                   objectId={id as string}
                   type="article"
                   variant={isDaily ? 'daily' : 'default'}
-                  onLayoutReady={handleContentLayoutReady}
+                  progressive
+                  canExpandProgressiveTail={tail.canExpandProgressiveTail}
+                  onFirstContentLayout={layout.onFirstContentLayout}
+                  onLayoutReady={layout.onLayoutReady}
                 />
               </InitialContentReveal>
             </View>
 
             {/* Column Card section */}
-            {!isDaily && columnCard && (
+            {showContentFooter && !isDaily && columnCard && (
               <View className="px-5 mt-8 mb-4 bg-transparent">
                 <Text className="text-sm font-bold mb-3">收录于专栏</Text>
                 <BouncyButton
@@ -588,7 +611,7 @@ export default function ArticleDetail() {
             )}
 
             {/* Publish time and copyright notice for standard articles */}
-            {!isDaily && zhihuData?.created && (
+            {showContentFooter && !isDaily && zhihuData?.created && (
               <View className="px-5">
                 <Text
                   type="secondary"

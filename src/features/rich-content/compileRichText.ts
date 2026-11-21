@@ -10,7 +10,6 @@ import type {
   RichTextAttachment,
   RichTextCompilation,
   RichTextDecoration,
-  RichTextDiagnostic,
   RichTextFlow,
   RichTextParagraph,
   RichTextPart,
@@ -90,8 +89,27 @@ export function compileZhihuDocument(
   document: ZhihuDocument,
   options: RichTextCompilationOptions,
 ): RichTextCompilation {
-  const parts: RichTextPart[] = [];
-  const diagnostics: RichTextDiagnostic[] = [];
+  return {
+    documentId: document.id,
+    parts: [...compileZhihuDocumentParts(document, options)],
+    diagnostics: [],
+  };
+}
+
+/** Yield complete selection buffers and independent blocks in reading order. */
+export function* compileZhihuDocumentParts(
+  document: ZhihuDocument,
+  options: RichTextCompilationOptions,
+): Generator<RichTextPart, void> {
+  const last = yield* compileZhihuDocumentCursor(document, options);
+  if (last) yield last;
+}
+
+/** The final part travels with done so a bounded batch can finish on that read. */
+export function* compileZhihuDocumentCursor(
+  document: ZhihuDocument,
+  options: RichTextCompilationOptions,
+): Generator<RichTextPart, RichTextPart | undefined> {
   const paragraphOffsets = new Map<string, number>();
   const fontSize =
     Number.isFinite(options.fontSize) && options.fontSize > 0
@@ -110,8 +128,18 @@ export function compileZhihuDocument(
   let builder = newBuilder();
   let segmentRanges: SegmentDecorationRange[] = [];
   let flowSerial = 0;
+  // Keep a standalone block until traversal finds the next paragraph/block, or
+  // reaches the end, including through empty containers and footnotes. This
+  // identifies a terminal block without compiling the text that follows it.
+  let pendingBlock: ZhihuBlock | undefined;
 
-  function flush(): void {
+  function takeBlock(block: ZhihuBlock): RichTextPart {
+    pendingBlock = undefined;
+    return { type: 'block', block };
+  }
+
+  function takeFlow(): RichTextPart | undefined {
+    let part: RichTextPart | undefined;
     if (builder.text.length) {
       const markers = segmentCommentMarkers(segmentRanges);
       builder.decorations = builder.decorations.map((decoration) =>
@@ -126,17 +154,18 @@ export function compileZhihuDocument(
         decorations: builder.decorations,
         attachments: builder.attachments,
       });
-      parts.push({
+      part = {
         type: 'flow',
         flow: {
           id: `${document.id}:flow:${++flowSerial}`,
           textVersion: contentVersion(identity),
           ...builder,
         },
-      });
+      };
     }
     builder = newBuilder();
     segmentRanges = [];
+    return part;
   }
 
   function append(
@@ -368,16 +397,21 @@ export function compileZhihuDocument(
     });
   }
 
-  function compileBlocks(
+  function* compileBlocks(
     blocks: readonly ZhihuBlock[],
     context: ParagraphContext = {},
     previousEmptyParagraph = false,
-  ): void {
+  ): Generator<RichTextPart, void> {
     for (const block of blocks) {
-      if (block.type === 'paragraph' || block.type === 'heading')
+      if (block.type === 'paragraph' || block.type === 'heading') {
+        if (pendingBlock && block.children.length)
+          yield takeBlock(pendingBlock);
         compileParagraph(block, context, previousEmptyParagraph);
-      else if (block.type === 'quote')
-        compileBlocks(block.blocks, {
+        // A childless paragraph can be metadata only, or carry a blank-line
+        // anchor or list/footnote marker. Only that second case starts a flow.
+        if (pendingBlock && builder.text.length) yield takeBlock(pendingBlock);
+      } else if (block.type === 'quote')
+        yield* compileBlocks(block.blocks, {
           kind: 'quote',
           indent: (context.indent ?? 0) + fontSize,
           prefix: context.prefix,
@@ -386,7 +420,8 @@ export function compileZhihuDocument(
         // A nested list can precede its parent's own prose. Give the pending
         // parent/footnote marker a semantic row instead of moving it after the
         // nested items or letting their markers overwrite it.
-        if (context.prefix && !context.prefix.consumed)
+        if (context.prefix && !context.prefix.consumed) {
+          if (pendingBlock) yield takeBlock(pendingBlock);
           compileParagraph(
             {
               id: `${block.id}:parent-marker`,
@@ -395,9 +430,10 @@ export function compileZhihuDocument(
             },
             context,
           );
-        block.items.forEach((item, index) => {
+        }
+        for (const [index, item] of block.items.entries()) {
           const precedingParagraph = builder.paragraphs.at(-1);
-          compileBlocks(item.blocks, {
+          yield* compileBlocks(item.blocks, {
             kind: 'listItem',
             indent: (context.indent ?? 0) + fontSize * 1.2,
             // Containers share this marker; media does not consume it, and
@@ -421,10 +457,12 @@ export function compileZhihuDocument(
               // geometry must not rewrite the preceding text's paragraph gap.
               marginBottom: RICH_CONTENT_LIST_ITEM_SPACING,
             };
-        });
+        }
       } else {
-        flush();
-        parts.push({ type: 'block', block });
+        if (pendingBlock) yield takeBlock(pendingBlock);
+        const flow = takeFlow();
+        if (flow) yield flow;
+        pendingBlock = block;
       }
       // Runs are local to sibling paragraphs: media, containers and prose
       // start a new run, including when they split the native text flow.
@@ -433,15 +471,14 @@ export function compileZhihuDocument(
     }
   }
 
-  compileBlocks(document.blocks, {}, options.continuesEmptyParagraph);
+  yield* compileBlocks(document.blocks, {}, options.continuesEmptyParagraph);
   if (document.footnotes?.length) {
     for (const definition of document.footnotes)
-      compileBlocks(definition.blocks, {
+      yield* compileBlocks(definition.blocks, {
         prefix: { text: `[${definition.label}] `, consumed: false },
       });
   }
-  flush();
-  return { documentId: document.id, parts, diagnostics };
+  return pendingBlock ? takeBlock(pendingBlock) : takeFlow();
 }
 
 function validSelection(

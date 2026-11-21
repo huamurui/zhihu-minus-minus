@@ -55,6 +55,7 @@ export function useReadingProgress({
   const [restoredOffset, setRestoredOffset] = useState<number | null>(null);
 
   const contentHeightRef = useRef(0);
+  const readyToSave = useRef(ready);
   const contentMeasuredWhileReadyRef = useRef(false);
   const viewportHeightRef = useRef(0);
   const offsetRef = useRef(0);
@@ -113,8 +114,14 @@ export function useReadingProgress({
     return unsubscribe;
   }, [progressEnabled]);
 
+  useLayoutEffect(() => {
+    // Keep the outgoing body's readiness through its cleanup when switching keys.
+    readyToSave.current = ready;
+  }, [ready]);
+
   const commitProgress = useCallback(() => {
-    if (!progressEnabled || !restoredRef.current) return;
+    if (!progressEnabled || !restoredRef.current || !readyToSave.current)
+      return;
 
     const result = calculateReadingProgress(
       offsetRef.current,

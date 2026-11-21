@@ -1,6 +1,6 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
 import type React from 'react';
-import { Alert } from 'react-native';
+import { Alert, type MeasureOnSuccessCallback } from 'react-native';
 import type {
   AnswerDetail,
   QuestionAnswersResponse,
@@ -96,6 +96,15 @@ const mockCollectionButton = jest.fn(
   (_props: React.ComponentProps<typeof CollectionButton>) => {},
 );
 const mockRichContent = jest.fn((_props: ZhihuContentProps) => {});
+const mockContentSizeChange = jest.fn();
+const mockCompleteContentMeasurement = jest.fn();
+const mockBeginContentMeasurement = jest.fn(
+  () => mockCompleteContentMeasurement,
+);
+const mockContentMeasure = jest.fn((callback: MeasureOnSuccessCallback) =>
+  callback(0, 0, 320, 4200, 0, 0),
+);
+const mockProgressSource = jest.fn((_options: { layoutSource?: object }) => {});
 const mockReveal = jest.fn((_props: { ready: boolean }) => {});
 let mockRichContentRenderer: 'native-v2' | 'webview' = 'webview';
 let mockNativeAvailable = false;
@@ -198,6 +207,40 @@ jest.mock('@shopify/flash-list', () => {
     useRecyclingState: (value: unknown) => react.useState(value),
   };
 });
+jest.mock(
+  'react-native/Libraries/Animated/components/AnimatedScrollView',
+  () => {
+    const react = jest.requireActual<typeof import('react')>('react');
+    const native =
+      jest.requireActual<typeof import('react-native')>('react-native');
+    return {
+      __esModule: true,
+      default: (props: {
+        innerViewRef?: React.Ref<{ measure: typeof mockContentMeasure }>;
+        onContentSizeChange?: (width: number, height: number) => void;
+        onScrollBeginDrag?: () => void;
+        showsVerticalScrollIndicator?: boolean;
+        children?: React.ReactNode;
+      }) => {
+        react.useImperativeHandle(
+          props.innerViewRef,
+          () => ({ measure: mockContentMeasure }),
+          [],
+        );
+        return react.createElement(
+          native.ScrollView,
+          {
+            testID: 'detail-scroll',
+            showsVerticalScrollIndicator: props.showsVerticalScrollIndicator,
+            onContentSizeChange: props.onContentSizeChange,
+            onScrollBeginDrag: props.onScrollBeginDrag,
+          },
+          props.children,
+        );
+      },
+    };
+  },
+);
 jest.mock('react-native-gesture-handler', () => {
   const native =
     jest.requireActual<typeof import('react-native')>('react-native');
@@ -400,7 +443,14 @@ jest.mock('../src/features/rich-content', () => ({
   },
 }));
 jest.mock('../src/hooks/useReadingProgress', () => ({
-  useReadingProgress: () => ({ restoredOffset: null }),
+  useReadingProgress: (options: { layoutSource?: object }) => {
+    mockProgressSource(options);
+    return {
+      restoredOffset: null,
+      beginContentMeasurement: mockBeginContentMeasurement,
+      onContentSizeChange: mockContentSizeChange,
+    };
+  },
 }));
 jest.mock('../src/hooks/useOptimisticToggle', () => ({
   useOptimisticToggle: (options: { queryKey?: readonly unknown[] }) => {
@@ -833,6 +883,95 @@ test('pin header and bottom more buttons open the same pin menu', async () => {
     expect(host.getByText('menu:pin:7')).toBeTruthy();
     await act(() => mockMenuProps.onClose());
   }
+});
+
+test.each([
+  { renderer: 'native-v2' as const, native: true },
+  { renderer: 'native-v2' as const, native: false },
+  { renderer: 'webview' as const, native: true },
+])(
+  'daily final-size-before-ready uses a fresh native measurement only with the native renderer ($renderer, native=$native)',
+  async ({ renderer, native }) => {
+    mockParams = { id: '7', source: 'daily' };
+    mockRichContentRenderer = renderer;
+    mockNativeAvailable = native;
+    const host = await render(<ArticleDetail />);
+    const currentBody = mockRichContent.mock.lastCall?.[0];
+    await act(() => currentBody?.onFirstContentLayout?.());
+    await fireEvent(
+      host.getByTestId('detail-scroll'),
+      'contentSizeChange',
+      320,
+      4200,
+    );
+    expect(mockContentSizeChange).toHaveBeenLastCalledWith(320, 4200);
+    expect(mockBeginContentMeasurement).not.toHaveBeenCalled();
+    await act(() => currentBody?.onLayoutReady?.());
+
+    if (renderer === 'native-v2' && native) {
+      expect(mockProgressSource.mock.lastCall?.[0].layoutSource).toEqual(
+        expect.objectContaining({ id: '7', isDaily: true }),
+      );
+      expect(mockContentMeasure).toHaveBeenCalledTimes(1);
+      expect(mockCompleteContentMeasurement).toHaveBeenCalledWith(320, 4200);
+    } else {
+      expect(
+        mockProgressSource.mock.lastCall?.[0].layoutSource,
+      ).toBeUndefined();
+      expect(mockContentMeasure).not.toHaveBeenCalled();
+    }
+  },
+);
+
+test('dragging limits the current article tail and a daily story starts untouched', async () => {
+  const host = await render(<ArticleDetail />);
+  const article = mockRichContent.mock.lastCall?.[0].canExpandProgressiveTail;
+  expect(article?.()).toBe(true);
+  await fireEvent(host.getByTestId('detail-scroll'), 'scrollBeginDrag');
+  expect(article?.()).toBe(false);
+
+  mockParams = { id: '7', source: 'daily' };
+  await host.rerender(<ArticleDetail />);
+  const daily = mockRichContent.mock.lastCall?.[0].canExpandProgressiveTail;
+  expect(daily?.()).toBe(true);
+  expect(article?.()).toBe(false);
+});
+
+test('reveals the article prefix and shows its footer only after the current body finishes', async () => {
+  mockRichContentRenderer = 'native-v2';
+  mockNativeAvailable = true;
+  mockQueryData['zhihu-article'] = {
+    ...(mockQueryData['zhihu-article'] as object),
+    created: 1,
+  };
+  const host = await render(<ArticleDetail />);
+  const oldBody = mockRichContent.mock.lastCall?.[0];
+  expect(oldBody?.progressive).toBe(true);
+  expect(mockReveal).toHaveBeenLastCalledWith(
+    expect.objectContaining({ ready: false }),
+  );
+  await act(() => oldBody?.onFirstContentLayout?.());
+  expect(mockReveal).toHaveBeenLastCalledWith(
+    expect.objectContaining({ ready: true }),
+  );
+  expect(host.queryByText(/发布于/)).toBeNull();
+
+  mockQueryData['zhihu-article'] = {
+    ...(mockQueryData['zhihu-article'] as object),
+    content: '<p>新的正文</p>',
+  };
+  await host.rerender(<ArticleDetail />);
+  const newBody = mockRichContent.mock.lastCall?.[0];
+  expect(host.queryByText(/发布于/)).toBeNull();
+  expect(host.getByTestId('detail-scroll')).toHaveProp(
+    'showsVerticalScrollIndicator',
+    false,
+  );
+  await act(() => newBody?.onFirstContentLayout?.());
+  await act(() => oldBody?.onLayoutReady?.());
+  expect(host.queryByText(/发布于/)).toBeNull();
+  await act(() => newBody?.onLayoutReady?.());
+  expect(host.getByText(/发布于/)).toBeOnTheScreen();
 });
 
 test('uses the selected daily body and leaves the cached article author out of sharing', async () => {
