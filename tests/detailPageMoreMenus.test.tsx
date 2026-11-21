@@ -218,6 +218,7 @@ jest.mock(
       default: (props: {
         innerViewRef?: React.Ref<{ measure: typeof mockContentMeasure }>;
         onContentSizeChange?: (width: number, height: number) => void;
+        onScrollBeginDrag?: () => void;
         showsVerticalScrollIndicator?: boolean;
         children?: React.ReactNode;
       }) => {
@@ -232,6 +233,7 @@ jest.mock(
             testID: 'detail-scroll',
             showsVerticalScrollIndicator: props.showsVerticalScrollIndicator,
             onContentSizeChange: props.onContentSizeChange,
+            onScrollBeginDrag: props.onScrollBeginDrag,
           },
           props.children,
         );
@@ -920,6 +922,20 @@ test.each([
     }
   },
 );
+
+test('dragging limits the current article tail and a daily story starts untouched', async () => {
+  const host = await render(<ArticleDetail />);
+  const article = mockRichContent.mock.lastCall?.[0].canExpandProgressiveTail;
+  expect(article?.()).toBe(true);
+  await fireEvent(host.getByTestId('detail-scroll'), 'scrollBeginDrag');
+  expect(article?.()).toBe(false);
+
+  mockParams = { id: '7', source: 'daily' };
+  await host.rerender(<ArticleDetail />);
+  const daily = mockRichContent.mock.lastCall?.[0].canExpandProgressiveTail;
+  expect(daily?.()).toBe(true);
+  expect(article?.()).toBe(false);
+});
 
 test('reveals the article prefix and shows its footer only after the current body finishes', async () => {
   mockRichContentRenderer = 'native-v2';

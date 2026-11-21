@@ -61,6 +61,7 @@ import {
 } from '@/features/rich-content';
 import { useDoubleTapAction } from '@/hooks/useDoubleTapAction';
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
+import { useProgressiveTailInteraction } from '@/hooks/useProgressiveTailInteraction';
 import { useReadingContentMeasurement } from '@/hooks/useReadingContentMeasurement';
 import { useReadingProgress } from '@/hooks/useReadingProgress';
 import { useRichContentReadiness } from '@/hooks/useRichContentReadiness';
@@ -176,6 +177,7 @@ export default function ArticleDetail() {
     [id, isDaily, articleContent, nativeGeometry],
   );
   const layout = useRichContentReadiness(contentLayoutSource);
+  const tail = useProgressiveTailInteraction(contentIdentity);
   const contentLayoutReady = Boolean(articleContent) && layout.complete;
   const showContentFooter =
     !articleContent || !nativeGeometry || layout.complete;
@@ -442,6 +444,7 @@ export default function ArticleDetail() {
         <RawView collapsable={false} style={{ flex: 1 }}>
           <Animated.ScrollView
             ref={scrollViewRef}
+            {...tail.scrollInteractionHandlers}
             // RN forwards a nullable ref, but its public prop type omits null.
             innerViewRef={contentViewRef as RefObject<ViewInstance>}
             className="flex-1"
@@ -559,6 +562,7 @@ export default function ArticleDetail() {
                   type="article"
                   variant={isDaily ? 'daily' : 'default'}
                   progressive
+                  canExpandProgressiveTail={tail.canExpandProgressiveTail}
                   onFirstContentLayout={layout.onFirstContentLayout}
                   onLayoutReady={layout.onLayoutReady}
                 />

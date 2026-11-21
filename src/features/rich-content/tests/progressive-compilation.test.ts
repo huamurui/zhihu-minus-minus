@@ -110,6 +110,100 @@ it('pauses at a nested block and resumes with the same source coordinates', () =
   expect(read.mock.calls).toEqual([['首🙂'], ['尾'], ['脚注']]);
 });
 
+it.each([
+  '<p>末段</p>',
+  '<p><span></span></p>',
+  '<p><a></a></p>',
+  '<section class="footnotes"><ol><li data-numero="1"><blockquote><ul><li><hr></li></ul></blockquote></li></ol></section>',
+])('finishes on the frame publishing the last part of %s', (ending) => {
+  const html = '<hr>'.repeat(17) + ending;
+  const normalized = normalizeZhihuDocument(html, { documentId: 'last' });
+  const document: ZhihuDocument = {
+    ...normalized.document,
+    blocks: [
+      ...normalized.document.blocks,
+      { id: 'empty-heading', type: 'heading', level: 2, children: [] },
+    ],
+    footnotes: [
+      ...(normalized.document.footnotes ?? []),
+      {
+        id: 'empty',
+        label: '2',
+        blocks: [{ id: 'empty-quote', type: 'quote', blocks: [] }],
+      },
+    ],
+  };
+  // A full viewport on each read makes the initial batch stop after one block.
+  // Force the tail budget to expire after one part too, including the final one.
+  const clock = jest.spyOn(performance, 'now');
+  let ms = 0;
+  clock.mockImplementation(() => (ms += 20));
+  try {
+    const compiled = prepareNativeParts(document, options, true, 0, false, {
+      width: 320,
+      height: 1,
+      fontScale: 1,
+    });
+    let batch = compiled.first;
+    while (!batch.done) {
+      const next = compiled.next(batch);
+      expect(next.count).toBeGreaterThan(batch.count);
+      batch = next;
+    }
+    expect(batch.groups.flat()).toEqual([
+      ...compileZhihuDocumentParts(document, options),
+    ]);
+  } finally {
+    clock.mockRestore();
+  }
+});
+
+it('preserves an empty heading alongside prose and the marker of an empty footnote paragraph', () => {
+  const divider = { id: 'divider', type: 'divider' } as const;
+  const { document } = normalizeZhihuDocument('<hr><p data-pid="p">正文</p>', {
+    documentId: 'empty-rows',
+  });
+  const parts = [
+    ...compileZhihuDocumentParts(
+      {
+        ...document,
+        blocks: [
+          document.blocks[0],
+          { id: 'empty-heading', type: 'heading', level: 3, children: [] },
+          document.blocks[1],
+          divider,
+        ],
+        footnotes: [
+          {
+            id: 'note',
+            label: '2',
+            blocks: [{ id: 'empty-note', type: 'paragraph', children: [] }],
+          },
+        ],
+      },
+      options,
+    ),
+  ];
+  expect(parts).toMatchObject([
+    { type: 'block' },
+    {
+      type: 'flow',
+      flow: {
+        text: '正文',
+        paragraphs: [
+          { nodeId: 'empty-heading', kind: 'heading', start: 0, end: 0 },
+          { paragraphId: 'p', start: 0, end: 2 },
+        ],
+      },
+    },
+    { type: 'block', block: divider },
+    {
+      type: 'flow',
+      flow: { text: '[2] ', paragraphs: [{ nodeId: 'empty-note' }] },
+    },
+  ]);
+});
+
 it('reuses a prepared batch when two frames resume the same committed prefix', () => {
   const { document } = normalizeZhihuDocument('<hr>'.repeat(24), {
     documentId: 'retried-frames',

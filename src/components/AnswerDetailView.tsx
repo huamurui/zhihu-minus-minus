@@ -64,6 +64,7 @@ import {
 } from '@/hooks/useAnswerDetailRead';
 import { useDoubleTapAction } from '@/hooks/useDoubleTapAction';
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
+import { useProgressiveTailInteraction } from '@/hooks/useProgressiveTailInteraction';
 import { useReadingContentMeasurement } from '@/hooks/useReadingContentMeasurement';
 import { useReadingProgress } from '@/hooks/useReadingProgress';
 import { useRichContentReadiness } from '@/hooks/useRichContentReadiness';
@@ -245,6 +246,7 @@ export const AnswerDetailView = ({
     ],
   );
   const layout = useRichContentReadiness(contentLayoutSource);
+  const tail = useProgressiveTailInteraction(id);
   const hasBody = shouldRenderBody && Boolean(answer);
   const contentLayoutReady =
     hasBody && (!waitForNativeLayout || layout.complete);
@@ -514,6 +516,7 @@ export const AnswerDetailView = ({
         <RawView collapsable={false} style={{ flex: 1 }}>
           <Reanimated.ScrollView
             ref={scrollViewRef}
+            {...tail.scrollInteractionHandlers}
             innerViewRef={
               // RN forwards a nullable React ref, but its public prop type omits null.
               contentViewRef as React.RefObject<NativeView>
@@ -704,6 +707,7 @@ export const AnswerDetailView = ({
                     onRefresh={refetch}
                     renderPlaceholder={renderContentPlaceholder}
                     progressive
+                    canExpandProgressiveTail={tail.canExpandProgressiveTail}
                     pauseProgressiveTail={!isFocused}
                     onFirstContentLayout={layout.onFirstContentLayout}
                     onLayoutReady={layout.onLayoutReady}

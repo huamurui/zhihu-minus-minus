@@ -338,6 +338,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
     renderPlaceholder,
     progressive,
     pauseProgressiveTail,
+    canExpandProgressiveTail,
     onFirstContentLayout,
     onLayoutReady,
     initialContentWidth,
@@ -790,6 +791,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
             renderPlaceholder={renderPlaceholder}
             progressive={progressive}
             pauseProgressiveTail={pauseProgressiveTail}
+            canExpandProgressiveTail={canExpandProgressiveTail}
             onFirstContentLayout={onFirstContentLayout}
             onLayoutReady={onLayoutReady}
             initialContentWidth={initialContentWidth}

@@ -1,6 +1,11 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { Suspense, startTransition, useState } from 'react';
-import { Dimensions, type LayoutChangeEvent, Text } from 'react-native';
+import {
+  Dimensions,
+  type LayoutChangeEvent,
+  Platform,
+  Text,
+} from 'react-native';
 import type {
   RichTextHeightEventData,
   RichTextNativeViewProps,
@@ -531,6 +536,59 @@ describe('Native V2 renderer staging transitions', () => {
       cancel.mockRestore();
     }
   });
+
+  it.each(['android', 'ios'] as const)(
+    'checks the reader interaction before a queued tail frame runs on %s',
+    async (os) => {
+      const platform = jest.replaceProperty(Platform, 'OS', os);
+      let queued: FrameRequestCallback | undefined;
+      const request = jest
+        .spyOn(globalThis, 'requestAnimationFrame')
+        .mockImplementation((cb) => {
+          queued = cb;
+          return 1;
+        });
+      let touched = false;
+      const advance = () =>
+        act(() => {
+          if (!queued) throw new Error('expected a tail frame');
+          const frame = queued;
+          queued = undefined;
+          // Exercise the part limit independently of test runner load.
+          const clock = jest.spyOn(performance, 'now').mockReturnValue(0);
+          try {
+            frame(0);
+          } finally {
+            clock.mockRestore();
+          }
+        });
+      try {
+        await render(
+          <ZhihuNativeContent
+            content={'<p>段落</p><hr>'.repeat(30)}
+            type="answer"
+            objectId="tail-interaction"
+            progressive
+            canExpandProgressiveTail={() => !touched}
+            renderFallback={() => null}
+          />,
+        );
+        await containerLayout(320);
+        const first = currentViews();
+        for (const view of first) await heightEvent(view);
+        await advance();
+        const beforeTouch = currentViews().length;
+        // Each pair contributes one independent text flow and one divider.
+        expect(beforeTouch - first.length).toBe(os === 'android' ? 6 : 3);
+        touched = true;
+        await advance();
+        expect(currentViews().length - beforeTouch).toBe(3);
+      } finally {
+        request.mockRestore();
+        platform.restore();
+      }
+    },
+  );
 
   it('reveals a long document before its tail, then resumes without remounting the visible text', async () => {
     const frames = new Map<number, FrameRequestCallback>();

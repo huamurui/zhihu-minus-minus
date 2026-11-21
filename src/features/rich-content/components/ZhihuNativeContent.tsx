@@ -152,6 +152,8 @@ export interface ZhihuNativeContentProps {
   progressive?: boolean;
   /** Keep an adjacent pager page warm without compiling its offscreen tail. */
   pauseProgressiveTail?: boolean;
+  /** Read immediately before each tail batch. Hosts stop expanding after the first reader interaction. */
+  canExpandProgressiveTail?: () => boolean;
   onFirstContentLayout?: () => void;
   onLayoutReady?: () => void;
   /** Exact inner width already known by the host, before the first onLayout. */
@@ -1303,6 +1305,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
   renderPlaceholder,
   progressive = false,
   pauseProgressiveTail = false,
+  canExpandProgressiveTail,
   onFirstContentLayout,
   onLayoutReady,
   initialContentWidth,
@@ -1621,13 +1624,25 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
         committed.current.batch !== batch
       )
         return;
-      setContinuation({ compiled, batch: compiled.next(batch) });
+      const allowLargerBatch =
+        Platform.OS === 'android' && canExpandProgressiveTail?.() === true;
+      setContinuation({
+        compiled,
+        batch: compiled.next(batch, allowLargerBatch),
+      });
     });
     return () => {
       active = false;
       cancelAnimationFrame(frame);
     };
-  }, [batch, compiled, geometry, initialLayoutReady, pauseProgressiveTail]);
+  }, [
+    batch,
+    compiled,
+    geometry,
+    initialLayoutReady,
+    pauseProgressiveTail,
+    canExpandProgressiveTail,
+  ]);
   // A known width hint can start native layout, but still needs confirmation
   // from this container. Content-only layouts don't wait for media downloads.
   const loadingPhase: RichContentLoadingPhase =

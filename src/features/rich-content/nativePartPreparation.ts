@@ -1,5 +1,5 @@
 import {
-  compileZhihuDocumentParts,
+  compileZhihuDocumentCursor,
   type RichTextCompilationOptions,
 } from './compileRichText';
 import type { ZhihuBlock, ZhihuDocument } from './document';
@@ -9,6 +9,7 @@ import type { RichTextPart } from './richText';
 
 const FIRST_BATCH_SIZE = 3;
 const NEXT_BATCH_SIZE = 6;
+const IDLE_BATCH_SIZE = 12;
 const FRAME_WORK_MS = 4;
 
 export interface NativePartBatch {
@@ -145,7 +146,7 @@ export function prepareNativeParts(
   resolveLocalUris: boolean,
   viewport: ViewportEstimate,
 ) {
-  const iterator = compileZhihuDocumentParts(document, options);
+  const iterator = compileZhihuDocumentCursor(document, options);
   const localUris = resolveLocalUris
     ? offlineAttachmentUris(document)
     : undefined;
@@ -159,8 +160,8 @@ export function prepareNativeParts(
     let estimated = 0;
     while (added.length < maxNewParts) {
       const item = iterator.next();
+      if (item.value) added.push(resolveLocalPart(item.value, localUris));
       if (item.done) return append(previous, added, true);
-      added.push(resolveLocalPart(item.value, localUris));
       if (budget && 'until' in budget && performance.now() >= budget.until)
         break;
       if (budget && 'viewport' in budget) {
@@ -179,12 +180,16 @@ export function prepareNativeParts(
   let prepared = first;
   return {
     first,
-    next(previous: NativePartBatch) {
+    next(previous: NativePartBatch, allowLargerBatch = false) {
       // A frame can retry the same committed prefix before React publishes its tail.
       if (previous === prepared && !prepared.done) {
-        prepared = read(previous, NEXT_BATCH_SIZE, {
-          until: performance.now() + FRAME_WORK_MS,
-        });
+        prepared = read(
+          previous,
+          allowLargerBatch ? IDLE_BATCH_SIZE : NEXT_BATCH_SIZE,
+          {
+            until: performance.now() + FRAME_WORK_MS,
+          },
+        );
       }
       return prepared;
     },

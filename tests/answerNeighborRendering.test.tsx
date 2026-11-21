@@ -92,6 +92,7 @@ let mockSessionVersion = 1;
 let mockCookies = 'z_c0=synthetic-session';
 let mockLayoutReady: () => void;
 let mockFirstContentLayout: () => void;
+let mockCanExpandProgressiveTail: () => boolean;
 const mockProgressiveBody = jest.fn(
   (_props: { progressive: boolean; pauseProgressiveTail: boolean }) => {},
 );
@@ -371,6 +372,7 @@ jest.mock('../src/features/rich-content', () => {
       selectable,
       onLayoutReady,
       onFirstContentLayout,
+      canExpandProgressiveTail,
       progressive,
       pauseProgressiveTail,
       renderPlaceholder,
@@ -379,12 +381,14 @@ jest.mock('../src/features/rich-content', () => {
       selectable: boolean;
       onLayoutReady: () => void;
       onFirstContentLayout: () => void;
+      canExpandProgressiveTail: () => boolean;
       progressive: boolean;
       pauseProgressiveTail: boolean;
       renderPlaceholder?: (phase: RichContentLoadingPhase) => ReactNode;
     }) => {
       mockLayoutReady = onLayoutReady;
       mockFirstContentLayout = onFirstContentLayout;
+      mockCanExpandProgressiveTail = canExpandProgressiveTail;
       mockProgressiveBody({ progressive, pauseProgressiveTail });
       react.useEffect(() => {
         mockBodyMount();
@@ -693,6 +697,18 @@ test('reports only the focused answer after its body layout is ready', async () 
     false,
     undefined,
   );
+});
+
+test('touching an answer keeps its tail batches small when focus returns', async () => {
+  const host = await renderAnswer({ isFocused: true });
+  const canExpand = mockCanExpandProgressiveTail;
+  expect(canExpand()).toBe(true);
+  await fireEvent(host.getByTestId('answer-body'), 'touchStartCapture');
+  expect(canExpand()).toBe(false);
+  await host.rerender(host.page(false, true));
+  await host.rerender(host.page(true, true));
+  expect(mockCanExpandProgressiveTail).toBe(canExpand);
+  expect(mockCanExpandProgressiveTail()).toBe(false);
 });
 
 test('a preloaded prefix becomes readable on focus while the footer, progress and scroll indicator wait for the full layout', async () => {
