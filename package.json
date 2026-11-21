@@ -1,7 +1,7 @@
 {
   "name": "zhihu--",
   "main": "expo-router/entry",
-  "version": "0.9.10",
+  "version": "0.10.0",
   "expo": {
     "autolinking": {
       "nativeModulesDir": "./modules"

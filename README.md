@@ -1,7 +1,7 @@
 # 🐱 知乎-- (Zhihu Minus Minus)
 
 [![CI](https://github.com/huamurui/zhihu-minus-minus/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/huamurui/zhihu-minus-minus/actions/workflows/ci.yml)
-[![版本](https://img.shields.io/badge/version-v0.9.10-blue)](./package.json)
+[![版本](https://img.shields.io/badge/version-v0.10.0-blue)](./package.json)
 ![平台](https://img.shields.io/badge/platform-Android%20%7C%20iOS-brightgreen)
 [![许可证](https://img.shields.io/badge/license-GPL--3.0-blue)](./LICENSE)
 
@@ -201,4 +201,4 @@ npm run check
 </a>
 
 ---
-**Version**: v0.9.10 | **Last Updated**: 2026-11-06
+**Version**: v0.10.0 | **Last Updated**: 2026-11-21
