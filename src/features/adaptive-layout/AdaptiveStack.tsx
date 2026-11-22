@@ -164,15 +164,20 @@ function AdaptiveStackContent({
   const predictiveBackEnabled = useSettingsStore(
     (settings) => settings.androidPredictiveBackEnabled,
   );
-  const [reduceMotion, setReduceMotion] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
   useEffect(() => {
     let mounted = true;
-    void AccessibilityInfo.isReduceMotionEnabled().then((value) => {
-      if (mounted) setReduceMotion(value);
-    });
     const subscription = AccessibilityInfo.addEventListener(
       'reduceMotionChanged',
       setReduceMotion,
+    );
+    void AccessibilityInfo.isReduceMotionEnabled().then(
+      (initial) => {
+        if (mounted) setReduceMotion((current) => current ?? initial);
+      },
+      () => {
+        // Wait for a preference event if the initial native read is unavailable.
+      },
     );
     return () => {
       mounted = false;
@@ -206,7 +211,7 @@ function AdaptiveStackContent({
     previousKey &&
     !enabled &&
     predictiveBackEnabled &&
-    !reduceMotion &&
+    reduceMotion === false &&
     !hasChildNavigator &&
     activeKey &&
     descriptors[activeKey]?.options.gestureEnabled !== false &&
@@ -269,7 +274,7 @@ function AdaptiveStackContent({
   const committed = usePredictiveBack(
     target,
     previousKey,
-    activeKey,
+    state.routes,
     pop,
     finishExit,
   );
@@ -396,7 +401,7 @@ function AdaptiveStackContent({
                   }
                   active={route.key === activeKey && !isList}
                   exiting={isExiting}
-                  reduceMotion={reduceMotion}
+                  reduceMotion={reduceMotion === true}
                   animateEntry={
                     Platform.OS !== 'android' || !transition.current.returning
                   }

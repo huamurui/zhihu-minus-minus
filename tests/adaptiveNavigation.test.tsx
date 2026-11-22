@@ -18,7 +18,13 @@ import {
   waitFor,
   within,
 } from 'expo-router/testing-library';
-import { type ReactNode, useContext, useEffect, useState } from 'react';
+import {
+  type ComponentProps,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
 import {
   AccessibilityInfo,
   Animated,
@@ -216,13 +222,20 @@ async function setTwoPanes(enabled: boolean) {
   );
 }
 
-async function open(initialUrl = '/', defaultHeaders = false) {
+async function open(
+  initialUrl = '/',
+  defaultHeaders = false,
+  routerOverride?: ComponentProps<typeof AdaptiveStack>['UNSTABLE_router'],
+) {
   return renderRouter(
     {
       _layout: {
         default: () => (
           <GestureHandlerRootView style={{ flex: 1 }}>
-            <AdaptiveStack screenOptions={{ headerShown: defaultHeaders }}>
+            <AdaptiveStack
+              screenOptions={{ headerShown: defaultHeaders }}
+              UNSTABLE_router={routerOverride}
+            >
               <AdaptiveStack.Screen name="(tabs)" options={{ title: '首页' }} />
               <AdaptiveStack.Screen
                 name="user/[id]/index"
@@ -829,6 +842,51 @@ test.each([
   },
 );
 
+test('an eligible deep link uses ordinary hardware Back until reduced motion is confirmed off', async () => {
+  const preference = Promise.withResolvers<boolean>();
+  jest
+    .spyOn(AccessibilityInfo, 'isReduceMotionEnabled')
+    .mockReturnValue(preference.promise);
+  const hardwareBack = jest.spyOn(BackHandler, 'addEventListener');
+  await setTwoPanes(false);
+  const result = await open('/answer/a');
+  const answer = appRoutes(result).at(-1);
+  await testRouter.push('/comments/a?type=answer');
+  expect(setPredictiveBackTarget).not.toHaveBeenCalled();
+  const handler = hardwareBack.mock.calls.find(
+    ([name]) => name === 'hardwareBackPress',
+  )?.[1];
+  await act(() => {
+    expect(handler?.({ type: 'hardwareBackPress', timeStamp: 1 })).toBe(true);
+  });
+  expect(result.getPathname()).toBe('/answer/a');
+  expect(setPredictiveBackTarget).not.toHaveBeenCalled();
+  await act(() => preference.resolve(false));
+  expect(setPredictiveBackTarget).toHaveBeenLastCalledWith(answer?.key);
+});
+
+test('a newer reduced-motion event takes priority over a pending initial read', async () => {
+  const preference = Promise.withResolvers<boolean>();
+  jest
+    .spyOn(AccessibilityInfo, 'isReduceMotionEnabled')
+    .mockReturnValue(preference.promise);
+  const subscriptions = jest.spyOn(AccessibilityInfo, 'addEventListener');
+  await setTwoPanes(false);
+  const result = await open('/answer/a');
+  const answer = appRoutes(result).at(-1);
+  const changes = subscriptions.mock.calls.filter(
+    ([name]) => name === 'reduceMotionChanged',
+  );
+  const change = (enabled: boolean) => {
+    for (const [, listener] of changes) listener(enabled);
+  };
+  await act(() => change(true));
+  await act(() => preference.resolve(false));
+  expect(setPredictiveBackTarget).not.toHaveBeenCalled();
+  await act(() => change(false));
+  expect(setPredictiveBackTarget).toHaveBeenLastCalledWith(answer?.key);
+});
+
 test('changing layout or disabling the setting cancels the preview before a late commit', async () => {
   await setTwoPanes(false);
   const result = await open('/answer/a');
@@ -856,7 +914,13 @@ test('a finish restores the native surface when a router guard kept the source a
   const pop = jest.fn();
   const finish = jest.fn();
   await renderHook(() =>
-    usePredictiveBack('editor', 'home', 'editor', pop, finish),
+    usePredictiveBack(
+      'editor',
+      'home',
+      [{ key: 'home' }, { key: 'editor' }],
+      pop,
+      finish,
+    ),
   );
   const gesture = currentGesture();
   await gesture('commit', 9);
@@ -866,6 +930,32 @@ test('a finish restores the native surface when a router guard kept the source a
   expect(finish).not.toHaveBeenCalled();
   await gesture('commit', 9);
   expect(pop).toHaveBeenCalledTimes(1);
+});
+
+test('a rejected pop restores the source even when a new route covers it before finish', async () => {
+  let guardedKey: string | undefined;
+  await setTwoPanes(false);
+  const result = await open('/answer/a', false, (original) => ({
+    getStateForAction(state, action, options) {
+      if (action.type === 'POP' && action.source === guardedKey)
+        return { state, affectedRouteKey: guardedKey };
+      return original.getStateForAction(state, action, options);
+    },
+  }));
+  guardedKey = appRoutes(result).at(-1)?.key;
+  const sourceGesture = currentGesture();
+  await sourceGesture('commit', 12);
+  expect(result.getPathname()).toBe('/answer/a');
+  await testRouter.push('/settings/appearance');
+  expect(appRoutes(result).some((route) => route.key === guardedKey)).toBe(
+    true,
+  );
+  await sourceGesture('finish', 12);
+  expect(releasePredictiveBackSurface).toHaveBeenCalledTimes(1);
+  expect(releasePredictiveBackSurface).toHaveBeenCalledWith(12);
+  expect(result.getPathname()).toBe('/settings/appearance');
+  await testRouter.back('/answer/a');
+  expect(screen.getByText('answer:a')).toBeVisible();
 });
 
 test('only a commit can navigate even if an older native event reaches the router', async () => {

@@ -18,7 +18,7 @@ type CommittedExit = {
 export function usePredictiveBack(
   target: string | undefined,
   destination: string | undefined,
-  activeKey: string | undefined,
+  routes: readonly { key: string }[],
   pop: (count: number, sourceKey: string) => void,
   finishExit: (routeKey: string) => void,
 ) {
@@ -62,12 +62,12 @@ export function usePredictiveBack(
 
   useLayoutEffect(() => {
     if (!committed?.finished) return;
-    // A guard may have blocked a pop after the native gesture began. Restore
-    // that route's pixels only after the router has rendered its actual result.
-    if (activeKey === committed.source)
+    // A blocked source still needs its pixels restored if another route
+    // covered it before the native exit finished.
+    if (routes.some((route) => route.key === committed.source))
       releasePredictiveBackSurface(committed.gestureId);
     else finishExit(committed.source);
     setCommitted(null);
-  }, [activeKey, committed, finishExit]);
+  }, [routes, committed, finishExit]);
   return committed;
 }

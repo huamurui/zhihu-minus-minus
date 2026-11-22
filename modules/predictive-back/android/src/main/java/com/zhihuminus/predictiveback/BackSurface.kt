@@ -13,7 +13,7 @@ import androidx.annotation.RequiresApi
 /** Owns only the dedicated Fabric host's visual properties for one gesture. */
 @RequiresApi(33)
 internal class BackSurface(
-  private val view: View,
+  val view: View,
   private val cornerRadii: FloatArray,
   fromRight: Boolean,
   followsFinger: Boolean,

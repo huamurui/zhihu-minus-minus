@@ -131,6 +131,8 @@ internal class BackWindow(
       it.isAttachedToWindow && it.width > 0 && it.height > 0 && it.isShown
     }
 
+  private fun isCommitted(view: View) = committed.values.any { it.view === view }
+
   @RequiresApi(34)
   fun edgeSwipeFor(view: BackSwipeHost): EdgeSwipe? {
     val key = target ?: return null
@@ -174,7 +176,7 @@ internal class BackWindow(
     val previewHome = allowHomePreview && routeKey == null && !hasBackHandler && Build.VERSION.SDK_INT >= 34
     callback = when {
       routeKey != null && Build.VERSION.SDK_INT >= 34 ->
-        PageGesture(routeKey, nextId, ::findSurface, ::readCornerRadii, ::commit, ::forwardToReact) { callback === it }.also {
+        PageGesture(routeKey, nextId, ::findSurface, ::isCommitted, ::readCornerRadii, ::commit, ::forwardToReact) { callback === it }.also {
           cancelGesture = it::release
         }
       // RN 0.88 installs its own hardwareBackPress callback starting on API 36.
@@ -204,6 +206,7 @@ private class PageGesture(
   private val routeKey: String,
   private val nextId: () -> Int,
   private val findSurface: (String) -> View?,
+  private val isCommitted: (View) -> Boolean,
   private val readCornerRadii: () -> FloatArray,
   private val commit: (String, Int, BackSurface) -> Unit,
   private val ordinaryBack: () -> Unit,
@@ -211,30 +214,32 @@ private class PageGesture(
 ) : OnBackAnimationCallback, EdgeSwipe {
   private var id: Int? = null
   private var surface: BackSurface? = null
-  private var committedSource: BackSurface? = null
+  private var ignoredSystemGesture = false
   private var appTracking = false
 
   override fun onBackStarted(event: BackEvent) {
-    if (!isCurrent(this) || committedSource?.attached == true) return
+    if (!isCurrent(this)) return
     release()
+    ignoredSystemGesture = false
     if (event.swipeEdge != BackEvent.EDGE_LEFT && event.swipeEdge != BackEvent.EDGE_RIGHT) return
     val view = findSurface(routeKey) ?: return
-    begin(view, event.swipeEdge == BackEvent.EDGE_RIGHT, false)
+    // Consume this sequence even if its previous commit releases the view before UP.
+    ignoredSystemGesture = !begin(view, event.swipeEdge == BackEvent.EDGE_RIGHT, false)
     surface?.applyProgress(event.progress)
   }
 
-  private fun begin(view: View, fromRight: Boolean, app: Boolean) {
-    committedSource = null
+  private fun begin(view: View, fromRight: Boolean, app: Boolean): Boolean {
+    if (isCommitted(view)) return false
     id = nextId()
     appTracking = app
     surface = BackSurface(view, readCornerRadii(), fromRight, followsFinger = app)
+    return true
   }
 
   override fun beginApp(view: BackSwipeHost, fromRight: Boolean): Boolean {
-    if (!isCurrent(this) || id != null || committedSource?.attached == true) return false
+    if (!isCurrent(this) || id != null) return false
     release()
-    begin(view, fromRight, true)
-    return true
+    return begin(view, fromRight, true)
   }
 
   override fun moveApp(progress: Float) {
@@ -252,6 +257,8 @@ private class PageGesture(
   }
 
   override fun onBackCancelled() {
+    if (!isCurrent(this)) return
+    ignoredSystemGesture = false
     if (!appTracking) cancelGesture()
   }
 
@@ -270,11 +277,15 @@ private class PageGesture(
   }
 
   override fun onBackInvoked() {
-    if (!isCurrent(this) || committedSource?.attached == true) return
+    if (!isCurrent(this)) return
+    if (ignoredSystemGesture) {
+      ignoredSystemGesture = false
+      return
+    }
     // Three-button navigation and accessibility actions can invoke without a gesture.
     if (surface?.attached != true || id == null || appTracking) {
       release()
-      ordinaryBack()
+      if (findSurface(routeKey)?.let(isCommitted) != true) ordinaryBack()
       return
     }
     commitGesture()
@@ -283,7 +294,6 @@ private class PageGesture(
   private fun commitGesture() {
     val source = surface ?: return
     val gestureId = id ?: return
-    committedSource = source
     appTracking = false
     surface = null
     id = null

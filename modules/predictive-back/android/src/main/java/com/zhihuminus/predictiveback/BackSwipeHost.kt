@@ -3,6 +3,7 @@ package com.zhihuminus.predictiveback
 import android.content.Context
 import android.os.Build
 import android.os.SystemClock
+import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.VelocityTracker
 import android.view.ViewConfiguration
@@ -72,6 +73,7 @@ class BackSwipeHost(context: Context, appContext: AppContext) : ExpoView(context
 
   @RequiresApi(34)
   private fun prepare(event: MotionEvent) {
+    if (event.isFromSource(InputDevice.SOURCE_MOUSE) || event.getToolType(0) == MotionEvent.TOOL_TYPE_MOUSE) return
     if (!hasWindowFocus() || accessibility?.isTouchExplorationEnabled == true) return
     if ((findFocus() as? TextView)?.hasSelection() == true) return
     val insets = rootWindowInsets?.getInsets(WindowInsets.Type.systemGestures()) ?: return
