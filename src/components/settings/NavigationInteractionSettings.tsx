@@ -26,6 +26,7 @@ export function NavigationInteractionSettings() {
   const previewBackground = useThemeColor({}, 'primary_26');
   const {
     androidFeedbackType,
+    androidPredictiveBackEnabled,
     defaultTab,
     enableHapticFeedback,
     largeScreenLayoutMode,
@@ -83,6 +84,28 @@ export function NavigationInteractionSettings() {
             : ' 切换时保留当前页面状态。'}
         </Text>
       </Section>
+
+      {Platform.OS === 'android' && Platform.Version >= 34 ? (
+        <Section title="返回手势" colorScheme={colorScheme}>
+          <SettingItem
+            label="预测性返回"
+            icon="arrow-back-outline"
+            colorScheme={colorScheme}
+          >
+            <ThemedSwitch
+              accessibilityLabel="预测性返回"
+              accessibilityHint="单栏浏览时，从屏幕边缘滑动可预览上一页"
+              value={androidPredictiveBackEnabled}
+              onValueChange={(value) =>
+                updateSettings({ androidPredictiveBackEnabled: value })
+              }
+            />
+          </SettingItem>
+          <Text type="secondary" style={styles.feedbackHint}>
+            单栏浏览时，从屏幕边缘向内滑动可预览上一页，滑回边缘可取消。关闭后或使用双栏时照常返回。
+          </Text>
+        </Section>
+      ) : null}
 
       {Platform.OS === 'ios' ? (
         <Section title="界面材质" colorScheme={colorScheme}>

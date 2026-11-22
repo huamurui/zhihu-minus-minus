@@ -26,7 +26,7 @@
         "backgroundImage": "./src/assets/images/android-icon-background.png",
         "monochromeImage": "./src/assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false,
+      "predictiveBackGestureEnabled": true,
       "package": "com.huamu013.ZhihuMinusMinus",
       "permissions": ["REQUEST_INSTALL_PACKAGES"],
       "intentFilters": [

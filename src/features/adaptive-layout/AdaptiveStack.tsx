@@ -45,6 +45,11 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import Reanimated, {
+  cancelAnimation,
+  useAnimatedStyle,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassNavigationButton } from '@/components/navigation/GlassNavigationButton';
 import { useIsLiquidGlassActive } from '@/components/surfaces/FloatingSurface';
@@ -65,6 +70,12 @@ import {
   useTitleTransitionActiveForRoute,
 } from './TitleTransition';
 import { PaneSelectionContext } from './usePaneRouter';
+import {
+  getPredictiveBackStyle,
+  PREDICTIVE_BACK_EXIT_MS,
+  type PredictiveBackPreview,
+  usePredictiveBack,
+} from './usePredictiveBack';
 
 type StackEvents = {
   [K in keyof NativeStackNavigationEventMap]: NativeStackNavigationEventMap[K] & {
@@ -80,11 +91,13 @@ type ContentProps = NavigatorContentProps<
     navigatorKey: string;
     isPreloaded: (key: string) => boolean;
     isRemovalPrevented: (key: string) => boolean;
+    hasChildNavigator: boolean;
     pop: (count: number, sourceRouteKey: string) => void;
   }
 >;
 
 type RetainedRoute = {
+  predictiveExit?: PredictiveBackPreview;
   route: ContentProps['state']['routes'][number];
   descriptor: ContentProps['descriptors'][string];
   index: number;
@@ -129,6 +142,9 @@ function AdaptiveStackContent({
   actions,
   dispatchNavigation,
   navigatorKey,
+  isRemovalPrevented,
+  hasChildNavigator,
+  pop,
   enabled,
   dimensions,
 }: ContentProps & {
@@ -137,6 +153,24 @@ function AdaptiveStackContent({
 }) {
   const colors = useRuntimeThemeColors();
   const savedRatio = useSettingsStore((s) => s.largeScreenListRatio);
+  const predictiveBackEnabled = useSettingsStore(
+    (settings) => settings.androidPredictiveBackEnabled,
+  );
+  const [reduceMotion, setReduceMotion] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then((value) => {
+      if (mounted) setReduceMotion(value);
+    });
+    const subscription = AccessibilityInfo.addEventListener(
+      'reduceMotionChanged',
+      setReduceMotion,
+    );
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
+  }, []);
   const [ratio, setRatio] = useState(savedRatio);
   const [measurement, setMeasurement] = useState<{
     width: number;
@@ -154,7 +188,22 @@ function AdaptiveStackContent({
   const width = size?.width ?? dimensions.width;
   const height = size?.height ?? dimensions.height;
   const panes = getVisiblePanes(state.routes, state.index, enabled);
-  const activeKey = state.routes[state.index]?.key;
+  const activeRoute = state.routes[state.index];
+  const activeKey = activeRoute?.key;
+  const previousKey = state.routes[state.index - 1]?.key;
+  const { preview, completedGesture } = usePredictiveBack(
+    !enabled &&
+      predictiveBackEnabled &&
+      !reduceMotion &&
+      !hasChildNavigator &&
+      activeKey &&
+      descriptors[activeKey]?.options.gestureEnabled !== false &&
+      !isRemovalPrevented(activeKey)
+      ? activeKey
+      : undefined,
+    previousKey,
+    pop,
+  );
   const transition = useRef({
     key: activeKey,
     sequence: 0,
@@ -210,11 +259,14 @@ function AdaptiveStackContent({
     previous.current?.routeKeys.includes(activeKey) &&
     previous.current.active &&
     !state.routes.some((route) => route.key === previous.current?.activeKey)
-      ? previous.current.active
+      ? completedGesture &&
+        completedGesture.source === previous.current.activeKey &&
+        completedGesture.destination === activeKey
+        ? { ...previous.current.active, predictiveExit: completedGesture }
+        : previous.current.active
       : null;
   const retained =
     pendingExit ?? (transition.current.returning ? exiting : null);
-  const activeRoute = state.routes[state.index];
   useLayoutEffect(() => {
     if (pendingExit) {
       if (completedExit.current === pendingExit.route.key) {
@@ -317,14 +369,21 @@ function AdaptiveStackContent({
                   width={paneWidth}
                   height={retainedRoute?.height ?? height}
                   visible={visible}
+                  preview={
+                    retainedRoute?.predictiveExit ??
+                    (route.key === preview?.source ? preview : null)
+                  }
+                  previewDestination={route.key === preview?.destination}
                   background={
                     Platform.OS === 'android' &&
-                    !transition.current.returning &&
-                    underlayKeys.includes(route.key) &&
+                    (route.key === preview?.destination ||
+                      (!transition.current.returning &&
+                        underlayKeys.includes(route.key))) &&
                     !visible
                   }
                   active={route.key === activeKey && !isList}
                   exiting={isExiting}
+                  reduceMotion={reduceMotion}
                   animateEntry={
                     Platform.OS !== 'android' || !transition.current.returning
                   }
@@ -372,9 +431,12 @@ function RoutePane({
   width,
   height,
   visible,
+  preview,
+  previewDestination,
   background,
   active,
   exiting,
+  reduceMotion,
   animateEntry,
   onExited,
   expand,
@@ -388,9 +450,12 @@ function RoutePane({
   width: number;
   height: number;
   visible: boolean;
+  preview: PredictiveBackPreview | null;
+  previewDestination: boolean;
   background: boolean;
   active: boolean;
   exiting: boolean;
+  reduceMotion: boolean;
   animateEntry: boolean;
   onExited: (routeKey: string) => void;
   expand: boolean;
@@ -404,23 +469,6 @@ function RoutePane({
     visible && active && animateEntry && transitionSequence > 0;
   const progress = useRef(new Animated.Value(isEntering ? 0 : 1)).current;
   const lastTransition = useRef(0);
-  const reduceMotion = useRef(false);
-  useEffect(() => {
-    let mounted = true;
-    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (mounted) reduceMotion.current = enabled;
-    });
-    const subscription = AccessibilityInfo.addEventListener(
-      'reduceMotionChanged',
-      (enabled) => {
-        reduceMotion.current = enabled;
-      },
-    );
-    return () => {
-      mounted = false;
-      subscription.remove();
-    };
-  }, []);
   useLayoutEffect(() => {
     if (
       !visible ||
@@ -432,7 +480,7 @@ function RoutePane({
     }
     lastTransition.current = transitionSequence;
     progress.stopAnimation();
-    if (!animateEntry || reduceMotion.current) {
+    if (!animateEntry || reduceMotion) {
       progress.setValue(1);
       return;
     }
@@ -448,14 +496,37 @@ function RoutePane({
       animation.stop();
       progress.setValue(1);
     };
-  }, [active, animateEntry, exiting, progress, transitionSequence, visible]);
+  }, [
+    active,
+    animateEntry,
+    exiting,
+    progress,
+    reduceMotion,
+    transitionSequence,
+    visible,
+  ]);
   useLayoutEffect(() => {
     if (!exiting) return;
     progress.stopAnimation();
     progress.setValue(1);
-    if (reduceMotion.current) {
+    if (reduceMotion) {
       onExited(routeKey);
       return;
+    }
+    if (preview) {
+      // Android has already committed the pop. Only retain the outgoing pixels
+      // until their transition ends, even if an animation callback is dropped.
+      preview.progress.set(
+        withTiming(1, { duration: PREDICTIVE_BACK_EXIT_MS }),
+      );
+      const timer = setTimeout(
+        () => onExited(routeKey),
+        PREDICTIVE_BACK_EXIT_MS,
+      );
+      return () => {
+        clearTimeout(timer);
+        cancelAnimation(preview.progress);
+      };
     }
     const animation = Animated.timing(progress, {
       toValue: 0,
@@ -467,7 +538,7 @@ function RoutePane({
       if (finished) onExited(routeKey);
     });
     return () => animation.stop();
-  }, [exiting, onExited, progress, routeKey]);
+  }, [exiting, onExited, preview, progress, reduceMotion, routeKey]);
   useEffect(() => {
     if (!visible && focused.current) {
       focused.current = false;
@@ -485,7 +556,10 @@ function RoutePane({
   ) {
     setLastFrame({ width, height, left });
   }
-  const frame = visible ? { width, height, left } : lastFrame;
+  // A hidden route may have last been visible in a narrow pane before rotation.
+  // Render its preview at the destination size without activating that pane.
+  const frame =
+    visible || previewDestination ? { width, height, left } : lastFrame;
   // Stable identity matters: route-level Stack.Screen updates options in a layout
   // effect. Recreating this value on each descriptor update causes a render loop.
   const value = useMemo(
@@ -500,9 +574,21 @@ function RoutePane({
     [frame.width, frame.height, visible, routeKey, twoPane, expand, progress],
   );
   const webProps = Platform.OS === 'web' ? { inert: !visible } : {};
+  const previewStyle = useAnimatedStyle(() =>
+    preview
+      ? getPredictiveBackStyle(preview, width)
+      : {
+          opacity: visible || background ? 1 : 0,
+          transform: [],
+          borderTopLeftRadius: 0,
+          borderTopRightRadius: 0,
+          borderBottomLeftRadius: 0,
+          borderBottomRightRadius: 0,
+        },
+  );
   // Keep visibility independent of native-driven opacity on retained routes.
   return (
-    <View
+    <Reanimated.View
       {...webProps}
       testID={testID}
       onFocusCapture={() => {
@@ -516,7 +602,12 @@ function RoutePane({
       importantForAccessibility={
         visible && !exiting ? 'auto' : 'no-hide-descendants'
       }
-      style={[styles.route, frame, { opacity: visible || background ? 1 : 0 }]}
+      style={[
+        styles.route,
+        frame,
+        { opacity: visible || background ? 1 : 0 },
+        previewStyle,
+      ]}
     >
       <Animated.View
         testID={`${testID}-transition`}
@@ -550,7 +641,7 @@ function RoutePane({
           <SafeAreaProviderCompat>{children}</SafeAreaProviderCompat>
         </PaneContext.Provider>
       </Animated.View>
-    </View>
+    </Reanimated.View>
   );
 }
 
@@ -639,6 +730,8 @@ export const TwoPaneStack = createStandardRouterNavigator(
   {
     createProps: (args) => ({
       ...createNativeStackProps(args),
+      // A child navigator (e.g. dev) handles Back before its enclosing route.
+      hasChildNavigator: !!args.state.routes[args.state.index]?.state,
       dispatchNavigation: args.dispatch,
       navigatorKey: args.state.key,
     }),

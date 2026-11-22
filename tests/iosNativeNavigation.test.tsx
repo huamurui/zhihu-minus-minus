@@ -1,3 +1,4 @@
+import './predictiveBackAnimationMock';
 import 'react-native-gesture-handler/jestSetup';
 import { Slot, useLocalSearchParams, usePreventRemove } from 'expo-router';
 import {

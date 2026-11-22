@@ -1,0 +1,13 @@
+apply plugin: 'com.android.library'
+apply plugin: 'expo-module-gradle-plugin'
+
+group = 'com.zhihuminus.predictiveback'
+version = '1.0.0'
+
+android {
+  namespace "com.zhihuminus.predictiveback"
+}
+
+dependencies {
+  implementation 'com.facebook.react:react-android'
+}
