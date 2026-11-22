@@ -25,6 +25,7 @@ import { useRuntimeThemeColors } from '@/components/Themed';
 import { UpdateChecker } from '@/components/UpdateChecker';
 import { VerificationModal } from '@/components/VerificationModal';
 import { AdaptiveStack as Stack } from '@/features/adaptive-layout/AdaptiveStack';
+import { AndroidBackNavigation } from '@/features/adaptive-layout/AndroidBackNavigation';
 import { useQueryConnectivity } from '@/hooks/useQueryConnectivity';
 import { useInitialSettingsReady } from '@/store/useSettingsStore';
 import {
@@ -327,6 +328,7 @@ function RootLayout() {
                   }}
                 />
               </Stack>
+              {Platform.OS === 'android' && <AndroidBackNavigation />}
 
               {/* 全局状态栏和底部安全区渐变模糊遮罩 */}
               <GradientMaskOverlay isDark={isDark} />

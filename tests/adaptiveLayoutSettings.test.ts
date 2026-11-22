@@ -27,7 +27,18 @@ test('defaults to automatic layout with a one-third list width', () => {
     largeScreenLayoutMode: 'auto',
     largeScreenListRatio: 1 / 3,
   });
-  expect(useSettingsStore.persist.getOptions().version).toBe(23);
+  expect(useSettingsStore.persist.getOptions().version).toBe(24);
+});
+
+test('enables predictive back when migrating v23 settings and preserves explicit opt-outs', async () => {
+  const previous = { largeScreenLayoutMode: 'dual', largeScreenListRatio: 0.4 };
+  expect(await migrate(previous, 23)).toMatchObject({
+    ...previous,
+    androidPredictiveBackEnabled: true,
+  });
+  expect(
+    await migrate({ ...previous, androidPredictiveBackEnabled: false }, 23),
+  ).toMatchObject({ ...previous, androidPredictiveBackEnabled: false });
 });
 
 test('migrates v18 settings without changing unrelated preferences or the input object', async () => {
@@ -125,26 +136,33 @@ test('retains the resized width when disabling and reenabling adaptive panes', (
   expect(useSettingsStore.getState().largeScreenListRatio).toBe(0.45);
 });
 
-test('rehydrates both layout preferences after restart', async () => {
+test('rehydrates layout and predictive back preferences after restart', async () => {
   useSettingsStore.getState().updateSettings({
     largeScreenLayoutMode: 'single',
     largeScreenListRatio: 0.45,
+    androidPredictiveBackEnabled: false,
   });
   const persistedJson = jest
     .mocked(SecureStore.setItemAsync)
     .mock.calls.at(-1)?.[1];
   if (!persistedJson) throw new Error('Layout preferences must be persisted');
   expect(JSON.parse(persistedJson)).toMatchObject({
-    version: 23,
-    state: { largeScreenLayoutMode: 'single', largeScreenListRatio: 0.45 },
+    version: 24,
+    state: {
+      largeScreenLayoutMode: 'single',
+      largeScreenListRatio: 0.45,
+      androidPredictiveBackEnabled: false,
+    },
   });
 
   useSettingsStore.getState().resetSettings();
+  expect(useSettingsStore.getState().androidPredictiveBackEnabled).toBe(true);
   jest.mocked(SecureStore.getItemAsync).mockResolvedValue(persistedJson);
   await useSettingsStore.persist.rehydrate();
   expect(useSettingsStore.getState()).toMatchObject({
     largeScreenLayoutMode: 'single',
     largeScreenListRatio: 0.45,
+    androidPredictiveBackEnabled: false,
   });
 });
 
@@ -165,7 +183,7 @@ test('rehydrates v18 settings and persists the layout defaults added in v19', as
     .mock.calls.at(-1)?.[1];
   if (!persistedJson) throw new Error('Migrated settings must be persisted');
   expect(JSON.parse(persistedJson)).toMatchObject({
-    version: 23,
+    version: 24,
     state: { largeScreenLayoutMode: 'auto', largeScreenListRatio: 1 / 3 },
   });
 });

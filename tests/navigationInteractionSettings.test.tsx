@@ -1,4 +1,5 @@
 import { fireEvent, render } from '@testing-library/react-native';
+import { Platform } from 'react-native';
 import { NavigationInteractionSettings } from '../src/components/settings/NavigationInteractionSettings';
 import { useSettingsStore } from '../src/store/useSettingsStore';
 
@@ -29,6 +30,31 @@ jest.mock('expo-secure-store', () => ({
 beforeEach(() => {
   useSettingsStore.getState().resetSettings();
 });
+
+afterEach(() => jest.restoreAllMocks());
+
+test('Android 14 offers predictive back and applies the switch immediately', async () => {
+  jest.replaceProperty(Platform, 'OS', 'android');
+  jest.spyOn(Platform, 'Version', 'get').mockReturnValue(34);
+  const host = await render(<NavigationInteractionSettings />);
+  const control = host.getByLabelText('预测性返回');
+  expect(control).toHaveProp('on', true);
+  await fireEvent(control, 'change', { nativeEvent: { value: false } });
+  expect(useSettingsStore.getState().androidPredictiveBackEnabled).toBe(false);
+  expect(control).toHaveProp('on', false);
+  await fireEvent(control, 'change', { nativeEvent: { value: true } });
+  expect(useSettingsStore.getState().androidPredictiveBackEnabled).toBe(true);
+});
+
+test.each(['android', 'ios', 'web'] as const)(
+  'hides the predictive back switch on unsupported platforms (%s)',
+  async (platform) => {
+    jest.replaceProperty(Platform, 'OS', platform);
+    jest.spyOn(Platform, 'Version', 'get').mockReturnValue(33);
+    const host = await render(<NavigationInteractionSettings />);
+    expect(host.queryByLabelText('预测性返回')).toBeNull();
+  },
+);
 
 test('layout mode starts automatic and applies each manual choice', async () => {
   const host = await render(<NavigationInteractionSettings />);

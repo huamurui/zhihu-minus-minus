@@ -171,6 +171,8 @@ export interface AppSettings {
   pressScale: number;
   /** 安卓按压反馈类型: ripple (水波纹), scale-opacity (透明度+缩放) */
   androidFeedbackType: 'ripple' | 'scale-opacity';
+  /** Android 单栏侧滑返回时预览上一页。 */
+  androidPredictiveBackEnabled: boolean;
   /** 是否开启应用内震动反馈 */
   enableHapticFeedback: boolean;
   /** 关注动态、消息通知与私信的未读角标样式 */
@@ -257,6 +259,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   pressOpacity: 0.82,
   pressScale: 0.98,
   androidFeedbackType: 'ripple',
+  androidPredictiveBackEnabled: true,
   enableHapticFeedback: true,
   unreadBadgeStyle: 'count',
   useNativeIOSBottomTabs: true,
@@ -342,6 +345,8 @@ export const useSettingsStore = create<SettingsState>()(
           if (typeof nextSettings.enablePressFeedback !== 'boolean') {
             nextSettings.enablePressFeedback = true;
           }
+          nextSettings.androidPredictiveBackEnabled =
+            nextSettings.androidPredictiveBackEnabled !== false;
           nextSettings.largeScreenLayoutMode = normalizeLargeScreenLayoutMode(
             nextSettings.largeScreenLayoutMode,
           );
@@ -398,7 +403,7 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'zhihu-settings-storage',
       storage: createJSONStorage(() => settingsStorage),
-      version: 23,
+      version: 24,
       onRehydrateStorage: () => () => useInitialSettingsReady.setState(true),
       migrate: (rawPersistedState: unknown, version: number) => {
         const persistedState =
@@ -571,6 +576,9 @@ export const useSettingsStore = create<SettingsState>()(
         persistedState.largeScreenListRatio = normalizeLargeScreenListRatio(
           persistedState.largeScreenListRatio,
         );
+        // v24 enables predictive back for existing installations.
+        persistedState.androidPredictiveBackEnabled =
+          persistedState.androidPredictiveBackEnabled !== false;
         // v21 adds unread badge styles; existing installs keep red counts.
         persistedState.unreadBadgeStyle = isValidUnreadBadgeStyle(
           persistedState.unreadBadgeStyle,
