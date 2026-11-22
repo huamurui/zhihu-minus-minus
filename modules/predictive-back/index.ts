@@ -32,11 +32,13 @@ const previewModule =
     : null;
 export const supportsPredictiveBack = previewModule !== null;
 
+type BackSwipeHostProps = ViewProps & { allowContentSwipe?: boolean };
+
 // Keep the same host type for the route's lifetime so changing eligibility
 // preserves its scroll position, focused controls and in-progress drafts.
 export const BackSwipeHost =
   previewModule && globalThis.expo?.getViewConfig?.(moduleName, undefined)
-    ? requireNativeView<ViewProps>(moduleName)
+    ? requireNativeView<BackSwipeHostProps>(moduleName)
     : View;
 
 export function setPredictiveBackTarget(routeKey: string | null): void {

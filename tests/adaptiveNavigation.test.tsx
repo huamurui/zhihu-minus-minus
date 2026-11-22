@@ -773,6 +773,43 @@ test('the native host contains the header and body, and only the eligible foregr
   expect(screen.getByTestId('instance-header:root').props.children).toBe(1);
 });
 
+test('the settings content area can swipe Back while answers reserve it for horizontal paging', async () => {
+  await setTwoPanes(false);
+  const result = await open();
+  const surface = (routeKey: string) =>
+    screen.getByTestId(`back-host-${predictiveBackSurfaceId(routeKey)}`, {
+      includeHiddenElements: true,
+    });
+  const currentKey = () => {
+    const key = appRoutes(result).at(-1)?.key;
+    if (!key) throw new Error('Missing current route');
+    return key;
+  };
+  await testRouter.push('/settings');
+  const settings = currentKey();
+  expect(surface(settings).props.allowContentSwipe).toBe(true);
+  await testRouter.push('/settings/appearance');
+  const appearance = currentKey();
+  expect(surface(appearance).props.allowContentSwipe).toBe(true);
+  expect(surface(settings).props.allowContentSwipe).toBe(false);
+  await setTwoPanes(true);
+  expect(surface(appearance).props.allowContentSwipe).toBe(false);
+  await setTwoPanes(false);
+  await act(() =>
+    useSettingsStore.setState({ androidPredictiveBackEnabled: false }),
+  );
+  expect(surface(appearance).props.allowContentSwipe).toBe(false);
+  await act(() =>
+    useSettingsStore.setState({ androidPredictiveBackEnabled: true }),
+  );
+  await testRouter.push('/answer/a');
+  const answer = currentKey();
+  expect(setPredictiveBackTarget).toHaveBeenLastCalledWith(answer);
+  expect(surface(answer).props.allowContentSwipe).toBe(false);
+  await testRouter.back('/settings/appearance');
+  expect(surface(appearance).props.allowContentSwipe).toBe(true);
+});
+
 test.each([
   { version: 33, reducedMotion: false },
   { version: 35, reducedMotion: true },

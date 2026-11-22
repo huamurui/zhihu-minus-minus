@@ -20,7 +20,11 @@ class PredictiveBackModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("ZhihuPredictiveBack")
     Events("onBackGesture")
-    View(BackSwipeHost::class) {}
+    View(BackSwipeHost::class) {
+      Prop("allowContentSwipe") { view: BackSwipeHost, enabled: Boolean ->
+        view.allowContentSwipe = enabled
+      }
+    }
 
     Function("setTarget") { routeKey: String? ->
       onMain {

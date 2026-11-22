@@ -102,6 +102,19 @@ type RetainedRoute = {
   twoPane: boolean;
 };
 
+// These pages scroll vertically. Other routes, including readers and galleries,
+// keep the content area available to pagers, media and horizontal gestures.
+const contentSwipeRoutes = new Set([
+  'settings/index',
+  'settings/appearance',
+  'settings/app-icon',
+  'settings/features',
+  'settings/filter',
+  'settings/diagnostics',
+  'about',
+  'releases',
+]);
+
 function StackContent(props: ContentProps) {
   const mode = useSettingsStore((s) => s.largeScreenLayoutMode);
   const dimensions = useWindowDimensions();
@@ -396,6 +409,9 @@ function AdaptiveStackContent({
                 >
                   <AdaptiveScreen
                     routeKey={route.key}
+                    allowContentSwipe={
+                      route.key === target && contentSwipeRoutes.has(route.name)
+                    }
                     options={descriptor.options}
                     canGoBack={(retainedRoute?.index ?? state.index) > 0}
                     onBack={actions.back}
@@ -625,6 +641,7 @@ function RoutePane({
 
 function AdaptiveScreen({
   routeKey,
+  allowContentSwipe,
   options,
   children,
   onBack,
@@ -632,6 +649,7 @@ function AdaptiveScreen({
   previousTitle,
 }: {
   routeKey: string;
+  allowContentSwipe: boolean;
   options: NativeStackNavigationOptions;
   children: React.ReactNode;
   onBack: () => void;
@@ -653,6 +671,9 @@ function AdaptiveScreen({
   // Its ancestors handle layout, visibility and ordinary route transitions.
   return (
     <BackSwipeHost
+      allowContentSwipe={
+        Platform.OS === 'android' ? allowContentSwipe : undefined
+      }
       collapsable={Platform.OS === 'android' ? false : undefined}
       nativeID={
         Platform.OS === 'android'

@@ -102,7 +102,7 @@ export function NavigationInteractionSettings() {
             />
           </SettingItem>
           <Text type="secondary" style={styles.feedbackHint}>
-            单栏浏览时，从左右边缘向内拖动可预览上一页，往回拖可取消。如果页面未跟随手指，可从稍靠内的位置起滑。
+            单栏浏览时，从左右边缘向内拖动可预览上一页，往回拖可取消。在设置页面，也可从内容区向右拖动。
           </Text>
         </Section>
       ) : null}

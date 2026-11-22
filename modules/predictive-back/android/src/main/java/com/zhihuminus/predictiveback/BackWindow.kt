@@ -20,7 +20,7 @@ internal class BackWindow(
   val activity: ReactActivity,
   private val nextId: () -> Int,
   private val emit: (Map<String, Any>) -> Unit,
-) : ViewTreeObserver.OnGlobalLayoutListener {
+) : ViewTreeObserver.OnGlobalLayoutListener, ViewTreeObserver.OnWindowFocusChangeListener {
   private val decor = activity.window.decorView
   private val dispatcher = activity.onBackInvokedDispatcher
   private var target: String? = null
@@ -31,8 +31,22 @@ internal class BackWindow(
   private var callback: OnBackInvokedCallback? = null
   private var cancelGesture: (() -> Unit)? = null
   private val committed = mutableMapOf<Int, BackSurface>()
+  private var refreshedAttributes = false
+  private var refreshPosted = false
+  private val refreshWindow = Runnable {
+    refreshPosted = false
+    if (canRefreshWindow()) {
+      // On some devices a cold-started window receives no gesture progress
+      // until WindowManager syncs its attributes after decor attachment.
+      refreshedAttributes = true
+      val window = activity.window
+      window.attributes = window.attributes
+    }
+  }
+
   init {
     decor.viewTreeObserver.addOnGlobalLayoutListener(this)
+    decor.viewTreeObserver.addOnWindowFocusChangeListener(this)
   }
 
   fun configure(routeKey: String?, enabled: Boolean, previewHome: Boolean) {
@@ -49,11 +63,17 @@ internal class BackWindow(
     if (keyboardVisible != visible) {
       keyboardVisible = visible
       updateRegistration()
-    }
+    } else scheduleWindowRefresh()
+  }
+
+  override fun onWindowFocusChanged(hasFocus: Boolean) {
+    if (hasFocus) scheduleWindowRefresh()
   }
 
   fun close() {
+    decor.removeCallbacks(refreshWindow)
     decor.viewTreeObserver.removeOnGlobalLayoutListener(this)
+    decor.viewTreeObserver.removeOnWindowFocusChangeListener(this)
     unregister()
     committed.values.toList().forEach { it.restore() }
   }
@@ -68,6 +88,18 @@ internal class BackWindow(
     cancelGesture?.invoke()
     cancelGesture = null
     registered?.let(dispatcher::unregisterOnBackInvokedCallback)
+  }
+
+  private fun canRefreshWindow() =
+    !refreshedAttributes && Build.VERSION.SDK_INT >= 34 && callback is PageGesture &&
+      decor.isAttachedToWindow && decor.hasWindowFocus() && !imeVisible() &&
+      !activity.isFinishing && !activity.isDestroyed
+
+  private fun scheduleWindowRefresh() {
+    if (!refreshPosted && canRefreshWindow()) {
+      refreshPosted = true
+      decor.post(refreshWindow)
+    }
   }
 
   private fun imeVisible() = decor.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == true
@@ -158,6 +190,7 @@ internal class BackWindow(
       else -> null
     }
     callback?.let { dispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, it) }
+    scheduleWindowRefresh()
   }
 
   private fun forwardToReact() {

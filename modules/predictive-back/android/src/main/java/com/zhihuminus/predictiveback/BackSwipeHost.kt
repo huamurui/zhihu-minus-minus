@@ -8,8 +8,13 @@ import android.view.VelocityTracker
 import android.view.ViewConfiguration
 import android.view.WindowInsets
 import android.view.accessibility.AccessibilityManager
+import android.widget.AbsSeekBar
+import android.widget.CompoundButton
+import android.widget.EditText
 import android.widget.TextView
 import androidx.annotation.RequiresApi
+import com.facebook.react.uimanager.ReactAccessibilityDelegate.AccessibilityRole
+import com.facebook.react.uimanager.TouchTargetHelper
 import com.facebook.react.uimanager.events.NativeGestureUtil
 import expo.modules.kotlin.AppContext
 import expo.modules.kotlin.views.ExpoView
@@ -21,8 +26,9 @@ internal interface EdgeSwipe {
   fun endApp(accept: Boolean)
 }
 
-/** An app-owned horizontal drag just inside Android's gesture-navigation area. */
+/** App-owned back drags for the active single-pane route. */
 class BackSwipeHost(context: Context, appContext: AppContext) : ExpoView(context, appContext) {
+  internal var allowContentSwipe = false
   private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
   private val accessibility = context.getSystemService(AccessibilityManager::class.java)
   private var swipe: EdgeSwipe? = null
@@ -70,17 +76,31 @@ class BackSwipeHost(context: Context, appContext: AppContext) : ExpoView(context
     if ((findFocus() as? TextView)?.hasSelection() == true) return
     val insets = rootWindowInsets?.getInsets(WindowInsets.Type.systemGestures()) ?: return
     val density = resources.displayMetrics.density
-    // Leave Android's reported edge untouched. A zero horizontal inset
-    // identifies a side without system gesture navigation (e.g. three buttons).
+    if (insets.left == 0 && insets.right == 0) return
+    // Android owns the outermost edge. Drags starting inside it use system Back.
     fun inBand(x: Float, inset: Int): Boolean =
-      inset > 0 && x >= inset && x <= minOf(width * 0.2f, maxOf(56f * density, inset + 28f * density))
+      inset > 0 && x >= inset &&
+        x <= minOf(width * 0.2f, maxOf(56f * density, inset + 28f * density))
+    val nearLeft = inBand(event.x, insets.left)
+    val nearRight = inBand(width - event.x, insets.right)
+    val fromContent = !nearLeft && !nearRight
     fromRight = when {
-      inBand(event.x, insets.left) -> false
-      inBand(width - event.x, insets.right) -> true
+      nearRight -> true
+      nearLeft -> false
+      allowContentSwipe && event.x >= insets.left && width - event.x >= insets.right -> false
       else -> return
     }
     val module = appContext.registry.getModule("ZhihuPredictiveBack") as? PredictiveBackModule
-    swipe = module?.edgeSwipeFor(this) ?: return
+    val current = module?.edgeSwipeFor(this) ?: return
+    val path = TouchTargetHelper.findTargetPathAndCoordinatesForTouch(event.x, event.y, this, FloatArray(2))
+    if (path.any {
+      val view = it.getView() ?: return@any false
+      val role = AccessibilityRole.fromViewTag(view)
+      view is EditText || view is AbsSeekBar || view is CompoundButton ||
+        role == AccessibilityRole.ADJUSTABLE || role == AccessibilityRole.SWITCH ||
+        (fromContent && (view.canScrollHorizontally(-1) || view.canScrollHorizontally(1)))
+    }) return
+    swipe = current
     startX = event.rawX
     startY = event.rawY
     startTime = event.eventTime
