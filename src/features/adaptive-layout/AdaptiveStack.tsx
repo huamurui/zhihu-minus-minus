@@ -45,15 +45,15 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import Reanimated, {
-  cancelAnimation,
-  useAnimatedStyle,
-  withTiming,
-} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassNavigationButton } from '@/components/navigation/GlassNavigationButton';
 import { useIsLiquidGlassActive } from '@/components/surfaces/FloatingSurface';
 import { useRuntimeThemeColors } from '@/components/Themed';
+import {
+  BackSwipeHost,
+  predictiveBackSurfaceId,
+  supportsPredictiveBack,
+} from '@/modules/predictive-back';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import {
   getListPaneWidth,
@@ -70,12 +70,7 @@ import {
   useTitleTransitionActiveForRoute,
 } from './TitleTransition';
 import { PaneSelectionContext } from './usePaneRouter';
-import {
-  getPredictiveBackStyle,
-  PREDICTIVE_BACK_EXIT_MS,
-  type PredictiveBackPreview,
-  usePredictiveBack,
-} from './usePredictiveBack';
+import { usePredictiveBack } from './usePredictiveBack';
 
 type StackEvents = {
   [K in keyof NativeStackNavigationEventMap]: NativeStackNavigationEventMap[K] & {
@@ -97,7 +92,7 @@ type ContentProps = NavigatorContentProps<
 >;
 
 type RetainedRoute = {
-  predictiveExit?: PredictiveBackPreview;
+  predictiveExit?: boolean;
   route: ContentProps['state']['routes'][number];
   descriptor: ContentProps['descriptors'][string];
   index: number;
@@ -191,19 +186,20 @@ function AdaptiveStackContent({
   const activeRoute = state.routes[state.index];
   const activeKey = activeRoute?.key;
   const previousKey = state.routes[state.index - 1]?.key;
-  const { preview, completedGesture } = usePredictiveBack(
+  const target =
+    Platform.OS === 'android' &&
+    Number(Platform.Version) >= 34 &&
+    supportsPredictiveBack &&
+    previousKey &&
     !enabled &&
-      predictiveBackEnabled &&
-      !reduceMotion &&
-      !hasChildNavigator &&
-      activeKey &&
-      descriptors[activeKey]?.options.gestureEnabled !== false &&
-      !isRemovalPrevented(activeKey)
+    predictiveBackEnabled &&
+    !reduceMotion &&
+    !hasChildNavigator &&
+    activeKey &&
+    descriptors[activeKey]?.options.gestureEnabled !== false &&
+    !isRemovalPrevented(activeKey)
       ? activeKey
-      : undefined,
-    previousKey,
-    pop,
-  );
+      : undefined;
   const transition = useRef({
     key: activeKey,
     sequence: 0,
@@ -252,6 +248,18 @@ function AdaptiveStackContent({
   const [exiting, setExiting] = useState<RetainedRoute | null>(null);
   const completedExit = useRef<string | null>(null);
   const [, markExitComplete] = useReducer((version: number) => version + 1, 0);
+  const finishExit = useCallback((routeKey: string) => {
+    completedExit.current = routeKey;
+    setExiting((current) => (current?.route.key === routeKey ? null : current));
+    markExitComplete();
+  }, []);
+  const committed = usePredictiveBack(
+    target,
+    previousKey,
+    activeKey,
+    pop,
+    finishExit,
+  );
   const pendingExit =
     Platform.OS === 'android' &&
     previous.current?.activeKey !== activeKey &&
@@ -259,10 +267,10 @@ function AdaptiveStackContent({
     previous.current?.routeKeys.includes(activeKey) &&
     previous.current.active &&
     !state.routes.some((route) => route.key === previous.current?.activeKey)
-      ? completedGesture &&
-        completedGesture.source === previous.current.activeKey &&
-        completedGesture.destination === activeKey
-        ? { ...previous.current.active, predictiveExit: completedGesture }
+      ? committed &&
+        committed.source === previous.current.activeKey &&
+        committed.destination === activeKey
+        ? { ...previous.current.active, predictiveExit: true }
         : previous.current.active
       : null;
   const retained =
@@ -296,11 +304,6 @@ function AdaptiveStackContent({
           : null,
     };
   });
-  const finishExit = useCallback((routeKey: string) => {
-    completedExit.current = routeKey;
-    setExiting((current) => (current?.route.key === routeKey ? null : current));
-    markExitComplete();
-  }, []);
   const commitRatio = useCallback((next: number) => {
     setRatio(next);
     useSettingsStore.getState().updateSettings({ largeScreenListRatio: next });
@@ -369,17 +372,14 @@ function AdaptiveStackContent({
                   width={paneWidth}
                   height={retainedRoute?.height ?? height}
                   visible={visible}
-                  preview={
-                    retainedRoute?.predictiveExit ??
-                    (route.key === preview?.source ? preview : null)
-                  }
-                  previewDestination={route.key === preview?.destination}
+                  predictiveExit={retainedRoute?.predictiveExit === true}
+                  previewDestination={!!target && route.key === previousKey}
                   background={
                     Platform.OS === 'android' &&
-                    (route.key === preview?.destination ||
+                    !visible &&
+                    ((!!target && route.key === previousKey) ||
                       (!transition.current.returning &&
-                        underlayKeys.includes(route.key))) &&
-                    !visible
+                        underlayKeys.includes(route.key)))
                   }
                   active={route.key === activeKey && !isList}
                   exiting={isExiting}
@@ -395,6 +395,7 @@ function AdaptiveStackContent({
                   transitionSequence={transition.current.sequence}
                 >
                   <AdaptiveScreen
+                    routeKey={route.key}
                     options={descriptor.options}
                     canGoBack={(retainedRoute?.index ?? state.index) > 0}
                     onBack={actions.back}
@@ -431,7 +432,7 @@ function RoutePane({
   width,
   height,
   visible,
-  preview,
+  predictiveExit,
   previewDestination,
   background,
   active,
@@ -450,7 +451,7 @@ function RoutePane({
   width: number;
   height: number;
   visible: boolean;
-  preview: PredictiveBackPreview | null;
+  predictiveExit: boolean;
   previewDestination: boolean;
   background: boolean;
   active: boolean;
@@ -506,27 +507,12 @@ function RoutePane({
     visible,
   ]);
   useLayoutEffect(() => {
-    if (!exiting) return;
+    if (!exiting || predictiveExit) return;
     progress.stopAnimation();
     progress.setValue(1);
     if (reduceMotion) {
       onExited(routeKey);
       return;
-    }
-    if (preview) {
-      // Android has already committed the pop. Only retain the outgoing pixels
-      // until their transition ends, even if an animation callback is dropped.
-      preview.progress.set(
-        withTiming(1, { duration: PREDICTIVE_BACK_EXIT_MS }),
-      );
-      const timer = setTimeout(
-        () => onExited(routeKey),
-        PREDICTIVE_BACK_EXIT_MS,
-      );
-      return () => {
-        clearTimeout(timer);
-        cancelAnimation(preview.progress);
-      };
     }
     const animation = Animated.timing(progress, {
       toValue: 0,
@@ -538,7 +524,7 @@ function RoutePane({
       if (finished) onExited(routeKey);
     });
     return () => animation.stop();
-  }, [exiting, onExited, preview, progress, reduceMotion, routeKey]);
+  }, [exiting, onExited, predictiveExit, progress, reduceMotion, routeKey]);
   useEffect(() => {
     if (!visible && focused.current) {
       focused.current = false;
@@ -566,29 +552,26 @@ function RoutePane({
     () => ({
       width: frame.width,
       height: frame.height,
-      visible,
+      visible: visible && !predictiveExit,
       routeKey,
       twoPane,
       fixedHeaderEntryProgress: expand ? undefined : progress,
     }),
-    [frame.width, frame.height, visible, routeKey, twoPane, expand, progress],
+    [
+      frame.width,
+      frame.height,
+      visible,
+      predictiveExit,
+      routeKey,
+      twoPane,
+      expand,
+      progress,
+    ],
   );
   const webProps = Platform.OS === 'web' ? { inert: !visible } : {};
-  const previewStyle = useAnimatedStyle(() =>
-    preview
-      ? getPredictiveBackStyle(preview, width)
-      : {
-          opacity: visible || background ? 1 : 0,
-          transform: [],
-          borderTopLeftRadius: 0,
-          borderTopRightRadius: 0,
-          borderBottomLeftRadius: 0,
-          borderBottomRightRadius: 0,
-        },
-  );
   // Keep visibility independent of native-driven opacity on retained routes.
   return (
-    <Reanimated.View
+    <View
       {...webProps}
       testID={testID}
       onFocusCapture={() => {
@@ -602,12 +585,7 @@ function RoutePane({
       importantForAccessibility={
         visible && !exiting ? 'auto' : 'no-hide-descendants'
       }
-      style={[
-        styles.route,
-        frame,
-        { opacity: visible || background ? 1 : 0 },
-        previewStyle,
-      ]}
+      style={[styles.route, frame, { opacity: visible || background ? 1 : 0 }]}
     >
       <Animated.View
         testID={`${testID}-transition`}
@@ -641,17 +619,19 @@ function RoutePane({
           <SafeAreaProviderCompat>{children}</SafeAreaProviderCompat>
         </PaneContext.Provider>
       </Animated.View>
-    </Reanimated.View>
+    </View>
   );
 }
 
 function AdaptiveScreen({
+  routeKey,
   options,
   children,
   onBack,
   canGoBack,
   previousTitle,
 }: {
+  routeKey: string;
   options: NativeStackNavigationOptions;
   children: React.ReactNode;
   onBack: () => void;
@@ -669,8 +649,18 @@ function AdaptiveScreen({
       ? options.headerTintColor
       : colors.primary;
   const itemProps = { tintColor, canGoBack };
+  // Native owns this surface's alpha, transform and outline during Back.
+  // Its ancestors handle layout, visibility and ordinary route transitions.
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <BackSwipeHost
+      collapsable={Platform.OS === 'android' ? false : undefined}
+      nativeID={
+        Platform.OS === 'android'
+          ? predictiveBackSurfaceId(routeKey)
+          : undefined
+      }
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
       {shown ? (
         <View
           onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}
@@ -720,7 +710,7 @@ function AdaptiveScreen({
           <View style={styles.container}>{children}</View>
         </HeaderHeightContext.Provider>
       </HeaderShownContext.Provider>
-    </View>
+    </BackSwipeHost>
   );
 }
 

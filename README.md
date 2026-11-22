@@ -1,7 +1,7 @@
 # 🐱 知乎-- (Zhihu Minus Minus)
 
 [![CI](https://github.com/huamurui/zhihu-minus-minus/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/huamurui/zhihu-minus-minus/actions/workflows/ci.yml)
-[![版本](https://img.shields.io/badge/version-v0.10.0-blue)](./package.json)
+[![版本](https://img.shields.io/badge/version-v0.10.1-blue)](./package.json)
 ![平台](https://img.shields.io/badge/platform-Android%20%7C%20iOS-brightgreen)
 [![许可证](https://img.shields.io/badge/license-GPL--3.0-blue)](./LICENSE)
 
@@ -27,7 +27,7 @@
 - **划线评论**：有评论的划线会在末尾显示空心评论图标。长按回答正文选中文字，可在底部操作条点“评论”或“赞同”。点“评论”会带上所选原文，写好后点“发布”即可。容易误触划线时，可在“设置 → 外观与阅读 → 正文排版”关闭“点击划线查看评论”。
 - **无图模式**可在“设置 → 外观与阅读 → 正文排版”开启。列表卡片缩略图和正文配图点按后才加载，头像和公式仍照常显示。
 - **双栏浏览（试验）**可在“设置 → 外观与阅读 → 双栏布局（试验性）”选择自动、单栏或双栏。自动模式会在窗口宽度达到 840 逻辑像素时并排显示列表和详情。
-- **预测性返回**在 Android 14 及以上默认开启。单栏浏览并使用系统手势导航时，从屏幕边缘向内滑动可预览上一页。当前页按窗口圆角缩小，滑回边缘可取消。双栏使用普通返回。可在“设置 → 外观与阅读 → 返回手势”关闭预览。
+- **预测性返回**在 Android 14 及以上默认开启。单栏浏览并使用手势导航时，从左边或右边向内拖动可预览上一页，往回拖可取消。当前页按设备窗口的圆角缩小。部分设备从最外沿起滑时只在松手后返回，可以稍往屏幕内侧起滑。双栏使用普通返回。可在“设置 → 外观与阅读 → 返回手势”关闭预览。
 - **自由定制**：自定义主题色、深浅色模式和阅读背景。
 - **内容筛选**：过滤广告与营销内容，支持关键词、正则屏蔽。
 - **创作互动**：写回答、文章，发想法、提问题，支持评论、赞同、收藏。
@@ -203,4 +203,4 @@ npm run check
 </a>
 
 ---
-**Version**: v0.10.0 | **Last Updated**: 2026-11-21
+**Version**: v0.10.1 | **Last Updated**: 2026-11-22

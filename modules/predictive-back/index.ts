@@ -1,21 +1,10 @@
-import { requireOptionalNativeModule } from 'expo';
-import { Platform } from 'react-native';
-
-export interface PredictiveBackCornerRadii {
-  topLeft: number;
-  topRight: number;
-  bottomRight: number;
-  bottomLeft: number;
-}
+import { requireNativeView, requireOptionalNativeModule } from 'expo';
+import { Platform, View, type ViewProps } from 'react-native';
 
 export interface PredictiveBackEvent {
-  phase: 'start' | 'progress' | 'cancel' | 'commit';
-  progress: number;
-  edge: 'left' | 'right';
+  phase: 'commit' | 'finish';
   routeKey: string;
   gestureId: number;
-  /** Logical window corner radii in dp, sampled when the swipe starts. */
-  cornerRadii?: PredictiveBackCornerRadii;
 }
 
 type Listener = (event: PredictiveBackEvent) => void;
@@ -23,16 +12,44 @@ type Listener = (event: PredictiveBackEvent) => void;
 interface PredictiveBackModule {
   setTarget(routeKey: string | null): void;
   setBackHandlerEnabled(enabled: boolean, allowHomePreview: boolean): void;
+  releaseSurface?(gestureId: number): void;
   addListener(event: 'onBackGesture', listener: Listener): { remove(): void };
 }
 
+const moduleName = 'ZhihuPredictiveBack';
 const nativeModule =
   Platform.OS === 'android' && Platform.Version >= 33
-    ? requireOptionalNativeModule<PredictiveBackModule>('ZhihuPredictiveBack')
+    ? requireOptionalNativeModule<PredictiveBackModule>(moduleName)
     : null;
 
+// A module without releaseSurface uses the old JS-driven event protocol:
+// it sends start/progress/cancel and never sends finish. Keep it on ordinary Back.
+const previewModule =
+  Platform.OS === 'android' &&
+  Platform.Version >= 34 &&
+  typeof nativeModule?.releaseSurface === 'function'
+    ? nativeModule
+    : null;
+export const supportsPredictiveBack = previewModule !== null;
+
+// Keep the same host type for the route's lifetime so changing eligibility
+// preserves its scroll position, focused controls and in-progress drafts.
+export const BackSwipeHost =
+  previewModule && globalThis.expo?.getViewConfig?.(moduleName, undefined)
+    ? requireNativeView<ViewProps>(moduleName)
+    : View;
+
 export function setPredictiveBackTarget(routeKey: string | null): void {
-  nativeModule?.setTarget(routeKey);
+  previewModule?.setTarget(routeKey);
+}
+
+export function predictiveBackSurfaceId(routeKey: string): string {
+  return `zhihu-back-surface-${routeKey}`;
+}
+
+/** Restore the still-mounted source if navigation declined a committed gesture. */
+export function releasePredictiveBackSurface(gestureId: number): void {
+  previewModule?.releaseSurface?.(gestureId);
 }
 
 export function setAndroidBackHandlerEnabled(
@@ -46,6 +63,6 @@ export function addPredictiveBackListener(listener: Listener): {
   remove(): void;
 } {
   return (
-    nativeModule?.addListener('onBackGesture', listener) ?? { remove() {} }
+    previewModule?.addListener('onBackGesture', listener) ?? { remove() {} }
   );
 }

@@ -20,6 +20,7 @@ class PredictiveBackModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("ZhihuPredictiveBack")
     Events("onBackGesture")
+    View(BackSwipeHost::class) {}
 
     Function("setTarget") { routeKey: String? ->
       onMain {
@@ -32,6 +33,11 @@ class PredictiveBackModule : Module() {
         hasBackHandler = enabled
         allowHomePreview = previewHome
         refresh()
+      }
+    }
+    Function("releaseSurface") { gestureId: Int ->
+      onMain {
+        if (Build.VERSION.SDK_INT >= 34) window?.releaseSurface(gestureId)
       }
     }
     OnActivityEntersForeground {
@@ -54,6 +60,9 @@ class PredictiveBackModule : Module() {
       }
     }
   }
+
+  internal fun edgeSwipeFor(view: BackSwipeHost): EdgeSwipe? =
+    if (Build.VERSION.SDK_INT >= 34) window?.edgeSwipeFor(view) else null
 
   private fun onMain(action: () -> Unit) {
     if (Looper.myLooper() == Looper.getMainLooper()) action() else main.post(action)

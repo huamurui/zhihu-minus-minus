@@ -1,4 +1,3 @@
-import './predictiveBackAnimationMock';
 import 'react-native-gesture-handler/jestSetup';
 import {
   Slot,
@@ -12,6 +11,7 @@ import { HeaderShownContext } from 'expo-router/react-navigation';
 import {
   act,
   fireEvent,
+  renderHook,
   renderRouter,
   screen,
   testRouter,
@@ -31,11 +31,14 @@ import {
   Text,
   TextInput,
   View,
+  type ViewProps,
 } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
   addPredictiveBackListener,
   type PredictiveBackEvent,
+  predictiveBackSurfaceId,
+  releasePredictiveBackSurface,
   setAndroidBackHandlerEnabled,
   setPredictiveBackTarget,
 } from '../modules/predictive-back';
@@ -52,10 +55,26 @@ import {
 } from '../src/features/adaptive-layout/PaneContext';
 import * as titleTransition from '../src/features/adaptive-layout/TitleTransition';
 import { usePaneRouter } from '../src/features/adaptive-layout/usePaneRouter';
+import { usePredictiveBack } from '../src/features/adaptive-layout/usePredictiveBack';
 import { useRefreshAction } from '../src/hooks/useRefreshAction';
 import { useSettingsStore } from '../src/store/useSettingsStore';
 
 jest.mock('../modules/predictive-back', () => ({
+  ...jest.requireActual<typeof import('../modules/predictive-back')>(
+    '../modules/predictive-back',
+  ),
+  supportsPredictiveBack: true,
+  BackSwipeHost: (props: ViewProps) => {
+    const { createElement } =
+      jest.requireActual<typeof import('react')>('react');
+    const { View } =
+      jest.requireActual<typeof import('react-native')>('react-native');
+    return createElement(View, {
+      ...props,
+      testID: `back-host-${props.nativeID}`,
+    });
+  },
+  releasePredictiveBackSurface: jest.fn(),
   addPredictiveBackListener: jest.fn(() => ({ remove: jest.fn() })),
   setPredictiveBackTarget: jest.fn(),
   setAndroidBackHandlerEnabled: jest.fn(),
@@ -424,7 +443,9 @@ test('returning from comments keeps the answer stationary and fades out comments
     const answerTransition = screen.getByTestId(
       `adaptive-route-${answerKey}-transition`,
     );
-    expect(profile).toHaveStyle({ opacity: 0 });
+    // The profile is already drawn underneath for the next back gesture.
+    expect(profile).toHaveStyle({ opacity: 1 });
+    expect(profile.props.pointerEvents).toBe('none');
     expect(answer).toHaveStyle({ opacity: 1 });
     expect(answerTransition).toHaveStyle({ opacity: 1 });
     const comments = screen.getByTestId(`adaptive-route-${commentsKey}`, {
@@ -543,6 +564,7 @@ test('rotation preserves route keys, draft state and full back order across both
 });
 
 test('a covered pane keeps its effects and geometry and completes an in-flight refresh', async () => {
+  useSettingsStore.setState({ androidPredictiveBackEnabled: false });
   await open();
   const width = screen.getByTestId('width-home:root').props.children;
   await fireEvent.press(screen.getByText('refresh-home:root'));
@@ -580,67 +602,63 @@ test('a pending deletion removes its own detail and preserves the newer list', a
   await testRouter.back('/');
 });
 
-test('system back consumes one chronological entry per press and leaves root unhandled', async () => {
-  const listener = jest.spyOn(BackHandler, 'addEventListener');
-  try {
-    const result = await open();
-    jest.runAllTicks();
-    expect(jest.mocked(setAndroidBackHandlerEnabled).mock.lastCall?.[0]).toBe(
-      false,
-    );
-    const onBack = listener.mock.calls.find(
-      ([event]) => event === 'hardwareBackPress',
-    )?.[1];
-    expect(onBack).toBeDefined();
-    await testRouter.push('/answer/a');
-    jest.runAllTicks();
-    expect(jest.mocked(setAndroidBackHandlerEnabled).mock.lastCall?.[0]).toBe(
-      true,
-    );
-    await testRouter.push('/user/u');
-    await resize(800, 1200);
-    await act(() => {
-      expect(onBack?.({ type: 'hardwareBackPress', timeStamp: 1 })).toBe(true);
-    });
-    expect(result.getPathname()).toBe('/answer/a');
-    await resize(1200, 800);
-    await act(() => {
-      expect(onBack?.({ type: 'hardwareBackPress', timeStamp: 1 })).toBe(true);
-    });
-    expect(result.getPathname()).toBe('/');
-    jest.runAllTicks();
-    expect(jest.mocked(setAndroidBackHandlerEnabled).mock.lastCall?.[0]).toBe(
-      false,
-    );
-    await act(() => {
-      expect(onBack?.({ type: 'hardwareBackPress', timeStamp: 1 })).toBe(false);
-    });
-  } finally {
-    listener.mockRestore();
-  }
-});
+test.each([false, true])(
+  'ordinary system Back consumes just one entry and leaves the root unhandled (dual panes %s)',
+  async (dual) => {
+    const listener = jest.spyOn(BackHandler, 'addEventListener');
+    try {
+      await setTwoPanes(dual);
+      const result = await open();
+      jest.runAllTicks();
+      expect(jest.mocked(setAndroidBackHandlerEnabled).mock.lastCall?.[0]).toBe(
+        false,
+      );
+      const onBack = listener.mock.calls.find(
+        ([event]) => event === 'hardwareBackPress',
+      )?.[1];
+      expect(onBack).toBeDefined();
+      await testRouter.push('/answer/a');
+      jest.runAllTicks();
+      expect(jest.mocked(setAndroidBackHandlerEnabled).mock.lastCall?.[0]).toBe(
+        true,
+      );
+      await testRouter.push('/user/u');
+      await resize(800, 1200);
+      await act(() => {
+        expect(onBack?.({ type: 'hardwareBackPress', timeStamp: 1 })).toBe(
+          true,
+        );
+      });
+      expect(result.getPathname()).toBe('/answer/a');
+      await resize(1200, 800);
+      await act(() => {
+        expect(onBack?.({ type: 'hardwareBackPress', timeStamp: 1 })).toBe(
+          true,
+        );
+      });
+      expect(result.getPathname()).toBe('/');
+      jest.runAllTicks();
+      expect(jest.mocked(setAndroidBackHandlerEnabled).mock.lastCall?.[0]).toBe(
+        false,
+      );
+      await act(() => {
+        expect(onBack?.({ type: 'hardwareBackPress', timeStamp: 1 })).toBe(
+          false,
+        );
+      });
+    } finally {
+      listener.mockRestore();
+    }
+  },
+);
 
 function currentGesture() {
   const listener = jest.mocked(addPredictiveBackListener).mock.lastCall?.[0];
   const routeKey = jest.mocked(setPredictiveBackTarget).mock.lastCall?.[0];
   if (!routeKey || !listener)
     throw new Error('No active predictive back target');
-  return (
-    phase: PredictiveBackEvent['phase'],
-    gestureId: number,
-    progress = 0,
-    cornerRadii?: PredictiveBackEvent['cornerRadii'],
-  ) =>
-    act(() =>
-      listener({
-        phase,
-        gestureId,
-        progress,
-        edge: 'left',
-        routeKey,
-        cornerRadii,
-      }),
-    );
+  return (phase: PredictiveBackEvent['phase'], gestureId: number) =>
+    act(() => listener({ phase, gestureId, routeKey }));
 }
 
 test('at the root the setting enables the system home preview only while using one pane', async () => {
@@ -662,12 +680,12 @@ test('at the root the setting enables the system home preview only while using o
   await setTwoPanes(false);
   jest.runAllTicks();
   expect(setAndroidBackHandlerEnabled).toHaveBeenLastCalledWith(false, true);
-  expect(addPredictiveBackListener).not.toHaveBeenCalled();
+  expect(setPredictiveBackTarget).not.toHaveBeenCalled();
 });
 
-test('a single-pane preview can cancel and then pop exactly once without activating or remounting its destination', async () => {
+test('single-pane Back prepares an inactive destination and retains the source until its native exit finishes', async () => {
   const result = await open();
-  expect(addPredictiveBackListener).not.toHaveBeenCalled();
+  expect(setPredictiveBackTarget).not.toHaveBeenCalled();
   await testRouter.push('/answer/a');
   const narrowWidth = screen.getByTestId('width-answer:a').props.children;
   await fireEvent.scroll(screen.getByTestId('scroll-answer:a'), {
@@ -678,13 +696,6 @@ test('a single-pane preview can cancel and then pop exactly once without activat
   const [, answer, comments] = appRoutes(result);
   expect(setPredictiveBackTarget).toHaveBeenLastCalledWith(comments.key);
   const gesture = currentGesture();
-  const foreground = () => screen.getByTestId(`adaptive-route-${comments.key}`);
-  const transform = () =>
-    StyleSheet.flatten(foreground().props.style).transform;
-  await gesture('start', 1);
-  const atStart = transform();
-  await gesture('progress', 1, 0.65);
-  expect(transform()).not.toEqual(atStart);
   expect(
     screen.getByTestId(`adaptive-route-${answer.key}`, {
       includeHiddenElements: true,
@@ -699,11 +710,6 @@ test('a single-pane preview can cancel and then pop exactly once without activat
       .children,
   ).toBeGreaterThan(narrowWidth);
   expect(result.getPathname()).toBe('/comments/a');
-  await gesture('cancel', 1);
-  await waitFor(() => expect(transform()).toEqual([]));
-  expect(result.getPathname()).toBe('/comments/a');
-  await gesture('start', 2);
-  await gesture('progress', 2, 0.5);
   const timing = jest.spyOn(Animated, 'timing');
   await gesture('commit', 2);
   // The mock never delivers animation-completion callbacks. History still
@@ -715,61 +721,56 @@ test('a single-pane preview can cancel and then pop exactly once without activat
   );
   await gesture('commit', 2);
   expect(appRoutes(result)).toHaveLength(2);
-  await waitFor(() =>
-    expect(
-      screen.queryByTestId(`adaptive-route-${comments.key}`, {
-        includeHiddenElements: true,
-      }),
-    ).toBeNull(),
-  );
+  const outgoing = () =>
+    screen.queryByTestId(`adaptive-route-${comments.key}`, {
+      includeHiddenElements: true,
+    });
+  expect(outgoing()?.props.pointerEvents).toBe('none');
+  expect(
+    screen.getByTestId('visible-comments:a', { includeHiddenElements: true })
+      .props.children,
+  ).toBe('false');
+  await gesture('finish', 1);
+  expect(outgoing()).not.toBeNull();
+  await gesture('finish', 2);
+  expect(outgoing()).toBeNull();
+  expect(releasePredictiveBackSurface).not.toHaveBeenCalled();
   expect(screen.getByTestId('offset-answer:a').props.children).toBe(823);
   expect(screen.getByTestId('instance-answer:a').props.children).toBe(1);
 });
 
-test('the moving foreground clips its header and body to device corners and removes the clip on cancel', async () => {
+test('the native host contains the header and body, and only the eligible foreground route is targeted', async () => {
   await setTwoPanes(false);
   const result = await open();
   await testRouter.push('/about');
   const [home, about] = appRoutes(result);
-  const foreground = () => screen.getByTestId(`adaptive-route-${about.key}`);
-  const corners = { topLeft: 17, topRight: 0, bottomRight: 28, bottomLeft: 30 };
-  const gesture = currentGesture();
-  const topLeft = () =>
-    StyleSheet.flatten(foreground().props.style).borderTopLeftRadius;
-  expect(topLeft()).toBe(0);
-  await gesture('start', 1, 0, corners);
-  expect(topLeft()).toBe(0);
-  await gesture('cancel', 1);
-  await waitFor(() => expect(topLeft()).toBe(0));
-
-  // Sample a fully dragged frame at mount because native animated updates do not
-  // run in the test renderer. Each corner must use its own supplied measurement.
-  await gesture('start', 2, 1, corners);
-  expect(foreground()).toHaveStyle({
-    overflow: 'hidden',
-    borderTopLeftRadius: corners.topLeft,
-    borderTopRightRadius: corners.topRight,
-    borderBottomRightRadius: corners.bottomRight,
-    borderBottomLeftRadius: corners.bottomLeft,
-  });
-  const clipped = within(foreground());
-  expect(
-    clipped.getByText('详情标题', { includeHiddenElements: true }),
-  ).toBeOnTheScreen();
-  expect(
-    clipped.getByText('header:root', { includeHiddenElements: true }),
-  ).toBeOnTheScreen();
-  expect(
-    StyleSheet.flatten(
-      screen.getByTestId(`adaptive-route-${home.key}`, {
-        includeHiddenElements: true,
-      }).props.style,
-    ).borderTopLeftRadius,
-  ).toBe(0);
-  await gesture('cancel', 2);
-  await waitFor(() => expect(topLeft()).toBe(0));
-  expect(screen.getByText('详情标题')).toBeVisible();
-  expect(screen.getByText('header:root')).toBeVisible();
+  if (!home.key || !about.key) throw new Error('Missing mounted route keys');
+  const surfaces = (key: string) =>
+    screen.container.queryAll(
+      (node) => node.props.nativeID === predictiveBackSurfaceId(key),
+    );
+  expect(surfaces(about.key)).toHaveLength(1);
+  expect(surfaces(home.key)).toHaveLength(1);
+  const foreground = surfaces(about.key)[0];
+  expect(foreground.props.testID).toBe(
+    `back-host-${predictiveBackSurfaceId(about.key)}`,
+  );
+  expect(setPredictiveBackTarget).toHaveBeenLastCalledWith(about.key);
+  expect(setPredictiveBackTarget).not.toHaveBeenCalledWith(home.key);
+  expect(foreground.props.collapsable).toBe(false);
+  expect(within(foreground).getByText('详情标题')).toBeVisible();
+  expect(within(foreground).getByText('header:root')).toBeVisible();
+  expect(StyleSheet.flatten(foreground.props.style).opacity).toBeUndefined();
+  expect(StyleSheet.flatten(foreground.props.style).transform).toBeUndefined();
+  await fireEvent.changeText(screen.getByTestId('draft-header:root'), '未发送');
+  await act(() =>
+    useSettingsStore.setState({ androidPredictiveBackEnabled: false }),
+  );
+  expect(setPredictiveBackTarget).toHaveBeenLastCalledWith(null);
+  const sameHost = surfaces(about.key)[0];
+  expect(sameHost).toBe(foreground);
+  expect(within(sameHost).getByDisplayValue('未发送')).toBeVisible();
+  expect(screen.getByTestId('instance-header:root').props.children).toBe(1);
 });
 
 test.each([
@@ -785,7 +786,7 @@ test.each([
     await setTwoPanes(false);
     const result = await open();
     await testRouter.push('/answer/a');
-    expect(addPredictiveBackListener).not.toHaveBeenCalled();
+    expect(setPredictiveBackTarget).not.toHaveBeenCalled();
     await testRouter.back('/');
     expect(result.getPathname()).toBe('/');
   },
@@ -796,7 +797,6 @@ test('changing layout or disabling the setting cancels the preview before a late
   const result = await open('/answer/a');
   const answer = appRoutes(result).at(-1);
   const gesture = currentGesture();
-  await gesture('start', 1);
   await setTwoPanes(true);
   expect(setPredictiveBackTarget).toHaveBeenLastCalledWith(null);
   await gesture('commit', 1);
@@ -804,31 +804,44 @@ test('changing layout or disabling the setting cancels the preview before a late
   await setTwoPanes(false);
   expect(setPredictiveBackTarget).toHaveBeenLastCalledWith(answer?.key);
   const next = currentGesture();
-  await next('start', 2);
   await act(() =>
     useSettingsStore.setState({ androidPredictiveBackEnabled: false }),
   );
   expect(setPredictiveBackTarget).toHaveBeenLastCalledWith(null);
   await next('commit', 2);
+  expect(releasePredictiveBackSurface).toHaveBeenCalledWith(2);
   expect(result.getPathname()).toBe('/answer/a');
   await testRouter.back();
   expect(result.getPathname()).toBe('/');
 });
 
-test('a system commit still navigates when its preview start was missed and ignores a cancelled gesture', async () => {
-  await setTwoPanes(false);
-  const result = await open();
-  await testRouter.push('/answer/a');
-  await testRouter.push('/comments/a?type=answer');
+test('a finish restores the native surface when a router guard kept the source active', async () => {
+  const pop = jest.fn();
+  const finish = jest.fn();
+  await renderHook(() =>
+    usePredictiveBack('editor', 'home', 'editor', pop, finish),
+  );
   const gesture = currentGesture();
-  await gesture('start', 4);
-  await gesture('cancel', 4);
-  await gesture('commit', 4);
-  expect(result.getPathname()).toBe('/comments/a');
-  await gesture('commit', 5);
-  expect(result.getPathname()).toBe('/answer/a');
-  await gesture('commit', 5);
-  expect(result.getPathname()).toBe('/answer/a');
+  await gesture('commit', 9);
+  expect(pop).toHaveBeenCalledWith(1, 'editor');
+  await gesture('finish', 9);
+  expect(releasePredictiveBackSurface).toHaveBeenCalledWith(9);
+  expect(finish).not.toHaveBeenCalled();
+  await gesture('commit', 9);
+  expect(pop).toHaveBeenCalledTimes(1);
+});
+
+test('only a commit can navigate even if an older native event reaches the router', async () => {
+  await setTwoPanes(false);
+  const result = await open('/answer/a');
+  const gesture = currentGesture();
+  for (const phase of ['start', 'progress', 'cancel'] as const) {
+    // @ts-expect-error Simulate the older native binary sending an untyped event.
+    await gesture(phase, 1);
+    expect(result.getPathname()).toBe('/answer/a');
+  }
+  await gesture('commit', 2);
+  expect(result.getPathname()).toBe('/');
 });
 
 test('protected editors and nested navigators retain their standard Back handling', async () => {

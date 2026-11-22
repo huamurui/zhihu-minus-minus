@@ -3,6 +3,7 @@ package com.zhihuminus.predictiveback
 import android.content.Intent
 import android.os.Build
 import android.view.RoundedCorner
+import android.view.View
 import android.view.ViewTreeObserver
 import android.view.WindowInsets
 import android.window.BackEvent
@@ -12,6 +13,7 @@ import android.window.OnBackInvokedDispatcher
 import android.window.SystemOnBackInvokedCallbacks
 import androidx.annotation.RequiresApi
 import com.facebook.react.ReactActivity
+import com.facebook.react.uimanager.util.ReactFindViewUtil
 
 @RequiresApi(33)
 internal class BackWindow(
@@ -28,7 +30,7 @@ internal class BackWindow(
   private var configured = false
   private var callback: OnBackInvokedCallback? = null
   private var cancelGesture: (() -> Unit)? = null
-
+  private val committed = mutableMapOf<Int, BackSurface>()
   init {
     decor.viewTreeObserver.addOnGlobalLayoutListener(this)
   }
@@ -53,6 +55,11 @@ internal class BackWindow(
   fun close() {
     decor.viewTreeObserver.removeOnGlobalLayoutListener(this)
     unregister()
+    committed.values.toList().forEach { it.restore() }
+  }
+
+  fun releaseSurface(gestureId: Int) {
+    committed[gestureId]?.restore()
   }
 
   private fun unregister() {
@@ -65,7 +72,7 @@ internal class BackWindow(
 
   private fun imeVisible() = decor.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == true
 
-  private fun readCornerRadii(): Map<String, Double> {
+  private fun readCornerRadii(): FloatArray {
     val manager = activity.windowManager
     val window = manager.currentWindowMetrics
     val insets = decor.rootWindowInsets ?: window.windowInsets
@@ -75,17 +82,56 @@ internal class BackWindow(
     // legitimately have square corners even on a rounded display.
     val display = if (!activity.isInMultiWindowMode && bounds == manager.maximumWindowMetrics.bounds &&
       decor.width == bounds.width() && decor.height == bounds.height()) decor.display else null
-    val density = decor.resources.displayMetrics.density.toDouble()
-    fun radius(position: Int): Double {
+    fun radius(position: Int): Float {
       val corner = insets.getRoundedCorner(position) ?: display?.getRoundedCorner(position)
-      return (corner?.radius ?: 0) / density
+      return (corner?.radius ?: 0).toFloat()
     }
-    return mapOf(
-      "topLeft" to radius(RoundedCorner.POSITION_TOP_LEFT),
-      "topRight" to radius(RoundedCorner.POSITION_TOP_RIGHT),
-      "bottomRight" to radius(RoundedCorner.POSITION_BOTTOM_RIGHT),
-      "bottomLeft" to radius(RoundedCorner.POSITION_BOTTOM_LEFT),
+    return floatArrayOf(
+      radius(RoundedCorner.POSITION_TOP_LEFT),
+      radius(RoundedCorner.POSITION_TOP_RIGHT),
+      radius(RoundedCorner.POSITION_BOTTOM_RIGHT),
+      radius(RoundedCorner.POSITION_BOTTOM_LEFT),
     )
+  }
+
+  private fun findSurface(routeKey: String): View? =
+    ReactFindViewUtil.findView(decor, "zhihu-back-surface-$routeKey")?.takeIf {
+      it.isAttachedToWindow && it.width > 0 && it.height > 0 && it.isShown
+    }
+
+  @RequiresApi(34)
+  fun edgeSwipeFor(view: BackSwipeHost): EdgeSwipe? {
+    val key = target ?: return null
+    if (view.getTag(com.facebook.react.R.id.view_tag_native_id) != "zhihu-back-surface-$key") return null
+    if (view.windowToken !== decor.windowToken || !view.hasWindowFocus() || imeVisible()) return null
+    return callback as? PageGesture
+  }
+
+  private fun commit(routeKey: String, id: Int, surface: BackSurface) {
+    committed[id] = surface
+    var finished = false
+    fun finish() {
+      if (finished) return
+      finished = true
+      emit(mapOf("phase" to "finish", "routeKey" to routeKey, "gestureId" to id))
+    }
+    // Ownership outlives the route callback. Its replacement must not reset
+    // the old view before Fabric has finished displaying its exiting layer.
+    val recoverUnconsumed = Runnable {
+      if (target == routeKey) releaseSurface(id)
+    }
+    surface.onRelease = {
+      decor.removeCallbacks(recoverUnconsumed)
+      committed.remove(id)
+      finish()
+    }
+    emit(mapOf("phase" to "commit", "routeKey" to routeKey, "gestureId" to id))
+    surface.settle(1f, 120) {
+      finish()
+      // If JS was interrupted before consuming the commit, restore the still
+      // active route's pixels without dispatching another navigation action.
+      if (surface.attached) decor.postDelayed(recoverUnconsumed, 1000L)
+    }
   }
 
   private fun updateRegistration() {
@@ -96,8 +142,8 @@ internal class BackWindow(
     val previewHome = allowHomePreview && routeKey == null && !hasBackHandler && Build.VERSION.SDK_INT >= 34
     callback = when {
       routeKey != null && Build.VERSION.SDK_INT >= 34 ->
-        PageGesture(routeKey, nextId, emit, ::readCornerRadii, ::forwardToReact) { callback === it }.also {
-          cancelGesture = it::onBackCancelled
+        PageGesture(routeKey, nextId, ::findSurface, ::readCornerRadii, ::commit, ::forwardToReact) { callback === it }.also {
+          cancelGesture = it::release
         }
       // RN 0.88 installs its own hardwareBackPress callback starting on API 36.
       !previewHome && Build.VERSION.SDK_INT < 36 ->
@@ -124,49 +170,90 @@ internal class BackWindow(
 private class PageGesture(
   private val routeKey: String,
   private val nextId: () -> Int,
-  private val emit: (Map<String, Any>) -> Unit,
-  private val readCornerRadii: () -> Map<String, Double>,
+  private val findSurface: (String) -> View?,
+  private val readCornerRadii: () -> FloatArray,
+  private val commit: (String, Int, BackSurface) -> Unit,
   private val ordinaryBack: () -> Unit,
   private val isCurrent: (PageGesture) -> Boolean,
-) : OnBackAnimationCallback {
+) : OnBackAnimationCallback, EdgeSwipe {
   private var id: Int? = null
-  private var edge = "left"
+  private var surface: BackSurface? = null
+  private var committedSource: BackSurface? = null
+  private var appTracking = false
 
   override fun onBackStarted(event: BackEvent) {
-    if (!isCurrent(this)) return
-    onBackCancelled()
+    if (!isCurrent(this) || committedSource?.attached == true) return
+    release()
     if (event.swipeEdge != BackEvent.EDGE_LEFT && event.swipeEdge != BackEvent.EDGE_RIGHT) return
+    val view = findSurface(routeKey) ?: return
+    begin(view, event.swipeEdge == BackEvent.EDGE_RIGHT, false)
+    surface?.applyProgress(event.progress)
+  }
+
+  private fun begin(view: View, fromRight: Boolean, app: Boolean) {
+    committedSource = null
     id = nextId()
-    edge = if (event.swipeEdge == BackEvent.EDGE_RIGHT) "right" else "left"
-    report("start", event.progress, readCornerRadii())
+    appTracking = app
+    surface = BackSurface(view, readCornerRadii(), fromRight, followsFinger = app)
+  }
+
+  override fun beginApp(view: BackSwipeHost, fromRight: Boolean): Boolean {
+    if (!isCurrent(this) || id != null || committedSource?.attached == true) return false
+    release()
+    begin(view, fromRight, true)
+    return true
+  }
+
+  override fun moveApp(progress: Float) {
+    if (appTracking && isCurrent(this)) surface?.applyProgress(progress)
+  }
+
+  override fun endApp(accept: Boolean) {
+    if (!appTracking || !isCurrent(this)) return
+    if (accept && surface?.attached == true) commitGesture() else cancelGesture()
   }
 
   override fun onBackProgressed(event: BackEvent) {
-    if (isCurrent(this)) report("progress", event.progress)
+    if (!isCurrent(this) || id == null || appTracking) return
+    surface?.applyProgress(event.progress)
   }
 
   override fun onBackCancelled() {
-    report("cancel", 0f)
+    if (!appTracking) cancelGesture()
+  }
+
+  private fun cancelGesture() {
+    if (id == null) return
     id = null
+    appTracking = false
+    surface?.let { it.settle(0f, 150, it::restore) }
+  }
+
+  fun release() {
+    id = null
+    appTracking = false
+    surface?.restore()
+    surface = null
   }
 
   override fun onBackInvoked() {
-    if (!isCurrent(this)) return
+    if (!isCurrent(this) || committedSource?.attached == true) return
     // Three-button navigation and accessibility actions can invoke without a gesture.
-    if (id == null) ordinaryBack() else report("commit", 1f)
-    id = null
+    if (surface?.attached != true || id == null || appTracking) {
+      release()
+      ordinaryBack()
+      return
+    }
+    commitGesture()
   }
 
-  private fun report(phase: String, progress: Float, corners: Map<String, Double>? = null) {
+  private fun commitGesture() {
+    val source = surface ?: return
     val gestureId = id ?: return
-    val event = mutableMapOf<String, Any>(
-      "phase" to phase,
-      "routeKey" to routeKey,
-      "gestureId" to gestureId,
-      "edge" to edge,
-      "progress" to progress.toDouble(),
-    )
-    if (corners != null) event["cornerRadii"] = corners
-    emit(event)
+    committedSource = source
+    appTracking = false
+    surface = null
+    id = null
+    commit(routeKey, gestureId, source)
   }
 }
