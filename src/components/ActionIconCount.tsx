@@ -4,7 +4,11 @@ import { useContentActionBarColor } from '@/components/ContentActionBarColor';
 import { useThemeColor } from '@/components/Themed';
 import { formatCount } from '@/utils/formatCount';
 
-/** A count in the lower-right corner of a fixed-size action target. */
+/**
+ * A count centred under its icon inside a fixed 44×44 action target. The icon
+ * and count are laid out as one centred column, so the count lines up with
+ * any icon size or count length without fixed offsets.
+ */
 export function ActionIconCount({
   children,
   count,
@@ -20,9 +24,10 @@ export function ActionIconCount({
 
   return (
     <View style={styles.container} accessible={false}>
-      <View style={styles.icon}>{children}</View>
+      {children}
       {hasCount ? (
         <Text
+          testID="action-icon-count"
           accessible={false}
           numberOfLines={1}
           adjustsFontSizeToFit
@@ -38,13 +43,16 @@ export function ActionIconCount({
 }
 
 const styles = StyleSheet.create({
-  container: { width: 44, height: 44 },
-  icon: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  container: {
+    width: 44,
+    height: 44,
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   count: {
-    position: 'absolute',
-    left: 16,
-    right: 0,
-    bottom: 3,
+    maxWidth: 44,
+    marginTop: 1,
     fontSize: 10,
     lineHeight: 12,
     fontWeight: '600',
