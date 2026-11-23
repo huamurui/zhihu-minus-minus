@@ -133,14 +133,6 @@ internal class BackWindow(
 
   private fun isCommitted(view: View) = committed.values.any { it.view === view }
 
-  @RequiresApi(34)
-  fun edgeSwipeFor(view: BackSwipeHost): EdgeSwipe? {
-    val key = target ?: return null
-    if (view.getTag(com.facebook.react.R.id.view_tag_native_id) != "zhihu-back-surface-$key") return null
-    if (view.windowToken !== decor.windowToken || !view.hasWindowFocus() || imeVisible()) return null
-    return callback as? PageGesture
-  }
-
   private fun commit(routeKey: String, id: Int, surface: BackSurface) {
     committed[id] = surface
     var finished = false
@@ -211,11 +203,11 @@ private class PageGesture(
   private val commit: (String, Int, BackSurface) -> Unit,
   private val ordinaryBack: () -> Unit,
   private val isCurrent: (PageGesture) -> Boolean,
-) : OnBackAnimationCallback, EdgeSwipe {
+) : OnBackAnimationCallback {
   private var id: Int? = null
   private var surface: BackSurface? = null
   private var ignoredSystemGesture = false
-  private var appTracking = false
+  private var receivedProgress = false
 
   override fun onBackStarted(event: BackEvent) {
     if (!isCurrent(this)) return
@@ -224,54 +216,35 @@ private class PageGesture(
     if (event.swipeEdge != BackEvent.EDGE_LEFT && event.swipeEdge != BackEvent.EDGE_RIGHT) return
     val view = findSurface(routeKey) ?: return
     // Consume this sequence even if its previous commit releases the view before UP.
-    ignoredSystemGesture = !begin(view, event.swipeEdge == BackEvent.EDGE_RIGHT, app = false)
-    surface?.applyProgress(event.progress)
-  }
-
-  private fun begin(view: View, fromRight: Boolean, app: Boolean): Boolean {
-    if (isCommitted(view)) return false
+    if (isCommitted(view)) {
+      ignoredSystemGesture = true
+      return
+    }
     id = nextId()
-    appTracking = app
-    surface = BackSurface(view, readCornerRadii(), fromRight)
-    return true
-  }
-
-  override fun beginApp(view: BackSwipeHost, fromRight: Boolean): Boolean {
-    if (!isCurrent(this) || id != null) return false
-    release()
-    return begin(view, fromRight, app = true)
-  }
-
-  override fun moveApp(progress: Float) {
-    if (appTracking && isCurrent(this)) surface?.applyProgress(progress)
-  }
-
-  override fun endApp(accept: Boolean) {
-    if (!appTracking || !isCurrent(this)) return
-    if (accept && surface?.attached == true) commitGesture() else cancelGesture()
+    surface = BackSurface(view, readCornerRadii(), event.swipeEdge == BackEvent.EDGE_RIGHT)
+    applyProgress(event.progress)
   }
 
   override fun onBackProgressed(event: BackEvent) {
-    if (!isCurrent(this) || id == null || appTracking) return
-    surface?.applyProgress(event.progress)
+    if (isCurrent(this) && id != null) applyProgress(event.progress)
+  }
+
+  private fun applyProgress(progress: Float) {
+    if (progress > 0f) receivedProgress = true
+    surface?.applyProgress(progress)
   }
 
   override fun onBackCancelled() {
     if (!isCurrent(this)) return
     ignoredSystemGesture = false
-    if (!appTracking) cancelGesture()
-  }
-
-  private fun cancelGesture() {
     if (id == null) return
     id = null
-    appTracking = false
     surface?.let { it.settle(committing = false, onEnd = it::restore) }
   }
 
   fun release() {
     id = null
-    appTracking = false
+    receivedProgress = false
     surface?.restore()
     surface = null
   }
@@ -282,19 +255,14 @@ private class PageGesture(
       ignoredSystemGesture = false
       return
     }
-    // Three-button navigation and accessibility actions can invoke without a gesture.
-    if (surface?.attached != true || id == null || appTracking) {
+    val source = surface
+    val gestureId = id
+    // Buttons, accessibility actions and some system gestures supply no progress.
+    if (source?.attached != true || gestureId == null || !receivedProgress) {
       release()
       if (findSurface(routeKey)?.let(isCommitted) != true) ordinaryBack()
       return
     }
-    commitGesture()
-  }
-
-  private fun commitGesture() {
-    val source = surface ?: return
-    val gestureId = id ?: return
-    appTracking = false
     surface = null
     id = null
     commit(routeKey, gestureId, source)

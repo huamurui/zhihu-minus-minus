@@ -1,5 +1,5 @@
-import { requireNativeView, requireOptionalNativeModule } from 'expo';
-import { Platform, View, type ViewProps } from 'react-native';
+import { requireOptionalNativeModule } from 'expo';
+import { Platform } from 'react-native';
 
 export interface PredictiveBackEvent {
   phase: 'commit' | 'finish';
@@ -31,15 +31,6 @@ const previewModule =
     ? nativeModule
     : null;
 export const supportsPredictiveBack = previewModule !== null;
-
-type BackSwipeHostProps = ViewProps & { allowContentSwipe?: boolean };
-
-// Keep the same host type for the route's lifetime so changing eligibility
-// preserves its scroll position, focused controls and in-progress drafts.
-export const BackSwipeHost =
-  previewModule && globalThis.expo?.getViewConfig?.(moduleName, undefined)
-    ? requireNativeView<BackSwipeHostProps>(moduleName)
-    : View;
 
 export function setPredictiveBackTarget(routeKey: string | null): void {
   previewModule?.setTarget(routeKey);
