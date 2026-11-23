@@ -3,10 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { type GestureResponderEvent, StyleSheet } from 'react-native';
 import { hasAuthenticationCookie } from '@/api/client';
 import { getAllContentCollectionStatus } from '@/api/zhihu/collection';
-import {
-  ACTION_ICON_COUNT_BUTTON,
-  ActionIconCount,
-} from '@/components/ActionIconCount';
+import { ActionIconCount } from '@/components/ActionIconCount';
 import { CollectionStarIcon } from '@/components/CollectionStarIcon';
 import { useContentActionBarColor } from '@/components/ContentActionBarColor';
 import { ContentActionButton } from '@/components/ContentActionButton';
@@ -193,7 +190,12 @@ export function CollectionButton({
 }
 
 const styles = StyleSheet.create({
-  cornerButton: ACTION_ICON_COUNT_BUTTON,
+  cornerButton: {
+    width: 44,
+    height: 44,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
   count: {
     marginLeft: 4,
     fontSize: typography.fontSize.body,

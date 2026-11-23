@@ -5,8 +5,9 @@ import { useThemeColor } from '@/components/Themed';
 import { formatCount } from '@/utils/formatCount';
 
 /**
- * An action icon with its count to the right, like the vote capsule's count.
- * At least 44 wide; a count widens the target instead of overlapping the icon.
+ * A count centred under its icon inside a fixed 44×44 action target. The icon
+ * and count are laid out as one centred column, so the count lines up with
+ * any icon size or count length without fixed offsets.
  */
 export function ActionIconCount({
   children,
@@ -22,16 +23,15 @@ export function ActionIconCount({
   const hasCount = count !== undefined && Number.isFinite(count) && count >= 0;
 
   return (
-    <View
-      style={[styles.container, hasCount && styles.withCount]}
-      accessible={false}
-    >
+    <View style={styles.container} accessible={false}>
       {children}
       {hasCount ? (
         <Text
           testID="action-icon-count"
           accessible={false}
           numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
           maxFontSizeMultiplier={1.2}
           style={[styles.count, { color: color ?? actionColor }]}
         >
@@ -42,28 +42,21 @@ export function ActionIconCount({
   );
 }
 
-/** Button style for an ActionIconCount target: 44 square, wider with a count. */
-export const ACTION_ICON_COUNT_BUTTON = {
-  minWidth: 44,
-  height: 44,
-  paddingHorizontal: 0,
-  paddingVertical: 0,
-} as const;
-
 const styles = StyleSheet.create({
   container: {
-    minWidth: 44,
+    width: 44,
     height: 44,
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  withCount: { paddingHorizontal: 8 },
   count: {
-    marginLeft: 4,
-    fontSize: 13,
-    lineHeight: 18,
+    maxWidth: 44,
+    marginTop: 1,
+    fontSize: 10,
+    lineHeight: 12,
     fontWeight: '600',
+    textAlign: 'center',
     includeFontPadding: false,
   },
 });
