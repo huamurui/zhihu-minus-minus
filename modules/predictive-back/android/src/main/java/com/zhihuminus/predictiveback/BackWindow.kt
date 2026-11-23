@@ -160,7 +160,7 @@ internal class BackWindow(
       finish()
     }
     emit(mapOf("phase" to "commit", "routeKey" to routeKey, "gestureId" to id))
-    surface.settle(1f, 120) {
+    surface.settle(committing = true) {
       finish()
       // If JS was interrupted before consuming the commit, restore the still
       // active route's pixels without dispatching another navigation action.
@@ -224,7 +224,7 @@ private class PageGesture(
     if (event.swipeEdge != BackEvent.EDGE_LEFT && event.swipeEdge != BackEvent.EDGE_RIGHT) return
     val view = findSurface(routeKey) ?: return
     // Consume this sequence even if its previous commit releases the view before UP.
-    ignoredSystemGesture = !begin(view, event.swipeEdge == BackEvent.EDGE_RIGHT, false)
+    ignoredSystemGesture = !begin(view, event.swipeEdge == BackEvent.EDGE_RIGHT, app = false)
     surface?.applyProgress(event.progress)
   }
 
@@ -232,14 +232,14 @@ private class PageGesture(
     if (isCommitted(view)) return false
     id = nextId()
     appTracking = app
-    surface = BackSurface(view, readCornerRadii(), fromRight, followsFinger = app)
+    surface = BackSurface(view, readCornerRadii(), fromRight)
     return true
   }
 
   override fun beginApp(view: BackSwipeHost, fromRight: Boolean): Boolean {
     if (!isCurrent(this) || id != null) return false
     release()
-    return begin(view, fromRight, true)
+    return begin(view, fromRight, app = true)
   }
 
   override fun moveApp(progress: Float) {
@@ -266,7 +266,7 @@ private class PageGesture(
     if (id == null) return
     id = null
     appTracking = false
-    surface?.let { it.settle(0f, 150, it::restore) }
+    surface?.let { it.settle(committing = false, onEnd = it::restore) }
   }
 
   fun release() {

@@ -1,6 +1,6 @@
 import { act, render } from '@testing-library/react-native';
 import React from 'react';
-import type { LayoutChangeEvent } from 'react-native';
+import { type LayoutChangeEvent, Platform } from 'react-native';
 import AnswerDetailScreen from '../src/app/answer/[id]';
 import { PaneContext } from '../src/features/adaptive-layout/PaneContext';
 import type { AnswerReadSession } from '../src/hooks/useAnswerDetailRead';
@@ -8,6 +8,7 @@ import { calculateDetailHeaderAppearance } from '../src/utils/detailHeaderAppear
 
 interface PagerProps {
   children?: React.ReactNode;
+  accessibilityRole?: string;
   initialPage: number;
   scrollEnabled: boolean;
   onLayout: (event: LayoutChangeEvent) => void;
@@ -1302,6 +1303,21 @@ function adaptiveAnswerScreen(twoPane: boolean) {
     React.createElement(AnswerDetailScreen),
   );
 }
+
+test('the Android answer pager reserves horizontal drags even before its neighbors load', async () => {
+  const platform = jest.replaceProperty(Platform, 'OS', 'android');
+  try {
+    const host = await render(adaptiveAnswerScreen(false));
+    expect(mockPagerProps.accessibilityRole).toBe('pager');
+    setList(['42', '11']);
+    await host.rerender(adaptiveAnswerScreen(false));
+    await selectPage(1);
+    expect(mockAnswerProps.get('11')?.isFocused).toBe(true);
+    expect(mockRouter.back).not.toHaveBeenCalled();
+  } finally {
+    platform.restore();
+  }
+});
 
 test('two-pane rotation disables swiping while retaining the current answer, scroll and read session', async () => {
   setList(['42', '11']);

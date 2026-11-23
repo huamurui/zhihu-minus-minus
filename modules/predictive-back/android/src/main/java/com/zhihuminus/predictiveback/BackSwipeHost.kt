@@ -31,6 +31,7 @@ internal interface EdgeSwipe {
 class BackSwipeHost(context: Context, appContext: AppContext) : ExpoView(context, appContext) {
   internal var allowContentSwipe = false
   private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+  private val edgeSlop = ViewConfiguration.get(context).scaledEdgeSlop
   private val accessibility = context.getSystemService(AccessibilityManager::class.java)
   private var swipe: EdgeSwipe? = null
   private var velocity: VelocityTracker? = null
@@ -77,19 +78,17 @@ class BackSwipeHost(context: Context, appContext: AppContext) : ExpoView(context
     if (!hasWindowFocus() || accessibility?.isTouchExplorationEnabled == true) return
     if ((findFocus() as? TextView)?.hasSelection() == true) return
     val insets = rootWindowInsets?.getInsets(WindowInsets.Type.systemGestures()) ?: return
-    val density = resources.displayMetrics.density
     if (insets.left == 0 && insets.right == 0) return
-    // Android owns the outermost edge. Drags starting inside it use system Back.
-    fun inBand(x: Float, inset: Int): Boolean =
-      inset > 0 && x >= inset &&
-        x <= minOf(width * 0.2f, maxOf(56f * density, inset + 28f * density))
-    val nearLeft = inBand(event.x, insets.left)
-    val nearRight = inBand(width - event.x, insets.right)
-    val fromContent = !nearLeft && !nearRight
+    // The window reports the system-owned edges. Use the device's edge slop
+    // only for the application's narrow strip immediately inside each one.
+    val fromLeftInset = event.x - insets.left
+    val fromRightInset = width - insets.right - event.x
+    if (fromLeftInset < 0f || fromRightInset <= 0f) return
+    val nearLeft = insets.left > 0 && fromLeftInset < edgeSlop
+    val nearRight = insets.right > 0 && fromRightInset <= edgeSlop
     fromRight = when {
-      nearRight -> true
-      nearLeft -> false
-      allowContentSwipe && event.x >= insets.left && width - event.x >= insets.right -> false
+      nearRight && (!nearLeft || fromRightInset < fromLeftInset) -> true
+      nearLeft || allowContentSwipe -> false
       else -> return
     }
     val module = appContext.registry.getModule("ZhihuPredictiveBack") as? PredictiveBackModule
@@ -98,9 +97,10 @@ class BackSwipeHost(context: Context, appContext: AppContext) : ExpoView(context
     if (path.any {
       val view = it.getView() ?: return@any false
       val role = AccessibilityRole.fromViewTag(view)
+      // A pager owns its whole hit area, even while the next page is loading.
       view is EditText || view is AbsSeekBar || view is CompoundButton ||
-        role == AccessibilityRole.ADJUSTABLE || role == AccessibilityRole.SWITCH ||
-        (fromContent && (view.canScrollHorizontally(-1) || view.canScrollHorizontally(1)))
+        role == AccessibilityRole.PAGER || role == AccessibilityRole.ADJUSTABLE ||
+        role == AccessibilityRole.SWITCH || view.canScrollHorizontally(-1) || view.canScrollHorizontally(1)
     }) return
     swipe = current
     startX = event.rawX
@@ -133,8 +133,7 @@ class BackSwipeHost(context: Context, appContext: AppContext) : ExpoView(context
         return
       }
       claimed = true
-      // A nested pager may already have requested exclusive input on DOWN.
-      // Override that request only after a horizontal drag qualified in the band.
+      // Cancel the child's touch only after Back has claimed a horizontal drag.
       super.requestDisallowInterceptTouchEvent(false)
       parent?.requestDisallowInterceptTouchEvent(true)
       NativeGestureUtil.notifyNativeGestureStarted(this, event)
