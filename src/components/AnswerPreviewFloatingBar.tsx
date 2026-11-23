@@ -96,6 +96,7 @@ export function AnswerPreviewFloatingBar({
             voted={answer.relationship.voting}
             type="answers"
             allowCountShrink
+            flatWhenNeutral
           />
         ) : null
       }

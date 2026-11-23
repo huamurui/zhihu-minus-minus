@@ -13,6 +13,7 @@ export interface SegmentedVoteCapsuleProps {
   type?: VoteContentType;
   showDownvote?: boolean;
   allowCountShrink?: boolean;
+  flatWhenNeutral?: boolean;
   onVoteChange?: (voted: number, count: number) => void;
   style?: StyleProp<ViewStyle>;
 }
@@ -24,6 +25,7 @@ export function SegmentedVoteCapsule({
   type = 'answers',
   showDownvote = true,
   allowCountShrink = false,
+  flatWhenNeutral = false,
   onVoteChange,
   style,
 }: SegmentedVoteCapsuleProps) {
@@ -38,8 +40,7 @@ export function SegmentedVoteCapsule({
     setCurrentCount(initialCount);
   }, [id, initialVoted, initialCount]);
 
-  const isUpvoted = currentVoted === 1;
-  const isDownvoted = currentVoted === -1;
+  const isVoted = currentVoted === 1 || currentVoted === -1;
 
   const primaryTint =
     colorScheme === 'dark' ? `${colors.primary}30` : `${colors.primary}18`;
@@ -55,23 +56,26 @@ export function SegmentedVoteCapsule({
       ? 'rgba(255, 255, 255, 0.08)'
       : 'rgba(0, 0, 0, 0.06)';
 
-  const containerBg = isUpvoted
-    ? primaryTint
-    : isDownvoted
-      ? primaryTint
-      : neutralBg;
-  const borderColor = isUpvoted || isDownvoted ? primaryBorder : neutralBorder;
-  const dividerColor =
-    isUpvoted || isDownvoted ? primaryBorder : neutralDivider;
+  const showFill = isVoted || !flatWhenNeutral;
+  const dividerColor = isVoted ? primaryBorder : neutralDivider;
 
   return (
     <View
       style={[
         styles.capsule,
         allowCountShrink && styles.shrinkable,
+        // The border stays (transparent when flat) so voting never shifts layout.
         {
-          backgroundColor: containerBg,
-          borderColor,
+          backgroundColor: showFill
+            ? isVoted
+              ? primaryTint
+              : neutralBg
+            : 'transparent',
+          borderColor: showFill
+            ? isVoted
+              ? primaryBorder
+              : neutralBorder
+            : 'transparent',
         },
         style,
       ]}

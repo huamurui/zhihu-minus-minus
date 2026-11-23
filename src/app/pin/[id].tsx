@@ -411,6 +411,7 @@ export default function PinDetailScreen() {
           leading={
             <SegmentedVoteCapsule
               id={pin.id}
+              flatWhenNeutral
               count={pinVoteCount}
               voted={pinVoteState}
               type="pins"
