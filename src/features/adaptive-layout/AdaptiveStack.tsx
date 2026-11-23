@@ -672,7 +672,7 @@ function AdaptiveScreen({
       ? options.headerTintColor
       : colors.primary;
   const itemProps = { tintColor, canGoBack };
-  // Native owns this surface's alpha, transform and outline during Back.
+  // Native owns this surface's scale, exit translation and rounded outline during Back.
   // Its ancestors handle layout, visibility and ordinary route transitions.
   return (
     <BackSwipeHost

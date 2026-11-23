@@ -13,7 +13,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import type { LayoutChangeEvent } from 'react-native';
+import { type LayoutChangeEvent, Platform } from 'react-native';
 import PagerView, { type PagerViewRef } from 'react-native-pager-view';
 import { recordReadHistory } from '@/api/zhihu/history';
 import {
@@ -401,6 +401,7 @@ function AnswerDetailScreen() {
         ref={pagerRef}
         key={pagerKey}
         style={{ flex: 1 }}
+        accessibilityRole={Platform.OS === 'android' ? 'pager' : undefined}
         initialPage={initialPage}
         scrollEnabled={!twoPane}
         offscreenPageLimit={1}
