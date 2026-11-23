@@ -57,6 +57,7 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { TitleTransitionTarget } from '@/features/adaptive-layout/TitleTransition';
 import { usePaneRouter as useRouter } from '@/features/adaptive-layout/usePaneRouter';
 import { RICH_CONTENT_STALE_TIME } from '@/features/rich-content';
+import { useCollapseScrollAnchor } from '@/hooks/useCollapseScrollAnchor';
 import { useDetailHeaderState } from '@/hooks/useDetailHeaderState';
 import { useGestureScrollView } from '@/hooks/useGestureScrollView';
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
@@ -344,6 +345,14 @@ export default function QuestionDetail() {
   };
 
   const flashListRef = useRef<FlashListRef<AnswerDetail>>(null);
+  const detailCollapse = useCollapseScrollAnchor({
+    getOffset: useCallback(() => scrollY.value, [scrollY]),
+    scrollToOffset: useCallback(
+      (offset: number) =>
+        flashListRef.current?.scrollToOffset({ offset, animated: false }),
+      [],
+    ),
+  });
   const {
     data: answersData,
     fetchNextPage,
@@ -535,7 +544,10 @@ export default function QuestionDetail() {
                 </View>
               ) : null}
               {question?.detail ? (
-                <View className="mt-3 rounded-2xl overflow-hidden">
+                <View
+                  className="mt-3 rounded-2xl overflow-hidden"
+                  onLayout={detailCollapse.onLayout}
+                >
                   {detailExpanded ? (
                     <>
                       <QuestionDetailContent
@@ -548,7 +560,10 @@ export default function QuestionDetail() {
                       <BouncyButton
                         accessibilityRole="button"
                         accessibilityLabel="收起问题描述"
-                        onPress={() => setDetailExpanded(false)}
+                        onPress={() => {
+                          detailCollapse.beforeCollapse();
+                          setDetailExpanded(false);
+                        }}
                         className="flex-row items-center self-start py-1 mt-1 gap-1"
                       >
                         <Text
@@ -729,6 +744,8 @@ export default function QuestionDetail() {
       followMutation.mutate,
       followMutation.isPending,
       detailExpanded,
+      detailCollapse.beforeCollapse,
+      detailCollapse.onLayout,
       primaryColor,
       linkColor,
       onPrimaryColor,
