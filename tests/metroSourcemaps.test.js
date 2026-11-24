@@ -73,8 +73,7 @@ async function main() {
     resolveRequest: () => ({ type: 'sourceFile', filePath: cssEntry }),
     isDev: false,
   }, cssEntry, platform);
-  const browserOrigin = path.join(root, 'node_modules/@sentry/browser/build/npm/esm/index.js');
-  const resolveSentry = (moduleName, originModulePath = browserOrigin) =>
+  const resolveSentry = (moduleName, originModulePath = entry) =>
     config.resolver.resolveRequest({
       resolveRequest: () => ({ type: 'sourceFile', filePath: entry }),
       originModulePath,
@@ -86,14 +85,23 @@ async function main() {
     '@sentry-internal/replay',
     '@sentry/feedback',
     '@sentry-internal/feedback',
-    './feedbackSync.js',
-    './feedbackAsync.js',
   ].every((moduleName) => resolveSentry(moduleName).type === 'empty');
+  // Exercise both host path formats even when CI runs entirely on Linux.
+  const originPaths = [path.win32, path.posix];
+  const index = (paths, pkg) => paths.join('fixture', 'node_modules', '@sentry', pkg, 'build', 'index.js');
+  const feedbackWrappersScoped = ['./feedbackSync.js', './feedbackAsync.js'].every((moduleName) =>
+    originPaths.every((paths) =>
+      resolveSentry(moduleName, index(paths, 'browser')).type === 'empty'
+      && resolveSentry(moduleName, index(paths, 'browser-utils')).type === 'sourceFile'
+    ) && resolveSentry(moduleName, entry).type === 'sourceFile',
+  );
   const errorPackagesPreserved = [
     '@sentry/react-native',
     '@sentry/core',
     '@sentry/browser',
-  ].every((moduleName) => resolveSentry(moduleName).type === 'sourceFile');
+  ].every((moduleName) =>
+    originPaths.every((paths) => resolveSentry(moduleName, index(paths, 'browser')).type === 'sourceFile'),
+  );
   process.stdout.write(JSON.stringify({
     registeredDebugIds: Object.values(sandbox._sentryDebugIds || {}),
     mapDebugId: sourceMap.debugId ?? sourceMap.debug_id,
@@ -107,7 +115,7 @@ async function main() {
       && fs.existsSync(cssModule.filePath),
     excludedWebPackages,
     errorPackagesPreserved,
-    unrelatedFeedbackPreserved: resolveSentry('./feedbackSync.js', entry).type === 'sourceFile',
+    feedbackWrappersScoped,
   }));
 }
 
@@ -140,7 +148,7 @@ test.each(['android', 'ios'])(
       cssResolved: true,
       excludedWebPackages: true,
       errorPackagesPreserved: true,
-      unrelatedFeedbackPreserved: true,
+      feedbackWrappersScoped: true,
     });
   },
 );

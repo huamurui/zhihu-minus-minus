@@ -149,6 +149,8 @@ Pop-Location
 
 产物位于 `android/app/build/outputs/apk/release/`，ARM64 文件名为 `app-arm64-v8a-release.apk`，内置 JS，可离线运行。包体积和构建时间随依赖、缓存与机器变化，不沿用旧版本测量作为当前基线。
 
+Sentry 8.28.0 的 Metro 解析器需要识别 Windows 路径分隔符，否则打包可能成功，应用却在冷启动时因缺少 `buildFeedbackIntegration` 而退出。`npm ci` 自动应用[项目补丁](../patches/@sentry+react-native+8.28.0.patch)。升级 Sentry 后可运行 `npm test -- tests/metroSourcemaps.test.js --runInBand` 并在设备上冷启动本地 Release 包。
+
 > 注意：`expo prebuild` 生成的本地 Android 工程通常使用本机的 debug keystore 为这个 release 变体签名；GitHub Actions 中的 EAS preview 构建可能使用 EAS 管理的另一份凭据。只有两个 APK 的 applicationId 与签名证书都一致时才能互相覆盖安装。若签名不同，需要先卸载旧包（会清除应用数据），或显式为两条构建链配置同一份 keystore。
 
 **坑**：release 构建期间不要同时开着 Metro——编译原生 C++ 时会在 `node_modules/*/android/.cxx` 下快速创建/删除临时目录，Metro 的文件扫描器会撞上 ENOENT 直接崩溃，等构建完再启动 Metro。
