@@ -30,6 +30,7 @@ export interface RichTextCompilationOptions {
   paragraphSpacing?: number;
   /** A separately rendered container child can continue its preceding blank. */
   continuesEmptyParagraph?: boolean;
+  /** Controls both rendering and interaction for comment underlines. */
   enableSegmentTap?: boolean;
 }
 
@@ -300,7 +301,10 @@ export function* compileZhihuDocumentCursor(
           ...(run.type === 'link' && { url: run.url }),
         });
       }
-      if (run.type === 'segment' || run.type === 'segmentHighlight') {
+      if (
+        options.enableSegmentTap !== false &&
+        (run.type === 'segment' || run.type === 'segmentHighlight')
+      ) {
         segmentRanges.push({ start, end, run });
         builder.decorations.push({
           id: `${run.id}:decoration`,
@@ -310,7 +314,7 @@ export function* compileZhihuDocumentCursor(
           kind: 'dashed',
           thickness: 1.2,
           offset: segmentUnderlineOffset,
-          ...(options.enableSegmentTap !== false && { actionId: run.id }),
+          actionId: run.id,
         });
       }
     }

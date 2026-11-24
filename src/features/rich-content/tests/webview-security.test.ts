@@ -533,6 +533,61 @@ test('marks the exact end of a commented source range across formatted WebView t
   }
 });
 
+test('hides comment markup from raw and serialized paragraphs with and without segment metadata', () => {
+  const html =
+    '<p data-pid="one"><strong>甲</strong>乙</p>' +
+    '<p><span class="highlight-wrap" data-highlight-comment-count="3"><a href="/people/u"><u>丙</u></a><mark>丁</mark></span></p>';
+  const { document } = normalizeZhihuDocument(html, {
+    documentId: 'answer:42',
+    segmentInfos: [
+      {
+        pid: 'one',
+        text: '甲乙',
+        marks: [
+          {
+            start_index: 0,
+            end_index: 1,
+            seg_info: { is_like: true, like_count: 1, comment_count: 2 },
+          },
+        ],
+      },
+    ],
+  });
+  const paragraphs = getWebViewSegmentParagraphs(document);
+  for (const source of [html, serializeZhihuDocumentHtml(document)]) {
+    const hidden = sanitizeRichContentHtml(source, paragraphs, false);
+    const nodes = parseDocument(hidden).children;
+    expect(DomUtils.textContent(nodes)).toBe('甲乙丙丁');
+    expect(hidden).not.toMatch(
+      /segment-interactable|segment-comments|segment-liked|highlight-wrap/,
+    );
+    expect(
+      DomUtils.findAll((node) => node.name === 'u', nodes).map((u) =>
+        DomUtils.textContent(u),
+      ),
+    ).toEqual(['丙']);
+    for (const [tag, text] of [
+      ['a', '丙'],
+      ['mark', '丁'],
+      ['strong', '甲'],
+    ]) {
+      expect(
+        DomUtils.textContent(
+          DomUtils.findAll((node) => node.name === tag, nodes),
+        ),
+      ).toBe(text);
+    }
+  }
+  const styled = sanitizeRichContentHtml(
+    '<u class="segment-comments custom" style="text-decoration:underline dashed;color:red">标注</u>',
+    undefined,
+    false,
+  );
+  expect(styled).toContain('class="custom"');
+  expect(styled).toContain('style="color:red"');
+  expect(styled).not.toContain('<u');
+});
+
 test.each([0, 2])(
   'uses the current API count %i for an exactly matching HTML underline',
   (count) => {

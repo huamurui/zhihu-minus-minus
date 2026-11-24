@@ -876,34 +876,39 @@ test('formula scripts and fonts are inline with no CDN dependency', async () => 
 });
 
 test.each([true, false])(
-  'keeps a comment icon inside a link independently tappable (segment taps %s)',
-  async (segmentTapEnabled) => {
+  'preserves a selectable link and conditionally renders its comment icon (highlights %s)',
+  async (showSegmentHighlights) => {
     const { html } = await renderPage({
       htmlContent:
-        '<p data-pid="p"><a href="https://example.com/"><span class="segment-interactable segment-comments" data-pid="p" data-segment-node-id="n">链接文字</span></a></p>',
-      segmentTapEnabled,
+        '<p data-pid="p"><a href="https://example.com/"><span class="segment-interactable segment-comments" data-pid="p" data-segment-node-id="n"><u>链接文字</u></span></a></p>',
+      segmentTapEnabled: showSegmentHighlights,
     });
     const { document, select, postMessage, close } = selectionRuntime(html);
     try {
-      const span = document.querySelector<HTMLElement>('.segment-comments');
-      const icon = span?.querySelector<HTMLElement>('.segment-comment-icon');
-      if (!span?.firstChild || !icon) throw new Error('Expected linked marker');
-      expect(span.textContent).toBe('链接文字');
+      const link = document.querySelector('a');
+      const underlinedText = link?.querySelector('u')?.firstChild;
+      if (!link || !underlinedText) throw new Error('Expected underlined link');
+      expect(link.textContent).toBe('链接文字');
       expect(
-        select(span.firstChild, 0, span, span.childNodes.length),
+        select(underlinedText, 0, link, link.childNodes.length),
       ).toMatchObject({
         text: '链接文字',
         startOffset: 0,
         endOffset: 4,
       });
       postMessage.mockClear();
-      icon.click();
-      expect(postMessage.mock.calls).toEqual(
-        segmentTapEnabled
-          ? [[bridgeMessage(html, { type: 'segment', pid: 'p', nodeId: 'n' })]]
-          : [],
-      );
-      span.click();
+      const icon = link.querySelector<HTMLElement>('.segment-comment-icon');
+      if (showSegmentHighlights) {
+        expect(icon).not.toBeNull();
+        icon?.click();
+        expect(postMessage).toHaveBeenCalledWith(
+          bridgeMessage(html, { type: 'segment', pid: 'p', nodeId: 'n' }),
+        );
+      } else {
+        expect(icon).toBeNull();
+        expect(link.querySelector('.segment-interactable')).toBeNull();
+      }
+      link.click();
       expect(postMessage).toHaveBeenLastCalledWith(
         bridgeMessage(html, { type: 'link', href: 'https://example.com/' }),
       );
@@ -915,8 +920,10 @@ test.each([true, false])(
 
 test.each([true, false])(
   'honors segment taps = %s and preserves links within a marked passage',
-  async (segmentTapEnabled) => {
-    const { html, props } = await renderPage({ segmentTapEnabled });
+  async (showSegmentHighlights) => {
+    const { html, props } = await renderPage({
+      segmentTapEnabled: showSegmentHighlights,
+    });
     const postMessage = jest.fn();
     const container = {
       innerHTML: '',
@@ -946,13 +953,13 @@ test.each([true, false])(
       getAttribute: (name: string) => (name === 'data-pid' ? 'p' : 'n'),
     };
     click({ target: span });
-    expect(postMessage).toHaveBeenCalledTimes(segmentTapEnabled ? 1 : 0);
+    expect(postMessage).toHaveBeenCalledTimes(showSegmentHighlights ? 1 : 0);
     const segmentMessage = bridgeMessage(html, {
       type: 'segment',
       pid: 'p',
       nodeId: 'n',
     });
-    if (segmentTapEnabled)
+    if (showSegmentHighlights)
       expect(postMessage).toHaveBeenCalledWith(segmentMessage);
     await act(() =>
       mockWebViewProps.onMessage?.({
@@ -960,7 +967,7 @@ test.each([true, false])(
       } as Parameters<NonNullable<WebViewProps['onMessage']>>[0]),
     );
     expect(props.onSegmentPress).toHaveBeenCalledTimes(
-      segmentTapEnabled ? 1 : 0,
+      showSegmentHighlights ? 1 : 0,
     );
     const link = {
       tagName: 'A',

@@ -278,32 +278,41 @@ it.each(['webview', 'native-v2'] as const)(
   },
 );
 
-it('keeps selection, links and exact WebView ranges when answer segment taps are disabled', async () => {
+it('keeps selection and links when segment highlights are hidden and restores segment actions when shown', async () => {
   const client = new QueryClient();
-  mockSegmentTapEnabled = false;
-  const page = (renderer: 'native-v2' | 'webview') => (
+  const page = (
+    renderer: 'native-v2' | 'webview',
+    type: 'answer' | 'article' = 'answer',
+  ) => (
     <QueryClientProvider client={client}>
       <ZhihuContent
         content={sourceHtml}
         segmentInfos={[segment]}
         objectId="42"
-        type="answer"
+        type={type}
         renderer={renderer}
       />
     </QueryClientProvider>
   );
-  const host = await render(page('native-v2'));
+  const host = await render(page('webview'));
+  const nodeId = mockDomProps.segmentParagraphs?.get(segment.pid)
+    ?.annotations[0].run.id;
+  expect(nodeId).toBeTruthy();
+  mockSegmentTapEnabled = false;
+  await host.rerender(page('native-v2'));
   expect(mockNativeProps.onSegmentPress).toBeUndefined();
   expect(mockNativeProps.onSelectionChange).toBeInstanceOf(Function);
   expect(mockNativeProps.onLinkPress).toBeInstanceOf(Function);
   await host.rerender(page('webview'));
   expect(mockDomProps.segmentTapEnabled).toBe(false);
   expect(mockDomProps.onTextSelected).toBeInstanceOf(Function);
-  const nodeId = mockDomProps.segmentParagraphs?.get(segment.pid)
-    ?.annotations[0].run.id;
-  expect(nodeId).toBeTruthy();
+  expect(mockDomProps.segmentParagraphs).toBeUndefined();
   await act(() => mockDomProps.onSegmentPress?.(segment.pid, nodeId));
   expect(mockOptions).toEqual([]);
+  await host.rerender(page('native-v2', 'article'));
+  expect(mockNativeProps.onSegmentPress).toBeUndefined();
+  await host.rerender(page('webview', 'article'));
+  expect(mockDomProps.segmentTapEnabled).toBe(false);
   mockSegmentTapEnabled = true;
   await host.rerender(page('native-v2'));
   await host.rerender(page('webview'));

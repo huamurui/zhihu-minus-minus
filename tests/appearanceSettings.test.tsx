@@ -419,12 +419,12 @@ test('the performance switch only updates its own preference', async () => {
   }
 });
 
-test('switches off the answer segment menu from reading settings', async () => {
+test('toggles comment underlines using the existing reading preference', async () => {
   const host = await render(<AppearanceSettings />);
-  await fireEvent(
-    host.getByLabelText('点击划线查看评论'),
-    'valueChange',
-    false,
-  );
-  expect(useSettingsStore.getState().enableSegmentTap).toBe(false);
+  const toggle = host.getByLabelText('显示评论划线');
+  for (const enabled of [false, true]) {
+    await fireEvent(toggle, 'valueChange', enabled);
+    expect(toggle).toHaveProp('value', enabled);
+    expect(useSettingsStore.getState().enableSegmentTap).toBe(enabled);
+  }
 });

@@ -18,6 +18,13 @@ const REMOVED_TAGS = new Set(
     ' ',
   ),
 );
+const SEGMENT_CLASSES = new Set([
+  'highlight-wrap',
+  'segment-interactable',
+  'segment-liked',
+  'segment-comments',
+  'segment-comment-icon',
+]);
 const CONTENT_ATTRIBUTES = new Set(
   'id class title alt width height eeimg start colspan rowspan align dir lang hidden controls preload type'.split(
     ' ',
@@ -89,15 +96,19 @@ export function getSafeRichContentUrl(
   return undefined;
 }
 
-function safeStyle(value: string): string {
+function safeStyle(value: string, hideSegmentUnderline: boolean): string {
   return value
     .split(';')
     .filter((declaration) => {
       const colon = declaration.indexOf(':');
+      const property = declaration.slice(0, colon).trim().toLowerCase();
       return (
         colon > 0 &&
-        STYLE_PROPERTIES.has(
-          declaration.slice(0, colon).trim().toLowerCase(),
+        STYLE_PROPERTIES.has(property) &&
+        !(
+          hideSegmentUnderline &&
+          property === 'text-decoration' &&
+          /\bunderline\b/i.test(declaration.slice(colon + 1))
         ) &&
         !/[\\<>"'{}@]|(?:url|expression)\s*\(/i.test(
           declaration.slice(colon + 1),
@@ -111,6 +122,7 @@ function safeStyle(value: string): string {
 export function sanitizeRichContentHtml(
   html: string,
   segmentParagraphs?: WebViewSegmentParagraphs,
+  showSegmentHighlights = true,
 ): string {
   const clean = (nodes: readonly ChildNode[]): ChildNode[] =>
     nodes.flatMap((node): ChildNode[] => {
@@ -164,10 +176,17 @@ export function sanitizeRichContentHtml(
       node.children = children;
       // Derive the controlled layout class from content, including plain
       // <p><br></p> emitted by the editor. A source class alone cannot hide text.
-      const classes = (node.attribs.class ?? '')
+      let classes = (node.attribs.class ?? '')
         .split(/\s+/)
         .filter((name) => name && name !== 'zhihu-empty-paragraph');
-      if (
+      const hideSegment =
+        !showSegmentHighlights &&
+        classes.some((name) => SEGMENT_CLASSES.has(name));
+      if (hideSegment) {
+        if (node.name === 'u') node.name = 'span';
+        classes = classes.filter((name) => !SEGMENT_CLASSES.has(name));
+        delete node.attribs['data-segment-node-id'];
+      } else if (
         classes.includes('highlight-wrap') &&
         (parseZhihuSegmentHighlight(node.attribs)?.reaction?.commentCount ??
           0) > 0
@@ -206,7 +225,7 @@ export function sanitizeRichContentHtml(
           if (safe) node.attribs[name] = safe;
           else delete node.attribs[name];
         } else if (name === 'style') {
-          const safe = safeStyle(value);
+          const safe = safeStyle(value, hideSegment);
           if (safe) node.attribs[name] = safe;
           else delete node.attribs[name];
         } else if (name === 'data-original-token') {
@@ -222,7 +241,7 @@ export function sanitizeRichContentHtml(
   // This serializer encodes all non-ASCII characters. Keep Chinese/emoji as
   // UTF-8 so sanitizing a long answer does not multiply its bridge payload.
   const nodes = clean(parseDocument(html).children);
-  if (segmentParagraphs?.size)
+  if (showSegmentHighlights && segmentParagraphs?.size)
     decorateWebViewSegments(nodes, segmentParagraphs);
   return DomUtils.getOuterHTML(nodes).replace(
     /&#x([\da-f]+);/gi,

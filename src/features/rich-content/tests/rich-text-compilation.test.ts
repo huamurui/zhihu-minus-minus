@@ -284,9 +284,9 @@ describe('Text Flow Island compilation and source ranges', () => {
     );
   });
 
-  it('marks only positive comment counts and disables segment taps without changing selectable text or link hits', () => {
+  it('toggles comment decorations while preserving selectable text, author underlines and link hits', () => {
     const { document } = normalizeZhihuDocument(
-      '<p data-pid="one"><a href="https://example.com">甲😀</a><span class="highlight-wrap" data-highlight-comment-count="8">乙</span><span class="highlight-wrap" data-highlight-comment-count="2">丙</span><span class="highlight-wrap">丁</span></p>',
+      '<p data-pid="one"><a href="https://example.com"><u>甲😀</u></a><span class="highlight-wrap" data-highlight-comment-count="8">乙</span><span class="highlight-wrap" data-highlight-comment-count="2">丙</span><span class="highlight-wrap">丁</span></p>',
       {
         documentId: 'answer:42',
         segmentInfos: [
@@ -309,28 +309,32 @@ describe('Text Flow Island compilation and source ranges', () => {
         ],
       },
     );
-    for (const enableSegmentTap of [false, true]) {
+    for (const showSegmentHighlights of [false, true]) {
       const first = compileZhihuDocument(document, {
         fontSize: 17,
         lineHeight: 26,
-        enableSegmentTap,
+        enableSegmentTap: showSegmentHighlights,
       }).parts[0];
       if (first.type !== 'flow') throw new Error('expected flow');
       const { flow } = first;
-      expect(
-        flow.decorations
-          .filter((d) => d.hasComments)
-          .map(({ start, end }) => [start, end]),
-      ).toEqual([
-        [0, 3],
-        [4, 5],
-      ]);
-      expect(
-        flow.decorations.every((d) => Boolean(d.actionId) === enableSegmentTap),
-      ).toBe(true);
-      expect(flow.spans).toContainEqual(
-        expect.objectContaining({ kind: 'link', start: 0, end: 3 }),
-      );
+      if (showSegmentHighlights) {
+        expect(
+          flow.decorations
+            .filter((d) => d.hasComments)
+            .map(({ start, end }) => [start, end]),
+        ).toEqual([
+          [0, 3],
+          [4, 5],
+        ]);
+        expect(flow.decorations.every((d) => d.actionId)).toBe(true);
+      } else {
+        expect(flow.decorations).toEqual([]);
+      }
+      for (const kind of ['link', 'underline']) {
+        expect(flow.spans).toContainEqual(
+          expect.objectContaining({ kind, start: 0, end: 3 }),
+        );
+      }
       expect(getRichTextSelectionText(flow, 0, flow.text.length)).toBe(
         '甲😀乙丙丁',
       );

@@ -254,13 +254,13 @@ export default function AppearanceSettings() {
             />
           </SettingItem>
           <SettingItem
-            label="点击划线查看评论"
+            label="显示评论划线"
             icon="comment-bubble"
             colorScheme={colorScheme}
           >
             <ThemedSwitch
-              accessibilityLabel="点击划线查看评论"
-              accessibilityHint="控制单击回答划线时是否打开段落菜单，长按仍可选字"
+              accessibilityLabel="显示评论划线"
+              accessibilityHint="关闭后隐藏正文中的评论划线和气泡，仍可长按选字"
               value={enableSegmentTap}
               onValueChange={(value) =>
                 updateSettings({ enableSegmentTap: value })

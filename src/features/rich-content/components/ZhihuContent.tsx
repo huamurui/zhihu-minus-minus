@@ -376,10 +376,12 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
           : undefined,
       [document, selectedRenderer],
     );
-    const segmentTapEnabled =
-      type !== 'answer' || settings.enableSegmentTap !== false;
+    const showSegmentHighlights = settings.enableSegmentTap !== false;
     const webSegmentDocument = useMemo(() => {
-      if (selectedRenderer !== 'webview' && isRichTextNativeAvailable())
+      if (
+        !showSegmentHighlights ||
+        (selectedRenderer !== 'webview' && isRichTextNativeAvailable())
+      )
         return undefined;
       if (document) return document;
       if (
@@ -392,7 +394,15 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         documentId: `${type}:${objectId}`,
         segmentInfos,
       }).document;
-    }, [selectedRenderer, document, type, content, segmentInfos, objectId]);
+    }, [
+      showSegmentHighlights,
+      selectedRenderer,
+      document,
+      type,
+      content,
+      segmentInfos,
+      objectId,
+    ]);
     const webSegmentParagraphs = useMemo(
       () =>
         webSegmentDocument && getWebViewSegmentParagraphs(webSegmentDocument),
@@ -417,12 +427,12 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
       sourceUrl?: string;
     } | null>(null);
     useEffect(() => {
-      if (!segmentTapEnabled) {
+      if (!showSegmentHighlights) {
         setModalVisible(false);
         setActiveSegment(null);
         setNativeHighlight(null);
       }
-    }, [segmentTapEnabled]);
+    }, [showSegmentHighlights]);
     const [viewerVisible, setViewerVisible] = useState(false);
     const [viewerImage, setViewerImage] = useState<string | null>(null);
     const [viewerImages, setViewerImages] = useState<string[]>([]);
@@ -600,7 +610,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
     );
     const onSegmentPressCallback = useCallback(
       (pid: string, nodeId?: string) => {
-        if (!segmentTapEnabled || !nodeId || !webSegmentDocument) return;
+        if (!showSegmentHighlights || !nodeId || !webSegmentDocument) return;
         const paragraph = webSegmentParagraphs?.get(pid);
         const mark = paragraph?.annotations.find(
           ({ run }) => run.id === nodeId,
@@ -620,7 +630,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         );
       },
       [
-        segmentTapEnabled,
+        showSegmentHighlights,
         webSegmentParagraphs,
         webSegmentDocument,
         onNativeSegmentPressCallback,
@@ -737,7 +747,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         contentArray={document ? undefined : contentArray}
         segmentParagraphs={webSegmentParagraphs}
         segmentSourceTexts={segmentSourceTexts}
-        segmentTapEnabled={segmentTapEnabled}
+        segmentTapEnabled={showSegmentHighlights}
         linkCardInfoStr={JSON.stringify(linkCardInfo || {})}
         colorScheme={colorScheme}
         onReady={handleWebViewReady}
@@ -780,7 +790,7 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
             onImagePress={onImagePressCallback}
             onImageLongPress={onImageLongPressCallback}
             onSegmentPress={
-              segmentTapEnabled ? onNativeSegmentPressCallback : undefined
+              showSegmentHighlights ? onNativeSegmentPressCallback : undefined
             }
             onSelectionChange={onNativeTextSelectedCallback}
             renderLinkCard={renderNativeLinkCard}

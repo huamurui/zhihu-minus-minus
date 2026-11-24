@@ -89,7 +89,8 @@ function inlineRunHtml(run: ZhihuInlineRun, paragraphId?: string): string {
       const children = inlineHtml(run.children, paragraphId);
       const marker =
         (segmentCommentCount(run) ?? 0) > 0 ? ' segment-comments' : '';
-      if (!paragraphId) return `<u class="${marker.trim()}">${children}</u>`;
+      if (!paragraphId)
+        return `<u class="highlight-wrap${marker}">${children}</u>`;
       return `<span class="segment-interactable${marker}"${attribute('data-pid', paragraphId)}${attribute('data-segment-node-id', run.id)}>${children}</span>`;
     }
     case 'strikethrough':

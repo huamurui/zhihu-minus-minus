@@ -476,7 +476,7 @@ function FormulaBlock({
 
 interface BlockViewProps {
   manualImages: boolean;
-  enableSegmentTap?: boolean;
+  showSegmentHighlights?: boolean;
   block: ZhihuBlock;
   width: number;
   fontSize: number;
@@ -512,7 +512,7 @@ function NativeParagraph(props: BlockViewProps) {
     fontSize,
     lineHeight,
     followsEmptyParagraph,
-    enableSegmentTap,
+    showSegmentHighlights,
   } = props;
   const compiled = useMemo(
     () =>
@@ -523,10 +523,10 @@ function NativeParagraph(props: BlockViewProps) {
           lineHeight,
           paragraphSpacing: 0,
           continuesEmptyParagraph: followsEmptyParagraph,
-          enableSegmentTap,
+          enableSegmentTap: showSegmentHighlights,
         },
       ),
-    [block, fontSize, lineHeight, followsEmptyParagraph, enableSegmentTap],
+    [block, fontSize, lineHeight, followsEmptyParagraph, showSegmentHighlights],
   );
   const configJson = useMemo(() => {
     const config: unknown = JSON.parse(props.configJson);
@@ -1352,8 +1352,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
   );
   const { fontSize, lineHeight } = metrics.body;
   const scaledEm = fontSize * dimensions.fontScale;
-  const enableSegmentTap =
-    type !== 'answer' || settings.enableSegmentTap !== false;
+  const showSegmentHighlights = settings.enableSegmentTap !== false;
   const width =
     options.integerMeasure && availableWidth > 0
       ? Math.max(scaledEm, Math.floor(availableWidth / scaledEm) * scaledEm)
@@ -1406,7 +1405,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
         {
           fontSize,
           lineHeight,
-          enableSegmentTap,
+          enableSegmentTap: showSegmentHighlights,
           paragraphSpacing: RICH_CONTENT_PARAGRAPH_SPACING,
         },
         gradual,
@@ -1418,7 +1417,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
       normalized.document,
       fontSize,
       lineHeight,
-      enableSegmentTap,
+      showSegmentHighlights,
       gradual,
       document,
     ],
@@ -1784,7 +1783,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
           key={part.block.id}
           block={part.block}
           manualImages={manualImages}
-          enableSegmentTap={enableSegmentTap}
+          showSegmentHighlights={showSegmentHighlights}
           width={availableWidth}
           fontSize={fontSize}
           lineHeight={lineHeight}
@@ -1827,7 +1826,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
       geometry,
       initialParts,
       checkLayout,
-      enableSegmentTap,
+      showSegmentHighlights,
       availableWidth,
       textColor,
       secondaryColor,
@@ -1970,7 +1969,7 @@ const NativeDocumentContent = React.memo(function NativeDocumentContent({
                   manualImages={manualImages}
                   key={block.id}
                   block={block}
-                  enableSegmentTap={enableSegmentTap}
+                  showSegmentHighlights={showSegmentHighlights}
                   width={Math.min(availableWidth, dimensions.width - 80)}
                   fontSize={fontSize}
                   lineHeight={lineHeight}

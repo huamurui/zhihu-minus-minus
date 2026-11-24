@@ -180,7 +180,7 @@ export interface AppSettings {
   /** 正文图片加载作者上传的原文件（知乎提供时），不带知乎水印。 */
   removeImageWatermark: boolean;
   imageLoadingMode: 'auto' | 'manual';
-  /** 允许单击回答中的划线打开段落菜单。 */
+  /** 显示正文中的评论划线和气泡，并允许单击划线打开段落菜单。 */
   enableSegmentTap: boolean;
   /** 点击回答卡片后的阅读方式；列表入口始终使用普通卡片。 */
   answerReadingMode: AnswerReadingMode;
