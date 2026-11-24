@@ -1,0 +1,10 @@
+diff --git a/node_modules/@sentry/react-native/dist/js/tools/metroconfig.js b/node_modules/@sentry/react-native/dist/js/tools/metroconfig.js
+--- a/node_modules/@sentry/react-native/dist/js/tools/metroconfig.js
++++ b/node_modules/@sentry/react-native/dist/js/tools/metroconfig.js
+@@ -181,5 +181,5 @@ function withSentryResolver(config, includeWebReplay) {
+ const SENTRY_BROWSER_FEEDBACK_WRAPPER_RE = /\/feedback(Sync|Async)/;
+ function isFromSentryBrowser(originModulePath) {
+-    return originModulePath.includes('@sentry/browser');
++    return /(?:^|[\\/])@sentry[\\/]browser[\\/]/.test(originModulePath);
+ }
+ /**
