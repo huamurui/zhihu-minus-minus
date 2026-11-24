@@ -84,7 +84,7 @@ Cookie、`z_c0`、`d_c0`、`_xsrf`、X-ZSE 请求头、完整 Axios config、Sen
 
 ## 工作流与验证
 
-本地与 CI 使用 Node.js 24（见 `.nvmrc`）；iOS 最低版本为 16.4，使用 Xcode 26.4 或更高版本与 CocoaPods。开始前先检查 `git status --short --branch`，保留用户已有改动。安装依赖优先使用锁文件：
+本地与 CI 使用 Node.js 24（见 `.nvmrc`）；iOS 最低版本为 16.4，使用 macOS 26.6 或更高版本、Xcode 27.1 或更高版本与 CocoaPods。CI 使用 GitHub 的 `xcode-27` runner 及其默认 Xcode。开始前先检查 `git status --short --branch`，保留用户已有改动。安装依赖优先使用锁文件：
 
 ```bash
 npm ci

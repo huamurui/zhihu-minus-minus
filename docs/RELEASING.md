@@ -32,7 +32,7 @@ Android job 需要全部 5 个 Secret：`EXPO_TOKEN` 加上 4 个 telemetry Secr
 
 1. `quality` job 使用 Node.js 24 执行 `npm ci` 和 `npm run check`，包括 TypeScript、Biome、全部测试和富文本 fixture 分析。
 2. `build-android` 使用 EAS CLI 25.3.0 和 `preview` profile，在 Ubuntu 上执行 `assembleRelease` 生成四个单 ABI APK，并检查每个 APK 实际包含的 ABI。prebuild 通过 `withAndroidBuildMemory` 将 Gradle 最大堆设为 4 GB、worker 上限设为 2，并关闭跨项目并行，控制多 ABI 封装的内存峰值。`preview` 是 EAS 构建配置名称，不再写入 APK 文件名。
-3. `build-ios` 在 macOS 26 上使用 Xcode 26.4 或更高版本执行干净 iOS prebuild、CocoaPods 安装和无签名 `xcodebuild`（iOS 最低版本 16.4）。构建及 Sentry 上传完成后，复制 `.app` 到 `Payload`，运行 [`strip-ios-app.py`](../scripts/strip-ios-app.py) 去除局部原生符号，校验 UUID、外部符号和运行时内容不变后打包为 IPA；脚本拒绝签名包，失败会停止发布。原始构建与 dSYM 保留，匹配 dSYM 仍是完整原生栈符号化的必要输入。
+3. `build-ios` 使用 GitHub 的 `xcode-27` runner 及其默认 Xcode，执行干净 iOS prebuild、CocoaPods 安装和无签名 `xcodebuild`（iOS 最低版本 16.4）。该 runner 提供 iOS 27.1 或更新的 SDK，会启用 iPhone Duo 的完整屏幕布局模式；这不等同于布局已经验证，仍需用 Duo 模拟器或真机检查折叠、展开、非对称安全区及分屏布局。构建及 Sentry 上传完成后，复制 `.app` 到 `Payload`，运行 [`strip-ios-app.py`](../scripts/strip-ios-app.py) 去除局部原生符号，校验 UUID、外部符号和运行时内容不变后打包为 IPA；脚本拒绝签名包，失败会停止发布。原始构建和 dSYM 保留，匹配 dSYM 仍是完整原生栈符号化的必要输入。
 4. 两个平台分别上传 artifact，临时 artifact 默认保留 7 天。
 5. `release` 模式下载全部产物，从真实 IPA 生成 `altstore-source.json` 和 `SHA256SUMS.txt`，先用 arm64-v8a APK 创建草稿 Release，再上传其余附件，确保旧版一键更新仍将 arm64-v8a 识别为第一个 APK。只有全部附件上传成功后，才按 `publish_release` 公开 Release。
 6. Release 的说明由 GitHub 结合 [`.github/release.yml`](../.github/release.yml) 和 PR label 自动生成；工作流额外注明 ABI、未签名 IPA 和校验文件信息。
@@ -88,7 +88,7 @@ npm test -- tests/altstoreSource.test.js --runInBand
 - **常规门禁**：[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) 会在 Pull Request 和 `main` push 时使用 Node.js 24 运行 `npm ci` 与 `npm run check`。建议在分支保护规则中将 **TypeScript, Biome and tests** job 设置为合并前必须通过。
 - **按需预览构建（ChatOps）**：[`.github/workflows/pr-build.yml`](../.github/workflows/pr-build.yml) 允许仓库维护者在任意 Pull Request 下通过评论指令按需触发完整正式包的构建并生成下载链接：
   - `/build` 或 `/build-apk`：构建 4 个 Android 单 ABI APK（默认，耗时约 5 分钟）；
-  - `/build-ios`：在 macOS 26 上构建无签名 iOS IPA；
+  - `/build-ios`：使用 `xcode-27` runner 的默认 Xcode 构建无签名 iOS IPA；
   - `/build-all`：同时构建 Android APK 与 iOS IPA。
   
   权限与安全规则：

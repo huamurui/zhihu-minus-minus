@@ -134,7 +134,7 @@ npx expo run:ios --configuration Release --device
 
 - Node.js **24.x**、npm（与 `.nvmrc`、CI 一致）；
 - Android：JDK 17、Android SDK、ADB 或模拟器；
-- iOS：macOS、Xcode **26.4 或更高版本**、CocoaPods；
+- iOS：macOS 26.6 或更高版本、Xcode 27.1 或更高版本、CocoaPods；
 - EAS CLI 仅在使用 EAS 构建时需要。
 
 1. **安装依赖**

@@ -19,7 +19,7 @@
 - Python 3：用于未签名 iOS 包的符号裁剪校验、AltStore/SideStore 订阅源及对应测试，仅使用标准库；实际裁剪调用 Xcode 的 `strip`。
 - Expo SDK 58、React Native 0.88、React 19.3、严格模式 TypeScript 6。
 - Android 的 `minSdkVersion` 为 24（Android 7.0）。已实测的最低系统是三星 SM-P583 上的 32 位 Android 8.1（API 27，`armeabi-v7a`），见[真机性能验证记录](./ANDROID_PERFORMANCE.md)。本地构建使用 JDK 17、Android SDK 和 ADB，编译所需的 SDK、Build Tools、NDK 与 Gradle 版本以 SDK 58 prebuild 生成的工程为准。
-- iOS：macOS、Xcode 26.4 或更高版本、CocoaPods；最低部署版本为 iOS 16.4。
+- iOS：macOS 26.6 或更高版本、Xcode 27.1 或更高版本、CocoaPods；最低部署版本为 iOS 16.4。CI 使用 GitHub 的 `xcode-27` runner 及其默认 Xcode，以使用 iOS 27.1 或更新的 SDK 并启用 iPhone Duo 的完整屏幕布局模式；实际适配仍需模拟器或真机验证。
 - 应用必须使用 Development Build 或 Release 原生包，Expo Go 不包含项目所需的原生模块。
 
 ## SDK 58 升级与依赖边界

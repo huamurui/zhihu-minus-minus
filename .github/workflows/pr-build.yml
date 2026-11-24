@@ -309,7 +309,7 @@ jobs:
     if: |
       needs.setup.outputs.authorized == 'true' &&
       (needs.setup.outputs.platform == 'ios' || needs.setup.outputs.platform == 'both')
-    runs-on: macos-26
+    runs-on: xcode-27
     env:
       SENTRY_CLI_RN_XCODE_EXTRA_ARGS: --force-foreground --wait
 
