@@ -54,7 +54,8 @@ export const FeedExcerpt: React.FC<{
   html?: string | React.ReactNode;
   contentArray?: readonly ZhihuContentSegment[];
   numberOfLines?: number;
-}> = React.memo(({ html, contentArray, numberOfLines = 3 }) => {
+  fallback?: string;
+}> = React.memo(({ html, contentArray, numberOfLines = 3, fallback }) => {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const surfaceColor = Colors[colorScheme].backgroundSecondary;
@@ -67,8 +68,7 @@ export const FeedExcerpt: React.FC<{
         links: result.links.map((l) => l.url || ''),
       };
     }
-    if (html && isString(html))
-      return { text: parseExcerpt(html).text, links: parseExcerpt(html).links };
+    if (html && isString(html)) return parseExcerpt(html);
     return { text: html || null, links: [] as string[] };
   }, [html, contentArray]);
 
@@ -90,9 +90,15 @@ export const FeedExcerpt: React.FC<{
     [router],
   );
 
-  if (!parsed.text && parsed.links.length === 0) return null;
-
   const limitLines = numberOfLines === 0 ? undefined : numberOfLines;
+  if (fallback && parsed.links.length === 0) {
+    return (
+      <Text type="secondary" numberOfLines={limitLines}>
+        {parsed.text || fallback}
+      </Text>
+    );
+  }
+  if (!parsed.text && parsed.links.length === 0) return null;
 
   return (
     <View className="bg-transparent">

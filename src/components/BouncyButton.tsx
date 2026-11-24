@@ -1,9 +1,8 @@
 import { cssInterop } from 'nativewind';
 import type React from 'react';
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import {
   type GestureResponderEvent,
-  Platform,
   Pressable,
   type PressableProps,
   type StyleProp,
@@ -12,20 +11,23 @@ import {
   type ViewStyle,
 } from 'react-native';
 import Animated, {
-  cancelAnimation,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import { useThemeColor } from '@/components/Themed';
-import { useSettingsStore } from '@/store/useSettingsStore';
+import {
+  getPressFeedbackMode,
+  useSettingsStore,
+} from '@/store/useSettingsStore';
 import { ImpactFeedbackStyle, impactAsync } from '@/utils/haptics';
 import { getRippleButtonStyles } from './bouncyButtonStyles';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export interface BouncyButtonProps extends PressableProps {
+  ref?: React.Ref<React.ComponentRef<typeof Pressable>>;
   children: React.ReactNode;
   hapticFeedback?: boolean;
   className?: string;
@@ -37,8 +39,10 @@ function RippleButton({
   style,
   hitSlop,
   onLayout,
+  android_ripple,
   ...props
 }: BouncyButtonProps) {
+  const primaryColor = useThemeColor({}, 'primary');
   const styles = getRippleButtonStyles(StyleSheet.flatten(style) ?? {});
 
   return (
@@ -50,7 +54,17 @@ function RippleButton({
       onLayout={onLayout}
       style={styles.container}
     >
-      <Pressable {...props} hitSlop={hitSlop} style={styles.content}>
+      <Pressable
+        {...props}
+        hitSlop={hitSlop}
+        style={styles.content}
+        android_ripple={{
+          color: `${primaryColor}1A`,
+          borderless: false,
+          foreground: true,
+          ...android_ripple,
+        }}
+      >
         {children}
       </Pressable>
     </View>
@@ -60,45 +74,35 @@ function RippleButton({
 // 先解析 className，使 rounded-full 等样式参与外层水波纹裁剪。
 cssInterop(RippleButton, { className: 'style' });
 
-export function BouncyButton({
-  children,
-  hapticFeedback = false,
+function OpacityButton({ style, ...props }: BouncyButtonProps) {
+  const pressOpacity = useSettingsStore((state) => state.pressOpacity ?? 0.82);
+  const opacity = StyleSheet.flatten(style)?.opacity ?? 1;
+  return (
+    <Pressable
+      {...props}
+      cssInterop={false}
+      style={({ pressed }) =>
+        pressed && !props.disabled && typeof opacity === 'number'
+          ? [style, { opacity: opacity * pressOpacity }]
+          : style
+      }
+    />
+  );
+}
+
+// Resolve className before passing the style callback to the native Pressable.
+cssInterop(OpacityButton, { className: 'style' });
+
+function ScaleOpacityButton({
   style,
   onPressIn,
   onPressOut,
-  android_ripple,
   ...props
 }: BouncyButtonProps) {
-  const isAndroid = Platform.OS === 'android';
   const pressOpacity = useSettingsStore((state) => state.pressOpacity ?? 0.82);
   const pressScale = useSettingsStore((state) => state.pressScale ?? 0.98);
-  const primaryColor = useThemeColor({}, 'primary');
-  const androidFeedbackType = useSettingsStore(
-    (state) => state.androidFeedbackType ?? 'ripple',
-  );
-  const enablePressFeedback = useSettingsStore(
-    (state) => state.enablePressFeedback ?? true,
-  );
-
-  // 是否启用物理动画（缩放与不透明度）
-  const enableAnimation =
-    enablePressFeedback &&
-    (!isAndroid || androidFeedbackType === 'scale-opacity');
-
-  // Android 水波纹颜色：跟随主题色，带透明度
-  const rippleColor = `${primaryColor}1A`; // 10% opacity
-
   const scale = useSharedValue(1);
   const opacity = useSharedValue(1);
-
-  useEffect(() => {
-    if (!enableAnimation) {
-      cancelAnimation(scale);
-      cancelAnimation(opacity);
-      scale.value = 1;
-      opacity.value = 1;
-    }
-  }, [enableAnimation, scale, opacity]);
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
@@ -109,77 +113,61 @@ export function BouncyButton({
 
   const handlePressIn = useCallback(
     (e: GestureResponderEvent) => {
-      if (enableAnimation) {
-        scale.value = withSpring(pressScale, { damping: 35, stiffness: 800 });
-        opacity.value = withTiming(pressOpacity, { duration: 50 });
-      }
-      if (hapticFeedback) {
-        void impactAsync(ImpactFeedbackStyle.Light);
-      }
-      if (onPressIn) onPressIn(e);
+      scale.value = withSpring(pressScale, { damping: 35, stiffness: 800 });
+      opacity.value = withTiming(pressOpacity, { duration: 50 });
+      onPressIn?.(e);
     },
-    [
-      pressScale,
-      pressOpacity,
-      enableAnimation,
-      onPressIn,
-      scale,
-      opacity,
-      hapticFeedback,
-    ],
+    [pressScale, pressOpacity, onPressIn, scale, opacity],
   );
 
   const handlePressOut = useCallback(
     (e: GestureResponderEvent) => {
-      if (enableAnimation) {
-        scale.value = withSpring(1, { damping: 35, stiffness: 800 });
-        opacity.value = withTiming(1, { duration: 100 });
-      }
-      if (onPressOut) onPressOut(e);
+      scale.value = withSpring(1, { damping: 35, stiffness: 800 });
+      opacity.value = withTiming(1, { duration: 100 });
+      onPressOut?.(e);
     },
-    [enableAnimation, onPressOut, scale, opacity],
+    [onPressOut, scale, opacity],
   );
-
-  if (!enablePressFeedback) {
-    return (
-      <Pressable
-        {...props}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        style={style}
-      >
-        {children}
-      </Pressable>
-    );
-  }
-
-  if (enableAnimation) {
-    return (
-      <AnimatedPressable
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        style={[animatedStyle, style]}
-        {...props}
-      >
-        {children}
-      </AnimatedPressable>
-    );
-  }
-
   return (
-    <RippleButton
+    <AnimatedPressable
       {...props}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
-      style={style}
-      android_ripple={{
-        color: rippleColor,
-        borderless: false,
-        foreground: true,
-        ...android_ripple,
-      }}
-    >
-      {children}
-    </RippleButton>
+      style={[animatedStyle, style]}
+    />
   );
+}
+
+export function BouncyButton({
+  hapticFeedback = false,
+  onPressIn,
+  android_ripple,
+  ...props
+}: BouncyButtonProps) {
+  const feedback = useSettingsStore(getPressFeedbackMode);
+  const hapticPressIn = useCallback(
+    (event: GestureResponderEvent) => {
+      void impactAsync(ImpactFeedbackStyle.Light);
+      onPressIn?.(event);
+    },
+    [onPressIn],
+  );
+  const pressIn = hapticFeedback ? hapticPressIn : onPressIn;
+
+  if (feedback === 'ripple') {
+    return (
+      <RippleButton
+        {...props}
+        onPressIn={pressIn}
+        android_ripple={android_ripple}
+      />
+    );
+  }
+  if (feedback === 'scale-opacity') {
+    return <ScaleOpacityButton {...props} onPressIn={pressIn} />;
+  }
+  if (feedback === 'opacity') {
+    return <OpacityButton {...props} onPressIn={pressIn} />;
+  }
+  return <Pressable {...props} onPressIn={pressIn} />;
 }

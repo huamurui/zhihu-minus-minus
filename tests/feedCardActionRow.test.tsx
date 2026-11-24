@@ -219,6 +219,34 @@ test('preview downvote actions follow the current answer', async () => {
   );
 });
 
+test('the ordinary vote button delegates to the card and consumes taps while that vote is pending', async () => {
+  const onPress = jest.fn();
+  const props = {
+    id: 'a',
+    voteCount: 1,
+    voted: 0,
+    engagementType: 'answers' as const,
+    commentCount: 0,
+    onComments: jest.fn(),
+    onMore: jest.fn(),
+  };
+  const host = await render(
+    <FeedCardActionRow {...props} voteAction={{ onPress, pending: false }} />,
+  );
+  const stopPropagation = jest.fn();
+  await fireEvent.press(host.getAllByRole('button')[0], { stopPropagation });
+  expect(onPress).toHaveBeenCalledTimes(1);
+  await host.rerender(
+    <FeedCardActionRow {...props} voteAction={{ onPress, pending: true }} />,
+  );
+  const pending = host.getAllByRole('button')[0];
+  expect(pending).toBeDisabled();
+  await fireEvent.press(pending, { stopPropagation });
+  expect(stopPropagation).toHaveBeenCalledTimes(2);
+  expect(onPress).toHaveBeenCalledTimes(1);
+  expect(voteContent).not.toHaveBeenCalled();
+});
+
 test.each(['articles', 'pins', 'questions'] as const)(
   '%s inline actions offer collection only for supported content',
   async (engagementType) => {

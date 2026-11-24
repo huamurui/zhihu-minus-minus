@@ -22,7 +22,7 @@ interface CollectionButtonProps {
   count?: number;
   compact?: boolean;
   countDisplay?: 'inline' | 'corner';
-  variant?: 'inline' | 'floating';
+  variant?: 'inline' | 'floating' | 'text';
   disabled?: boolean;
 }
 
@@ -152,11 +152,23 @@ export function CollectionButton({
           ? undefined
           : { text: `${collectionCount} 次收藏` }
       }
-      disabled={disabled || busy}
+      // The text control is nested in a card: keep consuming touches while its action is busy.
+      disabled={variant === 'text' ? undefined : disabled || busy}
       onPress={(event) => void handlePress(event)}
-      style={countDisplay === 'corner' ? styles.cornerButton : undefined}
+      style={
+        variant === 'text'
+          ? styles.textButton
+          : countDisplay === 'corner'
+            ? styles.cornerButton
+            : undefined
+      }
     >
-      {countDisplay === 'corner' ? (
+      {variant === 'text' ? (
+        <Text type="caption" style={{ color }} numberOfLines={1}>
+          {collected ? '已收藏' : '收藏'}
+          {countLabel === undefined ? '' : ` ${countLabel}`}
+        </Text>
+      ) : countDisplay === 'corner' ? (
         <ActionIconCount count={collectionCount} color={color}>
           <CollectionStarIcon
             filled={collected === true}
@@ -171,7 +183,8 @@ export function CollectionButton({
           color={color}
         />
       )}
-      {countDisplay === 'inline' &&
+      {variant !== 'text' &&
+        countDisplay === 'inline' &&
         !compact &&
         collectionCount !== undefined && (
           <Text
@@ -190,6 +203,7 @@ export function CollectionButton({
 }
 
 const styles = StyleSheet.create({
+  textButton: { minWidth: 48, minHeight: 48 },
   cornerButton: {
     width: 44,
     height: 44,

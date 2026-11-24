@@ -75,6 +75,7 @@ export default function AppearanceSettings() {
   const colorScheme = useColorScheme() ?? 'light';
   const {
     fontSizeScale,
+    performanceMode,
     lineHeightScale,
     primaryColor,
     readingBackground,
@@ -131,6 +132,26 @@ export default function AppearanceSettings() {
           paddingBottom: insets.bottom + 40,
         }}
       >
+        <Section title="性能" colorScheme={colorScheme}>
+          <SettingItem
+            label="性能模式"
+            icon="speedometer-outline"
+            colorScheme={colorScheme}
+          >
+            <ThemedSwitch
+              accessibilityLabel="性能模式"
+              accessibilityHint="精简信息流卡片与按压效果，打开正文时跳过标题动画"
+              value={performanceMode}
+              onValueChange={(value) =>
+                updateSettings({ performanceMode: value })
+              }
+            />
+          </SettingItem>
+          <Text type="secondary" style={styles.performanceHint}>
+            精简信息流卡片与按压效果，打开正文时跳过标题动画。
+          </Text>
+        </Section>
+
         <Section title="个性化" colorScheme={colorScheme}>
           <BouncyButton
             onPress={() => router.push('/settings/app-icon' as Href)}
@@ -1018,6 +1039,7 @@ function ColorPickerSection({
 // ================= Styles =================
 
 const styles = StyleSheet.create({
+  performanceHint: { paddingHorizontal: 16, paddingVertical: 12, fontSize: 13 },
   container: { flex: 1 },
   routeRow: {
     minHeight: 70,
