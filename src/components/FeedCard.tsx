@@ -13,7 +13,7 @@ import {
 } from '@/features/adaptive-layout/TitleTransition';
 import { usePaneRouter as useRouter } from '@/features/adaptive-layout/usePaneRouter';
 import { useContentActions } from '@/hooks/useContentActions';
-import { useAuthStore } from '@/store/useAuthStore';
+import { getAuthSessionVersion, useAuthStore } from '@/store/useAuthStore';
 import { useCollectionStore } from '@/store/useCollectionStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { seedAnswerPreviewEntry } from '@/utils/answerPreviewEntry';
@@ -21,11 +21,13 @@ import {
   type AnswerReadingContext,
   getAnswerReadingRouteParams,
 } from '@/utils/answerReadingContext';
+import type { ContentShareData } from '@/utils/contentActions';
 import {
   seedRichContentFromFeedItem,
   updateContentInteractionCaches,
 } from '@/utils/contentCache';
 import { seedContentDetailPreview } from '@/utils/contentDetailPreview';
+import { createGuestPreviewParams } from '@/utils/guestPreview';
 import { ImpactFeedbackStyle, impactAsync } from '@/utils/haptics';
 import { getCachedImageSource } from '@/utils/imageSource';
 import { getRecommendFeedbackTarget } from '@/utils/recommendFeedback';
@@ -75,6 +77,49 @@ interface FeedCardProps {
   tab?: string;
   answerContext?: AnswerReadingContext;
   onUninterested?: (item: FeedItem) => Promise<void>;
+}
+
+function FeedPreviewMenu({
+  item,
+  type,
+  data,
+  feedbackOptions,
+  options,
+  ...menuProps
+}: Omit<
+  React.ComponentProps<typeof CustomContextMenu>,
+  'visible' | 'previewContent'
+> & {
+  item: FeedItem;
+  type: ShareContentType;
+  data: ContentShareData;
+  feedbackOptions: ActionSheetOption[];
+}) {
+  const { actions } = useContentActions({
+    type,
+    data,
+    additionalOptions: feedbackOptions,
+  });
+  return (
+    <CustomContextMenu
+      {...menuProps}
+      visible
+      previewContent={<FeedCardPreview item={item} />}
+      options={[
+        ...options,
+        ...actions.map((action) => ({
+          key: action.key,
+          title: action.label,
+          icon: action.icon,
+          iconFamily: action.iconFamily,
+          iconSolid: action.iconSolid,
+          isDestructive: action.destructive,
+          disabled: action.disabled,
+          onPress: action.onPress,
+        })),
+      ]}
+    />
+  );
 }
 
 function areFeedContentEqual(
@@ -176,7 +221,7 @@ const FeedCardComponent = ({
   const answerOpensPreviewList =
     answerReadingMode === 'preview-list' && !twoPane;
   const queryClient = useQueryClient();
-  const { cookies } = useAuthStore();
+  const cookies = useAuthStore((state) => state.cookies);
   const [menuVisible, setMenuVisible] = useState(false);
   const isQuestionType = item.type === 'questions';
   const isPinType = item.type === 'pins';
@@ -242,13 +287,12 @@ const FeedCardComponent = ({
     if (isGuest) {
       router.push({
         pathname: '/guest/detail',
-        params: {
-          item: JSON.stringify({
-            ...item,
-            title: cleanTitle,
-            excerpt: typeof item.excerpt === 'string' ? item.excerpt : '',
-          }),
-        },
+        params: createGuestPreviewParams(
+          queryClient,
+          item,
+          getAuthSessionVersion(),
+          Platform.OS,
+        ),
       });
       return;
     }
@@ -356,18 +400,9 @@ const FeedCardComponent = ({
           },
         ]
       : [];
-  const { actions: contentActions } = useContentActions({
-    type: shareType,
-    data: shareData,
-    enabled: previewVisible,
-    ...(feedbackOptions.length > 0 && {
-      additionalOptions: feedbackOptions,
-    }),
-  });
-
-  const menuOptions: MenuOption[] = [
-    ...(engagementType
-      ? ([
+  const menuOptions: MenuOption[] =
+    previewVisible && engagementType
+      ? [
           {
             key: 'like',
             title:
@@ -441,19 +476,8 @@ const FeedCardComponent = ({
               );
             },
           },
-        ] satisfies MenuOption[])
-      : []),
-    ...contentActions.map((action) => ({
-      key: action.key,
-      title: action.label,
-      icon: action.icon,
-      iconFamily: action.iconFamily,
-      iconSolid: action.iconSolid,
-      isDestructive: action.destructive,
-      disabled: action.disabled,
-      onPress: action.onPress,
-    })),
-  ];
+        ]
+      : [];
 
   return (
     <RNView ref={containerRef} className="w-full bg-transparent">
@@ -691,20 +715,24 @@ const FeedCardComponent = ({
           onMore={() => setMenuVisible(true)}
         />
 
-        <ShareMenu
-          visible={menuVisible}
-          onClose={() => setMenuVisible(false)}
-          type={shareType}
-          data={shareData}
-          additionalOptions={feedbackOptions}
-        />
+        {menuVisible && (
+          <ShareMenu
+            visible
+            onClose={() => setMenuVisible(false)}
+            type={shareType}
+            data={shareData}
+            additionalOptions={feedbackOptions}
+          />
+        )}
       </BouncyButton>
 
       {previewVisible && (
-        <CustomContextMenu
-          visible={previewVisible}
+        <FeedPreviewMenu
           onClose={() => setPreviewVisible(false)}
-          previewContent={<FeedCardPreview item={item} />}
+          item={item}
+          type={shareType}
+          data={shareData}
+          feedbackOptions={feedbackOptions}
           options={menuOptions}
           contentIdentity={identity}
           originLayout={originLayout}

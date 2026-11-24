@@ -1,4 +1,9 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  type MutationFilters,
+  useIsMutating,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { hasAuthenticationCookie } from '@/api/client';
 import {
@@ -14,6 +19,36 @@ import { updateContentInteractionCaches } from '@/utils/contentCache';
 import { showToast as baseShowToast } from '@/utils/toast';
 import { getZhihuErrorMessage } from '@/utils/zhihuError';
 
+function collectionMutationKey(session: number) {
+  return ['content-collection-action', session] as const;
+}
+
+function collectionMutationFilters(
+  session: number,
+  type: 'answer' | 'article' | null,
+  id: string | number,
+): MutationFilters {
+  return {
+    mutationKey: collectionMutationKey(session),
+    exact: true,
+    predicate: ({ state: { variables } }) =>
+      variables != null &&
+      typeof variables === 'object' &&
+      'type' in variables &&
+      variables.type === type &&
+      'id' in variables &&
+      String(variables.id) === String(id),
+  };
+}
+
+export function useCollectionActionPending(
+  session: number,
+  type: 'answer' | 'article' | null,
+  id: string | number,
+) {
+  return useIsMutating(collectionMutationFilters(session, type, id)) > 0;
+}
+
 export function useCollectionAction() {
   const router = useRouter();
   const showToast = useCollectionStore((state) => state.showToast);
@@ -24,8 +59,10 @@ export function useCollectionAction() {
     (state) => state.updateCollectedCountOffset,
   );
   const queryClient = useQueryClient();
+  const session = getAuthSessionVersion();
 
   const collectMutation = useMutation({
+    mutationKey: collectionMutationKey(session),
     mutationFn: async ({
       id,
       type,
@@ -71,6 +108,7 @@ export function useCollectionAction() {
   });
 
   const uncollectMutation = useMutation({
+    mutationKey: collectionMutationKey(session),
     mutationFn: async ({
       id,
       type,
@@ -142,7 +180,11 @@ export function useCollectionAction() {
       router.push('/login');
       return;
     }
-    if (collectMutation.isPending || uncollectMutation.isPending) return;
+    if (
+      session !== getAuthSessionVersion() ||
+      queryClient.isMutating(collectionMutationFilters(session, type, id))
+    )
+      return;
     if (isCurrentlyCollected) {
       uncollectMutation.mutate({ id, type });
     } else {

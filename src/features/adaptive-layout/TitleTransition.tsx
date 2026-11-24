@@ -278,11 +278,24 @@ export function TitleTransitionProvider({
       };
       const SOURCE_WAIT_MS = Platform.OS === 'android' ? 200 : 100;
       const timeout = setTimeout(() => finish(), SOURCE_WAIT_MS);
+      // Queue both independent native reads in the same turn before opening the route.
+      let sourceFrame: Frame | undefined;
+      let rootOrigin: { x: number; y: number } | undefined;
+      const finishMeasured = () => {
+        if (sourceFrame && rootOrigin)
+          finish(sourceFrame, rootOrigin.x, rootOrigin.y);
+      };
       ref.current.measureInWindow((x, y, width, height) => {
-        root.current?.measureInWindow((rootX, rootY) => {
-          if (!Number.isFinite(rootX) || !Number.isFinite(rootY)) finish();
-          else finish({ x, y, width, height }, rootX, rootY);
-        });
+        sourceFrame = { x, y, width, height };
+        finishMeasured();
+      });
+      root.current.measureInWindow((x, y) => {
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+          finish();
+          return;
+        }
+        rootOrigin = { x, y };
+        finishMeasured();
       });
     },
     [progress, restoreSource],

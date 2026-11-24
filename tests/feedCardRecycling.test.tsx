@@ -27,6 +27,7 @@ interface MenuProps {
 }
 
 let mockShareMenuProps: MenuProps;
+const mockShareMenuRender = jest.fn();
 const mockUseContentActions = jest.fn();
 const mockCopy = jest.fn();
 const mockPush = jest.fn();
@@ -97,7 +98,8 @@ jest.mock('react-native-reanimated', () => ({
 }));
 jest.mock('../src/store/useAuthStore', () => ({
   getAuthSessionVersion: () => mockSessionVersion,
-  useAuthStore: () => ({ cookies: 'synthetic-session' }),
+  useAuthStore: (selector: (state: { cookies: string }) => unknown) =>
+    selector({ cookies: 'synthetic-session' }),
 }));
 jest.mock('../src/store/useCollectionStore', () => ({
   useCollectionStore: (selector: (state: object) => unknown) =>
@@ -149,6 +151,7 @@ jest.mock('../src/components/FeedExcerpt', () => ({
 }));
 jest.mock('../src/components/ShareMenu', () => ({
   ShareMenu: (props: MenuProps) => {
+    mockShareMenuRender();
     mockShareMenuProps = props;
     return props.visible
       ? jest
@@ -491,9 +494,8 @@ test.each(['answers', 'articles', 'pins', 'questions', 'videos'] as const)(
     } else {
       expect(host.queryByRole('button', { name: '收藏' })).toBeNull();
     }
-    expect(mockUseContentActions).toHaveBeenLastCalledWith(
-      expect.objectContaining({ enabled: false }),
-    );
+    expect(mockUseContentActions).not.toHaveBeenCalled();
+    expect(mockShareMenuRender).not.toHaveBeenCalled();
     const stopPropagation = jest.fn();
     await fireEvent.press(host.getByRole('button', { name: '更多操作' }), {
       stopPropagation,
@@ -553,15 +555,11 @@ test('recommendation feedback remains attached to the menu item and updates afte
       onUninterested={onUninterested}
     />,
   );
+  await fireEvent.press(host.getByRole('button', { name: '更多操作' }));
   const originalAction = mockShareMenuProps.additionalOptions?.find(
     (option) => option.key === 'uninterested',
   );
   expect(originalAction).toBeDefined();
-  expect(mockUseContentActions).toHaveBeenLastCalledWith(
-    expect.objectContaining({
-      additionalOptions: [expect.objectContaining({ key: 'uninterested' })],
-    }),
-  );
   const nextItem = { ...baseItem, id: 'next', title: '合成下个推荐' };
   await host.rerender(
     <FeedCard
@@ -572,6 +570,7 @@ test('recommendation feedback remains attached to the menu item and updates afte
   );
   await originalAction?.onPress();
   expect(onUninterested).toHaveBeenLastCalledWith(baseItem);
+  await fireEvent.press(host.getByRole('button', { name: '更多操作' }));
   await mockShareMenuProps.additionalOptions
     ?.find((option) => option.key === 'uninterested')
     ?.onPress();
@@ -593,7 +592,7 @@ test('feed previews use the shared action builder with the current content ident
   await fireEvent(host.getByText('合成原卡片'), 'longPress');
   expect(mockUseContentActions).toHaveBeenLastCalledWith({
     type: 'answer',
-    enabled: true,
+    additionalOptions: [],
     data: expect.objectContaining({
       id: 'original',
       questionId: 'question',

@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { skipToken, useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { Image, ScrollView, StyleSheet } from 'react-native';
@@ -14,14 +15,20 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { VoteTriangle } from '@/components/VoteTriangle';
 import Colors from '@/constants/Colors';
 import { ZhihuContent } from '@/features/rich-content';
+import { getAuthSessionVersion, useAuthStore } from '@/store/useAuthStore';
 import { contrastingText } from '@/utils/colorContrast';
+import { guestPreviewBodyKey } from '@/utils/guestPreview';
 import { getCachedImageSource } from '@/utils/imageSource';
 
 export default function GuestDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
-  const params = useLocalSearchParams();
+  const params = useLocalSearchParams<{
+    item?: string;
+    bodySession?: string;
+  }>();
+  const session = useAuthStore(() => getAuthSessionVersion());
 
   const textColor = Colors[colorScheme].text;
   const secondaryTextColor = Colors[colorScheme].textSecondary;
@@ -34,14 +41,24 @@ export default function GuestDetailScreen() {
   // 安全解析传递进来的 Feed 项数据
   const item = useMemo<FeedItem | null>(() => {
     try {
-      if (params.item) {
-        return JSON.parse(params.item as string);
+      if (typeof params.item === 'string') {
+        return JSON.parse(params.item);
       }
     } catch {
       console.error('[GuestDetail] Failed to parse item data');
     }
     return null;
   }, [params.item]);
+  const sameSession = params.bodySession === String(session);
+  const { data: cachedBody } = useQuery<NonNullable<FeedItem['content']>>({
+    queryKey: guestPreviewBodyKey(
+      session,
+      sameSession ? item?.type : undefined,
+      sameSession ? item?.id : undefined,
+    ),
+    queryFn: skipToken,
+  });
+  const content = sameSession ? (cachedBody ?? item?.content) : item?.content;
 
   if (!item) {
     return (
@@ -282,16 +299,13 @@ export default function GuestDetailScreen() {
 
           {/* 4. 预览正文 (若存在完整 HTML 内容，使用所选正文后端渲染，否则退回到摘要) */}
           <View className="px-5 mt-3 bg-transparent">
-            {item.content ? (
+            {content ? (
               <ZhihuContent
-                content={
-                  typeof item.content === 'string' ? item.content : undefined
-                }
-                contentArray={
-                  Array.isArray(item.content) ? item.content : undefined
-                }
+                content={typeof content === 'string' ? content : undefined}
+                contentArray={Array.isArray(content) ? content : undefined}
                 objectId={item.id}
                 type={isArticle ? 'article' : isPin ? 'pin' : 'answer'}
+                progressive
                 useNative={true}
               />
             ) : (

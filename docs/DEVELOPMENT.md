@@ -373,6 +373,8 @@ xcrun simctl openurl booted 'zhihu--:///dev/rich-content/prototype?caseId=attach
 
 ## 回答阅读方式与预览列表
 
+移动端游客从卡片打开正文时，带稳定 ID 的正文使用当前会话、内容类型和 ID 作为内存缓存键。导航参数携带标题、作者和摘要，冷恢复时即使缓存已经释放也能显示摘要。Web 保留内联正文，刷新页面仍可阅读。折叠回答和游客长文使用原生首批排版，图片集合在打开图库时读取。验证覆盖长文、分段想法、会话切换和旧格式预览，见 `guestPreview`、`answerPreviewPlainBody` 和富文本测试。
+
 回答和文章的卡片底部、详情及预览悬浮栏在评论左侧提供 `CollectionButton`，问题页回答卡片与创作卡片保持相同顺序。按钮复用 `useCollectionAction`，以全局收藏状态覆盖服务端初始值，收藏后显示实心星标。列表通过 `getContentCollectionMetadata` 保留 Web/App 返回的收藏状态与数量，未知状态和数量不补成 false/0；数量使用服务端值、随刷新更新，不叠加会话累计 offset，避免重复计数；未知状态仅在点击时读取现有收藏状态查询，再执行收藏或取消，不随列表挂载批量请求。读取中及提交中禁用，读取失败可重试，卡片复用、卸载或账号切换后忽略旧读取结果；更多菜单保留收藏入口。预览浮栏在窄屏将收起按钮并入右侧操作组，赞同数字可单行省略；极窄屏省略浮栏收藏与评论的可见数量，完整数量保留在无障碍属性中。专项回归见 `collectionButton`、`feedCardActionRow`、`feedCardRecycling` 和详情/预览测试，真机需验证窄屏及大字体下收藏、评论和更多按钮均可点击。
 
 回答入口 `/answer/[id]` 按 `answerReadingMode` 选择详情或预览卡片列表，默认 `detail`；settings version 16 给旧设置补齐该值。`readingMode=detail` 用于主动切换到详情。问题页、收藏夹与点赞页先显示普通摘要卡片，不在列表中加载完整正文。长按 FeedCard 的临时预览菜单保持原有行为。

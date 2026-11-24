@@ -44,8 +44,8 @@ jest.mock('../src/api/zhihu/collection', () => ({
 jest.mock('../src/hooks/useCollectionAction', () => ({
   useCollectionAction: () => ({
     toggleCollect: mockToggleCollect,
-    isPending: mockCollectionPending,
   }),
+  useCollectionActionPending: () => mockCollectionPending,
 }));
 jest.mock('../src/store/useAuthStore', () => ({
   getAuthSessionVersion: () => mockAuthSessionVersion,

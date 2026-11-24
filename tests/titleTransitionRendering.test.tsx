@@ -515,6 +515,33 @@ test('target with enabled=false does not intercept title transition', async () =
   }
 });
 
+test.each([0, 1])(
+  'opens as soon as both frame reads complete, first response %i',
+  async (first) => {
+    jest.useFakeTimers();
+    const reads: Array<(...args: number[]) => void> = [];
+    mockMeasureInWindow = (callback) => reads.push(callback);
+    try {
+      const host = await render(
+        <TitleTransitionProvider activeRouteKey="source">
+          <Example />
+        </TitleTransitionProvider>,
+      );
+      await fireEvent.press(host.getByText('打开'));
+      expect(reads).toHaveLength(2);
+      await act(() => reads[first](20, 80, 180, 24));
+      expect(host.queryByText('详情标题')).toBeNull();
+      await act(() => reads[1 - first](20, 80, 180, 24));
+      expect(
+        host.getByText('详情标题', { includeHiddenElements: true }),
+      ).toBeTruthy();
+    } finally {
+      mockMeasureInWindow = null;
+      jest.useRealTimers();
+    }
+  },
+);
+
 test('target retries measurement if initial destination frame is invalid', async () => {
   jest.useFakeTimers();
   const timing = jest.spyOn(Animated, 'timing').mockReturnValue({
