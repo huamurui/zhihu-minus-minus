@@ -1,0 +1,15 @@
+{
+  "name": "expo-crypto-android-decrypt-length-repro",
+  "version": "1.0.0",
+  "private": true,
+  "main": "expo/AppEntry",
+  "scripts": {
+    "android": "expo run:android"
+  },
+  "dependencies": {
+    "expo": "58.0.17",
+    "expo-crypto": "58.0.7",
+    "react": "19.3.0",
+    "react-native": "0.88.0"
+  }
+}

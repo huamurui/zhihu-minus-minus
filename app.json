@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "AES-GCM round trip",
+    "slug": "expo-crypto-android-decrypt-length-repro",
+    "version": "1.0.0",
+    "platforms": ["android"],
+    "android": {
+      "package": "dev.repro.aesgcmlength"
+    }
+  }
+}
