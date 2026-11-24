@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
-import { ActivityIndicator } from 'react-native';
+import { ActivityIndicator, type GestureResponderEvent } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -21,6 +21,12 @@ import { useContentActionBarColor } from './ContentActionBarColor';
 import { Text, useThemeColor } from './Themed';
 import { VoteTriangle } from './VoteTriangle';
 
+/** A parent can own the request when several controls vote on the same card. */
+export interface VoteAction {
+  pending: boolean;
+  onPress: () => void;
+}
+
 export const LikeButton = ({
   id,
   count: initialCount,
@@ -29,6 +35,7 @@ export const LikeButton = ({
   variant = 'default',
   allowCountShrink = false,
   onVoteChange,
+  voteAction,
 }: {
   id: string | number;
   count: number | string;
@@ -37,6 +44,7 @@ export const LikeButton = ({
   variant?: 'default' | 'ghost' | 'minimal' | 'segmented';
   allowCountShrink?: boolean;
   onVoteChange?: (voted: number, count: number) => void;
+  voteAction?: VoteAction;
 }) => {
   const [voted, setVoted] = useState(initialVoted);
   const [count, setCount] = useState(initialCount);
@@ -45,7 +53,7 @@ export const LikeButton = ({
   currentIdentityRef.current = identity;
   const pendingTargetsRef = useRef(new Set<string>());
   const [pendingIdentity, setPendingIdentity] = useState<string | null>(null);
-  const loading = pendingIdentity === identity;
+  const loading = voteAction?.pending ?? pendingIdentity === identity;
   const queryClient = useQueryClient();
   const scale = useSharedValue(1);
   const primaryColor = useThemeColor({}, 'primary');
@@ -86,14 +94,19 @@ export const LikeButton = ({
     transform: [{ scale: scale.value }],
   }));
 
-  const handlePress = async () => {
-    if (pendingTargetsRef.current.has(identity)) return;
-    pendingTargetsRef.current.add(identity);
+  const handlePress = async (event: GestureResponderEvent) => {
+    if (voteAction) event?.stopPropagation();
+    if (loading || pendingTargetsRef.current.has(identity)) return;
 
     scale.value = withSequence(
       withTiming(1.4, { duration: 100 }),
       withSpring(1),
     );
+    if (voteAction) {
+      voteAction.onPress();
+      return;
+    }
+    pendingTargetsRef.current.add(identity);
 
     const nextVoted = isUpvoted ? 0 : 1;
 
@@ -159,9 +172,13 @@ export const LikeButton = ({
           ? `${isUpvoted ? '取消赞同' : '赞同'}，${count}`
           : undefined
       }
-      accessibilityState={{ busy: loading, selected: isUpvoted }}
+      accessibilityState={{
+        busy: loading,
+        selected: isUpvoted,
+        disabled: loading,
+      }}
       onPress={handlePress}
-      disabled={loading}
+      disabled={voteAction ? undefined : loading}
       className={
         variant === 'default'
           ? 'flex-row items-center px-2 py-1.5 rounded-md'

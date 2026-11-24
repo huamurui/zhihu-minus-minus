@@ -1,4 +1,5 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
+import { Platform } from 'react-native';
 import { NavigationInteractionSettings } from '../src/components/settings/NavigationInteractionSettings';
 import { useSettingsStore } from '../src/store/useSettingsStore';
 
@@ -26,8 +27,12 @@ jest.mock('expo-secure-store', () => ({
   deleteItemAsync: jest.fn(async () => undefined),
 }));
 
+const originalPlatform = Platform.OS;
 beforeEach(() => {
   useSettingsStore.getState().resetSettings();
+});
+afterEach(() => {
+  Platform.OS = originalPlatform;
 });
 
 test('layout mode starts automatic and applies each manual choice', async () => {
@@ -62,4 +67,40 @@ test('iOS liquid glass switch toggles useNativeIOSBottomTabs under dedicated mat
   await fireEvent(glassSwitch, 'valueChange', true);
   expect(useSettingsStore.getState().useNativeIOSBottomTabs).toBe(true);
   expect(glassSwitch).toHaveProp('value', true);
+});
+
+test('Android opacity feedback exposes only the relevant press setting', async () => {
+  Platform.OS = 'android';
+  const host = await render(<NavigationInteractionSettings />);
+  const opacity = host.getByRole('radio', { name: '仅透明度' });
+  await fireEvent.press(opacity);
+  expect(opacity).toBeChecked();
+  expect(useSettingsStore.getState().androidFeedbackType).toBe('opacity');
+  expect(host.getByText('按压不透明度')).toBeVisible();
+  expect(host.queryByText('按压缩放比例')).toBeNull();
+  await fireEvent.press(host.getByRole('radio', { name: '缩放' }));
+  expect(host.getByText('按压缩放比例')).toBeVisible();
+  await fireEvent.press(host.getByRole('radio', { name: '水波纹' }));
+  expect(host.queryByText('按压不透明度')).toBeNull();
+});
+
+test('editing press feedback in performance mode exposes the active controls and preserves the saved style', async () => {
+  Platform.OS = 'android';
+  useSettingsStore.getState().updateSettings({
+    performanceMode: true,
+    androidFeedbackType: 'scale-opacity',
+  });
+  const host = await render(<NavigationInteractionSettings />);
+  expect(host.queryByRole('radio', { name: '缩放' })).toBeNull();
+  expect(host.queryByText('按压缩放比例')).toBeNull();
+  expect(host.getByText('按压不透明度')).toBeVisible();
+  await fireEvent(host.getByLabelText('视觉反馈'), 'valueChange', false);
+  expect(host.queryByText('按压不透明度')).toBeNull();
+  await act(() =>
+    useSettingsStore
+      .getState()
+      .updateSettings({ performanceMode: false, enablePressFeedback: true }),
+  );
+  expect(host.getByRole('radio', { name: '缩放' })).toBeChecked();
+  expect(host.getByText('按压缩放比例')).toBeVisible();
 });

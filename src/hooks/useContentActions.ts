@@ -9,7 +9,10 @@ import {
   EXPORT_CONTENT_LABELS,
   parseExportTarget,
 } from '@/features/content-export/entry';
-import { useCollectionAction } from '@/hooks/useCollectionAction';
+import {
+  useCollectionAction,
+  useCollectionActionPending,
+} from '@/hooks/useCollectionAction';
 import { getAuthSessionVersion, useAuthStore } from '@/store/useAuthStore';
 import { useCollectionStore } from '@/store/useCollectionStore';
 import { copyToClipboard } from '@/utils/clipboard';
@@ -46,7 +49,12 @@ export function useContentActions({
   );
   const collectionType = type === 'answer' || type === 'article' ? type : null;
   const knownCollected = storedCollected ?? data?.isCollected;
-  const { toggleCollect, isPending: collectionPending } = useCollectionAction();
+  const { toggleCollect } = useCollectionAction();
+  const collectionPending = useCollectionActionPending(
+    actionSession,
+    collectionType,
+    id,
+  );
   const collectionStatus = useQuery({
     queryKey: [
       collectionType

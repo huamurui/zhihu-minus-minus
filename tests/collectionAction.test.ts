@@ -7,6 +7,7 @@ import {
   removeFromCollection,
 } from '../src/api/zhihu/collection';
 import { useCollectionAction } from '../src/hooks/useCollectionAction';
+import { useContentActions } from '../src/hooks/useContentActions';
 import { useCollectionStore } from '../src/store/useCollectionStore';
 import { updateContentInteractionCaches } from '../src/utils/contentCache';
 
@@ -26,14 +27,18 @@ jest.mock('../src/utils/contentCache', () => ({
   updateContentInteractionCaches: jest.fn(),
 }));
 jest.mock('../src/utils/toast', () => ({ showToast: jest.fn() }));
+jest.mock('../src/components/Themed', () => ({ useThemeColor: () => '#222' }));
+jest.mock('../src/utils/clipboard', () => ({ copyToClipboard: jest.fn() }));
 let mockSessionVersion = 0;
 let mockCookies = 'z_c0=synthetic-session';
 const mockPush = jest.fn();
 jest.mock('../src/store/useAuthStore', () => ({
   getAuthSessionVersion: () => mockSessionVersion,
-  useAuthStore: Object.assign(() => ({ cookies: mockCookies }), {
-    getState: () => ({ cookies: mockCookies }),
-  }),
+  useAuthStore: Object.assign(
+    (select: (state: { cookies: string }) => unknown) =>
+      select({ cookies: mockCookies }),
+    { getState: () => ({ cookies: mockCookies }) },
+  ),
 }));
 
 beforeEach(() => {
@@ -117,6 +122,62 @@ test('quick overlapping successes only add one collected count', async () => {
     1,
   );
   await host.unmount();
+  client.clear();
+});
+
+test('reopening a menu while collection is pending prevents another request for that item', async () => {
+  let finish!: (value: Awaited<ReturnType<typeof fastCollectAnswer>>) => void;
+  jest.mocked(fastCollectAnswer).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const { client, host: button } = await setup();
+  const mountMenu = (type: 'answer' | 'article', id: string | number) =>
+    renderHook(
+      () => {
+        const { actions } = useContentActions({
+          type,
+          data: { id, isCollected: false },
+        });
+        const option = actions.find((action) => action.key === 'collection');
+        if (!option) throw new Error('Expected a collection action');
+        return option;
+      },
+      {
+        wrapper: ({ children }: PropsWithChildren) =>
+          createElement(QueryClientProvider, { client }, children),
+      },
+    );
+  const first = await mountMenu('answer', 42);
+  const collect = first.result.current.onPress;
+  await first.unmount();
+  await act(() => {
+    collect();
+    button.result.current.toggleCollect('42', 'answer', false);
+  });
+  const reopened = await mountMenu('answer', '42');
+  expect(reopened.result.current.disabled).toBe(true);
+  await act(() => {
+    reopened.result.current.onPress();
+  });
+  expect(fastCollectAnswer).toHaveBeenCalledTimes(1);
+
+  const otherItem = await mountMenu('answer', 43);
+  const otherType = await mountMenu('article', 42);
+  expect(otherItem.result.current.disabled).toBe(false);
+  expect(otherType.result.current.disabled).toBe(false);
+  await act(() =>
+    finish({ collection: { id: 'folder', title: '合成收藏夹' } }),
+  );
+  await waitFor(() => expect(reopened.result.current.disabled).toBe(false));
+  expect(reopened.result.current.label).toBe('取消收藏');
+  expect(useCollectionStore.getState().collectedCountOffsetMap['42']).toBe(1);
+  await reopened.unmount();
+  await otherItem.unmount();
+  await otherType.unmount();
+  await button.unmount();
   client.clear();
 });
 

@@ -1,0 +1,17 @@
+diff --git a/node_modules/expo-crypto/android/src/main/java/expo/modules/crypto/aes/extensions/CipherExtensions.kt b/node_modules/expo-crypto/android/src/main/java/expo/modules/crypto/aes/extensions/CipherExtensions.kt
+--- a/node_modules/expo-crypto/android/src/main/java/expo/modules/crypto/aes/extensions/CipherExtensions.kt
++++ b/node_modules/expo-crypto/android/src/main/java/expo/modules/crypto/aes/extensions/CipherExtensions.kt
+@@ -18,7 +18,10 @@ internal fun Cipher.decrypt(sealedData: SealedData): ByteBuffer {
+   val inputBuf = sealedData.taggedCiphertextBuffer
+   val plaintextSize = getOutputSize(inputBuf.remaining())
+ 
+-  return ByteBuffer.allocate(plaintextSize).also { outputBuf ->
+-    doFinal(inputBuf, outputBuf)
+-  }
++  val output = ByteBuffer.allocate(plaintextSize)
++  val written = doFinal(inputBuf, output)
++  // getOutputSize is an upper bound. Older Android providers include the tag
++  // even on decryption, and the Expo bridge returns the entire backing array.
++  return if (written == plaintextSize) output
++  else ByteBuffer.wrap(output.array().copyOf(written))
+ }

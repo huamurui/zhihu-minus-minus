@@ -6,6 +6,7 @@ import { type FeedItem, voteContent } from '../src/api/zhihu';
 import type { CollectionButton } from '../src/components/CollectionButton';
 import { CreationCard } from '../src/components/CreationCard';
 import { FeedCard } from '../src/components/FeedCard';
+import type { VoteAction } from '../src/components/LikeButton';
 import { useSettingsStore } from '../src/store/useSettingsStore';
 import { seedAnswerPreviewEntry } from '../src/utils/answerPreviewEntry';
 import type {
@@ -27,6 +28,7 @@ interface MenuProps {
 }
 
 let mockShareMenuProps: MenuProps;
+const mockShareMenuRender = jest.fn();
 const mockUseContentActions = jest.fn();
 const mockCopy = jest.fn();
 const mockPush = jest.fn();
@@ -97,7 +99,8 @@ jest.mock('react-native-reanimated', () => ({
 }));
 jest.mock('../src/store/useAuthStore', () => ({
   getAuthSessionVersion: () => mockSessionVersion,
-  useAuthStore: () => ({ cookies: 'synthetic-session' }),
+  useAuthStore: (selector: (state: { cookies: string }) => unknown) =>
+    selector({ cookies: 'synthetic-session' }),
 }));
 jest.mock('../src/store/useCollectionStore', () => ({
   useCollectionStore: (selector: (state: object) => unknown) =>
@@ -139,16 +142,9 @@ jest.mock('../src/components/BouncyButton', () => ({
 jest.mock('../src/components/FeedCardPreview', () => ({
   FeedCardPreview: () => null,
 }));
-jest.mock('../src/components/FeedExcerpt', () => ({
-  FeedExcerpt: ({ html }: { html?: string }) =>
-    html
-      ? jest
-          .requireActual('react')
-          .createElement(jest.requireActual('react-native').Text, null, html)
-      : null,
-}));
 jest.mock('../src/components/ShareMenu', () => ({
   ShareMenu: (props: MenuProps) => {
+    mockShareMenuRender();
     mockShareMenuProps = props;
     return props.visible
       ? jest
@@ -161,19 +157,38 @@ jest.mock('../src/components/ShareMenu', () => ({
       : null;
   },
 }));
-jest.mock('../src/features/rich-content', () => ({ ZhihuContent: () => null }));
+jest.mock('../src/features/rich-content', () => ({
+  ZhihuContent: () => null,
+  LinkCard: ({ url }: { url: string }) =>
+    jest
+      .requireActual('react')
+      .createElement(jest.requireActual('react-native').Text, null, url),
+}));
 jest.mock('expo-linear-gradient', () => ({
   LinearGradient: jest.requireActual('react-native').View,
 }));
 jest.mock('../src/components/LikeButton', () => ({
-  LikeButton: ({ count, voted }: { count: number; voted: number }) =>
-    jest
-      .requireActual('react')
-      .createElement(
-        jest.requireActual('react-native').Text,
-        null,
-        `vote:${voted}/${count}`,
-      ),
+  LikeButton: ({
+    count,
+    voted,
+    voteAction,
+  }: {
+    count: number;
+    voted: number;
+    voteAction?: VoteAction;
+  }) =>
+    jest.requireActual('react').createElement(
+      jest.requireActual('react-native').Text,
+      {
+        onPress:
+          voteAction &&
+          (() => {
+            voteAction.onPress();
+          }),
+        accessibilityState: { busy: voteAction?.pending },
+      },
+      `vote:${voted}/${count}`,
+    ),
 }));
 jest.mock('../src/components/CustomContextMenu', () => ({
   CustomContextMenu: ({
@@ -216,7 +231,10 @@ jest.mock('../src/utils/toast', () => ({ showToast: jest.fn() }));
 beforeEach(() => {
   jest.clearAllMocks();
   mockSessionVersion = 1;
-  useSettingsStore.setState({ imageLoadingMode: 'auto' });
+  useSettingsStore.setState({
+    imageLoadingMode: 'auto',
+    performanceMode: false,
+  });
 });
 
 const baseItem: FeedItem = {
@@ -230,6 +248,112 @@ const baseItem: FeedItem = {
   commentCount: 0,
   voted: 0,
 };
+
+test.each([
+  ['链接标题', '链接标题'],
+  ['', '查看回答'],
+])(
+  'performance mode renders a link excerpt as text (%s)',
+  async (label, expected) => {
+    const url = 'https://example.test/article';
+    const item = {
+      ...baseItem,
+      excerpt: `<a data-draft-type="link-card" href="${url}">${label}</a>`,
+    };
+    useSettingsStore.setState({ performanceMode: true });
+    const host = await render(<FeedCard item={item} tab="recommend" />);
+    expect(host.queryByText(url)).toBeNull();
+    expect(host.getByText(expected)).toBeVisible();
+
+    await act(() => useSettingsStore.setState({ performanceMode: false }));
+    expect(host.getByText(url)).toBeVisible();
+  },
+);
+
+test.each(['recommend', 'following'])(
+  'performance mode preserves reading and actions in the %s feed',
+  async (tab) => {
+    useSettingsStore.setState({ performanceMode: true });
+    const item = {
+      ...baseItem,
+      image: 'https://example.test/preview.png',
+      questionId: 'question',
+      favlistsCount: 3,
+      isCollected: true,
+      commentCount: 4,
+    };
+    const host = await render(<FeedCard item={item} tab={tab} />);
+    const stopPropagation = jest.fn();
+    const tap = { stopPropagation };
+    expect(
+      host.container.queryAll((node) => node.type === 'Image'),
+    ).toHaveLength(0);
+    await fireEvent.press(host.getByText('查看回答'));
+    expect(mockPush).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pathname: '/answer/[id]' }),
+    );
+    await fireEvent.press(host.getByText('合成原卡片'), tap);
+    expect(mockPush).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pathname: '/question/[id]' }),
+    );
+    await fireEvent.press(host.getByText('合成作者'), tap);
+    expect(mockPush).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pathname: '/user/[id]' }),
+    );
+    await fireEvent.press(host.getByRole('button', { name: '评论' }), tap);
+    expect(mockPush).toHaveBeenLastCalledWith(
+      '/comments/original?type=answer&count=4',
+    );
+    expect(mockCollectionButton).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        id: 'original',
+        type: 'answer',
+        isCollected: true,
+        count: 3,
+        variant: 'text',
+      }),
+    );
+    await fireEvent(host.getByText('合成原卡片'), 'longPress', tap);
+    expect(host.getByText('复制链接')).toBeVisible();
+    await host.rerender(
+      <FeedCard
+        item={{ ...item, id: 'next', title: '新条目', excerpt: '新摘要' }}
+        tab={tab}
+      />,
+    );
+    expect(host.queryByText('复制链接')).toBeNull();
+    await fireEvent.press(host.getByRole('button', { name: '更多操作' }), tap);
+    expect(host.getByText('更多:next')).toBeVisible();
+    await host.rerender(
+      <FeedCard
+        item={{ ...item, id: 'last', voted: 1, voteCount: 11 }}
+        tab={tab}
+      />,
+    );
+    expect(host.queryByText('更多:last')).toBeNull();
+    let finishVote = () => {};
+    jest.mocked(voteContent).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishVote = () => resolve({ voted: 0, voteCount: 10 });
+        }),
+    );
+    await fireEvent.press(host.getByText('已赞同 11'), tap);
+    const busyButton = host.getByRole('button', { name: '取消赞同' });
+    expect(busyButton).toBeDisabled();
+    await fireEvent.press(busyButton, tap);
+    expect(voteContent).toHaveBeenCalledTimes(1);
+    await act(() => finishVote());
+    expect(voteContent).toHaveBeenLastCalledWith('last', 'answers', 'neutral');
+    expect(host.getByText('赞同 10')).toBeVisible();
+    expect(stopPropagation).toHaveBeenCalledTimes(7);
+    expect(mockPush).toHaveBeenCalledTimes(4);
+    await act(() => useSettingsStore.setState({ performanceMode: false }));
+    expect(
+      host.container.queryAll((node) => node.type === 'Image').length,
+    ).toBeGreaterThan(0);
+  },
+);
 
 test('article preview follows a recycled card identity and session', async () => {
   const item: FeedItem = {
@@ -262,6 +386,43 @@ test('article preview follows a recycled card identity and session', async () =>
     expect.objectContaining({ id: 'next' }),
   );
 });
+
+test.each([false, true])(
+  'a pending vote survives mode changes (starts lightweight %s) and cannot update a new account',
+  async (textOnly) => {
+    useSettingsStore.setState({ performanceMode: textOnly });
+    let finishVote = () => {};
+    jest.mocked(voteContent).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishVote = () => resolve({ voted: 1, voteCount: 11 });
+        }),
+    );
+    const host = await render(<FeedCard item={baseItem} tab="recommend" />);
+    const label = (light: boolean) => (light ? '赞同 10' : 'vote:0/10');
+    await fireEvent.press(host.getByText(label(textOnly)));
+    await act(() => useSettingsStore.setState({ performanceMode: !textOnly }));
+    await fireEvent.press(host.getByText(label(!textOnly)));
+    await fireEvent(host.getByText('合成原卡片'), 'longPress');
+    await fireEvent.press(host.getByText('赞同'));
+    expect(voteContent).toHaveBeenCalledTimes(1);
+    mockSessionVersion++;
+    await host.rerender(
+      <FeedCard
+        item={{ ...baseItem, title: '新会话的回答' }}
+        tab="recommend"
+      />,
+    );
+    expect(host.queryByText('复制链接')).toBeNull();
+    await act(() => finishVote());
+    expect(updateContentInteractionCaches).not.toHaveBeenCalled();
+    expect(host.getByText(label(!textOnly))).toBeTruthy();
+    jest.mocked(voteContent).mockResolvedValueOnce({ voted: 1, voteCount: 15 });
+    await fireEvent.press(host.getByText(label(!textOnly)));
+    expect(voteContent).toHaveBeenCalledTimes(2);
+    expect(host.getByText(!textOnly ? '已赞同 15' : 'vote:1/15')).toBeTruthy();
+  },
+);
 
 test('creation-card pin preview uses the same normalized key when opened', async () => {
   const item = {
@@ -491,9 +652,8 @@ test.each(['answers', 'articles', 'pins', 'questions', 'videos'] as const)(
     } else {
       expect(host.queryByRole('button', { name: '收藏' })).toBeNull();
     }
-    expect(mockUseContentActions).toHaveBeenLastCalledWith(
-      expect.objectContaining({ enabled: false }),
-    );
+    expect(mockUseContentActions).not.toHaveBeenCalled();
+    expect(mockShareMenuRender).not.toHaveBeenCalled();
     const stopPropagation = jest.fn();
     await fireEvent.press(host.getByRole('button', { name: '更多操作' }), {
       stopPropagation,
@@ -544,47 +704,48 @@ test('feed collection actions receive the current list state and refreshed count
   );
 });
 
-test('recommendation feedback remains attached to the menu item and updates after recycling', async () => {
-  const onUninterested = jest.fn(async () => {});
-  const host = await render(
-    <FeedCard
-      item={baseItem}
-      tab="recommend"
-      onUninterested={onUninterested}
-    />,
-  );
-  const originalAction = mockShareMenuProps.additionalOptions?.find(
-    (option) => option.key === 'uninterested',
-  );
-  expect(originalAction).toBeDefined();
-  expect(mockUseContentActions).toHaveBeenLastCalledWith(
-    expect.objectContaining({
-      additionalOptions: [expect.objectContaining({ key: 'uninterested' })],
-    }),
-  );
-  const nextItem = { ...baseItem, id: 'next', title: '合成下个推荐' };
-  await host.rerender(
-    <FeedCard
-      item={nextItem}
-      tab="recommend"
-      onUninterested={onUninterested}
-    />,
-  );
-  await originalAction?.onPress();
-  expect(onUninterested).toHaveBeenLastCalledWith(baseItem);
-  await mockShareMenuProps.additionalOptions
-    ?.find((option) => option.key === 'uninterested')
-    ?.onPress();
-  expect(onUninterested).toHaveBeenLastCalledWith(nextItem);
-  await host.rerender(
-    <FeedCard
-      item={{ ...nextItem, isIdStable: false }}
-      tab="recommend"
-      onUninterested={onUninterested}
-    />,
-  );
-  expect(mockShareMenuProps.additionalOptions).toEqual([]);
-});
+test.each([false, true])(
+  'recommendation feedback remains attached after recycling (performance mode %s)',
+  async (performanceMode) => {
+    useSettingsStore.setState({ performanceMode });
+    const onUninterested = jest.fn(async () => {});
+    const host = await render(
+      <FeedCard
+        item={baseItem}
+        tab="recommend"
+        onUninterested={onUninterested}
+      />,
+    );
+    await fireEvent.press(host.getByRole('button', { name: '更多操作' }));
+    const originalAction = mockShareMenuProps.additionalOptions?.find(
+      (option) => option.key === 'uninterested',
+    );
+    expect(originalAction).toBeDefined();
+    const nextItem = { ...baseItem, id: 'next', title: '合成下个推荐' };
+    await host.rerender(
+      <FeedCard
+        item={nextItem}
+        tab="recommend"
+        onUninterested={onUninterested}
+      />,
+    );
+    await originalAction?.onPress();
+    expect(onUninterested).toHaveBeenLastCalledWith(baseItem);
+    await fireEvent.press(host.getByRole('button', { name: '更多操作' }));
+    await mockShareMenuProps.additionalOptions
+      ?.find((option) => option.key === 'uninterested')
+      ?.onPress();
+    expect(onUninterested).toHaveBeenLastCalledWith(nextItem);
+    await host.rerender(
+      <FeedCard
+        item={{ ...nextItem, isIdStable: false }}
+        tab="recommend"
+        onUninterested={onUninterested}
+      />,
+    );
+    expect(mockShareMenuProps.additionalOptions).toEqual([]);
+  },
+);
 
 test('feed previews use the shared action builder with the current content identity', async () => {
   const host = await render(
@@ -593,7 +754,7 @@ test('feed previews use the shared action builder with the current content ident
   await fireEvent(host.getByText('合成原卡片'), 'longPress');
   expect(mockUseContentActions).toHaveBeenLastCalledWith({
     type: 'answer',
-    enabled: true,
+    additionalOptions: [],
     data: expect.objectContaining({
       id: 'original',
       questionId: 'question',

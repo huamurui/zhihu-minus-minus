@@ -53,6 +53,7 @@ export function AnswerPreviewPlainBody({
             segmentInfos={item.segmentInfos}
             linkCardInfo={item.linkCardInfo}
             selectable
+            progressive
             onRefresh={onRefresh}
           />
         </View>

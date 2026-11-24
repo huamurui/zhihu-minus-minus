@@ -404,13 +404,6 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         JSON.stringify(segmentInfos?.map(({ pid, text }) => [pid, text]) ?? []),
       [segmentInfos],
     );
-    const documentImages = useMemo(
-      () =>
-        document
-          ? getZhihuDocumentPreviewImages(document).map((image) => image.url)
-          : undefined,
-      [document],
-    );
     const themeColors = useRuntimeThemeColors();
     const surfaceColor = useThemeColor({}, 'surface');
     const router = useRouter();
@@ -748,7 +741,13 @@ export const ZhihuContent: React.FC<ZhihuContentProps> = React.memo(
         linkCardInfoStr={JSON.stringify(linkCardInfo || {})}
         colorScheme={colorScheme}
         onReady={handleWebViewReady}
-        onImagePress={(src) => onImagePressCallback(src, documentImages)}
+        onImagePress={(src) =>
+          onImagePressCallback(
+            src,
+            document &&
+              getZhihuDocumentPreviewImages(document).map((image) => image.url),
+          )
+        }
         onImageLongPress={onImageLongPressCallback}
         onLinkPress={handleInternalLink}
         onSegmentPress={onSegmentPressCallback}

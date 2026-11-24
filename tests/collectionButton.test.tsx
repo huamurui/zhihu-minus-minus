@@ -113,6 +113,32 @@ afterEach(() => {
   for (const client of clients.splice(0)) client.clear();
 });
 
+test('text-only feed collection follows the selected item and remains actionable', async () => {
+  const host = await setup({ variant: 'text', isCollected: false });
+  await fireEvent.press(host.getByText('收藏'));
+  expect(mockToggleCollect).toHaveBeenLastCalledWith(
+    'answer-a',
+    'answer',
+    false,
+  );
+  await host.update({
+    id: 'article-b',
+    type: 'article',
+    isCollected: true,
+    count: 12345,
+  });
+  expect(host.getByRole('button', { name: '取消收藏' })).toHaveProp(
+    'accessibilityValue',
+    { text: '12345 次收藏' },
+  );
+  await fireEvent.press(host.getByText('已收藏 1.2万'));
+  expect(mockToggleCollect).toHaveBeenLastCalledWith(
+    'article-b',
+    'article',
+    true,
+  );
+});
+
 test.each([false, true])(
   'known collection state %s toggles directly and stops card navigation',
   async (isCollected) => {

@@ -311,22 +311,24 @@ export const CreationCard = React.forwardRef<
           </View>
         </NativeView>
 
-        <ShareMenu
-          visible={menuVisible}
-          onClose={() => setMenuVisible(false)}
-          type={displayTypeForShare}
-          data={{
-            id: item.id,
-            title: getTitle(),
-            author: item.author?.name,
-            authorHeadline: item.author?.headline,
-            questionId: item.question?.id,
-            isCollected: activeCollected,
-            excerpt:
-              typeof shareExcerpt === 'string' ? shareExcerpt : undefined,
-            url: item.url,
-          }}
-        />
+        {menuVisible && (
+          <ShareMenu
+            visible
+            onClose={() => setMenuVisible(false)}
+            type={displayTypeForShare}
+            data={{
+              id: item.id,
+              title: getTitle(),
+              author: item.author?.name,
+              authorHeadline: item.author?.headline,
+              questionId: item.question?.id,
+              isCollected: activeCollected,
+              excerpt:
+                typeof shareExcerpt === 'string' ? shareExcerpt : undefined,
+              url: item.url,
+            }}
+          />
+        )}
       </BouncyButton>
     );
   },

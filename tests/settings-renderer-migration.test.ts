@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import {
   type AppSettings,
   type RichContentRenderer,
@@ -11,6 +12,7 @@ jest.mock('expo-secure-store', () => ({
   setItemAsync: jest.fn(async () => undefined),
   deleteItemAsync: jest.fn(async () => undefined),
 }));
+jest.mock('react-native', () => ({ Platform: { OS: 'android', Version: 27 } }));
 
 async function migrate(
   value: unknown,
@@ -40,7 +42,7 @@ test('defaults to tiqian-super-mini with visual feedback and filtering enabled',
   expect(useSettingsStore.getState().filterEnableQuality).toBe(false);
   expect(useSettingsStore.getState().filterBlockLabeled).toBe(false);
   expect(useSettingsStore.getState().filterRegexPatterns).toEqual([]);
-  expect(useSettingsStore.persist.getOptions().version).toBe(24);
+  expect(useSettingsStore.persist.getOptions().version).toBe(26);
 });
 
 test('allows opting out of segment taps and keeps previous installs enabled', async () => {
@@ -149,7 +151,7 @@ test('retains unrelated settings and the earlier settings migrations', async () 
     enablePrivateMessaging: true,
     richContentRenderer: 'webview',
     pressOpacity: 0.82,
-    androidFeedbackType: 'ripple',
+    androidFeedbackType: 'opacity',
     enablePressFeedback: true,
     enableLocalFeedFilter: true,
     filterRegexPatterns: [],
@@ -183,7 +185,7 @@ test('hydrates legacy settings and writes back only the new renderer field', asy
       fontSizeScale: 1.3,
       enablePressFeedback: true,
     },
-    version: 24,
+    version: 26,
   });
   expect(JSON.parse(persistedJson).state).not.toHaveProperty('useWebView');
 });
@@ -201,6 +203,64 @@ test('adds visual feedback to v13 settings without changing the saved style or h
   });
   expect(legacy).not.toHaveProperty('enablePressFeedback');
 });
+
+test('uses opacity on a fresh Android 8 installation and preserves saved choices on upgrade', async () => {
+  expect(useSettingsStore.getInitialState().androidFeedbackType).toBe(
+    'opacity',
+  );
+  for (const androidFeedbackType of ['ripple', 'scale-opacity', 'opacity']) {
+    const saved = { androidFeedbackType, enablePressFeedback: false };
+    expect(await migrate(saved, 24)).toMatchObject(saved);
+  }
+});
+
+test('keeps performance mode opt-in on upgrade and restores the chosen mode after restart', async () => {
+  expect(useSettingsStore.getInitialState().performanceMode).toBe(false);
+  expect(await migrate({ androidFeedbackType: 'ripple' }, 25)).toMatchObject({
+    androidFeedbackType: 'ripple',
+    performanceMode: false,
+  });
+  useSettingsStore.getState().updateSettings({
+    performanceMode: true,
+    androidFeedbackType: 'scale-opacity',
+    enablePressFeedback: false,
+  });
+  const stored = jest.mocked(SecureStore.setItemAsync).mock.calls.at(-1)?.[1];
+  if (!stored) throw new Error('Missing saved performance preferences');
+  useSettingsStore.getState().resetSettings();
+  jest.mocked(SecureStore.getItemAsync).mockResolvedValue(stored);
+  await useSettingsStore.persist.rehydrate();
+  expect(useSettingsStore.getState()).toMatchObject({
+    performanceMode: true,
+    androidFeedbackType: 'scale-opacity',
+    enablePressFeedback: false,
+  });
+});
+
+test.each([
+  [24, 'opacity'],
+  [27, 'opacity'],
+  [28, 'ripple'],
+  [35, 'ripple'],
+] as const)(
+  'recovers missing or invalid feedback on API %i',
+  async (api, expected) => {
+    const version = jest.replaceProperty(Platform, 'Version', api);
+    try {
+      expect((await migrate({}, 3)).androidFeedbackType).toBe(expected);
+      expect(
+        (await migrate({ androidFeedbackType: 'unknown' }, 24))
+          .androidFeedbackType,
+      ).toBe(expected);
+      useSettingsStore.getState().updateSettings({
+        androidFeedbackType: 'unknown',
+      } as unknown as Partial<AppSettings>);
+      expect(useSettingsStore.getState().androidFeedbackType).toBe(expected);
+    } finally {
+      version.restore();
+    }
+  },
+);
 
 test('persists disabled visual feedback and restores the saved style when reenabled', async () => {
   useSettingsStore.getState().updateSettings({
@@ -336,7 +396,7 @@ test('persists and restores sanitized custom regex rules together with a disable
       enableLocalFeedFilter: false,
       filterRegexPatterns: expectedPatterns,
     },
-    version: 24,
+    version: 26,
   });
   useSettingsStore.setState({
     enableLocalFeedFilter: true,

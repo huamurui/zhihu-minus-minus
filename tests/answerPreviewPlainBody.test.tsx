@@ -121,6 +121,7 @@ test('collapses the selected HTML without replacing its renderer, metadata or in
     objectId: html.id,
     type: 'answer',
     selectable: true,
+    progressive: true,
   });
   expect(mockBodyProps.content).toBe(html.content);
   expect(mockBodyProps.document).toBeUndefined();

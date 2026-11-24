@@ -168,10 +168,6 @@ export const ZhihuStructuredContent = React.memo(
       );
       return completeSegmentInfos.filter((info) => visiblePids.has(info.pid));
     }, [completeSegmentInfos, document]);
-    const previewImages = useMemo(
-      () => getZhihuDocumentPreviewImages(document).map((image) => image.url),
-      [document],
-    );
     const textStyle: TextStyle = {
       color: colors.text,
       fontSize: 17,
@@ -293,7 +289,12 @@ export const ZhihuStructuredContent = React.memo(
                   accessibilityRole={onImagePress ? 'button' : undefined}
                   accessibilityLabel={onImagePress ? '查看正文图片' : undefined}
                   onPress={() =>
-                    onImagePress?.(block.resource.url, previewImages)
+                    onImagePress?.(
+                      block.resource.url,
+                      getZhihuDocumentPreviewImages(document).map(
+                        (image) => image.url,
+                      ),
+                    )
                   }
                 >
                   <Image
@@ -429,6 +430,7 @@ export const ZhihuStructuredContent = React.memo(
           segmentInfos={segmentInfos}
           onRefresh={onRefresh}
           selectable={selectable}
+          progressive={collapseMode === 'height'}
         />
       ) : renderer === 'native-v2' ? (
         <View testID="structured-content-native">

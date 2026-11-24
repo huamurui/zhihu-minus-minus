@@ -27,7 +27,7 @@ test('defaults to automatic layout with a one-third list width', () => {
     largeScreenLayoutMode: 'auto',
     largeScreenListRatio: 1 / 3,
   });
-  expect(useSettingsStore.persist.getOptions().version).toBe(24);
+  expect(useSettingsStore.persist.getOptions().version).toBe(26);
 });
 
 test('migrates v18 settings without changing unrelated preferences or the input object', async () => {
@@ -135,7 +135,7 @@ test('rehydrates both layout preferences after restart', async () => {
     .mock.calls.at(-1)?.[1];
   if (!persistedJson) throw new Error('Layout preferences must be persisted');
   expect(JSON.parse(persistedJson)).toMatchObject({
-    version: 24,
+    version: 26,
     state: {
       largeScreenLayoutMode: 'single',
       largeScreenListRatio: 0.45,
@@ -168,7 +168,7 @@ test('rehydrates v18 settings and persists the layout defaults added in v19', as
     .mock.calls.at(-1)?.[1];
   if (!persistedJson) throw new Error('Migrated settings must be persisted');
   expect(JSON.parse(persistedJson)).toMatchObject({
-    version: 24,
+    version: 26,
     state: { largeScreenLayoutMode: 'auto', largeScreenListRatio: 1 / 3 },
   });
 });

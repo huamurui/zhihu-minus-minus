@@ -288,6 +288,7 @@ describe('isolated structured-content renderer', () => {
       type: 'answer',
       onRefresh,
       selectable: false,
+      progressive: true,
     });
     expect(preview?.renderer).toBeUndefined();
     expect(document.blocks).toHaveLength(4);

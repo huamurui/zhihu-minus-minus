@@ -13,6 +13,13 @@ import {
 } from '@/utils/url';
 import { Text, View } from './Themed';
 
+export function stripFeedExcerptTags(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 function parseExcerpt(html: string): { text: string; links: string[] } {
   const links: string[] = [];
   const linkRegex = /<a[^>]*data-draft-type="link-card"[^>]*href="([^"]*)"/gi;
@@ -21,11 +28,7 @@ function parseExcerpt(html: string): { text: string; links: string[] } {
     if (m === null) break;
     links.push(m[1]);
   }
-  const text = html
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-  return { text, links };
+  return { text: stripFeedExcerptTags(html), links };
 }
 
 function parsePinContent(contentArray: readonly ZhihuContentSegment[]): {
@@ -67,8 +70,7 @@ export const FeedExcerpt: React.FC<{
         links: result.links.map((l) => l.url || ''),
       };
     }
-    if (html && isString(html))
-      return { text: parseExcerpt(html).text, links: parseExcerpt(html).links };
+    if (html && isString(html)) return parseExcerpt(html);
     return { text: html || null, links: [] as string[] };
   }, [html, contentArray]);
 
@@ -90,9 +92,8 @@ export const FeedExcerpt: React.FC<{
     [router],
   );
 
-  if (!parsed.text && parsed.links.length === 0) return null;
-
   const limitLines = numberOfLines === 0 ? undefined : numberOfLines;
+  if (!parsed.text && parsed.links.length === 0) return null;
 
   return (
     <View className="bg-transparent">

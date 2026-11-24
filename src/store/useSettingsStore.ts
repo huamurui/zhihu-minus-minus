@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { colors } from '@/constants/designTokens';
@@ -104,6 +105,32 @@ function isValidSurfaceStyle(v: unknown): v is SurfaceStyle {
 
 export type AnswerReadingMode = 'detail' | 'preview-list';
 
+type AndroidFeedbackType = 'ripple' | 'opacity' | 'scale-opacity';
+
+function resolveAndroidFeedbackType(value: unknown): AndroidFeedbackType {
+  if (value === 'ripple' || value === 'opacity' || value === 'scale-opacity') {
+    return value;
+  }
+  return Platform.OS === 'android' &&
+    Platform.Version >= 24 &&
+    Platform.Version <= 27
+    ? 'opacity'
+    : 'ripple';
+}
+
+export function getPressFeedbackMode(
+  settings: Pick<
+    AppSettings,
+    'performanceMode' | 'enablePressFeedback' | 'androidFeedbackType'
+  >,
+): AndroidFeedbackType | 'none' {
+  if (settings.enablePressFeedback === false) return 'none';
+  if (settings.performanceMode) return 'opacity';
+  return Platform.OS === 'android'
+    ? resolveAndroidFeedbackType(settings.androidFeedbackType)
+    : 'scale-opacity';
+}
+
 function isValidAnswerReadingMode(value: unknown): value is AnswerReadingMode {
   return value === 'detail' || value === 'preview-list';
 }
@@ -163,14 +190,16 @@ export interface AppSettings {
    */
   doubleTapAction?: DoubleTapAction;
   enablePrivateMessaging: boolean;
+  /** 简化信息流卡片与按压效果。 */
+  performanceMode: boolean;
   /** 是否开启按压时的水波纹、缩放与透明度变化 */
   enablePressFeedback: boolean;
-  /** 缩放模式按压时的不透明度 (0.5 ~ 1.0) */
+  /** 仅透明度和缩放模式按压时的不透明度 (0.5 ~ 1.0) */
   pressOpacity: number;
   /** 缩放模式按压时的缩放比例 (0.88 ~ 1.0) */
   pressScale: number;
-  /** 安卓按压反馈类型: ripple (水波纹), scale-opacity (透明度+缩放) */
-  androidFeedbackType: 'ripple' | 'scale-opacity';
+  /** Android 按压时使用水波纹、透明度或缩放反馈。 */
+  androidFeedbackType: AndroidFeedbackType;
   /** Android 单栏侧滑返回时预览上一页。 */
   androidPredictiveBackEnabled: boolean;
   /** 是否开启应用内震动反馈 */
@@ -255,10 +284,11 @@ const DEFAULT_SETTINGS: AppSettings = {
   answerReadingMode: 'detail',
   doubleTapAction: undefined,
   enablePrivateMessaging: false,
+  performanceMode: false,
   enablePressFeedback: true,
   pressOpacity: 0.82,
   pressScale: 0.98,
-  androidFeedbackType: 'ripple',
+  androidFeedbackType: resolveAndroidFeedbackType(undefined),
   androidPredictiveBackEnabled: true,
   enableHapticFeedback: true,
   unreadBadgeStyle: 'count',
@@ -345,6 +375,10 @@ export const useSettingsStore = create<SettingsState>()(
           if (typeof nextSettings.enablePressFeedback !== 'boolean') {
             nextSettings.enablePressFeedback = true;
           }
+          nextSettings.performanceMode = nextSettings.performanceMode === true;
+          nextSettings.androidFeedbackType = resolveAndroidFeedbackType(
+            nextSettings.androidFeedbackType,
+          );
           nextSettings.androidPredictiveBackEnabled =
             nextSettings.androidPredictiveBackEnabled !== false;
           nextSettings.largeScreenLayoutMode = normalizeLargeScreenLayoutMode(
@@ -403,7 +437,7 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'zhihu-settings-storage',
       storage: createJSONStorage(() => settingsStorage),
-      version: 24,
+      version: 26,
       onRehydrateStorage: () => () => useInitialSettingsReady.setState(true),
       migrate: (rawPersistedState: unknown, version: number) => {
         const persistedState =
@@ -418,11 +452,13 @@ export const useSettingsStore = create<SettingsState>()(
           persistedState.pressScale = persistedState.pressScale ?? 0.98;
         }
 
-        // 升级到 v4 时兜底安卓按压反馈类型选择
-        if (version < 4) {
-          persistedState.androidFeedbackType =
-            persistedState.androidFeedbackType ?? 'ripple';
-        }
+        // v25 keeps saved feedback styles and picks a device default if unset.
+        persistedState.androidFeedbackType = resolveAndroidFeedbackType(
+          persistedState.androidFeedbackType,
+        );
+        // v26 adds an opt-in mode independent of the saved feedback preference.
+        persistedState.performanceMode =
+          version >= 26 && persistedState.performanceMode === true;
 
         if (version < 5) {
           persistedState.enableBrowseHistory =
