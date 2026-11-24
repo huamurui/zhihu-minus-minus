@@ -14,6 +14,7 @@ import {
   useTitleTransition,
   useTitleTransitionSource,
 } from '../src/features/adaptive-layout/TitleTransition';
+import { useSettingsStore } from '../src/store/useSettingsStore';
 
 let mockMeasureInWindow:
   | ((callback: (...args: number[]) => void) => void)
@@ -396,6 +397,26 @@ test('returning during the title handoff reveals the actual title', async () => 
   ).toBeNull();
   expect(host.getByText('详情标题')).toBeVisible();
   timing.mockRestore();
+});
+
+test('performance mode opens content without measuring or hiding the title', async () => {
+  const originalMode = useSettingsStore.getState().performanceMode;
+  const measure = jest.fn();
+  mockMeasureInWindow = measure;
+  try {
+    useSettingsStore.setState({ performanceMode: true });
+    const host = await render(
+      <TitleTransitionProvider activeRouteKey="source">
+        <Example />
+      </TitleTransitionProvider>,
+    );
+    await fireEvent.press(host.getByText('打开'));
+    expect(host.getByText('详情标题')).toBeVisible();
+    expect(measure).not.toHaveBeenCalled();
+  } finally {
+    mockMeasureInWindow = null;
+    useSettingsStore.setState({ performanceMode: originalMode });
+  }
 });
 
 test('reduced motion opens the destination without hiding its title', async () => {

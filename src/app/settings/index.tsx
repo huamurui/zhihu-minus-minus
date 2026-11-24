@@ -46,11 +46,11 @@ const SEARCH_ENTRIES: ReadonlyArray<SearchEntry> = [
   },
   {
     label: '外观与阅读',
-    description: '主题、字体、阅读、导航、启动页与按压反馈',
+    description: '性能模式、主题、阅读、导航与按压反馈',
     icon: 'color-palette-outline',
     href: '/settings/appearance',
     keywords:
-      '外观 阅读 无图模式 按需加载 图片 缩略图 回答详情 预览卡片 列表 阅读方式 划线评论 点击划线查看评论 正文 排版 原生 实验 tiqian super mini tiqian-super-mini native v2 网页 webview 主题 模式 深色 浅色 系统 颜色 字体 字号 行高 背景 对比度 表面 导航 预测性返回 返回手势 侧滑 底部 栏目 启动页 震动 触感 按压 视觉反馈 无反馈 水波纹 缩放 液态玻璃',
+      '外观 阅读 性能模式 轻量 滚动 卡顿 无图模式 按需加载 图片 缩略图 回答详情 预览卡片 列表 阅读方式 划线评论 点击划线查看评论 正文 排版 原生 实验 tiqian super mini tiqian-super-mini native v2 网页 webview 主题 模式 深色 浅色 系统 颜色 字体 字号 行高 背景 对比度 表面 导航 预测性返回 返回手势 侧滑 底部 栏目 启动页 震动 触感 按压 视觉反馈 无反馈 水波纹 仅透明度 缩放 液态玻璃',
   },
   {
     label: '过滤与推荐',
@@ -262,7 +262,7 @@ export default function SettingsScreen() {
               <SettingsRouteRow
                 icon="color-palette-outline"
                 label="外观与阅读"
-                description="主题、字体、阅读、导航与按压反馈"
+                description="性能模式、主题、阅读、导航与按压反馈"
                 onPress={() => router.push('/settings/appearance')}
               />
             </Section>

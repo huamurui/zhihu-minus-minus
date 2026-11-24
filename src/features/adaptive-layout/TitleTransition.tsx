@@ -178,6 +178,10 @@ export function TitleTransitionProvider({
       restoreSource();
       setFlight(null);
       setWaiting(null);
+      if (useSettingsStore.getState().performanceMode) {
+        open();
+        return;
+      }
       if (
         !id ||
         !text ||

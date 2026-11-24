@@ -4,7 +4,10 @@ import { Platform, View as RNView, type ViewInstance } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { hasAuthenticationCookie } from '@/api/client';
 import { type FeedItem, getVoteSuccessMessage, voteContent } from '@/api/zhihu';
-import { FeedCardActionRow } from '@/components/FeedCardActionRow';
+import {
+  FeedCardActionRow,
+  FeedTextTarget,
+} from '@/components/FeedCardActionRow';
 import type { ActionSheetOption } from '@/components/overlays/ActionSheet';
 import { useIsTwoPaneLayout } from '@/features/adaptive-layout/PaneContext';
 import {
@@ -226,6 +229,17 @@ const FeedCardComponent = ({
   const isQuestionType = item.type === 'questions';
   const isPinType = item.type === 'pins';
   const isVideoType = item.type === 'videos';
+  const performanceMode = useSettingsStore((state) => state.performanceMode);
+  const textOnly =
+    performanceMode &&
+    (tab === 'recommend' || tab === 'following') &&
+    !isPinType &&
+    !isVideoType;
+  const typeLabel = isQuestionType
+    ? '问题'
+    : item.type === 'articles'
+      ? '文章'
+      : '回答';
   const engagementType: 'answers' | 'articles' | 'pins' | null =
     item.type === 'answers' || item.type === 'articles' || item.type === 'pins'
       ? item.type
@@ -235,11 +249,15 @@ const FeedCardComponent = ({
 
   const [voted, setVoted] = useState(item.voted || 0);
   const [voteCount, setVoteCount] = useState(item.voteCount || 0);
-  const identity = `${item.type}:${item.videoSource || ''}:${item.id}`;
+  const session = useAuthStore(() => getAuthSessionVersion());
+  const identity = `${session}:${item.type}:${item.videoSource || ''}:${item.id}`;
   const titleSource = useTitleTransitionSource(identity);
   const currentIdentityRef = useRef(identity);
   currentIdentityRef.current = identity;
-  const pendingVotesRef = useRef(new Set<string>());
+  const [pendingVotes, setPendingVotes] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const pendingVotesRef = useRef(pendingVotes);
 
   const itemIdStr = item.id != null ? item.id.toString() : '';
   const storeCollected = useCollectionStore((state) =>
@@ -257,10 +275,21 @@ const FeedCardComponent = ({
     </Text>
   );
   const authorAvatarSource = useMemo(
-    () => getCachedImageSource(item.author.avatar),
-    [item.author.avatar],
+    () => (textOnly ? undefined : getCachedImageSource(item.author.avatar)),
+    [item.author.avatar, textOnly],
   );
   const authorId = item.author.url_token || item.author.id;
+  const authorLabel = item.hideAuthor ? item.actionText : item.author.name;
+  const openAuthor = () =>
+    router.push({
+      pathname: '/user/[id]',
+      params: {
+        id: authorId,
+        avatar: item.author.avatar,
+        name: item.author.name,
+        ...(item.author.headline ? { headline: item.author.headline } : {}),
+      },
+    });
   const isAuthenticated = hasAuthenticationCookie(cookies);
 
   useEffect(() => {
@@ -400,6 +429,59 @@ const FeedCardComponent = ({
           },
         ]
       : [];
+  const toggleVote = async () => {
+    if (
+      !engagementType ||
+      session !== getAuthSessionVersion() ||
+      currentIdentityRef.current !== identity ||
+      pendingVotesRef.current.has(identity)
+    )
+      return;
+    pendingVotesRef.current = new Set(pendingVotesRef.current).add(identity);
+    setPendingVotes(pendingVotesRef.current);
+    const nextVoted = voted === 1 ? 0 : 1;
+    try {
+      const voteType =
+        item.type === 'pins'
+          ? nextVoted === 1
+            ? 'like'
+            : 'unlike'
+          : nextVoted === 1
+            ? 'up'
+            : 'neutral';
+      const result = await voteContent(item.id, engagementType, voteType);
+      if (session !== getAuthSessionVersion()) return;
+      const resolvedCount =
+        result.voteCount ??
+        Math.max(
+          0,
+          voteCount + Number(result.voted === 1) - Number(voted === 1),
+        );
+      if (currentIdentityRef.current === identity) {
+        setVoted(result.voted);
+        setVoteCount(resolvedCount);
+      }
+      updateContentInteractionCaches(queryClient, {
+        type: engagementType,
+        id: item.id,
+        voted: result.voted,
+        voteCount: resolvedCount,
+      });
+      showToast(getVoteSuccessMessage(engagementType, voted, result.voted));
+    } catch (error: unknown) {
+      if (session === getAuthSessionVersion())
+        showToast(getZhihuErrorMessage(error));
+    } finally {
+      const remaining = new Set(pendingVotesRef.current);
+      remaining.delete(identity);
+      pendingVotesRef.current = remaining;
+      setPendingVotes(remaining);
+    }
+  };
+  const openComments = () =>
+    router.push(
+      `/comments/${item.id}?type=${shareType}&count=${item.commentCount}`,
+    );
   const menuOptions: MenuOption[] =
     previewVisible && engagementType
       ? [
@@ -414,86 +496,38 @@ const FeedCardComponent = ({
                   ? '点赞'
                   : '赞同',
             icon: voted === 1 ? 'vote-up-active' : 'vote-up',
-            onPress: async () => {
-              if (pendingVotesRef.current.has(identity)) return;
-              pendingVotesRef.current.add(identity);
-              const nextVoted = voted === 1 ? 0 : 1;
-              try {
-                const voteType =
-                  item.type === 'pins'
-                    ? nextVoted === 1
-                      ? 'like'
-                      : 'unlike'
-                    : nextVoted === 1
-                      ? 'up'
-                      : 'neutral';
-                const result = await voteContent(
-                  item.id,
-                  engagementType,
-                  voteType,
-                );
-                const resolvedCount =
-                  result.voteCount ??
-                  Math.max(
-                    0,
-                    voteCount +
-                      Number(result.voted === 1) -
-                      Number(voted === 1),
-                  );
-                if (currentIdentityRef.current === identity) {
-                  setVoted(result.voted);
-                  setVoteCount(resolvedCount);
-                }
-                updateContentInteractionCaches(queryClient, {
-                  type: engagementType,
-                  id: item.id,
-                  voted: result.voted,
-                  voteCount: resolvedCount,
-                });
-                showToast(
-                  getVoteSuccessMessage(engagementType, voted, result.voted),
-                );
-              } catch (error: unknown) {
-                showToast(getZhihuErrorMessage(error));
-              } finally {
-                pendingVotesRef.current.delete(identity);
-              }
-            },
+            onPress: toggleVote,
+            disabled: pendingVotes.has(identity),
           },
           {
             key: 'comment',
             title: '评论',
             icon: 'comment-bubble',
-            onPress: () => {
-              const type =
-                item.type === 'articles'
-                  ? 'article'
-                  : item.type === 'answers'
-                    ? 'answer'
-                    : item.type.slice(0, -1);
-              router.push(
-                `/comments/${item.id}?type=${type}&count=${item.commentCount}`,
-              );
-            },
+            onPress: openComments,
           },
         ]
       : [];
+  const openQuestion = (questionId: string) =>
+    router.push({
+      pathname: '/question/[id]',
+      params: { id: questionId, title: cleanTitle },
+    });
+  const showPreview = () => {
+    void impactAsync(ImpactFeedbackStyle.Medium);
+    containerRef.current?.measureInWindow((x, y, width, height) => {
+      if (currentIdentityRef.current !== identity) return;
+      setOriginLayout({ x, y, width, height });
+      setPreviewVisible(true);
+    });
+  };
 
   return (
     <RNView ref={containerRef} className="w-full bg-transparent">
       <BouncyButton
-        onLongPress={() => {
-          void impactAsync(ImpactFeedbackStyle.Medium);
-          containerRef.current?.measureInWindow(
-            (x: number, y: number, width: number, height: number) => {
-              if (currentIdentityRef.current !== identity) return;
-              setOriginLayout({ x, y, width, height });
-              setPreviewVisible(true);
-            },
-          );
-        }}
+        onLongPress={showPreview}
         onPress={() => {
           if (
+            !textOnly &&
             Platform.OS === 'android' &&
             ((item.type === 'answers' && !answerOpensPreviewList) ||
               item.type === 'questions' ||
@@ -515,30 +549,39 @@ const FeedCardComponent = ({
           } else openDetail();
         }}
         style={[
-          surface,
+          textOnly ? undefined : surface,
           { opacity: previewVisible ? 0 : 1 },
           isQuestionType ? { paddingBottom: 10 } : undefined,
         ]}
         className="p-4 pb-2 mx-1.5"
       >
         {/* 动态动作提示 (针对关注流) */}
-        {item.actionText && item.hideAuthor && authorId ? (
+        {textOnly ? (
+          <RNView className="flex-row flex-wrap items-center">
+            <Text type="caption">
+              {typeLabel}
+              {!item.hideAuthor && item.actionText
+                ? ` · ${item.actionText}`
+                : ''}
+              {authorLabel ? ' · ' : ''}
+            </Text>
+            {authorLabel && authorId ? (
+              <FeedTextTarget
+                accessibilityRole="link"
+                accessibilityLabel={`查看${item.author.name}的主页`}
+                onPress={openAuthor}
+              >
+                <Text type="caption">{authorLabel}</Text>
+              </FeedTextTarget>
+            ) : authorLabel ? (
+              <Text type="caption">{authorLabel}</Text>
+            ) : null}
+          </RNView>
+        ) : item.actionText && item.hideAuthor && authorId ? (
           <BouncyButton
             accessibilityRole="link"
             accessibilityLabel={`查看${item.author.name}的主页`}
-            onPress={() =>
-              router.push({
-                pathname: '/user/[id]',
-                params: {
-                  id: authorId,
-                  avatar: item.author.avatar,
-                  name: item.author.name,
-                  ...(item.author.headline
-                    ? { headline: item.author.headline }
-                    : {}),
-                },
-              })
-            }
+            onPress={openAuthor}
           >
             <Text
               type="secondary"
@@ -557,22 +600,10 @@ const FeedCardComponent = ({
         ) : null}
 
         {/* 热区1：点击作者头像/姓名 -> 用户页 */}
-        {item.hideAuthor ? null : (
+        {textOnly || item.hideAuthor ? null : (
           <BouncyButton
             disabled={!authorId}
-            onPress={() =>
-              router.push({
-                pathname: '/user/[id]',
-                params: {
-                  id: authorId,
-                  avatar: item.author.avatar,
-                  name: item.author.name,
-                  ...(item.author.headline
-                    ? { headline: item.author.headline }
-                    : {}),
-                },
-              })
-            }
+            onPress={openAuthor}
             className="flex-row items-center mb-2"
           >
             <Animated.Image
@@ -610,7 +641,19 @@ const FeedCardComponent = ({
         )}
 
         {/* 标题 - 统一为主卡片点击，但点击标题跳转问题 */}
-        {item.title ? (
+        {textOnly && item.title ? (
+          item.type === 'answers' && item.questionId ? (
+            <FeedTextTarget
+              accessibilityRole="link"
+              onLongPress={showPreview}
+              onPress={() => openQuestion(String(item.questionId))}
+            >
+              {sourceTitle}
+            </FeedTextTarget>
+          ) : (
+            sourceTitle
+          )
+        ) : item.title ? (
           <BouncyButton
             onPress={() => {
               if (item.type === 'answers' && item.questionId) {
@@ -622,20 +665,14 @@ const FeedCardComponent = ({
                     cleanTitle,
                     () => {
                       if (currentIdentityRef.current !== identity) return;
-                      router.push({
-                        pathname: '/question/[id]',
-                        params: { id: questionId, title: cleanTitle },
-                      });
+                      openQuestion(questionId);
                     },
                     () => currentIdentityRef.current === identity,
                     titleSource.onSourceHiddenChange,
                     sourceTitle,
                   );
                 } else {
-                  router.push({
-                    pathname: '/question/[id]',
-                    params: { id: questionId, title: cleanTitle },
-                  });
+                  openQuestion(questionId);
                 }
                 return;
               }
@@ -676,18 +713,35 @@ const FeedCardComponent = ({
         ) : null}
 
         {/* 摘要与图片 - 统一为主卡片点击，完美穿透 */}
-        <View className="flex-row mt-1 bg-transparent">
-          <View className="flex-1 bg-transparent">
-            {isPinType && Array.isArray(item.content) ? (
-              <FeedExcerpt contentArray={item.content} />
-            ) : item.excerpt ? (
-              <FeedExcerpt html={item.excerpt} />
-            ) : null}
+        {textOnly &&
+        (!item.excerpt ||
+          (typeof item.excerpt === 'string' && !item.excerpt.includes('<'))) ? (
+          <Text type="secondary" numberOfLines={2}>
+            {item.excerpt || `查看${typeLabel}`}
+          </Text>
+        ) : textOnly ? (
+          <FeedExcerpt
+            html={item.excerpt}
+            numberOfLines={2}
+            fallback={`查看${typeLabel}`}
+          />
+        ) : (
+          <View className="flex-row mt-1 bg-transparent">
+            <View className="flex-1 bg-transparent">
+              {isPinType && Array.isArray(item.content) ? (
+                <FeedExcerpt contentArray={item.content} />
+              ) : item.excerpt ? (
+                <FeedExcerpt html={item.excerpt} />
+              ) : null}
+            </View>
+            {item.image && (
+              <FeedThumbnail
+                key={`${identity}:${item.image}`}
+                uri={item.image}
+              />
+            )}
           </View>
-          {item.image && (
-            <FeedThumbnail key={`${identity}:${item.image}`} uri={item.image} />
-          )}
-        </View>
+        )}
 
         <FeedCardActionRow
           id={item.id}
@@ -697,21 +751,12 @@ const FeedCardComponent = ({
           commentCount={item.commentCount}
           isCollected={storeCollected ?? item.isCollected}
           collectionCount={item.favlistsCount}
-          onVoteChange={(newVoted, newCount) => {
-            setVoted(newVoted);
-            setVoteCount(newCount);
+          textOnly={textOnly}
+          voteAction={{
+            onPress: toggleVote,
+            pending: pendingVotes.has(identity),
           }}
-          onComments={() => {
-            const type =
-              item.type === 'articles'
-                ? 'article'
-                : item.type === 'answers'
-                  ? 'answer'
-                  : item.type.slice(0, -1);
-            router.push(
-              `/comments/${item.id}?type=${type}&count=${item.commentCount}`,
-            );
-          }}
+          onComments={openComments}
           onMore={() => setMenuVisible(true)}
         />
 
