@@ -4,7 +4,12 @@
   "version": "0.10.1",
   "expo": {
     "autolinking": {
-      "nativeModulesDir": "./modules"
+      "nativeModulesDir": "./modules",
+      "android": {
+        "buildFromSource": [
+          "expo-crypto"
+        ]
+      }
     },
     "install": {
       "exclude": [

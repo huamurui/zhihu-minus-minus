@@ -22,6 +22,18 @@
 
 账号文件与 SecureStore 密钥必须同时可用。仅复制 JSON 到其他设备不能恢复账号；卸载、换机及系统备份恢复不保证登录态可迁移。遇到不可恢复的密钥丢失时，应由用户确认清除并重新登录。
 
+## 旧版 Android 的解密长度
+
+Android 8 的 AES-GCM 实现可把认证标签计入解密缓冲区的容量上界。Expo Crypto 58.0.7 将整个缓冲区交给 JS，未写入的字节会出现在账号 JSON 末尾，导致首次保存的读回校验和后续冷启动解析失败。[Android Cipher 文档](https://developer.android.com/reference/javax/crypto/Cipher#getOutputSize(int))
+
+项目的 [Expo Crypto 补丁](../patches/expo-crypto+58.0.7.patch) 按 `Cipher.doFinal` 返回的有效字节数交付明文，保留原始数据中的零字节。旧版写入的有效密文可使用已有密钥直接恢复。`package.json` 的 Android `buildFromSource` 配置确保原生构建使用补丁源码。修改补丁或升级 Expo Crypto 后要重新构建 APK，在旧设备上验证保存和恢复。
+
+三星 SM-P583（Android 8.1，API 27，armeabi-v7a）的独立 DEX 探针使用系统 AndroidOpenSSL，对照旧实现的整块缓冲区与修补后的 Expo `CipherExtensions.kt`。58 字节的合成 UTF-8 JSON、空明文和 5 字节的含尾零数据，旧路径分别返回 74、16、21 字节，修补后分别返回 58、0、5 字节，三组篡改密文均被拒绝。探针使用测试用的 `SealedData` 容器。
+
+同一台平板上，用独立包名安装的 v0.10.1 基线能保存 SecureStore 密钥并写入合成密文，但重启后无法准确读回。原地覆盖安装修复包后，首次启动及再次强制停止后的冷启动均使用原密钥完整读回了同一份密文。修复包也通过了合成账号保存、旧明文迁移、损坏主文件的备份恢复及退出后保持登出检查。
+
+设备持有人随后在修复包中完成了实际登录。强制停止应用后再打开，“我的”页恢复了已登录的个人主页入口，从推荐页进入回答详情也成功。
+
 ## 验证
 
 ```bash
