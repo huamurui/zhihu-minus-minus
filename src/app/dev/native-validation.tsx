@@ -95,7 +95,7 @@ async function runStorageValidation() {
           additionalData: aad,
         }),
       );
-    const unicode = '合成账号 🙂 é';
+    const unicode = '合成账号 🙂 é\u0000';
     await recordResult(
       'aesUnicodeRoundTrip',
       (await decrypt(await encrypt(unicode))) === unicode,
@@ -154,6 +154,12 @@ async function runStorageValidation() {
         !(await readAtomically(`${prefix}primary.json`))?.includes(
           'synthetic-only',
         ),
+    );
+    // Exercise a new save (including its read-back check) and a cold restore.
+    await storage.setItem(initial);
+    await recordResult(
+      'persistedAccountRoundTrip',
+      (await createEncryptedAuthStorage(operations).getItem()) === initial,
     );
     await writeAtomically(`${prefix}primary.json`, '{truncated');
     await recordResult(
