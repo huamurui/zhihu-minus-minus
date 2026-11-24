@@ -425,7 +425,7 @@ jobs:
             --target "$GITHUB_SHA"
             --generate-notes
             --fail-on-no-commits
-            --notes "Android 默认提供已验证的 arm64-v8a APK；其余 compat APK 未经实机验证，供对应架构设备手动安装。iOS 为未签名 IPA，SideStore / AltStore Classic 订阅源：https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/altstore-source.json 。SHA256SUMS.txt 可用于校验下载文件。"
+            --notes "Android：大多数手机和平板请下载已验证的 arm64-v8a 主包；其余 compat APK 未经实机验证，仅供对应架构设备手动安装。iOS 为未签名 IPA，SideStore / AltStore Classic 订阅源：https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/altstore-source.json 。SHA256SUMS.txt 可用于校验下载文件。"
             --draft
           )
 

@@ -43,7 +43,7 @@ Android job 需要全部 5 个 Secret：`EXPO_TOKEN` 加上 4 个 telemetry Secr
 
 | 文件 | 说明 |
 | --- | --- |
-| `zhihu-minus-minus-v<version>-arm64-v8a.apk` | Android arm64-v8a 主包，默认验证包 |
+| `zhihu-minus-minus-v<version>-arm64-v8a.apk` | Android arm64-v8a 主包，适用于大多数手机和平板，也是默认验证包 |
 | `zhihu-minus-minus-v<version>-compat-armeabi-v7a.apk` | Android 32 位 ARM 兼容包，未完成完整实机验证 |
 | `zhihu-minus-minus-v<version>-compat-x86.apk` | Android 32 位 x86 兼容包，未完成完整实机验证 |
 | `zhihu-minus-minus-v<version>-compat-x86_64.apk` | Android 64 位 x86 兼容包，未完成完整实机验证 |

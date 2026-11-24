@@ -78,7 +78,7 @@
 当前 APK 的最低系统要求为 **Android 7.0（API 24）**。已通过真机验证的最低版本为 **32 位 Android 8.1（API 27）**，测试设备是三星 SM-P583 平板。安装包可从 [GitHub Releases](https://github.com/huamurui/zhihu-minus-minus/releases) 下载。
 
 > [!NOTE]
-> 请按设备架构选择 APK。`arm64-v8a` 是主包，32 位 ARM 设备选 `compat-armeabi-v7a`。Release 也提供 `compat-x86` 和 `compat-x86_64` 包。应用内更新会自动选择匹配的附件。
+> 大多数 Android 手机和平板请下载 `arm64-v8a` 主包。仅 32 位 ARM 设备选择 `compat-armeabi-v7a`；`compat-x86` 和 `compat-x86_64` 主要用于对应架构的模拟器或少数设备。应用内更新会自动选择匹配的附件。
 
 也可以从源码构建：
 
