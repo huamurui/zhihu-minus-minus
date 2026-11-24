@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import {
+  act,
+  fireEvent,
+  render,
+  waitFor,
+  within,
+} from '@testing-library/react-native';
 import type { ComponentProps } from 'react';
 import type { PressableProps } from 'react-native';
 import { getAllContentCollectionStatus } from '../src/api/zhihu/collection';
@@ -216,15 +222,16 @@ test('compact collection keeps its complete accessible count while hiding only t
   expect(getAllContentCollectionStatus).not.toHaveBeenCalled();
 });
 
-test('corner collection count stays visible and exposes the full value', async () => {
+test('long corner counts remain outside the clipping button without intercepting its presses', async () => {
   const host = await setup({
-    count: 12345,
+    count: 99999000,
     isCollected: true,
     countDisplay: 'corner',
   });
-  expect(host.getByText('1.2万')).toBeTruthy();
   const button = host.getByRole('button', { name: '取消收藏' });
-  expect(button).toHaveProp('accessibilityValue', { text: '12345 次收藏' });
+  expect(within(button).queryByText('9999.9万')).toBeNull();
+  expect(host.getByText('9999.9万').parent).toHaveProp('pointerEvents', 'none');
+  expect(button).toHaveProp('accessibilityValue', { text: '99999000 次收藏' });
   await fireEvent.press(button);
   expect(mockToggleCollect).toHaveBeenCalledWith('answer-a', 'answer', true);
 });

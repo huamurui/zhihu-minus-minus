@@ -14,7 +14,6 @@ import { recordReadHistory } from '@/api/zhihu/history';
 import { followMember, unfollowMember } from '@/api/zhihu/member';
 import { getPin } from '@/api/zhihu/pin';
 import { getContentVoteCount, getContentVoteState } from '@/api/zhihu/voters';
-import { ActionIconCount } from '@/components/ActionIconCount';
 import { BouncyButton } from '@/components/BouncyButton';
 import { CommentBubbleIcon } from '@/components/CommentBubbleIcon';
 import {
@@ -426,19 +425,12 @@ export default function PinDetailScreen() {
                 accessibilityValue={{
                   text: `${pin.comment_count ?? 0} 条评论`,
                 }}
-                style={{
-                  width: 44,
-                  height: 44,
-                  paddingHorizontal: 0,
-                  paddingVertical: 0,
+                cornerCount={{
+                  value: pin.comment_count > 0 ? pin.comment_count : undefined,
                 }}
                 onPress={() => router.push(`/comments/${id}?type=pin`)}
               >
-                <ActionIconCount
-                  count={pin.comment_count > 0 ? pin.comment_count : undefined}
-                >
-                  <CommentBubbleIcon size={20} />
-                </ActionIconCount>
+                <CommentBubbleIcon size={20} />
               </ContentActionButton>
               <MoreActionsButton
                 onPress={() => setOpenMenuIdentity(contentIdentity)}

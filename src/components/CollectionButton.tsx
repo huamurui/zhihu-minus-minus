@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from 'react';
 import { type GestureResponderEvent, StyleSheet } from 'react-native';
 import { hasAuthenticationCookie } from '@/api/client';
 import { getAllContentCollectionStatus } from '@/api/zhihu/collection';
-import { ActionIconCount } from '@/components/ActionIconCount';
 import { CollectionStarIcon } from '@/components/CollectionStarIcon';
 import { useContentActionBarColor } from '@/components/ContentActionBarColor';
 import { ContentActionButton } from '@/components/ContentActionButton';
@@ -155,12 +154,11 @@ export function CollectionButton({
       // The text control is nested in a card: keep consuming touches while its action is busy.
       disabled={variant === 'text' ? undefined : disabled || busy}
       onPress={(event) => void handlePress(event)}
-      style={
-        variant === 'text'
-          ? styles.textButton
-          : countDisplay === 'corner'
-            ? styles.cornerButton
-            : undefined
+      style={variant === 'text' ? styles.textButton : undefined}
+      cornerCount={
+        variant !== 'text' && countDisplay === 'corner'
+          ? { value: collectionCount, color }
+          : undefined
       }
     >
       {variant === 'text' ? (
@@ -168,18 +166,10 @@ export function CollectionButton({
           {collected ? '已收藏' : '收藏'}
           {countLabel === undefined ? '' : ` ${countLabel}`}
         </Text>
-      ) : countDisplay === 'corner' ? (
-        <ActionIconCount count={collectionCount} color={color}>
-          <CollectionStarIcon
-            filled={collected === true}
-            size={24}
-            color={color}
-          />
-        </ActionIconCount>
       ) : (
         <CollectionStarIcon
           filled={collected === true}
-          size={variant === 'inline' ? 20 : 24}
+          size={variant === 'inline' && countDisplay === 'inline' ? 20 : 24}
           color={color}
         />
       )}
@@ -204,12 +194,6 @@ export function CollectionButton({
 
 const styles = StyleSheet.create({
   textButton: { minWidth: 48, minHeight: 48 },
-  cornerButton: {
-    width: 44,
-    height: 44,
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-  },
   count: {
     marginLeft: 4,
     fontSize: typography.fontSize.body,

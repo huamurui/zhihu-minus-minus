@@ -1,5 +1,6 @@
 import { cssInterop } from 'nativewind';
-import { StyleSheet } from 'react-native';
+import { type ColorValue, StyleSheet } from 'react-native';
+import { ActionIconCount } from '@/components/ActionIconCount';
 import {
   BouncyButton,
   type BouncyButtonProps,
@@ -8,15 +9,25 @@ import {
 /** Shared capsule feedback for controls in content action rows. */
 export function ContentActionButton({
   accessibilityRole = 'button',
+  cornerCount,
   style,
   ...props
-}: BouncyButtonProps) {
-  return (
+}: BouncyButtonProps & {
+  cornerCount?: { value?: number; color?: ColorValue };
+}) {
+  const button = (
     <BouncyButton
       {...props}
       accessibilityRole={accessibilityRole}
-      style={[styles.button, style]}
+      style={[styles.button, cornerCount && styles.cornerButton, style]}
     />
+  );
+  return cornerCount ? (
+    <ActionIconCount count={cornerCount.value} color={cornerCount.color}>
+      {button}
+    </ActionIconCount>
+  ) : (
+    button
   );
 }
 
@@ -31,5 +42,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     paddingHorizontal: 8,
     paddingVertical: 8,
+  },
+  cornerButton: {
+    width: 44,
+    height: 44,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
 });

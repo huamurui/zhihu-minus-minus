@@ -4,7 +4,7 @@ import { useContentActionBarColor } from '@/components/ContentActionBarColor';
 import { useThemeColor } from '@/components/Themed';
 import { formatCount } from '@/utils/formatCount';
 
-/** A count in the lower-right corner of a fixed-size action target. */
+/** Overlay the count outside the button's circular ripple mask. */
 export function ActionIconCount({
   children,
   count,
@@ -19,34 +19,34 @@ export function ActionIconCount({
   const hasCount = count !== undefined && Number.isFinite(count) && count >= 0;
 
   return (
-    <View style={styles.container} accessible={false}>
-      <View style={styles.icon}>{children}</View>
+    <View pointerEvents="box-none" accessible={false}>
+      {children}
       {hasCount ? (
-        <Text
-          accessible={false}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.7}
-          maxFontSizeMultiplier={1.2}
-          style={[styles.count, { color: color ?? actionColor }]}
-        >
-          {formatCount(count)}
-        </Text>
+        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+          <Text
+            accessible={false}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+            maxFontSizeMultiplier={1.2}
+            style={[styles.count, { color: color ?? actionColor }]}
+          >
+            {formatCount(count)}
+          </Text>
+        </View>
       ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { width: 44, height: 44 },
-  icon: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   count: {
     position: 'absolute',
-    left: 16,
+    minWidth: 28,
+    maxWidth: '100%',
     right: 0,
-    bottom: 3,
+    bottom: 1,
     fontSize: 10,
-    lineHeight: 12,
     fontWeight: '600',
     textAlign: 'center',
     includeFontPadding: false,
