@@ -1,6 +1,6 @@
 # Android AES-GCM decryption length
 
-This app compares each plaintext with the bytes returned by the published `expo-crypto@58.0.7` after an AES-GCM encrypt/decrypt round trip. It uses a freshly generated key and three synthetic inputs. The empty and binary cases also check that the result preserves valid trailing zero bytes.
+This app compares each plaintext with the bytes returned by the published `expo-crypto@58.0.8` after an AES-GCM encrypt/decrypt round trip. It uses a freshly generated key and three synthetic inputs. The empty and binary cases also check that the result preserves valid trailing zero bytes.
 
 ## Run on Android
 
