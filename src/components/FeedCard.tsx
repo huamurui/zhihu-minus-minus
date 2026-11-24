@@ -40,7 +40,7 @@ import { BouncyButton } from './BouncyButton';
 import { CustomContextMenu, type MenuOption } from './CustomContextMenu';
 import { useContentCardSurface } from './contentCardSurface';
 import { FeedCardPreview } from './FeedCardPreview';
-import { FeedExcerpt } from './FeedExcerpt';
+import { FeedExcerpt, stripFeedExcerptTags } from './FeedExcerpt';
 import { type ShareContentType, ShareMenu } from './ShareMenu';
 import { Text, useThemeColor, View } from './Themed';
 
@@ -713,18 +713,12 @@ const FeedCardComponent = ({
         ) : null}
 
         {/* 摘要与图片 - 统一为主卡片点击，完美穿透 */}
-        {textOnly &&
-        (!item.excerpt ||
-          (typeof item.excerpt === 'string' && !item.excerpt.includes('<'))) ? (
+        {textOnly ? (
           <Text type="secondary" numberOfLines={2}>
-            {item.excerpt || `查看${typeLabel}`}
+            {(typeof item.excerpt === 'string' && item.excerpt.includes('<')
+              ? stripFeedExcerptTags(item.excerpt)
+              : item.excerpt) || `查看${typeLabel}`}
           </Text>
-        ) : textOnly ? (
-          <FeedExcerpt
-            html={item.excerpt}
-            numberOfLines={2}
-            fallback={`查看${typeLabel}`}
-          />
         ) : (
           <View className="flex-row mt-1 bg-transparent">
             <View className="flex-1 bg-transparent">

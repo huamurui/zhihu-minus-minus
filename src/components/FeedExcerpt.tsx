@@ -13,6 +13,13 @@ import {
 } from '@/utils/url';
 import { Text, View } from './Themed';
 
+export function stripFeedExcerptTags(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 function parseExcerpt(html: string): { text: string; links: string[] } {
   const links: string[] = [];
   const linkRegex = /<a[^>]*data-draft-type="link-card"[^>]*href="([^"]*)"/gi;
@@ -21,11 +28,7 @@ function parseExcerpt(html: string): { text: string; links: string[] } {
     if (m === null) break;
     links.push(m[1]);
   }
-  const text = html
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-  return { text, links };
+  return { text: stripFeedExcerptTags(html), links };
 }
 
 function parsePinContent(contentArray: readonly ZhihuContentSegment[]): {
@@ -54,8 +57,7 @@ export const FeedExcerpt: React.FC<{
   html?: string | React.ReactNode;
   contentArray?: readonly ZhihuContentSegment[];
   numberOfLines?: number;
-  fallback?: string;
-}> = React.memo(({ html, contentArray, numberOfLines = 3, fallback }) => {
+}> = React.memo(({ html, contentArray, numberOfLines = 3 }) => {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const surfaceColor = Colors[colorScheme].backgroundSecondary;
@@ -91,13 +93,6 @@ export const FeedExcerpt: React.FC<{
   );
 
   const limitLines = numberOfLines === 0 ? undefined : numberOfLines;
-  if (fallback && parsed.links.length === 0) {
-    return (
-      <Text type="secondary" numberOfLines={limitLines}>
-        {parsed.text || fallback}
-      </Text>
-    );
-  }
   if (!parsed.text && parsed.links.length === 0) return null;
 
   return (

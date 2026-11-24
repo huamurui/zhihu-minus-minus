@@ -142,14 +142,6 @@ jest.mock('../src/components/BouncyButton', () => ({
 jest.mock('../src/components/FeedCardPreview', () => ({
   FeedCardPreview: () => null,
 }));
-jest.mock('../src/components/FeedExcerpt', () => ({
-  FeedExcerpt: ({ html }: { html?: string }) =>
-    html
-      ? jest
-          .requireActual('react')
-          .createElement(jest.requireActual('react-native').Text, null, html)
-      : null,
-}));
 jest.mock('../src/components/ShareMenu', () => ({
   ShareMenu: (props: MenuProps) => {
     mockShareMenuRender();
@@ -165,7 +157,13 @@ jest.mock('../src/components/ShareMenu', () => ({
       : null;
   },
 }));
-jest.mock('../src/features/rich-content', () => ({ ZhihuContent: () => null }));
+jest.mock('../src/features/rich-content', () => ({
+  ZhihuContent: () => null,
+  LinkCard: ({ url }: { url: string }) =>
+    jest
+      .requireActual('react')
+      .createElement(jest.requireActual('react-native').Text, null, url),
+}));
 jest.mock('expo-linear-gradient', () => ({
   LinearGradient: jest.requireActual('react-native').View,
 }));
@@ -250,6 +248,27 @@ const baseItem: FeedItem = {
   commentCount: 0,
   voted: 0,
 };
+
+test.each([
+  ['链接标题', '链接标题'],
+  ['', '查看回答'],
+])(
+  'performance mode renders a link excerpt as text (%s)',
+  async (label, expected) => {
+    const url = 'https://example.test/article';
+    const item = {
+      ...baseItem,
+      excerpt: `<a data-draft-type="link-card" href="${url}">${label}</a>`,
+    };
+    useSettingsStore.setState({ performanceMode: true });
+    const host = await render(<FeedCard item={item} tab="recommend" />);
+    expect(host.queryByText(url)).toBeNull();
+    expect(host.getByText(expected)).toBeVisible();
+
+    await act(() => useSettingsStore.setState({ performanceMode: false }));
+    expect(host.getByText(url)).toBeVisible();
+  },
+);
 
 test.each(['recommend', 'following'])(
   'performance mode preserves reading and actions in the %s feed',
