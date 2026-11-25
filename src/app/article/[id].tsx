@@ -324,77 +324,27 @@ export default function ArticleDetail() {
     extrapolate: 'clamp',
   });
 
-  if (isLoading && !data) {
-    if (preview) {
-      return (
-        <ContentDetailLoadingPreview
-          type="article"
-          preview={preview}
-          onBack={() => router.back()}
-          onOpenAuthor={(token) => router.push(`/user/${token}`)}
-        />
-      );
-    }
+  if (isLoading && !data && preview) {
     return (
-      <View className="flex-1 justify-center items-center">
-        <Stack.Screen options={{ headerShown: false, title: '正文' }} />
-        <ActivityIndicator size="large" color={primaryColor} />
-        <Text className="mt-3">正赶往知识的荒原...喵</Text>
-      </View>
+      <ContentDetailLoadingPreview
+        type="article"
+        preview={preview}
+        onBack={() => router.back()}
+        onOpenAuthor={(token) => router.push(`/user/${token}`)}
+      />
     );
   }
 
-  if (!data) {
-    if (isError) {
-      return (
-        <View className="flex-1 justify-center items-center px-6">
-          <Stack.Screen options={{ headerShown: false, title: '正文' }} />
-          <QueryErrorView
-            message="正文加载失败"
-            onRetry={() => void refetchContent()}
-          />
-        </View>
-      );
-    }
-    return (
-      <View className="flex-1 justify-center items-center px-6">
-        <Stack.Screen options={{ headerShown: false, title: '正文' }} />
-        <Ionicons
-          name="compass-outline"
-          size={48}
-          color={Colors[colorScheme].textSecondary}
-        />
-        <Text className="text-base font-bold mt-4 mb-2">
-          你似乎来到了没有知识存在的荒原
-        </Text>
-        <Text type="secondary" className="text-xs text-center mb-6">
-          该文章可能已被删除、失效或暂不可见 喵~
-        </Text>
-        <BouncyButton
-          onPress={() => router.back()}
-          className="px-4 py-2 rounded-full"
-          style={{ backgroundColor: primaryTransparent }}
-        >
-          <Text className="text-xs font-bold" style={{ color: linkColor }}>
-            返回上一页
-          </Text>
-        </BouncyButton>
-      </View>
-    );
-  }
-
-  return (
-    <View className="flex-1">
-      {/* Hide native header */}
+  const headerHeight = insets.top + 56;
+  const header = (
+    <>
       <Stack.Screen options={{ headerShown: false, title: '正文' }} />
-
-      {/* Floating Header Bar */}
       <View
         className="flex-row items-center justify-between px-2.5 absolute left-0 right-0 z-50"
         style={{
           top: 0,
           paddingTop: insets.top,
-          height: 56 + insets.top,
+          height: headerHeight,
           backgroundColor: 'transparent',
         }}
         pointerEvents="box-none"
@@ -420,25 +370,84 @@ export default function ArticleDetail() {
           color={textColor}
         />
 
-        <Animated.View
-          className="flex-1 mx-4"
-          style={{ opacity: headerTitleOpacity }}
-          pointerEvents="none"
-        >
-          <Text
-            className="text-[16px] font-bold text-center"
-            numberOfLines={1}
-            style={{ color: textColor }}
-          >
-            {data.title}
-          </Text>
-        </Animated.View>
+        {data ? (
+          <>
+            <Animated.View
+              className="flex-1 mx-4"
+              style={{ opacity: headerTitleOpacity }}
+              pointerEvents="none"
+            >
+              <Text
+                className="text-[16px] font-bold text-center"
+                numberOfLines={1}
+                style={{ color: textColor }}
+              >
+                {data.title}
+              </Text>
+            </Animated.View>
 
-        <MoreActionsButton
-          onPress={() => setOpenMenuIdentity(contentIdentity)}
-        />
+            <MoreActionsButton
+              onPress={() => setOpenMenuIdentity(contentIdentity)}
+            />
+          </>
+        ) : null}
       </View>
+    </>
+  );
 
+  if (!data) {
+    return (
+      <View className="flex-1">
+        {header}
+        <View
+          className="flex-1 justify-center items-center px-6"
+          style={{ marginTop: headerHeight }}
+        >
+          {isLoading ? (
+            <>
+              <ActivityIndicator size="large" color={primaryColor} />
+              <Text className="mt-3">正赶往知识的荒原...喵</Text>
+            </>
+          ) : isError ? (
+            <QueryErrorView
+              message="正文加载失败"
+              onRetry={() => void refetchContent()}
+            />
+          ) : (
+            <>
+              <Ionicons
+                name="compass-outline"
+                size={48}
+                color={Colors[colorScheme].textSecondary}
+              />
+              <Text className="text-base font-bold mt-4 mb-2">
+                你似乎来到了没有知识存在的荒原
+              </Text>
+              <Text type="secondary" className="text-xs text-center mb-6">
+                该文章可能已被删除、失效或暂不可见 喵~
+              </Text>
+              <BouncyButton
+                onPress={() => router.back()}
+                className="px-4 py-2 rounded-full"
+                style={{ backgroundColor: primaryTransparent }}
+              >
+                <Text
+                  className="text-xs font-bold"
+                  style={{ color: linkColor }}
+                >
+                  返回上一页
+                </Text>
+              </BouncyButton>
+            </>
+          )}
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View className="flex-1">
+      {header}
       <GestureDetector gesture={doubleTapVote}>
         <RawView collapsable={false} style={{ flex: 1 }}>
           <Animated.ScrollView

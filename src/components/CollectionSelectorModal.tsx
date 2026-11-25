@@ -9,6 +9,7 @@ import {
 } from '@/api/zhihu/collection';
 import { BouncyButton } from '@/components/BouncyButton';
 import { CollectionEditorForm } from '@/components/CollectionEditorForm';
+import { GlassNavigationButton } from '@/components/navigation/GlassNavigationButton';
 import { BottomSheet } from '@/components/overlays/BottomSheet';
 import { SheetScrollView } from '@/components/overlays/SheetScrollView';
 import { Text, useThemeColor, View } from '@/components/Themed';
@@ -122,16 +123,12 @@ export function CollectionSelectorModal() {
   );
 
   const backButton = (
-    <BouncyButton
-      className="rounded-full"
-      accessibilityRole="button"
+    <GlassNavigationButton
+      icon="back"
       accessibilityLabel="返回收藏夹列表"
-      hitSlop={8}
       onPress={() => setEditorVisible(false)}
-      style={styles.backButton}
-    >
-      <Ionicons name="chevron-back" size={24} color={colors.text} />
-    </BouncyButton>
+      color={colors.text}
+    />
   );
 
   return (
@@ -285,11 +282,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '700',
-  },
-  backButton: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
   },
   selectorBody: {
     flex: 1,

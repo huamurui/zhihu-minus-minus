@@ -81,7 +81,7 @@ function renderIcon(
  * 统一导航按钮（返回、关闭、搜索等）：
  * - iOS 26+ 原生 Liquid Glass 模式：采用系统原生 GlassView 圆形按钮，开启 isInteractive
  *   由系统底层提供光学触觉交互，避免父级 opacity/scale 动画撕裂材质；
- * - 旧版 iOS / Android / 无障碍减少透明度模式：降级使用 BouncyButton 与稳定半透明圆底。
+ * - 其他模式使用 BouncyButton，默认透明，可通过 backgroundColor 指定底色。
  */
 export function GlassNavigationButton({
   icon = 'back',

@@ -5,17 +5,18 @@ import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getMemberWithFallback, type ZhihuActor } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
+import { GlassNavigationButton } from '@/components/navigation/GlassNavigationButton';
 import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor } from '@/components/Themed';
 
-function HeaderButton({
+function PageButton({
   label,
   icon,
   onPress,
   disabled = false,
 }: {
   label: string;
-  icon: 'arrow-back' | 'chevron-back' | 'chevron-forward';
+  icon: 'chevron-back' | 'chevron-forward';
   onPress: () => void;
   disabled?: boolean;
 }) {
@@ -29,11 +30,7 @@ function HeaderButton({
       onPress={onPress}
       className="h-11 w-11 items-center justify-center rounded-full"
     >
-      <Ionicons
-        name={icon}
-        size={icon === 'arrow-back' ? 22 : 18}
-        color={color}
-      />
+      <Ionicons name={icon} size={18} color={color} />
     </BouncyButton>
   );
 }
@@ -53,6 +50,7 @@ export function PublishedStreamHeader({
 }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const textColor = useThemeColor({}, 'text');
   const muted = useThemeColor({}, 'textSecondary');
   // Each page loads its own member. Observe the selected page's cached details.
   const { data: member } = useQuery({
@@ -72,9 +70,10 @@ export function PublishedStreamHeader({
           paddingRight: Math.max(12, insets.right),
         }}
       >
-        <HeaderButton
-          label="返回"
-          icon="arrow-back"
+        <GlassNavigationButton
+          icon="back"
+          accessibilityLabel="返回"
+          color={textColor}
           onPress={() => router.back()}
         />
         <BouncyButton
@@ -112,7 +111,7 @@ export function PublishedStreamHeader({
         </BouncyButton>
         {total > 1 && (
           <View className="flex-row items-center">
-            <HeaderButton
+            <PageButton
               label="上一位用户"
               icon="chevron-back"
               disabled={page === 0}
@@ -125,7 +124,7 @@ export function PublishedStreamHeader({
             >
               {`${String(page + 1).padStart(String(total).length, '\u2007')} / ${total}`}
             </Text>
-            <HeaderButton
+            <PageButton
               label="下一位用户"
               icon="chevron-forward"
               disabled={page === total - 1}
