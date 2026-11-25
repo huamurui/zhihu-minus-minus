@@ -12,6 +12,7 @@ const mockParams: { id: string; unreadCount?: string; source?: string } = {
 };
 let mockMoments: RecentMomentItem[] | undefined;
 const mockMarkRead = jest.fn();
+const mockBack = jest.fn();
 const mockPush = jest.fn();
 let mockMemberLoading = false;
 const mockSetPage = jest.fn();
@@ -80,7 +81,7 @@ jest.mock('@tanstack/react-query', () => ({
 jest.mock('expo-router', () => ({
   Stack: { Screen: () => null },
   useLocalSearchParams: () => mockParams,
-  useRouter: () => ({ back: jest.fn(), push: mockPush }),
+  useRouter: () => ({ back: mockBack, push: mockPush }),
 }));
 jest.mock('../src/hooks/useMarkRecentMomentRead', () => ({
   useMarkRecentMomentRead: () => mockMarkRead,
@@ -418,6 +419,8 @@ test('one toolbar stays outside the pager and updates its page number on confirm
   await fireEvent.press(host.getByRole('button', { name: '上一位用户' }));
   expect(mockSetPage).toHaveBeenLastCalledWith(0);
   expect(mockMarkRead).toHaveBeenCalledTimes(2);
+  await fireEvent.press(back);
+  expect(mockBack).toHaveBeenCalledTimes(1);
   await host.unmount();
 });
 

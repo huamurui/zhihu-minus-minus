@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { skipToken, useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import { Image, ScrollView, StyleSheet } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,7 +10,12 @@ import { BouncyButton } from '@/components/BouncyButton';
 import { CommentBubbleIcon } from '@/components/CommentBubbleIcon';
 import { GlassNavigationButton } from '@/components/navigation/GlassNavigationButton';
 import { StableAvatar } from '@/components/StableAvatar';
-import { Text, useThemeColor, View } from '@/components/Themed';
+import {
+  Text,
+  useRuntimeThemeColors,
+  useThemeColor,
+  View,
+} from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import { VoteTriangle } from '@/components/VoteTriangle';
 import Colors from '@/constants/Colors';
@@ -19,6 +24,63 @@ import { getAuthSessionVersion, useAuthStore } from '@/store/useAuthStore';
 import { contrastingText } from '@/utils/colorContrast';
 import { guestPreviewBodyKey } from '@/utils/guestPreview';
 import { getCachedImageSource } from '@/utils/imageSource';
+
+function GuestPreviewLayout({
+  children,
+  typeLabel,
+}: {
+  children: ReactNode;
+  typeLabel?: string;
+}) {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const colors = useRuntimeThemeColors();
+
+  return (
+    <View
+      style={[styles.container, { backgroundColor: colors.background }]}
+      type="default"
+    >
+      <Stack.Screen options={{ headerShown: false, title: '内容预览' }} />
+      <View
+        style={[
+          styles.header,
+          {
+            minHeight: insets.top + 56,
+            paddingTop: insets.top,
+            paddingLeft: Math.max(insets.left, 15),
+            paddingRight: Math.max(insets.right, 15),
+            borderBottomColor: colors.border,
+          },
+        ]}
+      >
+        <GlassNavigationButton
+          icon="back"
+          accessibilityLabel="返回"
+          onPress={() => router.back()}
+          color={colors.text}
+        />
+        <Text className="text-[17px] font-bold">游客预览</Text>
+        {typeLabel ? (
+          <View
+            className="px-2 py-0.5 rounded-full"
+            style={{ backgroundColor: `${colors.primary}15` }}
+          >
+            <Text
+              className="text-[11px] font-medium"
+              style={{ color: colors.primary }}
+            >
+              {typeLabel}
+            </Text>
+          </View>
+        ) : (
+          <View style={{ width: 40 }} />
+        )}
+      </View>
+      {children}
+    </View>
+  );
+}
 
 export default function GuestDetailScreen() {
   const router = useRouter();
@@ -33,7 +95,6 @@ export default function GuestDetailScreen() {
   const textColor = Colors[colorScheme].text;
   const secondaryTextColor = Colors[colorScheme].textSecondary;
   const borderColor = Colors[colorScheme].border;
-  const backgroundColor = Colors[colorScheme].background;
   const cardBg = Colors[colorScheme].backgroundSecondary;
   const tintColor = useThemeColor({}, 'primary');
   const onPrimary = useThemeColor({}, 'onPrimary');
@@ -62,29 +123,27 @@ export default function GuestDetailScreen() {
 
   if (!item) {
     return (
-      <View
-        style={[styles.centerContainer, { backgroundColor }]}
-        type="default"
-      >
-        <Stack.Screen options={{ headerShown: false, title: '内容预览' }} />
-        <Ionicons
-          name="alert-circle-outline"
-          size={48}
-          color={secondaryTextColor}
-        />
-        <Text type="secondary" className="mt-3 text-center">
-          加载预览失败喵
-        </Text>
-        <BouncyButton
-          className="mt-6 px-6 py-2.5 rounded-full"
-          style={{ backgroundColor: tintColor }}
-          onPress={() => router.back()}
-        >
-          <Text className="font-bold" style={{ color: onPrimary }}>
-            返回上一页
+      <GuestPreviewLayout>
+        <View style={styles.centerContainer}>
+          <Ionicons
+            name="alert-circle-outline"
+            size={48}
+            color={secondaryTextColor}
+          />
+          <Text type="secondary" className="mt-3 text-center">
+            加载预览失败喵
           </Text>
-        </BouncyButton>
-      </View>
+          <BouncyButton
+            className="mt-6 px-6 py-2.5 rounded-full"
+            style={{ backgroundColor: tintColor }}
+            onPress={() => router.back()}
+          >
+            <Text className="font-bold" style={{ color: onPrimary }}>
+              返回上一页
+            </Text>
+          </BouncyButton>
+        </View>
+      </GuestPreviewLayout>
     );
   }
 
@@ -122,43 +181,7 @@ export default function GuestDetailScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor }]} type="default">
-      <Stack.Screen options={{ headerShown: false, title: '内容预览' }} />
-
-      {/* 顶部标题导航栏 */}
-      <View
-        style={[
-          styles.header,
-          {
-            paddingTop: insets.top,
-            backgroundColor,
-            borderBottomColor: borderColor,
-            borderBottomWidth: StyleSheet.hairlineWidth,
-          },
-        ]}
-        className="flex-row items-center justify-between px-[15px]"
-      >
-        <GlassNavigationButton
-          icon="back"
-          accessibilityLabel="返回"
-          onPress={() => router.back()}
-          size={40}
-          color={textColor}
-        />
-        <Text className="text-[17px] font-bold">游客预览</Text>
-        <View
-          className="px-2 py-0.5 rounded-full"
-          style={{ backgroundColor: `${tintColor}15` }}
-        >
-          <Text
-            className="text-[11px] font-medium"
-            style={{ color: tintColor }}
-          >
-            {typeLabel}
-          </Text>
-        </View>
-      </View>
-
+    <GuestPreviewLayout typeLabel={typeLabel}>
       <ScrollView
         className="flex-1"
         contentContainerStyle={{
@@ -398,7 +421,7 @@ export default function GuestDetailScreen() {
           </BouncyButton>
         </Animated.View>
       </ScrollView>
-    </View>
+    </GuestPreviewLayout>
   );
 }
 
@@ -413,8 +436,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   header: {
-    height: 56 + 32, // standard heights adjusted
-    minHeight: 56,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
