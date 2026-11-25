@@ -14,6 +14,7 @@ import AnswerScreen from '../src/app/answer/[id]';
 import { AnswerDetailView } from '../src/components/AnswerDetailView';
 import type { CollectionButton } from '../src/components/CollectionButton';
 import type { ActionSheetOption } from '../src/components/overlays/ActionSheet';
+import type { ReadingScrollIndicator } from '../src/components/ReadingScrollIndicator';
 import type { RichContentLoadingPhase } from '../src/features/rich-content';
 import { useAnswerDetailRead } from '../src/hooks/useAnswerDetailRead';
 import {
@@ -96,7 +97,28 @@ let mockCanExpandProgressiveTail: () => boolean;
 const mockProgressiveBody = jest.fn(
   (_props: { progressive: boolean; pauseProgressiveTail: boolean }) => {},
 );
-const mockScrollIndicator = jest.fn((_props: { visible: boolean }) => null);
+type IndicatorProps = ComponentProps<typeof ReadingScrollIndicator>;
+const mockScrollIndicator = jest.fn((_props: IndicatorProps) => null);
+type ScrollSamples = Record<
+  'onScroll' | 'onEndDrag' | 'onMomentumEnd',
+  (event: ReturnType<typeof nativeSample>) => void
+>;
+const mockScrollHandlers = jest.fn((_handlers: ScrollSamples) => jest.fn());
+function getMountedScroll() {
+  const handlers = mockScrollHandlers.mock.lastCall?.[0];
+  const indicator = mockScrollIndicator.mock.lastCall?.[0];
+  if (!handlers || !indicator)
+    throw new Error('Expected the answer scroll view to be mounted');
+  return { handlers, indicator };
+}
+
+function nativeSample(y: number) {
+  return {
+    contentOffset: { y },
+    contentSize: { height: 1600 },
+    layoutMeasurement: { height: 600 },
+  };
+}
 let mockContentLoadingPhase: RichContentLoadingPhase | null = null;
 const mockPagerMount = jest.fn();
 let mockScreenAnswerIds = ['84'];
@@ -292,8 +314,7 @@ jest.mock('../src/components/ReadingProgressNotice', () => ({
   ReadingProgressNotice: () => null,
 }));
 jest.mock('../src/components/ReadingScrollIndicator', () => ({
-  ReadingScrollIndicator: (props: { visible: boolean }) =>
-    mockScrollIndicator(props),
+  ReadingScrollIndicator: (props: IndicatorProps) => mockScrollIndicator(props),
 }));
 jest.mock('../src/components/ShareMenu', () => ({
   ShareMenu: ({
@@ -424,7 +445,8 @@ jest.mock('react-native-reanimated', () => {
     },
     SharedTransition: { duration: () => ({}) },
     useSharedValue: <T,>(value: T) => react.useRef({ value }).current,
-    useAnimatedScrollHandler: () => jest.fn(),
+    useAnimatedScrollHandler: (handlers: ScrollSamples) =>
+      mockScrollHandlers(handlers),
     // Gesture-handler's reanimated wrapper probes these two entry points.
     useEvent: () => jest.fn(),
     setGestureState: () => {},
@@ -465,6 +487,7 @@ async function renderAnswer({
   endorsementSource,
   entryEndorsements,
   activeAnswerId,
+  onHeaderScroll,
 }: {
   cached?: boolean;
   isFocused?: boolean;
@@ -473,6 +496,7 @@ async function renderAnswer({
   endorsementSource?: EndorsementSource;
   entryEndorsements?: unknown;
   activeAnswerId?: SharedValue<string>;
+  onHeaderScroll?: ComponentProps<typeof AnswerDetailView>['onHeaderScroll'];
 } = {}) {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -499,6 +523,7 @@ async function renderAnswer({
         isFocused={focused}
         isPreloading={preloading}
         activeAnswerId={activeAnswerId}
+        onHeaderScroll={onHeaderScroll}
       />
     </QueryClientProvider>
   );
@@ -708,6 +733,52 @@ test('reports only the focused answer after its body layout is ready', async () 
     undefined,
   );
 });
+
+test('refocusing reuses the scroll range captured with the last offscreen native offset', async () => {
+  const report = jest.fn();
+  const host = await renderAnswer({ onHeaderScroll: report });
+  const { handlers, indicator } = getMountedScroll();
+  await act(() => handlers.onScroll(nativeSample(700)));
+  // A delayed layout callback still describes the shorter, preloaded body.
+  indicator.contentHeight.value = 800;
+  indicator.viewportHeight.value = 600;
+  expect(report).not.toHaveBeenCalled();
+  await host.rerender(host.page(true, true));
+  expect(report).toHaveBeenLastCalledWith(
+    '84',
+    700,
+    expect.any(Number),
+    1000,
+    false,
+  );
+});
+
+test.each(['onEndDrag', 'onMomentumEnd'] as const)(
+  '%s applies the terminal native offset to the header, indicator and saved progress',
+  async (eventName) => {
+    const report = jest.fn();
+    await renderAnswer({ isFocused: true, onHeaderScroll: report });
+    const { handlers, indicator } = getMountedScroll();
+    const reading =
+      mockReadingProgress.mock.results[
+        mockReadingProgress.mock.results.length - 1
+      ].value;
+    await act(() => {
+      handlers.onScroll(nativeSample(130));
+      handlers[eventName](nativeSample(80));
+    });
+    expect(report).toHaveBeenLastCalledWith(
+      '84',
+      80,
+      expect.any(Number),
+      1000,
+      true,
+    );
+    expect(indicator.scrollY.value).toBe(80);
+    expect(reading.onScroll).toHaveBeenLastCalledWith(80);
+    expect(reading.commitProgress).toHaveBeenCalledTimes(1);
+  },
+);
 
 test('touching an answer keeps its tail batches small when focus returns', async () => {
   const host = await renderAnswer({ isFocused: true });

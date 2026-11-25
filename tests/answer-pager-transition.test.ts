@@ -4,6 +4,7 @@ import type { LayoutChangeEvent } from 'react-native';
 import AnswerDetailScreen from '../src/app/answer/[id]';
 import { PaneContext } from '../src/features/adaptive-layout/PaneContext';
 import type { AnswerReadSession } from '../src/hooks/useAnswerDetailRead';
+import { useAnswerHeaderState } from '../src/hooks/useAnswerHeaderState';
 
 interface PagerProps {
   children?: React.ReactNode;
@@ -1030,6 +1031,70 @@ describe('answer header state across pager navigation', () => {
     expect(mockHeaderProps.progress.value).toBe(0);
     expect(mockHeaderProps.collapsed).toBe(false);
     expect(mockHeaderProps.onMore).toBeDefined();
+  });
+
+  it('fully reveals the compact header between sampled offsets on a short answer', async () => {
+    await render(React.createElement(AnswerDetailScreen));
+    const layout = { collapseOffset: 80, maxScroll: 110 };
+    await scrollAnswer('42', 110, layout);
+    expect(mockHeaderProps.collapsed).toBe(false);
+    // Reverse samples straddle the midpoint without ever landing exactly on it.
+    await scrollAnswer('42', 98, layout);
+    await scrollAnswer('42', 92, layout);
+    expect(mockHeaderProps.progress.value).toBe(1);
+    expect(mockHeaderProps.collapsed).toBe(true);
+    await scrollAnswer('42', 84, layout);
+    expect(mockHeaderProps.progress.value).toBeGreaterThan(0);
+    expect(mockHeaderProps.progress.value).toBeLessThan(1);
+    await scrollAnswer('42', 80, layout);
+    expect(mockHeaderProps.progress.value).toBe(0);
+    expect(mockHeaderProps.collapsed).toBe(false);
+  });
+
+  it('keeps queued visibility reports for the committed pager during a suspended switch', async () => {
+    let changePager!: (key: string) => void;
+    let committed!: ReturnType<typeof useAnswerHeaderState>;
+    const suspended = jest.fn();
+    const never = new Promise<void>(() => {});
+    function Pager({ pagerKey }: { pagerKey: string }) {
+      const header = useAnswerHeaderState(pagerKey, '42');
+      React.useLayoutEffect(() => {
+        committed = header;
+      }, [header]);
+      if (pagerKey === 'pending') {
+        suspended();
+        throw never;
+      }
+      return null;
+    }
+    function App() {
+      const [pagerKey, setPagerKey] = React.useState('current');
+      changePager = setPagerKey;
+      return React.createElement(
+        React.Suspense,
+        { fallback: null },
+        React.createElement(Pager, { pagerKey }),
+      );
+    }
+    const host = await render(React.createElement(App));
+    const original = committed;
+    mockDeferHeaderReports = true;
+    await act(() => {
+      original.onHeaderScroll('42', 400, 80, 1000, true);
+      original.onHeaderScroll('42', 320, 80, 1000, true);
+    });
+    const reports = mockHeaderReports.splice(0);
+    expect(reports).toHaveLength(1);
+    await act(() => {
+      React.startTransition(() => changePager('pending'));
+    });
+    expect(suspended).toHaveBeenCalled();
+    expect(committed).toBe(original);
+    await act(() => {
+      for (const report of reports) report();
+    });
+    expect(committed.collapsed).toBe(true);
+    await host.unmount();
   });
 
   it('fades out as the original question title comes back into view', async () => {

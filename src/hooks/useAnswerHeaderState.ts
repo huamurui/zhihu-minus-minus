@@ -20,11 +20,12 @@ const REVEAL_DISTANCE = 48;
 
 /** A reverse scroll reveals the compact header only after the inline header has left. */
 export function useAnswerHeaderState(pagerKey: string, answerId?: string) {
-  const scope = useRef({ pagerKey, version: 1 });
-  if (scope.current.pagerKey !== pagerKey) {
-    scope.current = { pagerKey, version: scope.current.version + 1 };
+  const [scope, setScope] = useState({ pagerKey, version: 1 });
+  if (scope.pagerKey !== pagerKey) {
+    setScope({ pagerKey, version: scope.version + 1 });
   }
-  const scopeVersion = scope.current.version;
+  const scopeVersion = scope.version;
+  const committedScope = useRef<number | null>(null);
   const activeAnswerId = useSharedValue(answerId ?? '');
   const activeScopeVersion = useSharedValue(scopeVersion);
   const activeScrollY = useSharedValue(0);
@@ -42,11 +43,7 @@ export function useAnswerHeaderState(pagerKey: string, answerId?: string) {
 
   const publish = useCallback(
     (id: string) => {
-      if (
-        scope.current.version !== scopeVersion ||
-        pages.current.version !== scopeVersion ||
-        pages.current.id !== id
-      )
+      if (committedScope.current !== scopeVersion || pages.current.id !== id)
         return;
       // Read the latest UI state when the JS callback runs, even after a fast reversal.
       const collapsed = headerProgress.value >= 1;
@@ -74,12 +71,19 @@ export function useAnswerHeaderState(pagerKey: string, answerId?: string) {
       // A bounce or a shorter document can move the native offset without a reversal.
       const previous = Math.min(maxScroll, activeScrollY.value);
       const progress = headerProgress.value;
-      const delta = scrolling ? (previous - current) / REVEAL_DISTANCE : 0;
-      const distancePastHeader = Math.max(0, current - collapseOffset);
-      const next = Math.max(
-        0,
-        Math.min(1, progress + delta, distancePastHeader / REVEAL_DISTANCE),
-      );
+      let next = 0;
+      if (current > collapseOffset) {
+        // Leave room to reveal, stay fully interactive, then fade near the inline header.
+        const distance = Math.min(
+          REVEAL_DISTANCE,
+          (maxScroll - collapseOffset) / 3,
+        );
+        const delta = scrolling ? (previous - current) / distance : 0;
+        next = Math.max(
+          0,
+          Math.min(1, progress + delta, (current - collapseOffset) / distance),
+        );
+      }
       activeScrollY.value = current;
       headerProgress.value = next;
       const wasFullyVisible = progress >= 1;
@@ -98,7 +102,7 @@ export function useAnswerHeaderState(pagerKey: string, answerId?: string) {
 
   const restore = useCallback(
     (id: string) => {
-      if (scope.current.version !== scopeVersion) return;
+      if (committedScope.current !== scopeVersion) return;
       const page = pages.current;
       const sameScope = page.version === scopeVersion;
       if (sameScope && page.id === id) return;
@@ -134,8 +138,12 @@ export function useAnswerHeaderState(pagerKey: string, answerId?: string) {
   );
 
   useLayoutEffect(() => {
+    committedScope.current = scopeVersion;
     restore(answerId ?? '');
-  }, [answerId, restore]);
+    return () => {
+      committedScope.current = null;
+    };
+  }, [answerId, restore, scopeVersion]);
 
   return {
     collapsed:
