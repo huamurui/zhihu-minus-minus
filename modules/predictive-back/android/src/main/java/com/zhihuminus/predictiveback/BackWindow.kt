@@ -126,12 +126,12 @@ internal class BackWindow(
     )
   }
 
-  private fun findSurface(routeKey: String): View? =
-    ReactFindViewUtil.findView(decor, "zhihu-back-surface-$routeKey")?.takeIf {
+  private fun findSurface(nativeId: String): View? =
+    ReactFindViewUtil.findView(decor, nativeId)?.takeIf {
       it.isAttachedToWindow && it.width > 0 && it.height > 0 && it.isShown
     }
 
-  private fun isCommitted(view: View) = committed.values.any { it.view === view }
+  private fun isCommitted(view: View) = committed.values.any { it.owns(view) }
 
   private fun commit(routeKey: String, id: Int, surface: BackSurface) {
     committed[id] = surface
@@ -208,20 +208,22 @@ private class PageGesture(
   private var surface: BackSurface? = null
   private var ignoredSystemGesture = false
   private var receivedProgress = false
+  private fun sourceView() = findSurface("zhihu-back-surface-$routeKey")
 
   override fun onBackStarted(event: BackEvent) {
     if (!isCurrent(this)) return
     release()
     ignoredSystemGesture = false
     if (event.swipeEdge != BackEvent.EDGE_LEFT && event.swipeEdge != BackEvent.EDGE_RIGHT) return
-    val view = findSurface(routeKey) ?: return
+    val view = sourceView() ?: return
     // Consume this sequence even if its previous commit releases the view before UP.
     if (isCommitted(view)) {
       ignoredSystemGesture = true
       return
     }
     id = nextId()
-    surface = BackSurface(view, readCornerRadii(), event.swipeEdge == BackEvent.EDGE_RIGHT)
+    val destination = findSurface("zhihu-back-destination-$routeKey")?.takeUnless(isCommitted)
+    surface = BackSurface(view, destination, readCornerRadii(), event.swipeEdge == BackEvent.EDGE_RIGHT)
     applyProgress(event.progress)
   }
 
@@ -260,7 +262,7 @@ private class PageGesture(
     // Buttons, accessibility actions and some system gestures supply no progress.
     if (source?.attached != true || gestureId == null || !receivedProgress) {
       release()
-      if (findSurface(routeKey)?.let(isCommitted) != true) ordinaryBack()
+      if (sourceView()?.let(isCommitted) != true) ordinaryBack()
       return
     }
     surface = null

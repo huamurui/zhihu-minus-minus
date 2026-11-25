@@ -40,6 +40,10 @@ export function predictiveBackSurfaceId(routeKey: string): string {
   return `zhihu-back-surface-${routeKey}`;
 }
 
+export function predictiveBackDestinationId(sourceKey: string): string {
+  return `zhihu-back-destination-${sourceKey}`;
+}
+
 /** Restore the still-mounted source if navigation declined a committed gesture. */
 export function releasePredictiveBackSurface(gestureId: number): void {
   previewModule?.releaseSurface?.(gestureId);

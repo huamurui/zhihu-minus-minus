@@ -50,6 +50,7 @@ import { GlassNavigationButton } from '@/components/navigation/GlassNavigationBu
 import { useIsLiquidGlassActive } from '@/components/surfaces/FloatingSurface';
 import { useRuntimeThemeColors } from '@/components/Themed';
 import {
+  predictiveBackDestinationId,
   predictiveBackSurfaceId,
   supportsPredictiveBack,
 } from '@/modules/predictive-back';
@@ -353,6 +354,8 @@ function AdaptiveStackContent({
               const retainedRoute =
                 retained?.route.key === route.key ? retained : null;
               const isExiting = retainedRoute !== null;
+              const previewSource =
+                route.key === previousKey ? target : undefined;
               const descriptor =
                 retainedRoute?.descriptor ?? descriptors[route.key];
               const isList = route.key === panes.listKey;
@@ -377,11 +380,16 @@ function AdaptiveStackContent({
                   height={retainedRoute?.height ?? height}
                   visible={visible}
                   predictiveExit={retainedRoute?.predictiveExit === true}
-                  previewDestination={!!target && route.key === previousKey}
+                  previewDestination={!!previewSource}
+                  backdropColor={
+                    previewSource || route.key === committed?.destination
+                      ? colors.background
+                      : undefined
+                  }
                   background={
                     Platform.OS === 'android' &&
                     !visible &&
-                    ((!!target && route.key === previousKey) ||
+                    (!!previewSource ||
                       (!transition.current.returning &&
                         underlayKeys.includes(route.key)))
                   }
@@ -399,7 +407,11 @@ function AdaptiveStackContent({
                   transitionSequence={transition.current.sequence}
                 >
                   <AdaptiveScreen
-                    routeKey={route.key}
+                    surfaceId={
+                      previewSource
+                        ? predictiveBackDestinationId(previewSource)
+                        : predictiveBackSurfaceId(route.key)
+                    }
                     options={descriptor.options}
                     canGoBack={(retainedRoute?.index ?? state.index) > 0}
                     onBack={actions.back}
@@ -438,6 +450,7 @@ function RoutePane({
   visible,
   predictiveExit,
   previewDestination,
+  backdropColor,
   background,
   active,
   exiting,
@@ -457,6 +470,7 @@ function RoutePane({
   visible: boolean;
   predictiveExit: boolean;
   previewDestination: boolean;
+  backdropColor?: string;
   background: boolean;
   active: boolean;
   exiting: boolean;
@@ -589,7 +603,15 @@ function RoutePane({
       importantForAccessibility={
         visible && !exiting ? 'auto' : 'no-hide-descendants'
       }
-      style={[styles.route, frame, { opacity: visible || background ? 1 : 0 }]}
+      style={[
+        styles.route,
+        frame,
+        // Mask the older route through the margins of a shrinking destination.
+        {
+          opacity: visible || background ? 1 : 0,
+          backgroundColor: backdropColor,
+        },
+      ]}
     >
       <Animated.View
         testID={`${testID}-transition`}
@@ -628,14 +650,14 @@ function RoutePane({
 }
 
 function AdaptiveScreen({
-  routeKey,
+  surfaceId,
   options,
   children,
   onBack,
   canGoBack,
   previousTitle,
 }: {
-  routeKey: string;
+  surfaceId: string;
   options: NativeStackNavigationOptions;
   children: React.ReactNode;
   onBack: () => void;
@@ -658,11 +680,7 @@ function AdaptiveScreen({
   return (
     <View
       collapsable={Platform.OS === 'android' ? false : undefined}
-      nativeID={
-        Platform.OS === 'android'
-          ? predictiveBackSurfaceId(routeKey)
-          : undefined
-      }
+      nativeID={Platform.OS === 'android' ? surfaceId : undefined}
       style={[styles.container, { backgroundColor: colors.background }]}
     >
       {shown ? (
