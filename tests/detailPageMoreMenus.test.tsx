@@ -84,10 +84,13 @@ interface RelationshipNoticeProps {
 let mockParams: { id: string; source?: string };
 let mockQueryData: Record<string, unknown>;
 let mockPausedQueries: Set<string>;
+let mockFailedQuery: string | undefined;
 let mockMenuProps: MenuProps;
 let mockMutationOptions: MutationOptions;
 let mockInfiniteQueryOptions: QuestionAnswersQueryOptions;
 const mockPush = jest.fn();
+const mockBack = jest.fn();
+const mockRefetch = jest.fn();
 const mockMutate = jest.fn();
 const mockInvalidateQueries = jest.fn();
 const mockDownvoteButton = jest.fn((_props: { voted?: number }) => null);
@@ -135,7 +138,7 @@ jest.mock('expo-router', () => {
   const react = jest.requireActual<typeof import('react')>('react');
   return {
     useLocalSearchParams: () => mockParams,
-    useRouter: () => ({ push: mockPush, back: jest.fn() }),
+    useRouter: () => ({ push: mockPush, back: mockBack }),
     useNavigation: () => ({
       getState: () => ({ key: 'detail-stack' }),
       dispatch: jest.fn(),
@@ -157,9 +160,9 @@ jest.mock('@tanstack/react-query', () => ({
       isLoading: false,
       isPending: mockQueryData[String(queryKey[0])] === undefined,
       isPaused: mockPausedQueries.has(String(queryKey[0])),
-      isError: false,
+      isError: queryKey[0] === mockFailedQuery,
       isFetchedAfterMount: false,
-      refetch: jest.fn(),
+      refetch: () => mockRefetch(queryKey[0]),
     };
   },
   useInfiniteQuery: (options: QuestionAnswersQueryOptions) => {
@@ -565,6 +568,7 @@ beforeEach(() => {
   mockOptimisticQueryKeys.length = 0;
   mockParams = { id: '7' };
   mockPausedQueries = new Set();
+  mockFailedQuery = undefined;
   mockQueryData = {
     'article-collection-status': { data: [{ is_favorited: false }] },
     'zhihu-article': {
@@ -710,6 +714,34 @@ test.each([
     expect(host.getByTestId('detail-body')).toBeOnTheScreen();
   },
 );
+
+test.each([
+  { query: 'zhihu-article', source: undefined },
+  { query: 'daily-article', source: 'daily' },
+])('$query keeps back available without content', async ({ query, source }) => {
+  mockParams = { id: '7', source };
+  mockQueryData[query] = undefined;
+  mockPausedQueries.add(query);
+  const host = await render(<ArticleDetail />);
+  const back = host.getByRole('button', { name: '返回' });
+  await pressButton(back);
+  expect(mockBack).toHaveBeenCalledTimes(1);
+  expect(host.queryByRole('button', { name: '更多操作' })).toBeNull();
+
+  mockPausedQueries.clear();
+  mockFailedQuery = query;
+  await host.rerender(<ArticleDetail />);
+  expect(host.getByRole('button', { name: '返回' })).toBe(back);
+  await pressButton(host.getByRole('button', { name: '重新加载' }));
+  expect(mockRefetch).toHaveBeenCalledWith(query);
+  expect(host.queryByRole('button', { name: '更多操作' })).toBeNull();
+
+  mockFailedQuery = undefined;
+  await host.rerender(<ArticleDetail />);
+  expect(host.getByText(/可能已被删除/)).toBeOnTheScreen();
+  expect(host.getByRole('button', { name: '返回' })).toBe(back);
+  expect(host.queryByRole('button', { name: '更多操作' })).toBeNull();
+});
 
 test('a long article preview stays scrollable while the detail request is pending', async () => {
   mockQueryData['zhihu-article'] = undefined;

@@ -9,12 +9,18 @@ import {
 } from '../src/api/zhihu';
 import CollectionDetailScreen from '../src/app/collections/[id]';
 import MyCollectionsScreen from '../src/app/collections/index';
+import { CollectionSelectorModal } from '../src/components/CollectionSelectorModal';
+import { collectionSelectorStatusKey } from '../src/hooks/useCollectionSelectionToggle';
+import { useCollectionStore } from '../src/store/useCollectionStore';
 
 let mockCookies: string | null = 'z_c0=synthetic';
 const mockNavigation = { setOptions: jest.fn() };
 const mockRouter = { push: jest.fn() };
 const mockVideoTypes = new Map<string, string | undefined>();
 jest.mock('@expo/vector-icons/Ionicons', () => () => null);
+jest.mock('../src/utils/contentCache', () => ({
+  updateContentInteractionCaches: jest.fn(),
+}));
 jest.mock('../src/api/client', () => ({
   hasAuthenticationCookie: (cookies: string | null) => Boolean(cookies),
 }));
@@ -67,11 +73,15 @@ jest.mock('../src/components/overlays/BottomSheet', () => ({
   BottomSheet: ({
     visible,
     children,
+    headerLeft,
+    headerRight,
     dismissible = true,
     onClose,
   }: {
     visible: boolean;
     children: ReactNode;
+    headerLeft?: ReactNode;
+    headerRight?: ReactNode;
     dismissible?: boolean;
     onClose: () => void;
   }) => {
@@ -84,6 +94,8 @@ jest.mock('../src/components/overlays/BottomSheet', () => ({
             testID: 'collection-editor',
             accessibilityState: { busy: !dismissible },
           },
+          headerLeft,
+          headerRight,
           children,
           createElement(
             Pressable,
@@ -183,6 +195,26 @@ beforeEach(() => {
     data: [{ id: 17, title: '合成收藏夹', is_public: true }],
     paging: { is_end: true, next: '' },
   });
+});
+
+test('back from creating a folder returns to the open collection selector', async () => {
+  const client = createClient();
+  client.setQueryData(collectionSelectorStatusKey('1', 'answer'), {
+    data: [],
+  });
+  useCollectionStore.getState().openSelector('1', 'answer');
+  const host = await render(
+    <QueryClientProvider client={client}>
+      <CollectionSelectorModal />
+    </QueryClientProvider>,
+  );
+  await fireEvent.press(host.getByRole('button', { name: '新建收藏夹' }));
+  await fireEvent.press(host.getByRole('button', { name: '返回收藏夹列表' }));
+  expect(host.getByRole('button', { name: '完成选择收藏夹' })).toBeEnabled();
+  await fireEvent.press(host.getByRole('button', { name: '完成选择收藏夹' }));
+  expect(host.queryByTestId('collection-editor')).toBeNull();
+  await host.unmount();
+  client.clear();
 });
 
 test('guest collections show login guidance without making authenticated requests', async () => {
