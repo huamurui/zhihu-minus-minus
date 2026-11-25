@@ -33,6 +33,9 @@ jest.mock('../src/components/Themed', () => {
 jest.mock('../src/components/BouncyButton', () => ({
   BouncyButton: jest.requireActual('react-native').Pressable,
 }));
+jest.mock('../src/components/overlays/SheetScrollView', () => ({
+  SheetScrollView: jest.requireActual('react-native').ScrollView,
+}));
 jest.mock('../src/components/overlays/BottomSheet', () => ({
   BottomSheet: () => null,
 }));

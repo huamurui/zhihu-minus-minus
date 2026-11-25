@@ -16,6 +16,12 @@ import {
   StyleSheet,
   Text,
 } from 'react-native';
+import {
+  type Gesture,
+  type GestureTouchEvent,
+  PointerType,
+  State,
+} from 'react-native-gesture-handler';
 import { withSpring } from 'react-native-reanimated';
 import { createAnswerSelectionComment } from '../src/api/zhihu/comment';
 import { uploadImage } from '../src/api/zhihu/image';
@@ -36,7 +42,12 @@ import { PaneModal } from '../src/features/adaptive-layout/PaneModal';
 import { SelectionCommentSheet } from '../src/features/rich-content/components/SelectionCommentSheet';
 import { useSettingsStore } from '../src/store/useSettingsStore';
 
+type SheetPan = ReturnType<typeof Gesture.Pan>;
+let mockSheetPan: SheetPan;
+let mockListGesture: ReturnType<typeof Gesture.Native>;
+const mockListOffset = { value: 0 };
 let mockFinishAnimation: (finished: boolean) => void;
+const mockDispatchToJS = jest.fn((callback: () => void) => callback());
 let mockFocused = true;
 let mockWindowHeight = 800;
 
@@ -75,23 +86,39 @@ jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
   }),
 }));
 jest.mock('react-native-gesture-handler', () => {
-  const gesture = {
-    enabled: () => gesture,
-    activeOffsetY: () => gesture,
-    failOffsetX: () => gesture,
-    onUpdate: () => gesture,
-    onEnd: () => gesture,
-    onFinalize: () => gesture,
-  };
+  jest.requireActual('react-native-gesture-handler/jestSetup');
+  const react = jest.requireActual<typeof import('react')>('react');
+  const { View } =
+    jest.requireActual<typeof import('react-native')>('react-native');
+  const { Gesture, PointerType, State } = jest.requireActual<
+    typeof import('react-native-gesture-handler')
+  >('react-native-gesture-handler');
   return {
-    Gesture: { Pan: () => gesture },
-    GestureDetector: ({ children }: PropsWithChildren) => children,
+    Gesture,
+    PointerType,
+    State,
+    GestureHandlerRootView: ({ children }: PropsWithChildren) =>
+      react.createElement(View, { testID: 'gesture-root' }, children),
+    GestureDetector: ({
+      children,
+      gesture,
+    }: PropsWithChildren<{
+      gesture: SheetPan | ReturnType<typeof Gesture.Native>;
+    }>) => {
+      if (gesture.handlerName === 'NativeViewGestureHandler') {
+        mockListGesture = gesture as ReturnType<typeof Gesture.Native>;
+        return children;
+      }
+      mockSheetPan = gesture as SheetPan;
+      return react.createElement(View, { testID: 'pan-area' }, children);
+    },
   };
 });
 jest.mock('react-native-reanimated', () => {
   const react = jest.requireActual<typeof import('react')>('react');
   type MockTiming = { target: number; callback: (finished: boolean) => void };
-  function useSharedValue(initial: number) {
+  type MockValue = number | boolean | null | { x: number; y: number };
+  function useSharedValue(initial: MockValue) {
     const [shared] = react.useState(() => {
       let value = initial;
       let pending: MockTiming | undefined;
@@ -104,10 +131,10 @@ jest.mock('react-native-reanimated', () => {
         get value() {
           return value;
         },
-        set value(next: number | MockTiming) {
+        set value(next: MockValue | MockTiming) {
           // Assigning to an animating shared value cancels its previous animation.
           finish(false);
-          if (typeof next === 'number') {
+          if (!next || typeof next !== 'object' || !('callback' in next)) {
             value = next;
           } else {
             value = next.target;
@@ -121,8 +148,18 @@ jest.mock('react-native-reanimated', () => {
   }
   return {
     __esModule: true,
-    default: { View: jest.requireActual('react-native').View },
+    default: {
+      View: jest.requireActual('react-native').View,
+      ScrollView: jest.requireActual('react-native').ScrollView,
+      createAnimatedComponent: (component: unknown) => component,
+    },
+    cancelAnimation: (shared: { value: number }) => {
+      const current = shared.value;
+      shared.value = current;
+    },
     useSharedValue,
+    useScrollOffset: () => mockListOffset,
+    useAnimatedRef: () => react.useCallback(() => {}, []),
     useAnimatedStyle: (style: () => object) => style(),
     withSpring: jest.fn((value: number) => value),
     withTiming: (
@@ -130,13 +167,17 @@ jest.mock('react-native-reanimated', () => {
       _config: unknown,
       callback?: (finished: boolean) => void,
     ) => (callback ? { target: value, callback } : value),
-    runOnJS: (callback: () => void) => callback,
+    runOnJS:
+      <Args extends unknown[]>(callback: (...args: Args) => void) =>
+      (...args: Args) =>
+        mockDispatchToJS(() => callback(...args)),
   };
 });
 
 beforeEach(() => {
   mockFocused = true;
   mockWindowHeight = 800;
+  mockListOffset.value = 0;
   useSettingsStore.setState({ largeScreenLayoutMode: 'single' });
   jest.spyOn(Animated, 'timing').mockImplementation(() => ({
     start: (callback) => callback?.({ finished: true }),
@@ -378,6 +419,152 @@ test('iOS completes a requested sheet dismissal once even when navigation hides 
   expect(afterClose).toHaveBeenCalledTimes(1);
 });
 
+function touch(
+  x: number,
+  y: number,
+  eventType: GestureTouchEvent['eventType'],
+): GestureTouchEvent {
+  const point = { x, y, absoluteX: x, absoluteY: y, id: 0 };
+  return {
+    handlerTag: 1,
+    state: State.BEGAN,
+    numberOfTouches: 1,
+    pointerType: PointerType.TOUCH,
+    eventType,
+    allTouches: [point],
+    changedTouches: [point],
+  };
+}
+
+function attemptPan(dx: number, dy: number, insideList = false) {
+  const manager = {
+    handlerTag: 1,
+    begin: jest.fn(),
+    activate: jest.fn(),
+    fail: jest.fn(),
+    end: jest.fn(),
+  };
+  const down = touch(100, 100, 1);
+  if (insideList) mockListGesture.handlers.onTouchesDown?.(down, manager);
+  mockSheetPan.handlers.onTouchesDown?.(down, manager);
+  mockSheetPan.handlers.onTouchesMove?.(touch(100 + dx, 100 + dy, 2), manager);
+  return manager;
+}
+
+function panEvent(translationY: number, velocityY = 0) {
+  return {
+    handlerTag: 1,
+    state: State.ACTIVE,
+    oldState: State.BEGAN,
+    numberOfPointers: 1,
+    pointerType: PointerType.TOUCH,
+    x: 100,
+    y: 100 + translationY,
+    absoluteX: 100,
+    absoluteY: 100 + translationY,
+    translationX: 0,
+    translationY,
+    velocityX: 0,
+    velocityY,
+  };
+}
+
+test.each([
+  { distance: 180, velocity: 0 },
+  { distance: 36, velocity: 1600 },
+])(
+  'dragging the sheet body closes it after a downward release ($distance, $velocity)',
+  async ({ distance, velocity }) => {
+    jest.replaceProperty(Platform, 'OS', 'android');
+    const onClose = jest.fn();
+    const host = await render(
+      <BottomSheet visible showHandle={false} onClose={onClose}>
+        <Text>菜单项</Text>
+      </BottomSheet>,
+    );
+    const modalRoot = host.getByTestId('gesture-root');
+    const panArea = within(modalRoot).getByTestId('pan-area');
+    expect(within(panArea).getByText('菜单项')).toBeVisible();
+    expect(within(panArea).queryByLabelText('关闭弹窗')).toBeNull();
+    expect(attemptPan(0, 16).activate).toHaveBeenCalled();
+    const { onStart, onUpdate, onEnd, onFinalize } = mockSheetPan.handlers;
+    await act(() => {
+      onStart?.(panEvent(0));
+      const event = panEvent(distance, velocity);
+      onUpdate?.(event);
+      onEnd?.(event, true);
+      onFinalize?.(event, true);
+    });
+    expect(onClose).not.toHaveBeenCalled();
+    await act(() => mockFinishAnimation(true));
+    expect(host.queryByText('菜单项')).toBeNull();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  },
+);
+
+test.each([true, false])(
+  'a short or canceled sheet drag returns to rest (completed: %s)',
+  async (completed) => {
+    jest.replaceProperty(Platform, 'OS', 'android');
+    const onClose = jest.fn();
+    const sheet = () => (
+      <BottomSheet visible onClose={onClose}>
+        <Text>内容</Text>
+      </BottomSheet>
+    );
+    const host = await render(sheet());
+    const surface = () =>
+      host.container.queryAll(
+        (node) =>
+          node.props.accessibilityViewIsModal &&
+          StyleSheet.flatten(node.props.style)?.transform,
+      )[0];
+    const translation = () =>
+      StyleSheet.flatten(surface().props.style).transform[0].translateY;
+    const { onStart, onUpdate, onEnd, onFinalize } = mockSheetPan.handlers;
+    const event = panEvent(completed ? 20 : 220);
+    await act(() => {
+      onStart?.(panEvent(0));
+      onUpdate?.(event);
+    });
+    await host.rerender(sheet());
+    expect(translation()).toBeGreaterThan(0);
+    await act(() => {
+      onEnd?.(event, completed);
+      onFinalize?.(event, completed);
+    });
+    await host.rerender(sheet());
+    expect(translation()).toBe(0);
+    expect(onClose).not.toHaveBeenCalled();
+  },
+);
+
+test('a list keeps its scroll gestures and hands downward drags to the sheet at its top', async () => {
+  await render(
+    <BottomSheet visible scrollable onClose={jest.fn()}>
+      <Text>长列表</Text>
+    </BottomSheet>,
+  );
+  mockListOffset.value = 120;
+  expect(attemptPan(0, 32, true).fail).toHaveBeenCalled();
+  mockListOffset.value = 0;
+  expect(attemptPan(0, -32, true).fail).toHaveBeenCalled();
+  expect(attemptPan(40, 4, true).fail).toHaveBeenCalled();
+  expect(attemptPan(0, 32, true).activate).toHaveBeenCalled();
+});
+
+test('a non-dismissible sheet does not register an enabled drag or offer a close action', async () => {
+  const host = await render(
+    <BottomSheet visible dismissible={false} title="请稍候" onClose={jest.fn()}>
+      <Text>处理中</Text>
+    </BottomSheet>,
+  );
+  expect(mockSheetPan.config.enabled).toBe(false);
+  expect(host.queryByLabelText('关闭')).toBeNull();
+  expect(host.queryByLabelText('关闭弹窗')).toBeNull();
+  expect(host.getByText('处理中')).toBeOnTheScreen();
+});
+
 test('resizing an open sheet preserves it and reopening still plays its entrance', async () => {
   const onClose = jest.fn();
   const view = (visible: boolean) => (
@@ -397,6 +584,29 @@ test('resizing an open sheet preserves it and reopening still plays its entrance
   await host.rerender(view(true));
   expect(withSpring).toHaveBeenCalledTimes(1);
   expect(host.getByText('内容')).toBeOnTheScreen();
+});
+
+test('a delayed dismissal callback leaves a reopened sheet in place', async () => {
+  jest.replaceProperty(Platform, 'OS', 'android');
+  const onClose = jest.fn();
+  const sheet = (visible: boolean) => (
+    <BottomSheet visible={visible} title="菜单" onClose={onClose}>
+      <Text>内容</Text>
+    </BottomSheet>
+  );
+  const host = await render(sheet(true));
+  await fireEvent.press(host.getByLabelText('关闭'));
+  let finishOnJS: (() => void) | undefined;
+  mockDispatchToJS.mockImplementationOnce((callback) => {
+    finishOnJS = callback;
+  });
+  await act(() => mockFinishAnimation(true));
+  expect(finishOnJS).toBeDefined();
+  await host.rerender(sheet(false));
+  await host.rerender(sheet(true));
+  await act(() => finishOnJS?.());
+  expect(host.getByText('内容')).toBeOnTheScreen();
+  expect(onClose).not.toHaveBeenCalled();
 });
 
 test('iOS finishes a sheet dismissal once when the window resizes during its exit', async () => {

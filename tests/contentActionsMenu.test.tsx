@@ -94,6 +94,9 @@ jest.mock('../src/utils/haptics', () => ({
 }));
 jest.mock('../src/utils/clipboard', () => ({ copyToClipboard: jest.fn() }));
 jest.mock('../src/utils/toast', () => ({ showToast: jest.fn() }));
+jest.mock('../src/components/overlays/SheetScrollView', () => ({
+  SheetScrollView: jest.requireActual('react-native').ScrollView,
+}));
 jest.mock('../src/components/overlays/BottomSheet', () => {
   const react = jest.requireActual<typeof import('react')>('react');
   const native =

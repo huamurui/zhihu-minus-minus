@@ -6,6 +6,7 @@ import type { ZhihuVoter, ZhihuVotersResponse } from '@/api/zhihu/voters';
 import { getAnswerVoters, getPinVoters } from '@/api/zhihu/voters';
 import { BouncyButton } from '@/components/BouncyButton';
 import { BottomSheet } from '@/components/overlays/BottomSheet';
+import { SheetScrollView } from '@/components/overlays/SheetScrollView';
 import { StableAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -120,6 +121,7 @@ export function VoterListModal({
       ) : (
         <FlashList
           data={uniqueVoters}
+          renderScrollComponent={SheetScrollView}
           renderItem={renderVoter}
           keyExtractor={(item) => String(item.id)}
           onEndReached={() => {

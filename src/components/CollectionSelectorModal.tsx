@@ -11,6 +11,7 @@ import { BouncyButton } from '@/components/BouncyButton';
 import { CollectionEditorForm } from '@/components/CollectionEditorForm';
 import { GlassNavigationButton } from '@/components/navigation/GlassNavigationButton';
 import { BottomSheet } from '@/components/overlays/BottomSheet';
+import { SheetScrollView } from '@/components/overlays/SheetScrollView';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -160,6 +161,7 @@ export function CollectionSelectorModal() {
           ) : (
             <FlatList
               data={collections}
+              renderScrollComponent={(props) => <SheetScrollView {...props} />}
               keyExtractor={(item) => item.id.toString()}
               style={styles.list}
               keyboardShouldPersistTaps="handled"

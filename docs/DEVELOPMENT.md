@@ -212,6 +212,8 @@ Android 14 及以上的单栏预览由 [predictive-back 原生模块](../modules
 
 设置 v24 的 `androidPredictiveBackEnabled` 可在“外观与阅读 → 返回手势”即时切换。双栏、三键导航和受草稿离开保护的页面沿用普通返回。修改原生回调或 `android.predictiveBackGestureEnabled` 后，需重新 prebuild 并编译 Android 包。
 
+公共 `BottomSheet` 可从整个面板向下拖动关闭。面板内的纵向列表使用 `SheetScrollView` 作为滚动容器，列表已滚动时优先滚动内容，从列表顶部开始的下拉才带动面板。Android 的手势根视图位于弹窗内部。
+
 iOS 双栏中的自绘 `BottomSheet` 使用 `FullWindowOverlay` 覆盖两栏，使打开收藏夹或菜单时背景导航保持原位。来源页面隐藏时，浮层应让出触控。若已请求关闭，退出动画完成后仍须恰好调用一次关闭回调，供下一步分享或打开另一个弹窗使用。
 
 使用 Node.js 24 运行以下定向回归，再运行完整质量门禁：
