@@ -75,10 +75,10 @@
 
 ### 🤖 Android
 
-当前 APK 的最低系统要求为 **Android 7.0（API 24）**。已通过真机验证的最低版本为 **32 位 Android 8.1（API 27）**，测试设备是三星 SM-P583 平板。安装包可从 [GitHub Releases](https://github.com/huamurui/zhihu-minus-minus/releases) 下载。
+安装包可从 [GitHub Releases](https://github.com/huamurui/zhihu-minus-minus/releases) 下载。当前 APK 的最低系统要求为 **Android 7.0（API 24）**。已通过真机验证的最低版本为 **32 位 Android 8.1（API 27）**。
 
 > [!NOTE]
-> 大多数 Android 手机和平板请下载 `arm64-v8a` 主包。仅 32 位 ARM 设备选择 `compat-armeabi-v7a`；`compat-x86` 和 `compat-x86_64` 主要用于对应架构的模拟器或少数设备。应用内更新会自动选择匹配的附件。
+> 大多数 Android 手机和平板请下载 `arm64-v8a` 主包。仅 32 位 ARM 设备选择 `compat-armeabi-v7a`；`compat-x86` 和 `compat-x86_64` 主要用于对应架构的模拟器或少数设备。
 
 也可以从源码构建：
 
@@ -100,7 +100,7 @@ Windows 无法运行 `eas build --local`，请使用 [Windows 本地构建指南
 本应用不会在 App Store 上架。
 [GitHub Releases](https://github.com/huamurui/zhihu-minus-minus/releases) 会提供未签名 IPA；需要用户自行处理签名和安装环境。
 
-从 **v0.9.4** 起，最低系统版本为 **iOS 16.4**。[v0.9.3](https://github.com/huamurui/zhihu-minus-minus/releases/tag/v0.9.3) 是最后一个支持 **iOS 15.1** 的版本，适用于仍在使用 iOS 15.1 至 16.3.x 的设备。
+从 **v0.9.4** 起，最低系统版本为 **iOS 16.4**。[v0.9.3](https://github.com/huamurui/zhihu-minus-minus/releases/tag/v0.9.3) 是最后一个支持 **iOS 15.1** 的版本，适用于 iOS 15.1 至 16.3.x 的设备。
 
 使用 **SideStore 或 AltStore Classic** 时，可以添加以下订阅源，从源中安装并在侧载工具内更新应用：
 
@@ -204,4 +204,4 @@ npm run check
 </a>
 
 ---
-**Version**: v0.10.1 | **Last Updated**: 2026-11-22
+**Version**: v0.10.1 | **Last Updated**: 2026-11-23

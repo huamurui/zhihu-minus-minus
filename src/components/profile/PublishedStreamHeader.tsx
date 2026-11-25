@@ -1,13 +1,20 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useQuery } from '@tanstack/react-query';
+import { useQueries } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
+import { type PropsWithChildren, useLayoutEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getMemberWithFallback, type ZhihuActor } from '@/api/zhihu';
+import { getMemberWithFallback } from '@/api/zhihu';
 import { BouncyButton } from '@/components/BouncyButton';
 import { GlassNavigationButton } from '@/components/navigation/GlassNavigationButton';
-import { StableAvatar } from '@/components/StableAvatar';
+import { RetainedAvatar } from '@/components/StableAvatar';
 import { Text, useThemeColor } from '@/components/Themed';
+import type { RecentMomentStreamEntry } from '@/utils/recentMomentStream';
 
 function PageButton({
   label,
@@ -35,31 +42,62 @@ function PageButton({
   );
 }
 
+function IdentityLayer({
+  active,
+  children,
+}: PropsWithChildren<{ active: boolean }>) {
+  const opacity = useSharedValue(active ? 1 : 0);
+  useLayoutEffect(() => {
+    opacity.value = withTiming(active ? 1 : 0, { duration: 160 });
+  }, [active, opacity]);
+  const fade = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  return (
+    <Animated.View
+      pointerEvents="none"
+      accessibilityElementsHidden={!active}
+      importantForAccessibility={active ? 'auto' : 'no-hide-descendants'}
+      style={[!active && StyleSheet.absoluteFill, fade]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
 export function PublishedStreamHeader({
-  id,
-  actor,
+  entries,
   page,
-  total,
   goToPage,
 }: {
-  id: string;
-  actor?: ZhihuActor;
+  entries: readonly RecentMomentStreamEntry[];
   page: number;
-  total: number;
   goToPage: (index: number) => void;
 }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const textColor = useThemeColor({}, 'text');
   const muted = useThemeColor({}, 'textSecondary');
-  // Each page loads its own member. Observe the selected page's cached details.
-  const { data: member } = useQuery({
-    queryKey: ['user-detail', id],
-    queryFn: () => getMemberWithFallback(id),
-    enabled: false,
+  const total = entries.length;
+  const first = Math.max(0, page - 1);
+  const nearby = entries.slice(first, page + 2);
+  // The stream pages fetch member details. Warm the same neighboring identities
+  // in the header so Android can keep their decoded image views through selection.
+  const members = useQueries({
+    queries: nearby.map(({ id }) => ({
+      queryKey: ['user-detail', id],
+      queryFn: () => getMemberWithFallback(id),
+      enabled: false,
+    })),
   });
-  const name = member?.name || actor?.name;
-  const avatar = member?.avatar_url || actor?.avatar_url;
+  const identities = nearby.map(({ id, moment }, i) => {
+    const member = members[i].data;
+    return {
+      id,
+      name: member?.name || moment?.actor.name,
+      avatar: member?.avatar_url || moment?.actor.avatar_url,
+      headline: member?.headline,
+    };
+  });
+  const { id, name, avatar, headline } = identities[page - first];
 
   return (
     <View className="bg-surface" style={{ paddingTop: insets.top }}>
@@ -87,26 +125,40 @@ export function PublishedStreamHeader({
                 id,
                 ...(name ? { name } : {}),
                 ...(avatar ? { avatar } : {}),
-                ...(member?.headline ? { headline: member.headline } : {}),
+                ...(headline ? { headline } : {}),
               },
             })
           }
           className="flex-1 min-h-11 flex-row items-center gap-2 rounded-lg"
         >
-          <View className="h-9 w-9 overflow-hidden rounded-full bg-surface-tertiary items-center justify-center">
-            {avatar ? (
-              <StableAvatar key={id} uri={avatar} className="h-9 w-9" />
-            ) : (
-              <Ionicons name="person" size={18} color={muted} />
-            )}
+          <View className="h-9 w-9 overflow-hidden rounded-full bg-surface-tertiary">
+            {identities.map((identity) => (
+              <IdentityLayer key={identity.id} active={identity.id === id}>
+                <View className="h-9 w-9 items-center justify-center bg-surface-tertiary">
+                  <Ionicons name="person" size={18} color={muted} />
+                  {identity.avatar && (
+                    <RetainedAvatar
+                      uri={identity.avatar}
+                      style={StyleSheet.absoluteFill}
+                    />
+                  )}
+                </View>
+              </IdentityLayer>
+            ))}
           </View>
           <View className="flex-1">
             <Text type="secondary" style={styles.section} numberOfLines={1}>
               最近发布
             </Text>
-            <Text style={styles.name} numberOfLines={1}>
-              {name || '用户'}
-            </Text>
+            <View>
+              {identities.map((identity) => (
+                <IdentityLayer key={identity.id} active={identity.id === id}>
+                  <Text style={styles.name} numberOfLines={1}>
+                    {identity.name || '用户'}
+                  </Text>
+                </IdentityLayer>
+              ))}
+            </View>
           </View>
         </BouncyButton>
         {total > 1 && (

@@ -48,10 +48,8 @@ function UserStreamPager({ id, unreadCount, source }: StreamParams) {
     <View className="flex-1 bg-base">
       <Stack.Screen options={{ headerShown: false, title: '最近发布' }} />
       <PublishedStreamHeader
-        id={currentEntry.id}
-        actor={currentEntry.moment?.actor}
+        entries={stream.entries}
         page={currentPage}
-        total={stream.entries.length}
         goToPage={goToPage}
       />
       <PagerView

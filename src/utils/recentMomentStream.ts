@@ -1,7 +1,7 @@
 import type { RecentMomentItem } from '@/api/zhihu/moments';
 import { normalizeRecentMoments } from './recentMoments';
 
-interface RecentMomentStreamEntry {
+export interface RecentMomentStreamEntry {
   id: string;
   unreadCount: number;
   moment?: RecentMomentItem;

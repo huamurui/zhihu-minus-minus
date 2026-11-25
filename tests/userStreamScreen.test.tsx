@@ -1,6 +1,6 @@
 import { act, fireEvent, render, within } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
-import { Animated, StyleSheet } from 'react-native';
+import { Animated, Platform, StyleSheet } from 'react-native';
 import type { ZhihuMemberActivity } from '../src/api/zhihu/member';
 import type { RecentMomentItem } from '../src/api/zhihu/moments';
 import UserStreamScreen from '../src/app/user/[id]/stream';
@@ -15,6 +15,7 @@ const mockMarkRead = jest.fn();
 const mockBack = jest.fn();
 const mockPush = jest.fn();
 let mockMemberLoading = false;
+const mockMemberAvatars = new Map<string, string>();
 const mockSetPage = jest.fn();
 const mockRefresh = jest.fn();
 const mockFetchNextPage = jest.fn();
@@ -63,7 +64,13 @@ jest.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({
     getQueryData: () => (mockMoments ? { data: mockMoments } : undefined),
   }),
-  useQuery: ({ queryKey }: { queryKey: string[] }) => ({
+  useQuery: mockMemberQuery,
+  useQueries: ({ queries }: { queries: { queryKey: string[] }[] }) =>
+    queries.map(mockMemberQuery),
+}));
+
+function mockMemberQuery({ queryKey }: { queryKey: string[] }) {
+  return {
     data: mockMemberLoading
       ? undefined
       : {
@@ -71,13 +78,13 @@ jest.mock('@tanstack/react-query', () => ({
           url_token: queryKey[1],
           name: `合成用户 ${queryKey[1]}`,
           type: 'people',
-          avatar_url: '',
+          avatar_url: mockMemberAvatars.get(queryKey[1]) ?? '',
         },
     isLoading: mockMemberLoading,
     isError: false,
     refetch: jest.fn(),
-  }),
-}));
+  };
+}
 jest.mock('expo-router', () => ({
   Stack: { Screen: () => null },
   useLocalSearchParams: () => mockParams,
@@ -99,6 +106,15 @@ jest.mock('react-native-pager-view', () => {
     ),
   };
 });
+jest.mock('react-native-reanimated', () => ({
+  __esModule: true,
+  default: { View: jest.requireActual('react-native').View },
+  useSharedValue: (value: number) =>
+    jest.requireActual<typeof import('react')>('react').useRef({ value })
+      .current,
+  useAnimatedStyle: (style: () => object) => style(),
+  withTiming: (value: number) => value,
+}));
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
@@ -108,9 +124,6 @@ jest.mock('../src/hooks/useUserCreations', () => ({
 }));
 jest.mock('../src/components/BouncyButton', () => ({
   BouncyButton: jest.requireActual('react-native').Pressable,
-}));
-jest.mock('../src/components/StableAvatar', () => ({
-  StableAvatar: () => null,
 }));
 jest.mock('../src/components/QueryErrorView', () => ({
   QueryErrorView: () => null,
@@ -150,6 +163,7 @@ beforeEach(() => {
   delete mockParams.source;
   mockMoments = undefined;
   mockMemberLoading = false;
+  mockMemberAvatars.clear();
   mockQuery.activities = ['a', 'b', 'c'].map(activity);
   mockQuery.refreshing = false;
   mockQuery.isFetching = false;
@@ -284,6 +298,55 @@ test('the user information opens the current user profile after changing pages',
   });
   expect(mockPush).toHaveBeenCalledTimes(2);
   await host.unmount();
+});
+
+test('Android keeps the preloaded avatar mounted and a late load cannot change the selected profile', async () => {
+  const platform = jest.replaceProperty(Platform, 'OS', 'android');
+  const avatar = (id: string) => `https://example.test/${id}.png`;
+  mockParams.id = 'first';
+  mockParams.source = 'recent-moments';
+  mockMoments = ['first', 'second', 'third'].map((id) => {
+    const entry = moment(id);
+    entry.actor.avatar_url = avatar(id);
+    return entry;
+  });
+
+  try {
+    const host = await render(<UserStreamScreen />);
+    const imageFor = (uri: string) =>
+      host.container.queryAll(
+        (node) => node.type === 'Image' && node.props.source?.uri === uri,
+      )[0];
+    const preloaded = imageFor(avatar('second'));
+    expect(preloaded).toBeDefined();
+    await selectPage(host, 1);
+    expect(imageFor(avatar('second'))).toBe(preloaded);
+    const replacementUri = avatar('second-detail');
+    mockMemberAvatars.set('second', replacementUri);
+    await host.rerender(<UserStreamScreen />);
+    expect(imageFor(avatar('second'))).toBe(preloaded);
+    const replacement = imageFor(replacementUri);
+    expect(replacement).toBeDefined();
+    await selectPage(host, 2);
+    await fireEvent(replacement, 'load');
+
+    const current = host.getByRole('link', {
+      name: '查看合成用户 third的主页',
+    });
+    expect(host.getAllByRole('link')).toHaveLength(1);
+    expect(host.queryByText('合成用户 second')).toBeNull();
+    expect(host.getByText('合成用户 third')).toBeOnTheScreen();
+    await fireEvent.press(current);
+    expect(mockPush).toHaveBeenLastCalledWith({
+      pathname: '/user/[id]',
+      params: { id: 'third', name: '合成用户 third', avatar: avatar('third') },
+    });
+    await selectPage(host, 1);
+    expect(imageFor(replacementUri)).toBe(replacement);
+    await host.unmount();
+  } finally {
+    platform.restore();
+  }
 });
 
 test('the cached user information remains a usable profile link while details load', async () => {

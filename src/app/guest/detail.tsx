@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { skipToken, useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { type ReactNode, useMemo } from 'react';
-import { Image, ScrollView, StyleSheet } from 'react-native';
+import { Image, Platform, ScrollView, StyleSheet } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { FeedItem } from '@/api/zhihu';
@@ -190,7 +190,9 @@ export default function GuestDetailScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Animated.View
-          entering={FadeIn.duration(400)}
+          entering={
+            Platform.OS === 'android' ? undefined : FadeIn.duration(400)
+          }
           className="bg-transparent"
         >
           {/* 热榜排名的特殊处理 */}
@@ -370,7 +372,11 @@ export default function GuestDetailScreen() {
 
         {/* 5. 游客提示卡片 */}
         <Animated.View
-          entering={FadeInDown.delay(100).duration(500)}
+          entering={
+            Platform.OS === 'android'
+              ? undefined
+              : FadeInDown.delay(100).duration(500)
+          }
           className="mx-5 mt-8 p-6 rounded-[24px] items-center border"
           style={{
             backgroundColor: cardBg,

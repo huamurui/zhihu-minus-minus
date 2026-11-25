@@ -37,6 +37,7 @@ const mockTransitionTitle = jest.fn(
 );
 const mockSetQueryData = jest.fn();
 let mockSessionVersion = 1;
+let mockCookies: string | null = 'synthetic-session';
 const mockCollectionButton = jest.fn(
   (_props: React.ComponentProps<typeof CollectionButton>) => {},
 );
@@ -99,8 +100,8 @@ jest.mock('react-native-reanimated', () => ({
 }));
 jest.mock('../src/store/useAuthStore', () => ({
   getAuthSessionVersion: () => mockSessionVersion,
-  useAuthStore: (selector: (state: { cookies: string }) => unknown) =>
-    selector({ cookies: 'synthetic-session' }),
+  useAuthStore: (selector: (state: { cookies: string | null }) => unknown) =>
+    selector({ cookies: mockCookies }),
 }));
 jest.mock('../src/store/useCollectionStore', () => ({
   useCollectionStore: (selector: (state: object) => unknown) =>
@@ -231,6 +232,7 @@ jest.mock('../src/utils/toast', () => ({ showToast: jest.fn() }));
 beforeEach(() => {
   jest.clearAllMocks();
   mockSessionVersion = 1;
+  mockCookies = 'synthetic-session';
   useSettingsStore.setState({
     imageLoadingMode: 'auto',
     performanceMode: false,
@@ -1041,6 +1043,43 @@ describe('the Android title flight into an answer', () => {
       expect.objectContaining({ pathname: '/answer/[id]' }),
     );
   });
+
+  test.each(['answers', 'questions'] as const)(
+    'opens a guest %s preview directly and keeps the question link distinct',
+    async (type) => {
+      mockCookies = null;
+      useSettingsStore.setState({ answerReadingMode: 'detail' });
+      const host = await render(
+        <FeedCard
+          item={{
+            ...baseItem,
+            type,
+            questionId: 'question',
+            excerpt: '合成摘要',
+          }}
+        />,
+      );
+      await fireEvent.press(host.getByText('合成摘要'));
+      expect(mockTransitionTitle).not.toHaveBeenCalled();
+      expect(mockPush).toHaveBeenCalledTimes(1);
+      expect(mockPush).toHaveBeenLastCalledWith(
+        expect.objectContaining({ pathname: '/guest/detail' }),
+      );
+
+      await fireEvent.press(host.getByText('合成原卡片'));
+      if (type === 'answers') {
+        expect(mockTransitionTitle).toHaveBeenCalledTimes(1);
+        expect(mockPush).toHaveBeenLastCalledWith(
+          expect.objectContaining({ pathname: '/question/[id]' }),
+        );
+      } else {
+        expect(mockTransitionTitle).not.toHaveBeenCalled();
+        expect(mockPush).toHaveBeenLastCalledWith(
+          expect.objectContaining({ pathname: '/guest/detail' }),
+        );
+      }
+    },
+  );
 
   test('opens a preview list without a flight, since nothing there receives it', async () => {
     useSettingsStore.setState({ answerReadingMode: 'preview-list' });

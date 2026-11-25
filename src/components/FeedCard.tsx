@@ -367,6 +367,25 @@ const FeedCardComponent = ({
     }
   };
 
+  const openDetailWithTitle = () => {
+    // Guest previews have no shared title target. The route owns their entrance.
+    if (isGuest || Platform.OS !== 'android') {
+      openDetail();
+      return;
+    }
+    transitionTitle(
+      titleRef,
+      String(item.type === 'articles' ? item.id : item.questionId || item.id),
+      cleanTitle,
+      () => {
+        if (currentIdentityRef.current === identity) openDetail();
+      },
+      () => currentIdentityRef.current === identity,
+      titleSource.onSourceHiddenChange,
+      sourceTitle,
+    );
+  };
+
   const [previewVisible, setPreviewVisible] = useState(false);
   const containerRef = useRef<ViewInstance>(null);
   const [originLayout, setOriginLayout] = useState<{
@@ -525,29 +544,14 @@ const FeedCardComponent = ({
     <RNView ref={containerRef} className="w-full bg-transparent">
       <BouncyButton
         onLongPress={showPreview}
-        onPress={() => {
-          if (
-            !textOnly &&
-            Platform.OS === 'android' &&
-            ((item.type === 'answers' && !answerOpensPreviewList) ||
-              item.type === 'questions' ||
-              (item.type === 'articles' && !isGuest))
-          ) {
-            transitionTitle(
-              titleRef,
-              String(
-                item.type === 'articles' ? item.id : item.questionId || item.id,
-              ),
-              cleanTitle,
-              () => {
-                if (currentIdentityRef.current === identity) openDetail();
-              },
-              () => currentIdentityRef.current === identity,
-              titleSource.onSourceHiddenChange,
-              sourceTitle,
-            );
-          } else openDetail();
-        }}
+        onPress={
+          !textOnly &&
+          ((item.type === 'answers' && !answerOpensPreviewList) ||
+            isQuestionType ||
+            item.type === 'articles')
+            ? openDetailWithTitle
+            : openDetail
+        }
         style={[
           textOnly ? undefined : surface,
           { opacity: previewVisible ? 0 : 1 },
@@ -676,30 +680,9 @@ const FeedCardComponent = ({
                 }
                 return;
               }
-              if (
-                item.type === 'questions' ||
-                (item.type === 'articles' && !isGuest)
-              ) {
-                if (Platform.OS === 'android') {
-                  transitionTitle(
-                    titleRef,
-                    String(
-                      item.type === 'articles'
-                        ? item.id
-                        : item.questionId || item.id,
-                    ),
-                    cleanTitle,
-                    () => {
-                      if (currentIdentityRef.current === identity) openDetail();
-                    },
-                    () => currentIdentityRef.current === identity,
-                    titleSource.onSourceHiddenChange,
-                    sourceTitle,
-                  );
-                } else {
-                  openDetail();
-                }
-              } else openDetail();
+              if (isQuestionType || item.type === 'articles')
+                openDetailWithTitle();
+              else openDetail();
             }}
           >
             <RNView
