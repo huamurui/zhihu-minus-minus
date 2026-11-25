@@ -1,173 +1,152 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useSharedValue } from 'react-native-reanimated';
-import { calculateDetailHeaderAppearance } from '@/utils/detailHeaderAppearance';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
+import { runOnJS, useSharedValue } from 'react-native-reanimated';
+import { runOnUISync } from 'react-native-worklets';
 
-interface AnswerHeaderState {
+interface AnswerHeaderPosition {
   offset: number;
-  collapseOffset: number;
-  collapsed: boolean;
+  progress: number;
 }
 
-const initialState: AnswerHeaderState = {
-  offset: 0,
-  collapseOffset: 80,
-  collapsed: false,
-};
+export type AnswerHeaderScrollHandler = (
+  id: string,
+  offset: number,
+  collapseOffset: number,
+  maxScroll: number,
+  scrolling: boolean,
+) => void;
 
-/** Keep header state attached to answer identity, including across list reorders. */
+const REVEAL_DISTANCE = 48;
+
+/** A reverse scroll reveals the compact header only after the inline header has left. */
 export function useAnswerHeaderState(pagerKey: string, answerId?: string) {
-  const scopeSequence = useRef(0);
-  const scope = useMemo(
-    () => ({ pagerKey, version: ++scopeSequence.current }),
-    [pagerKey],
-  );
-  const headerProgress = useSharedValue(0);
+  const scope = useRef({ pagerKey, version: 1 });
+  if (scope.current.pagerKey !== pagerKey) {
+    scope.current = { pagerKey, version: scope.current.version + 1 };
+  }
+  const scopeVersion = scope.current.version;
   const activeAnswerId = useSharedValue(answerId ?? '');
+  const activeScopeVersion = useSharedValue(scopeVersion);
   const activeScrollY = useSharedValue(0);
-  const activeScopeVersion = useSharedValue(scope.version);
-  const active = useRef({ scope, answerId });
-  active.current = { scope, answerId };
-  const saved = useRef({
-    scope,
-    answers: new Map<string, AnswerHeaderState>(),
+  const headerProgress = useSharedValue(0);
+  const pages = useRef({
+    version: scopeVersion,
+    id: answerId ?? '',
+    saved: new Map<string, AnswerHeaderPosition>(),
   });
-  const [, setDisplayed] = useState({
-    scope,
-    answerId,
+  const [displayed, setDisplayed] = useState({
+    scopeVersion,
+    id: answerId ?? '',
     collapsed: false,
   });
 
-  const read = useCallback(
-    (id: string): AnswerHeaderState =>
-      saved.current.scope === scope
-        ? (saved.current.answers.get(id) ?? initialState)
-        : initialState,
-    [scope],
-  );
-
-  useLayoutEffect(() => {
-    if (saved.current.scope !== scope) {
-      saved.current = { scope, answers: new Map() };
-    }
-    activeAnswerId.value = answerId ?? '';
-    activeScopeVersion.value = scope.version;
-    const state = answerId ? read(answerId) : initialState;
-    activeScrollY.value = state.offset;
-    headerProgress.value = calculateDetailHeaderAppearance(
-      state.offset,
-      state.collapseOffset,
-    );
-  }, [
-    scope,
-    answerId,
-    read,
-    activeAnswerId,
-    activeScrollY,
-    activeScopeVersion,
-    headerProgress,
-  ]);
-
   const publish = useCallback(
-    (id: string, state: AnswerHeaderState) => {
-      if (saved.current.scope !== scope) {
-        saved.current = { scope, answers: new Map() };
-      }
-      saved.current.answers.set(id, state);
-      if (active.current.answerId !== id) return;
+    (id: string) => {
+      if (
+        scope.current.version !== scopeVersion ||
+        pages.current.version !== scopeVersion ||
+        pages.current.id !== id
+      )
+        return;
+      // Read the latest UI state when the JS callback runs, even after a fast reversal.
+      const collapsed = headerProgress.value >= 1;
       setDisplayed((previous) =>
-        previous.scope === scope &&
-        previous.answerId === id &&
-        previous.collapsed === state.collapsed
+        previous.scopeVersion === scopeVersion &&
+        previous.id === id &&
+        previous.collapsed === collapsed
           ? previous
-          : { scope, answerId: id, collapsed: state.collapsed },
+          : { scopeVersion, id, collapsed },
       );
     },
-    [scope],
+    [headerProgress, scopeVersion],
+  );
+
+  const onHeaderScroll = useCallback<AnswerHeaderScrollHandler>(
+    (id, offset, collapseOffset, maxScroll, scrolling) => {
+      'worklet';
+      if (
+        activeScopeVersion.value !== scopeVersion ||
+        activeAnswerId.value !== id ||
+        !Number.isFinite(offset)
+      )
+        return;
+      const current = Math.max(0, Math.min(maxScroll, offset));
+      // A bounce or a shorter document can move the native offset without a reversal.
+      const previous = Math.min(maxScroll, activeScrollY.value);
+      const progress = headerProgress.value;
+      const delta = scrolling ? (previous - current) / REVEAL_DISTANCE : 0;
+      const distancePastHeader = Math.max(0, current - collapseOffset);
+      const next = Math.max(
+        0,
+        Math.min(1, progress + delta, distancePastHeader / REVEAL_DISTANCE),
+      );
+      activeScrollY.value = current;
+      headerProgress.value = next;
+      const wasFullyVisible = progress >= 1;
+      const fullyVisible = next >= 1;
+      if (wasFullyVisible !== fullyVisible) runOnJS(publish)(id);
+    },
+    [
+      activeAnswerId,
+      activeScopeVersion,
+      activeScrollY,
+      headerProgress,
+      publish,
+      scopeVersion,
+    ],
   );
 
   const restore = useCallback(
     (id: string) => {
-      if (active.current.scope !== scope) return;
-      const changingAnswer = active.current.answerId !== id;
-      const outgoingId = active.current.answerId;
-      if (
-        changingAnswer &&
-        outgoingId &&
-        activeAnswerId.value === outgoingId &&
-        Number.isFinite(activeScrollY.value)
-      ) {
-        const previous = read(outgoingId);
-        const offset = Math.max(0, activeScrollY.value);
-        saved.current.answers.set(outgoingId, {
-          ...previous,
-          offset,
-          collapsed: offset > previous.collapseOffset,
-        });
-      }
-      // Set identity before React commits, so a queued outgoing scroll is rejected.
-      active.current.answerId = id;
-      const state = read(id);
-      if (changingAnswer) {
+      if (scope.current.version !== scopeVersion) return;
+      const page = pages.current;
+      const sameScope = page.version === scopeVersion;
+      if (sameScope && page.id === id) return;
+      if (!sameScope) page.saved.clear();
+      const position = page.saved.get(id) ?? { offset: 0, progress: 0 };
+      // Snapshot and switch together so no native scroll lands between the two.
+      const switchPage = () => {
+        'worklet';
+        const outgoing = {
+          offset: activeScrollY.value,
+          progress: headerProgress.value,
+        };
+        activeScopeVersion.value = scopeVersion;
         activeAnswerId.value = id;
-        activeScrollY.value = state.offset;
-        headerProgress.value = calculateDetailHeaderAppearance(
-          state.offset,
-          state.collapseOffset,
-        );
-      }
-      publish(id, state);
+        activeScrollY.value = position.offset;
+        headerProgress.value = position.progress;
+        return outgoing;
+      };
+      const outgoing =
+        Platform.OS === 'web' ? switchPage() : runOnUISync(switchPage);
+      if (sameScope && page.id) page.saved.set(page.id, outgoing);
+      page.id = id;
+      page.version = scopeVersion;
+      setDisplayed({ scopeVersion, id, collapsed: position.progress >= 1 });
     },
-    [scope, publish, read, activeAnswerId, activeScrollY, headerProgress],
+    [
+      scopeVersion,
+      activeAnswerId,
+      activeScopeVersion,
+      activeScrollY,
+      headerProgress,
+    ],
   );
 
-  const onScroll = useCallback(
-    (id: string, offset: number) => {
-      if (
-        active.current.scope !== scope ||
-        active.current.answerId !== id ||
-        !Number.isFinite(offset)
-      )
-        return;
-      const previous = read(id);
-      const nextOffset = Math.max(0, offset);
-      publish(id, {
-        ...previous,
-        offset: nextOffset,
-        collapsed: nextOffset > previous.collapseOffset,
-      });
-    },
-    [scope, publish, read],
-  );
-
-  const onHeaderLayout = useCallback(
-    (id: string, collapseOffset: number) => {
-      if (
-        active.current.scope !== scope ||
-        !Number.isFinite(collapseOffset) ||
-        collapseOffset <= 0
-      )
-        return;
-      const previous = read(id);
-      publish(id, {
-        ...previous,
-        collapseOffset,
-        collapsed: previous.offset > collapseOffset,
-      });
-    },
-    [scope, publish, read],
-  );
-
-  const collapsed = answerId ? read(answerId).collapsed : false;
+  useLayoutEffect(() => {
+    restore(answerId ?? '');
+  }, [answerId, restore]);
 
   return {
-    collapsed,
+    collapsed:
+      displayed.scopeVersion === scopeVersion &&
+      displayed.id === answerId &&
+      displayed.collapsed,
     restore,
-    onScroll,
-    onHeaderLayout,
+    onHeaderScroll,
     headerProgress,
     activeAnswerId,
-    activeScrollY,
     activeScopeVersion,
-    scopeVersion: scope.version,
+    scopeVersion,
   };
 }

@@ -404,6 +404,13 @@ jest.mock('../src/features/rich-content', () => {
     },
   };
 });
+jest.mock('react-native-worklets', () => ({
+  runOnUISync: <T,>(worklet: () => T) => worklet(),
+  scheduleOnUI: <Args extends unknown[]>(
+    worklet: (...args: Args) => void,
+    ...args: Args
+  ) => worklet(...args),
+}));
 jest.mock('react-native-reanimated', () => {
   const react = jest.requireActual<typeof import('react')>('react');
   const native =
@@ -424,10 +431,13 @@ jest.mock('react-native-reanimated', () => {
     runOnJS: <T,>(callback: T) => callback,
   };
 });
-jest.mock('react-native-gesture-handler', () => ({
-  ...jest.requireActual('react-native-gesture-handler'),
-  GestureDetector: ({ children }: { children: ReactNode }) => children,
-}));
+jest.mock('react-native-gesture-handler', () => {
+  jest.requireActual('react-native-gesture-handler/jestSetup');
+  return {
+    ...jest.requireActual('react-native-gesture-handler'),
+    GestureDetector: ({ children }: { children: ReactNode }) => children,
+  };
+});
 
 const answer: AnswerDetail = {
   id: '84',

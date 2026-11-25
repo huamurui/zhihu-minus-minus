@@ -17,6 +17,7 @@ import Reanimated, {
   useSharedValue,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { scheduleOnUI } from 'react-native-worklets';
 import {
   type AnswerDetail,
   deleteAnswer,
@@ -61,6 +62,7 @@ import {
   type AnswerReadSession,
   useAnswerDetailRead,
 } from '@/hooks/useAnswerDetailRead';
+import type { AnswerHeaderScrollHandler } from '@/hooks/useAnswerHeaderState';
 import { useDoubleTapAction } from '@/hooks/useDoubleTapAction';
 import { useOptimisticToggle } from '@/hooks/useOptimisticToggle';
 import { useProgressiveTailInteraction } from '@/hooks/useProgressiveTailInteraction';
@@ -72,7 +74,6 @@ import { useCollectionStore } from '@/store/useCollectionStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { getAnswerEndorsementsKey } from '@/utils/answerEndorsements';
 import { formatDate } from '@/utils/date';
-import { calculateDetailHeaderAppearance } from '@/utils/detailHeaderAppearance';
 import { getZhihuErrorMessage, getZhihuErrorStatus } from '@/utils/zhihuError';
 
 export interface AnswerEndorsementSource {
@@ -87,11 +88,8 @@ interface AnswerDetailViewProps {
   endorsementSource?: AnswerEndorsementSource;
   initialTitle?: string;
   questionId?: string;
-  onScroll?: (y: number) => void;
-  onHeaderLayout?: (collapseOffset: number) => void;
-  headerProgress?: SharedValue<number>;
+  onHeaderScroll?: AnswerHeaderScrollHandler;
   activeAnswerId?: SharedValue<string>;
-  activeScrollY?: SharedValue<number>;
   activeScopeVersion?: SharedValue<number>;
   scopeVersion?: number;
   isFocused?: boolean;
@@ -110,11 +108,8 @@ export const AnswerDetailView = ({
   endorsementSource,
   initialTitle,
   questionId,
-  onScroll,
-  onHeaderLayout,
-  headerProgress,
+  onHeaderScroll,
   activeAnswerId,
-  activeScrollY,
   activeScopeVersion,
   scopeVersion,
   isFocused = false,
@@ -152,8 +147,6 @@ export const AnswerDetailView = ({
       (!activeAnswerId || activeAnswerId.value === id),
     [focusScope, activeScopeVersion, scopeVersion, activeAnswerId, id],
   );
-  const scrollCallbackRef = useRef(onScroll);
-  scrollCallbackRef.current = onScroll;
   const scrollY = useSharedValue(0);
   const collapseOffset = useSharedValue(80);
   const contentHeight = useSharedValue(0);
@@ -259,45 +252,44 @@ export const AnswerDetailView = ({
     readSession,
   );
 
-  const updateHeaderProgress = React.useCallback(
-    (offset: number) => {
-      if (
-        !headerProgress ||
-        activeAnswerId?.value !== id ||
-        activeScopeVersion?.value !== scopeVersion
-      )
-        return;
-      if (activeScrollY) activeScrollY.value = offset;
-      headerProgress.value = calculateDetailHeaderAppearance(
-        offset,
-        collapseOffset.value,
-      );
+  const updateHeader = React.useCallback(
+    (
+      offset: number,
+      scrolling: boolean,
+      content = contentHeight.value,
+      viewport = viewportHeight.value,
+    ) => {
+      'worklet';
+      const maxScroll =
+        content > 0 && viewport > 0
+          ? Math.max(0, content - viewport)
+          : Infinity;
+      onHeaderScroll?.(id, offset, collapseOffset.value, maxScroll, scrolling);
     },
-    [
-      headerProgress,
-      activeAnswerId,
-      activeScrollY,
-      activeScopeVersion,
-      scopeVersion,
-      id,
-      collapseOffset,
-    ],
+    [onHeaderScroll, id, collapseOffset, contentHeight, viewportHeight],
+  );
+  const syncHeaderLayout = React.useCallback(
+    (measuredOffset?: number) => {
+      'worklet';
+      if (measuredOffset !== undefined) collapseOffset.value = measuredOffset;
+      updateHeader(scrollY.value, false);
+    },
+    [collapseOffset, scrollY, updateHeader],
   );
   React.useLayoutEffect(() => {
-    if (!isCurrentFocus()) return;
     // An offscreen page can be clamped by native layout after content reflows.
-    const offset = scrollY.value;
-    updateHeaderProgress(offset);
-    scrollCallbackRef.current?.(offset);
-  }, [isCurrentFocus, scrollY, updateHeaderProgress]);
+    if (isCurrentFocus()) scheduleOnUI(syncHeaderLayout);
+  }, [isCurrentFocus, syncHeaderLayout]);
   const handleProgrammaticScroll = React.useCallback(
     (offset: number) => {
-      if (!focusedRef.current.isFocused) return;
-      scrollY.value = offset;
-      updateHeaderProgress(offset);
-      scrollCallbackRef.current?.(offset);
+      if (!isCurrentFocus()) return;
+      scheduleOnUI(() => {
+        'worklet';
+        scrollY.value = offset;
+        updateHeader(offset, false);
+      });
     },
-    [scrollY, updateHeaderProgress],
+    [isCurrentFocus, scrollY, updateHeader],
   );
   const handleContentMeasured = React.useCallback(
     (_width: number, height: number) => {
@@ -323,9 +315,7 @@ export const AnswerDetailView = ({
   });
   const handleTrackedScroll = React.useCallback(() => {
     if (!isCurrentFocus()) return;
-    const offset = scrollY.value;
-    scrollCallbackRef.current?.(offset);
-    readingProgress.onScroll(offset);
+    readingProgress.onScroll(scrollY.value);
   }, [isCurrentFocus, readingProgress.onScroll, scrollY]);
   const handleScroll = useAnimatedScrollHandler(
     {
@@ -335,13 +325,12 @@ export const AnswerDetailView = ({
         scrollY.value = offset;
         if (!isFocused || (activeAnswerId && activeAnswerId.value !== id))
           return;
-        if (headerProgress && activeAnswerId?.value === id) {
-          if (activeScrollY) activeScrollY.value = offset;
-          headerProgress.value = calculateDetailHeaderAppearance(
-            offset,
-            collapseOffset.value,
-          );
-        }
+        updateHeader(
+          offset,
+          true,
+          event.contentSize?.height,
+          event.layoutMeasurement?.height,
+        );
         const now = Date.now();
         if (now - lastCallbackTime.value >= 80) {
           lastCallbackTime.value = now;
@@ -352,14 +341,12 @@ export const AnswerDetailView = ({
     [
       isFocused,
       handleTrackedScroll,
-      headerProgress,
+      updateHeader,
       activeAnswerId,
-      activeScrollY,
       activeScopeVersion,
       scopeVersion,
       id,
       scrollY,
-      collapseOffset,
       lastCallbackTime,
     ],
   );
@@ -534,16 +521,12 @@ export const AnswerDetailView = ({
             onContentSizeChange={handleContentSizeChange}
             onScrollEndDrag={(event) => {
               if (!isCurrentFocus()) return;
-              scrollY.value = event.nativeEvent.contentOffset.y;
-              updateHeaderProgress(event.nativeEvent.contentOffset.y);
-              handleTrackedScroll();
+              readingProgress.onScroll(event.nativeEvent.contentOffset.y);
               readingProgress.commitProgress();
             }}
             onMomentumScrollEnd={(event) => {
               if (!isCurrentFocus()) return;
-              scrollY.value = event.nativeEvent.contentOffset.y;
-              updateHeaderProgress(event.nativeEvent.contentOffset.y);
-              handleTrackedScroll();
+              readingProgress.onScroll(event.nativeEvent.contentOffset.y);
               readingProgress.commitProgress();
             }}
             contentContainerStyle={{
@@ -558,10 +541,8 @@ export const AnswerDetailView = ({
                   1,
                   layout.y + layout.height - navigationHeight,
                 );
-                collapseOffset.value = offset;
-                onHeaderLayout?.(offset);
-                if (focusedRef.current.isFocused)
-                  updateHeaderProgress(scrollY.value);
+                if (!Number.isFinite(offset)) return;
+                scheduleOnUI(syncHeaderLayout, offset);
               }}
             >
               <BouncyButton

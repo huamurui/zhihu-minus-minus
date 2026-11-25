@@ -63,7 +63,7 @@ beforeEach(() => {
   mockReadingSettings = { fontSizeScale: 1, lineHeightScale: 1.5 };
 });
 
-test('the expanded header shows only the back action even when author and share actions are available', async () => {
+test('floating answer actions stay available while the compact title and author are hidden', async () => {
   const onBack = jest.fn();
   const onMore = jest.fn();
   const host = await render(
@@ -71,6 +71,7 @@ test('the expanded header shows only the back action even when author and share 
       testID="expanded-detail-header"
       title={title}
       collapsed={false}
+      floatingActions
       onBack={onBack}
       onMore={onMore}
       author={{
@@ -93,11 +94,31 @@ test('the expanded header shows only the back action even when author and share 
   expect(host.queryByText(title)).toBeNull();
   expect(host.queryByText('作者 A')).toBeNull();
   expect(host.queryByTestId('detail-header-avatar')).toBeNull();
-  expect(host.queryByRole('button', { name: '更多操作' })).toBeNull();
-  expect(host.getAllByRole('button')).toHaveLength(1);
+  expect(host.getAllByRole('button')).toHaveLength(2);
   await fireEvent.press(host.getByRole('button', { name: '返回' }));
+  await fireEvent.press(host.getByRole('button', { name: '更多操作' }));
   expect(onBack).toHaveBeenCalledTimes(1);
-  expect(onMore).not.toHaveBeenCalled();
+  expect(onMore).toHaveBeenCalledTimes(1);
+});
+
+test('the floating more button stays in place while its question is loading', async () => {
+  const onMore = jest.fn();
+  const header = (ready: boolean) => (
+    <DetailNavigationHeader
+      title={title}
+      collapsed={false}
+      floatingActions
+      onBack={jest.fn()}
+      onMore={ready ? onMore : undefined}
+    />
+  );
+  const host = await render(header(false));
+  const more = host.getByRole('button', { name: '更多操作' });
+  expect(more).toBeDisabled();
+  await host.rerender(header(true));
+  expect(host.getByRole('button', { name: '更多操作' })).toBe(more);
+  await fireEvent.press(more);
+  expect(onMore).toHaveBeenCalledTimes(1);
 });
 
 test('the collapsed header keeps the author avatar and name alongside a single-line title and working actions', async () => {
