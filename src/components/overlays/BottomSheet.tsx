@@ -1,41 +1,30 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type React from 'react';
-import {
-  Fragment,
-  forwardRef,
-  useCallback,
-  useEffect,
-  useEffectEvent,
-  useImperativeHandle,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { Fragment, forwardRef, useImperativeHandle, useMemo } from 'react';
 import {
   KeyboardAvoidingView,
   type ModalProps,
   Platform,
   Pressable,
-  ScrollView,
   type StyleProp,
   StyleSheet,
-  useWindowDimensions,
   type ViewStyle,
 } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Reanimated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
+import {
+  Gesture,
+  GestureDetector,
+  GestureHandlerRootView,
+} from 'react-native-gesture-handler';
+import Reanimated, { useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BouncyButton } from '@/components/BouncyButton';
 import { Text, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { PaneModal } from '@/features/adaptive-layout/PaneModal';
+
+import { SheetScrollContext, SheetScrollView } from './SheetScrollView';
+import { useSheetMotion } from './useSheetMotion';
 
 export interface BottomSheetHandle {
   close: () => void;
@@ -59,8 +48,7 @@ interface BottomSheetProps {
   showHandle?: boolean;
 }
 
-const ENTER_DURATION = 220;
-const EXIT_DURATION = 180;
+const DRAG_SLOP = 8;
 // An iPhone native modal would otherwise rotate a landscape window to portrait.
 const sheetOrientations: ModalProps['supportedOrientations'] = [
   'portrait',
@@ -70,9 +58,9 @@ const sheetOrientations: ModalProps['supportedOrientations'] = [
 
 function ScrollableContent({ children }: React.PropsWithChildren) {
   return (
-    <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
+    <SheetScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
       {children}
-    </ScrollView>
+    </SheetScrollView>
   );
 }
 
@@ -98,118 +86,67 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
   ) {
     const colorScheme = useColorScheme();
     const insets = useSafeAreaInsets();
-    const { height: windowHeight } = useWindowDimensions();
-    const [mounted, setMounted] = useState(visible);
-    const mountedRef = useRef(visible);
-    const onCloseRef = useRef(onClose);
-    const translateY = useSharedValue(windowHeight);
-    const backdropOpacity = useSharedValue(0);
-    const closing = useRef(false);
-    const notifyOnDismiss = useRef(false);
-
-    useEffect(() => {
-      onCloseRef.current = onClose;
-    }, [onClose]);
-
-    const animateClosed = useCallback(
-      (notify: boolean) => {
-        if (closing.current) return;
-        closing.current = true;
-        const finishClose = (finished: boolean) => {
-          closing.current = false;
-          if (!finished) return;
-          mountedRef.current = false;
-          notifyOnDismiss.current = notify && Platform.OS === 'ios';
-          setMounted(false);
-          if (notify && Platform.OS !== 'ios') onCloseRef.current();
-        };
-
-        backdropOpacity.value = withTiming(0, { duration: EXIT_DURATION });
-        translateY.value = withTiming(
-          windowHeight,
-          { duration: EXIT_DURATION },
-          (finished) => {
-            runOnJS(finishClose)(Boolean(finished));
-          },
-        );
-      },
-      [backdropOpacity, translateY, windowHeight],
-    );
-
-    const requestClose = useCallback(() => {
-      if (dismissible) animateClosed(true);
-    }, [animateClosed, dismissible]);
-
+    const {
+      mounted,
+      requestClose,
+      onDismiss,
+      onLayout,
+      sheetAnimatedStyle,
+      backdropAnimatedStyle,
+      beginDrag,
+      updateDrag,
+      endDrag,
+      cancelDrag,
+    } = useSheetMotion({ visible, dismissible, onClose });
     useImperativeHandle(ref, () => ({ close: requestClose }), [requestClose]);
 
-    const animateVisibilityChange = useEffectEvent((show: boolean) => {
-      if (show) {
-        notifyOnDismiss.current = false;
-        closing.current = false;
-        mountedRef.current = true;
-        setMounted(true);
-        translateY.value = windowHeight;
-        backdropOpacity.value = 0;
-        translateY.value = withSpring(0, {
-          damping: 26,
-          stiffness: 260,
-          mass: 0.8,
-        });
-        backdropOpacity.value = withTiming(1, { duration: ENTER_DURATION });
-      } else if (mountedRef.current) {
-        animateClosed(false);
-      }
-    });
-
-    useEffect(() => {
-      // Sample the current window height for each transition. Resizing an open
-      // sheet must not restart its entrance or interrupt a pending dismissal.
-      animateVisibilityChange(visible);
-    }, [visible]);
-
-    const panGesture = useMemo(
+    const scrollOwnsTouch = useSharedValue(false);
+    const touchOrigin = useSharedValue<{ x: number; y: number } | null>(null);
+    const pan = useMemo(
       () =>
         Gesture.Pan()
           .enabled(dismissible)
-          .activeOffsetY(5)
-          .failOffsetX([-12, 12])
-          .onUpdate((event) => {
-            const distance = Math.max(0, event.translationY);
-            translateY.value = distance;
-            backdropOpacity.value = Math.max(
-              0.25,
-              1 - distance / Math.max(windowHeight * 0.55, 1),
-            );
-          })
-          .onEnd((event) => {
-            if (event.translationY > 84 || event.velocityY > 900) {
-              runOnJS(requestClose)();
+          .manualActivation(true)
+          .onTouchesDown((event, manager) => {
+            const touch = event.allTouches[0];
+            if (event.numberOfTouches !== 1 || !touch) {
+              touchOrigin.value = null;
+              manager.fail();
               return;
             }
-            translateY.value = withSpring(0, {
-              damping: 24,
-              stiffness: 300,
-            });
-            backdropOpacity.value = withTiming(1, { duration: 140 });
+            touchOrigin.value = { x: touch.absoluteX, y: touch.absoluteY };
           })
-          .onFinalize((_event, success) => {
-            if (!success) {
-              translateY.value = withSpring(0, {
-                damping: 24,
-                stiffness: 300,
-              });
-              backdropOpacity.value = withTiming(1, { duration: 140 });
-            }
+          .onTouchesMove((event, manager) => {
+            const origin = touchOrigin.value;
+            const touch = event.allTouches[0];
+            if (!origin || !touch) return;
+            const dx = Math.abs(touch.absoluteX - origin.x);
+            const dy = touch.absoluteY - origin.y;
+            if (Math.max(dx, Math.abs(dy)) < DRAG_SLOP) return;
+            touchOrigin.value = null;
+            if (!scrollOwnsTouch.value && dy > dx) manager.activate();
+            else manager.fail();
+          })
+          .onStart(() => beginDrag())
+          .onUpdate((event) => updateDrag(event.translationY))
+          .onEnd((event, success) => {
+            if (success) endDrag(event.translationY, event.velocityY);
+            else cancelDrag();
           }),
-      [backdropOpacity, dismissible, requestClose, translateY, windowHeight],
+      [
+        dismissible,
+        touchOrigin,
+        scrollOwnsTouch,
+        beginDrag,
+        updateDrag,
+        endDrag,
+        cancelDrag,
+      ],
     );
-
-    const backdropAnimatedStyle = useAnimatedStyle(() => ({
-      opacity: backdropOpacity.value,
-    }));
-    const sheetAnimatedStyle = useAnimatedStyle(() => ({
-      transform: [{ translateY: translateY.value }],
-    }));
+    const scrollContext = useMemo(
+      () => ({ pan, scrollOwnsTouch }),
+      [pan, scrollOwnsTouch],
+    );
 
     // Keep the iOS Modal mounted until native dismissal delivers onDismiss.
     // Presenting another native sheet from the animation callback is too early.
@@ -230,116 +167,120 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
         animationType="none"
         statusBarTranslucent
         onRequestClose={requestClose}
-        onDismiss={() => {
-          if (!notifyOnDismiss.current) return;
-          notifyOnDismiss.current = false;
-          onCloseRef.current();
-        }}
+        onDismiss={onDismiss}
       >
-        <KeyboardAvoidingView
-          onAccessibilityEscape={requestClose}
-          enabled={keyboardAvoiding}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.overlay}
-        >
-          <Reanimated.View
-            pointerEvents="none"
-            style={[
-              StyleSheet.absoluteFill,
-              {
-                backgroundColor: Colors[colorScheme].blackTransparent,
-              },
-              backdropAnimatedStyle,
-            ]}
-          />
-          {dismissible && (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="关闭弹窗"
-              style={StyleSheet.absoluteFill}
-              onPress={requestClose}
-            />
-          )}
-          <Reanimated.View
-            accessibilityViewIsModal
-            style={[
-              styles.sheet,
-              {
-                backgroundColor: surfaceColor,
-                height,
-                maxHeight,
-                paddingBottom: Math.max(insets.bottom, 12) + 8,
-              },
-              sheetAnimatedStyle,
-              contentStyle,
-            ]}
+        <GestureHandlerRootView>
+          <KeyboardAvoidingView
+            onAccessibilityEscape={requestClose}
+            enabled={keyboardAvoiding}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.overlay}
           >
-            {showHandle && (
-              <GestureDetector gesture={panGesture}>
-                <View style={styles.handleHitArea}>
-                  <View
-                    style={[styles.handle, { backgroundColor: handleColor }]}
-                  />
-                </View>
-              </GestureDetector>
+            <Reanimated.View
+              pointerEvents="none"
+              style={[
+                StyleSheet.absoluteFill,
+                {
+                  backgroundColor: Colors[colorScheme].blackTransparent,
+                },
+                backdropAnimatedStyle,
+              ]}
+            />
+            {dismissible && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="关闭弹窗"
+                style={StyleSheet.absoluteFill}
+                onPress={requestClose}
+              />
             )}
-
-            <Content>
-              {hasHeader && (
-                <View style={styles.header}>
-                  {headerLeft ? (
-                    <View style={styles.headerSide}>{headerLeft}</View>
-                  ) : (
-                    <View style={styles.headerSide} />
-                  )}
-                  <View style={styles.headerCopy}>
-                    {title ? <Text style={styles.title}>{title}</Text> : null}
-                    {subtitle ? (
-                      <Text
-                        type="secondary"
-                        style={styles.subtitle}
-                        numberOfLines={2}
-                      >
-                        {subtitle}
-                      </Text>
-                    ) : null}
+            <GestureDetector gesture={pan} touchAction="pan-y">
+              <Reanimated.View
+                collapsable={false}
+                onLayout={onLayout}
+                accessibilityViewIsModal
+                style={[
+                  styles.sheet,
+                  {
+                    backgroundColor: surfaceColor,
+                    height,
+                    maxHeight,
+                    paddingBottom: Math.max(insets.bottom, 12) + 8,
+                  },
+                  sheetAnimatedStyle,
+                  contentStyle,
+                ]}
+              >
+                {showHandle && (
+                  <View style={styles.handleHitArea}>
+                    <View
+                      style={[styles.handle, { backgroundColor: handleColor }]}
+                    />
                   </View>
-                  {headerRight ? (
-                    <View style={[styles.headerSide, styles.headerRight]}>
-                      {headerRight}
-                    </View>
-                  ) : dismissible ? (
-                    <View style={[styles.headerSide, styles.headerRight]}>
-                      <BouncyButton
-                        accessibilityRole="button"
-                        accessibilityLabel="关闭"
-                        hitSlop={8}
-                        onPress={requestClose}
-                        style={[
-                          styles.closeButton,
-                          {
-                            backgroundColor:
-                              Colors[colorScheme].backgroundTertiary,
-                          },
-                        ]}
-                      >
-                        <Ionicons
-                          name="close"
-                          size={18}
-                          color={Colors[colorScheme].textSecondary}
-                        />
-                      </BouncyButton>
-                    </View>
-                  ) : (
-                    <View style={styles.headerSide} />
-                  )}
-                </View>
-              )}
+                )}
 
-              {children}
-            </Content>
-          </Reanimated.View>
-        </KeyboardAvoidingView>
+                <SheetScrollContext.Provider value={scrollContext}>
+                  <Content>
+                    {hasHeader && (
+                      <View style={styles.header}>
+                        {headerLeft ? (
+                          <View style={styles.headerSide}>{headerLeft}</View>
+                        ) : (
+                          <View style={styles.headerSide} />
+                        )}
+                        <View style={styles.headerCopy}>
+                          {title ? (
+                            <Text style={styles.title}>{title}</Text>
+                          ) : null}
+                          {subtitle ? (
+                            <Text
+                              type="secondary"
+                              style={styles.subtitle}
+                              numberOfLines={2}
+                            >
+                              {subtitle}
+                            </Text>
+                          ) : null}
+                        </View>
+                        {headerRight ? (
+                          <View style={[styles.headerSide, styles.headerRight]}>
+                            {headerRight}
+                          </View>
+                        ) : dismissible ? (
+                          <View style={[styles.headerSide, styles.headerRight]}>
+                            <BouncyButton
+                              accessibilityRole="button"
+                              accessibilityLabel="关闭"
+                              hitSlop={8}
+                              onPress={requestClose}
+                              style={[
+                                styles.closeButton,
+                                {
+                                  backgroundColor:
+                                    Colors[colorScheme].backgroundTertiary,
+                                },
+                              ]}
+                            >
+                              <Ionicons
+                                name="close"
+                                size={18}
+                                color={Colors[colorScheme].textSecondary}
+                              />
+                            </BouncyButton>
+                          </View>
+                        ) : (
+                          <View style={styles.headerSide} />
+                        )}
+                      </View>
+                    )}
+
+                    {children}
+                  </Content>
+                </SheetScrollContext.Provider>
+              </Reanimated.View>
+            </GestureDetector>
+          </KeyboardAvoidingView>
+        </GestureHandlerRootView>
       </PaneModal>
     );
   },

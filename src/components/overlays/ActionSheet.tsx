@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { ActionIcon, type ActionIconName } from '@/components/ActionIcon';
 import { BouncyButton } from '@/components/BouncyButton';
 import { CollectionStarIcon } from '@/components/CollectionStarIcon';
+import { SheetScrollView } from '@/components/overlays/SheetScrollView';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -102,7 +103,7 @@ export function ActionSheet({
       title={title}
       subtitle={subtitle}
     >
-      <ScrollView
+      <SheetScrollView
         style={styles.scroll}
         contentContainerStyle={styles.body}
         keyboardShouldPersistTaps="handled"
@@ -181,7 +182,7 @@ export function ActionSheet({
             {cancelLabel}
           </Text>
         </BouncyButton>
-      </ScrollView>
+      </SheetScrollView>
     </BottomSheet>
   );
 }

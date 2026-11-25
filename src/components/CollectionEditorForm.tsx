@@ -1,10 +1,6 @@
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-} from 'react-native';
+import { ActivityIndicator, StyleSheet, TextInput } from 'react-native';
 import { BouncyButton } from '@/components/BouncyButton';
+import { SheetScrollView } from '@/components/overlays/SheetScrollView';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { ThemedSwitch } from '@/components/ThemedSwitch';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -40,7 +36,7 @@ export function CollectionEditorForm({
 
   return (
     <View style={styles.container}>
-      <ScrollView
+      <SheetScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -96,7 +92,7 @@ export function CollectionEditorForm({
             onValueChange={onPublicChange}
           />
         </View>
-      </ScrollView>
+      </SheetScrollView>
 
       <BouncyButton
         accessibilityRole="button"

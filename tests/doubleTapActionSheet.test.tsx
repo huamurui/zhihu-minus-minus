@@ -16,6 +16,9 @@ jest.mock('../src/store/useSettingsStore', () => ({
       updateSettings: mockUpdateSettings,
     }),
 }));
+jest.mock('../src/components/overlays/SheetScrollView', () => ({
+  SheetScrollView: jest.requireActual('react-native').ScrollView,
+}));
 jest.mock('../src/components/overlays/BottomSheet', () => {
   const React = jest.requireActual('react');
   const { View } = jest.requireActual('react-native');

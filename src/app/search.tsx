@@ -19,6 +19,7 @@ import { BouncyButton } from '@/components/BouncyButton';
 import { FeedCard } from '@/components/FeedCard';
 import { GlassNavigationButton } from '@/components/navigation/GlassNavigationButton';
 import { BottomSheet } from '@/components/overlays/BottomSheet';
+import { SheetScrollView } from '@/components/overlays/SheetScrollView';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import type { UserCardMember } from '@/components/UserCard';
@@ -666,7 +667,7 @@ export default function SearchScreen() {
         }
         height="58%"
       >
-        <ScrollView
+        <SheetScrollView
           contentContainerStyle={{ paddingHorizontal: 15, paddingVertical: 12 }}
           showsVerticalScrollIndicator={false}
         >
@@ -711,7 +712,7 @@ export default function SearchScreen() {
               </Text>
             </BouncyButton>
           </View>
-        </ScrollView>
+        </SheetScrollView>
       </BottomSheet>
 
       {isSearching && flattenedResults.length > 0 ? (

@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { BouncyButton } from '@/components/BouncyButton';
 import { BottomSheet } from '@/components/overlays/BottomSheet';
+import { SheetScrollView } from '@/components/overlays/SheetScrollView';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
@@ -61,7 +62,7 @@ export function DoubleTapActionSheet() {
       title="双击正文的动作"
       subtitle="之后可在设置页修改"
     >
-      <ScrollView
+      <SheetScrollView
         style={styles.scroll}
         contentContainerStyle={styles.body}
         keyboardShouldPersistTaps="handled"
@@ -116,7 +117,7 @@ export function DoubleTapActionSheet() {
         >
           <Text style={[styles.saveLabel, { color: onPrimary }]}>保存</Text>
         </BouncyButton>
-      </ScrollView>
+      </SheetScrollView>
     </BottomSheet>
   );
 }

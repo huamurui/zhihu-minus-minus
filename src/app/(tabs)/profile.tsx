@@ -3,12 +3,13 @@ import CookieManager from '@preeternal/react-native-cookie-manager';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import React from 'react';
-import { Alert, ScrollView } from 'react-native';
+import { Alert } from 'react-native';
 import { verifyZhihuSession } from '@/api/session';
 import { getMe, getMemberWithFallback } from '@/api/zhihu';
 import { AuthStorageNotice } from '@/components/AuthStorageNotice';
 import { BouncyButton } from '@/components/BouncyButton';
 import { BottomSheet } from '@/components/overlays/BottomSheet';
+import { SheetScrollView } from '@/components/overlays/SheetScrollView';
 import { MyProfileScrollView } from '@/components/profile/MyProfileScrollView';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { StableAvatar } from '@/components/StableAvatar';
@@ -500,7 +501,7 @@ export default function ProfileScreen({
         maxHeight="78%"
       >
         <View className="px-5 flex-shrink bg-transparent">
-          <ScrollView className="bg-transparent">
+          <SheetScrollView className="bg-transparent">
             {accounts.map((account, index) => (
               <View
                 key={account.me.id}
@@ -624,7 +625,7 @@ export default function ProfileScreen({
               </View>
               <Text className="text-base ml-4 font-medium">添加账号</Text>
             </BouncyButton>
-          </ScrollView>
+          </SheetScrollView>
 
           <BouncyButton
             onPress={() => setAccountModalVisible(false)}
