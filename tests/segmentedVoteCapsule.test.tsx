@@ -4,8 +4,10 @@ import {
   useQuery,
 } from '@tanstack/react-query';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { voteContent } from '../src/api/zhihu/voters';
 import { SegmentedVoteCapsule } from '../src/components/SegmentedVoteCapsule';
+import { colors } from '../src/constants/designTokens';
 
 jest.mock('../src/api/zhihu', () => ({
   voteContent: jest.fn(),
@@ -94,9 +96,62 @@ function createClient() {
   return client;
 }
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => jest.mocked(voteContent).mockReset());
 afterEach(() => {
   for (const client of clients.splice(0)) client.clear();
+});
+
+test('a floating-bar capsule has no visible neutral fill or outline and restores its primary tint when voted', async () => {
+  jest
+    .mocked(voteContent)
+    .mockResolvedValueOnce({ voted: 1, voteCount: 11 })
+    .mockResolvedValueOnce({ voted: -1, voteCount: 10 })
+    .mockResolvedValueOnce({ voted: 0, voteCount: 10 });
+  const host = await render(
+    <QueryClientProvider client={createClient()}>
+      <SegmentedVoteCapsule id="synthetic-answer" count={10} flatWhenNeutral />
+    </QueryClientProvider>,
+  );
+  const capsule = host.getByRole('button', { name: '反对' }).parent;
+  const expectFlat = () => {
+    const style = StyleSheet.flatten(capsule?.props.style);
+    expect(style?.backgroundColor).toBe('transparent');
+    expect(style?.borderColor).toBe('transparent');
+    // The outline keeps its width, so voting does not shift the layout.
+    expect(style?.borderWidth).toBe(StyleSheet.hairlineWidth);
+  };
+  const expectTinted = () => {
+    expect(capsule).toHaveStyle({
+      backgroundColor: `${colors.light.primary}18`,
+      borderColor: `${colors.light.primary}33`,
+      borderWidth: StyleSheet.hairlineWidth,
+    });
+  };
+
+  expectFlat();
+  await fireEvent.press(host.getAllByRole('button')[0]);
+  await waitFor(expectTinted);
+  await fireEvent.press(host.getByRole('button', { name: '反对' }));
+  await waitFor(() => {
+    expect(host.getByRole('button', { name: '取消反对' })).toBeSelected();
+    expectTinted();
+  });
+  await fireEvent.press(host.getByRole('button', { name: '取消反对' }));
+  await waitFor(expectFlat);
+});
+
+test('a standalone neutral capsule keeps its fill and outline', async () => {
+  const host = await render(
+    <QueryClientProvider client={createClient()}>
+      <SegmentedVoteCapsule id="synthetic-answer" count={10} />
+    </QueryClientProvider>,
+  );
+
+  expect(host.getByRole('button', { name: '反对' }).parent).toHaveStyle({
+    backgroundColor: 'rgba(0, 0, 0, 0.035)',
+    borderColor: colors.light.contentBorder,
+    borderWidth: StyleSheet.hairlineWidth,
+  });
 });
 
 test('downvote response count updates the capsule and its parent without a subscribed content cache', async () => {

@@ -1,6 +1,6 @@
 import { GlassContainer } from 'expo-glass-effect';
 import type { ComponentProps, ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import {
   ContentActionBarColorContext,
@@ -8,6 +8,7 @@ import {
 } from '@/components/ContentActionBarColor';
 import {
   FloatingSurface,
+  type FloatingSurfaceProps,
   useIsLiquidGlassActive,
 } from '@/components/surfaces/FloatingSurface';
 import { useRuntimeThemeColors } from '@/components/Themed';
@@ -55,9 +56,37 @@ export function ContentActionBar({
   const colorScheme = useColorScheme();
   const useGlass = useIsLiquidGlassActive();
   const bottom = getContentActionBarBottom(bottomInset, bottomOffset);
+  // Android's default BlurView only adds a tint.
+  const useOpaqueSurface = Platform.OS !== 'ios' && Platform.OS !== 'web';
+  const Surface = useOpaqueSurface ? View : FloatingSurface;
+  const effectProps: FloatingSurfaceProps | undefined = useOpaqueSurface
+    ? undefined
+    : {
+        glassStyle: 'regular',
+        colorScheme: useGlass ? 'auto' : colorScheme,
+        intensity: 130,
+        tint: colorScheme,
+      };
+  const surfaceStyle = {
+    height: CONTENT_ACTION_BAR_HEIGHT,
+    borderRadius: CONTENT_ACTION_BAR_HEIGHT / 2,
+    borderWidth: useGlass ? 0 : StyleSheet.hairlineWidth,
+    borderColor: useGlass ? undefined : colors.contentBorder,
+    backgroundColor: useGlass
+      ? undefined
+      : useOpaqueSurface
+        ? colors.surface
+        : colors.contentOverlayStrong,
+  };
 
   if (variant === 'islands') {
     const IslandsContainer = useGlass ? GlassContainer : View;
+    const islandEffectProps = effectProps && {
+      ...effectProps,
+      isInteractive: interactiveGlass && visible,
+    };
+    const islandBackdrop = !useGlass &&
+      !useOpaqueSurface && { backgroundColor: colors.contentOverlayStrong };
 
     return (
       <Animated.View
@@ -91,71 +120,36 @@ export function ContentActionBar({
                 style={[
                   styles.islandContainer,
                   shrinkLeading && styles.shrinkableLeading,
-                  !useGlass && {
-                    backgroundColor: colors.contentOverlayStrong,
-                  },
+                  islandBackdrop,
                 ]}
               >
-                <FloatingSurface
-                  glassStyle="regular"
-                  isInteractive={interactiveGlass && visible}
-                  colorScheme={useGlass ? 'auto' : colorScheme}
-                  intensity={130}
-                  tint={colorScheme}
+                <Surface
+                  {...islandEffectProps}
                   style={[
                     // Let native interactive glass deform beyond its static bounds.
                     (!useGlass || !interactiveGlass) && styles.surface,
                     styles.islandLeading,
-                    {
-                      height: CONTENT_ACTION_BAR_HEIGHT,
-                      borderRadius: CONTENT_ACTION_BAR_HEIGHT / 2,
-                      borderWidth: useGlass ? 0 : StyleSheet.hairlineWidth,
-                      borderColor: useGlass ? undefined : colors.contentBorder,
-                      backgroundColor: useGlass
-                        ? undefined
-                        : colors.contentOverlayStrong,
-                    },
+                    surfaceStyle,
                   ]}
                 >
                   {leading}
-                </FloatingSurface>
+                </Surface>
               </View>
             ) : null}
 
             <View style={styles.islandRightGroup}>
               {trailing ? (
-                <View
-                  style={[
-                    styles.islandContainer,
-                    !useGlass && {
-                      backgroundColor: colors.contentOverlayStrong,
-                    },
-                  ]}
-                >
-                  <FloatingSurface
-                    glassStyle="regular"
-                    isInteractive={interactiveGlass && visible}
-                    colorScheme={useGlass ? 'auto' : colorScheme}
-                    intensity={130}
-                    tint={colorScheme}
+                <View style={[styles.islandContainer, islandBackdrop]}>
+                  <Surface
+                    {...islandEffectProps}
                     style={[
                       (!useGlass || !interactiveGlass) && styles.surface,
                       styles.islandTrailing,
-                      {
-                        height: CONTENT_ACTION_BAR_HEIGHT,
-                        borderRadius: CONTENT_ACTION_BAR_HEIGHT / 2,
-                        borderWidth: useGlass ? 0 : StyleSheet.hairlineWidth,
-                        borderColor: useGlass
-                          ? undefined
-                          : colors.contentBorder,
-                        backgroundColor: useGlass
-                          ? undefined
-                          : colors.contentOverlayStrong,
-                      },
+                      surfaceStyle,
                     ]}
                   >
                     {trailing}
-                  </FloatingSurface>
+                  </Surface>
                 </View>
               ) : null}
 
@@ -164,36 +158,19 @@ export function ContentActionBar({
                   style={[
                     styles.islandContainer,
                     styles.islandAccessoryContainer,
-                    !useGlass && {
-                      backgroundColor: colors.contentOverlayStrong,
-                    },
+                    islandBackdrop,
                   ]}
                 >
-                  <FloatingSurface
-                    glassStyle="regular"
-                    isInteractive={interactiveGlass && visible}
-                    colorScheme={useGlass ? 'auto' : colorScheme}
-                    intensity={130}
-                    tint={colorScheme}
+                  <Surface
+                    {...islandEffectProps}
                     style={[
                       (!useGlass || !interactiveGlass) && styles.surface,
                       styles.islandAccessory,
-                      {
-                        width: CONTENT_ACTION_BAR_HEIGHT,
-                        height: CONTENT_ACTION_BAR_HEIGHT,
-                        borderRadius: CONTENT_ACTION_BAR_HEIGHT / 2,
-                        borderWidth: useGlass ? 0 : StyleSheet.hairlineWidth,
-                        borderColor: useGlass
-                          ? undefined
-                          : colors.contentBorder,
-                        backgroundColor: useGlass
-                          ? undefined
-                          : colors.contentOverlayStrong,
-                      },
+                      surfaceStyle,
                     ]}
                   >
                     {accessory}
-                  </FloatingSurface>
+                  </Surface>
                 </View>
               ) : null}
             </View>
@@ -226,24 +203,7 @@ export function ContentActionBar({
       <ContentActionBarColorContext.Provider
         value={useGlass ? glassActionColor : null}
       >
-        <FloatingSurface
-          glassStyle="regular"
-          colorScheme={useGlass ? 'auto' : colorScheme}
-          intensity={130}
-          tint={colorScheme}
-          style={[
-            styles.surface,
-            {
-              height: CONTENT_ACTION_BAR_HEIGHT,
-              borderRadius: CONTENT_ACTION_BAR_HEIGHT / 2,
-              borderWidth: useGlass ? 0 : StyleSheet.hairlineWidth,
-              backgroundColor: useGlass
-                ? undefined
-                : colors.contentOverlayStrong,
-              borderColor: useGlass ? undefined : colors.contentBorder,
-            },
-          ]}
-        >
+        <Surface {...effectProps} style={[styles.surface, surfaceStyle]}>
           {leading || trailing || accessory ? (
             <View style={styles.barRow}>
               {leading ? (
@@ -266,7 +226,7 @@ export function ContentActionBar({
           ) : (
             children
           )}
-        </FloatingSurface>
+        </Surface>
       </ContentActionBarColorContext.Provider>
     </Animated.View>
   );
@@ -334,6 +294,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   islandAccessory: {
+    width: CONTENT_ACTION_BAR_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -804,6 +804,7 @@ export const AnswerDetailView = ({
         leading={
           <SegmentedVoteCapsule
             id={answer?.id ?? ''}
+            flatWhenNeutral
             count={answer?.voteup_count ?? 0}
             voted={
               answer?.relationship?.voting ??
