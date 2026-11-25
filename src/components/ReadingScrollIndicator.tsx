@@ -13,6 +13,7 @@ interface ReadingScrollIndicatorProps {
   contentHeight: SharedValue<number>;
   /** Use the ScrollView's full onLayout height, before subtracting track insets. */
   viewportHeight: SharedValue<number>;
+  edgePull?: SharedValue<number>;
   top?: number;
   bottom?: number;
   right?: number;
@@ -24,6 +25,7 @@ export function ReadingScrollIndicator({
   scrollY,
   contentHeight,
   viewportHeight,
+  edgePull,
   top = 8,
   bottom = 8,
   right = 4,
@@ -37,6 +39,8 @@ export function ReadingScrollIndicator({
       contentHeight.value,
       viewportHeight.value,
       trackHeight.value,
+      undefined,
+      edgePull?.value,
     ),
   );
   const trackStyle = useAnimatedStyle(() => ({

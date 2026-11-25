@@ -7,7 +7,6 @@ import {
   type ScrollViewInstance as NativeScrollView,
   type ViewInstance as NativeView,
   Platform,
-  View as RawView,
 } from 'react-native';
 import { GestureDetector } from 'react-native-gesture-handler';
 import Reanimated, {
@@ -44,6 +43,7 @@ import { MoreActionsButton } from '@/components/MoreActionsButton';
 import { QueryErrorView } from '@/components/QueryErrorView';
 import { ReadingProgressNotice } from '@/components/ReadingProgressNotice';
 import { ReadingScrollIndicator } from '@/components/ReadingScrollIndicator';
+import { ReadingScrollViewport } from '@/components/ReadingScrollViewport';
 import { SegmentedVoteCapsule } from '@/components/SegmentedVoteCapsule';
 import { ShareMenu } from '@/components/ShareMenu';
 import { RetainedAvatar } from '@/components/StableAvatar';
@@ -148,6 +148,7 @@ export const AnswerDetailView = ({
     [focusScope, activeScopeVersion, scopeVersion, activeAnswerId, id],
   );
   const scrollY = useSharedValue(0);
+  const edgePull = useSharedValue(0);
   const collapseOffset = useSharedValue(80);
   const contentHeight = useSharedValue(0);
   const viewportHeight = useSharedValue(0);
@@ -499,7 +500,14 @@ export const AnswerDetailView = ({
   return (
     <View className="flex-1">
       <GestureDetector gesture={doubleTapVote}>
-        <RawView collapsable={false} style={{ flex: 1 }}>
+        <ReadingScrollViewport
+          doubleTap={doubleTapVote}
+          focused={isFocused}
+          scrollY={scrollY}
+          viewportHeight={viewportHeight}
+          contentHeight={contentHeight}
+          edgePull={edgePull}
+        >
           <Reanimated.ScrollView
             ref={scrollViewRef}
             {...tail.scrollInteractionHandlers}
@@ -745,10 +753,11 @@ export const AnswerDetailView = ({
               </View>
             )}
           </Reanimated.ScrollView>
-        </RawView>
+        </ReadingScrollViewport>
       </GestureDetector>
 
       <ReadingScrollIndicator
+        edgePull={edgePull}
         scrollY={scrollY}
         contentHeight={contentHeight}
         viewportHeight={viewportHeight}
