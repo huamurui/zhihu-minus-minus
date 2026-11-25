@@ -1,6 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type React from 'react';
-import { Fragment, forwardRef, useImperativeHandle, useMemo } from 'react';
+import {
+  Fragment,
+  forwardRef,
+  useCallback,
+  useImperativeHandle,
+  useMemo,
+} from 'react';
 import {
   KeyboardAvoidingView,
   type ModalProps,
@@ -8,6 +14,7 @@ import {
   Pressable,
   type StyleProp,
   StyleSheet,
+  type ViewInstance,
   type ViewStyle,
 } from 'react-native';
 import {
@@ -24,6 +31,7 @@ import Colors from '@/constants/Colors';
 import { PaneModal } from '@/features/adaptive-layout/PaneModal';
 
 import { SheetScrollContext, SheetScrollView } from './SheetScrollView';
+import { attachSheetWebTouch } from './sheetWebTouch';
 import { useSheetMotion } from './useSheetMotion';
 
 export interface BottomSheetHandle {
@@ -101,6 +109,13 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
     useImperativeHandle(ref, () => ({ close: requestClose }), [requestClose]);
 
     const scrollOwnsTouch = useSharedValue(false);
+    const webPanelRef = useCallback(
+      (node: ViewInstance | null) => {
+        if (node instanceof HTMLElement)
+          return attachSheetWebTouch(node, () => scrollOwnsTouch.value);
+      },
+      [scrollOwnsTouch],
+    );
     const touchOrigin = useSharedValue<{ x: number; y: number } | null>(null);
     const pan = useMemo(
       () =>
@@ -196,6 +211,9 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
             )}
             <GestureDetector gesture={pan} touchAction="pan-y">
               <Reanimated.View
+                ref={
+                  Platform.OS === 'web' && dismissible ? webPanelRef : undefined
+                }
                 collapsable={false}
                 onLayout={onLayout}
                 accessibilityViewIsModal

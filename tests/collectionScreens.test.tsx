@@ -69,6 +69,9 @@ jest.mock('../src/components/CreationCard', () => ({
       );
   },
 }));
+jest.mock('../src/components/overlays/SheetScrollView', () => ({
+  SheetScrollView: jest.requireActual('react-native').ScrollView,
+}));
 jest.mock('../src/components/overlays/BottomSheet', () => ({
   BottomSheet: ({
     visible,
