@@ -320,8 +320,13 @@ test('starts at the tapped user and marks only selected pages, preserving strip 
   expect(mockMarkRead).toHaveBeenCalledTimes(1);
   expect(mockMarkRead).toHaveBeenLastCalledWith(entries[1]);
   expect(
-    host.queryByText('合成用户 distant', { includeHiddenElements: true }),
-  ).toBeNull();
+    host.getAllByTestId('published-stream-list', {
+      includeHiddenElements: true,
+    }),
+  ).toHaveLength(3);
+  expect(host.getByLabelText('第 2 位，共 4 位用户')).toHaveTextContent(
+    '2 / 4',
+  );
 
   await selectPage(host, 2);
   expect(host.getByText('合成用户 last')).toBeTruthy();
@@ -368,14 +373,37 @@ test('paging back preserves each user unread boundary and ignores offscreen pagi
   await host.unmount();
 });
 
-test('page buttons ask the pager to navigate; only confirmed selection marks read', async () => {
+test('one toolbar stays outside the pager and updates its page number on confirmed selection', async () => {
   mockParams.id = 'first';
   mockParams.source = 'recent-moments';
   mockMoments = ['first', 'second'].map((id) => moment(id));
   const host = await render(<UserStreamScreen />);
+  const pager = host.getByTestId('recent-moment-pager');
+  const back = host.getByRole('button', {
+    name: '返回',
+    includeHiddenElements: true,
+  });
+  expect(
+    within(pager).queryByRole('button', {
+      name: '返回',
+      includeHiddenElements: true,
+    }),
+  ).toBeNull();
+  expect(
+    within(pager).queryByLabelText(/共 2 位用户/, {
+      includeHiddenElements: true,
+    }),
+  ).toBeNull();
+  expect(
+    host.getByText('最近发布', { includeHiddenElements: true }),
+  ).toBeVisible();
+
   await fireEvent.press(host.getByRole('button', { name: '下一位用户' }));
   expect(mockSetPage).toHaveBeenCalledWith(1);
   expect(mockMarkRead).toHaveBeenCalledTimes(1);
+  expect(host.getByLabelText('第 1 位，共 2 位用户')).toHaveTextContent(
+    '1 / 2',
+  );
   expect(host.getByText('合成用户 first')).toBeTruthy();
   await selectPage(host, -1);
   await selectPage(host, 2);
@@ -383,6 +411,12 @@ test('page buttons ask the pager to navigate; only confirmed selection marks rea
   expect(mockMarkRead).toHaveBeenCalledTimes(1);
   await selectPage(host, 1);
   expect(host.getByText('合成用户 second')).toBeTruthy();
+  expect(host.getByRole('button', { name: '返回' })).toBe(back);
+  expect(host.getByLabelText('第 2 位，共 2 位用户')).toHaveTextContent(
+    '2 / 2',
+  );
+  await fireEvent.press(host.getByRole('button', { name: '上一位用户' }));
+  expect(mockSetPage).toHaveBeenLastCalledWith(0);
   expect(mockMarkRead).toHaveBeenCalledTimes(2);
   await host.unmount();
 });
@@ -398,6 +432,8 @@ test.each([undefined, 'recent-moments'])(
       false,
     );
     expect(host.queryByRole('button', { name: '下一位用户' })).toBeNull();
+    expect(host.queryByLabelText(/共 1 位用户/)).toBeNull();
+    expect(host.queryByText('1 / 1')).toBeNull();
     expect(mockMarkRead).not.toHaveBeenCalled();
     await host.unmount();
   },
