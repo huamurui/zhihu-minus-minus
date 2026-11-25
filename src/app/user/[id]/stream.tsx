@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import PagerView, { type PagerViewRef } from 'react-native-pager-view';
 import type { RecentMomentsResponse } from '@/api/zhihu';
+import { PublishedStreamHeader } from '@/components/profile/PublishedStreamHeader';
 import { UserPublishedStream } from '@/components/profile/UserPublishedStream';
 import { useMarkRecentMomentRead } from '@/hooks/useMarkRecentMomentRead';
 import { createRecentMomentStream } from '@/utils/recentMomentStream';
@@ -44,8 +45,15 @@ function UserStreamPager({ id, unreadCount, source }: StreamParams) {
   };
 
   return (
-    <>
+    <View className="flex-1 bg-base">
       <Stack.Screen options={{ headerShown: false, title: '最近发布' }} />
+      <PublishedStreamHeader
+        id={currentEntry.id}
+        actor={currentEntry.moment?.actor}
+        page={currentPage}
+        total={stream.entries.length}
+        goToPage={goToPage}
+      />
       <PagerView
         ref={pagerRef}
         testID="recent-moment-pager"
@@ -76,25 +84,14 @@ function UserStreamPager({ id, unreadCount, source }: StreamParams) {
               <UserPublishedStream
                 id={entry.id}
                 unreadCount={entry.unreadCount}
-                actor={entry.moment?.actor}
                 isActive={index === currentPage}
                 enabled={Math.abs(index - currentPage) <= 1}
-                navigation={
-                  stream.entries.length > 1
-                    ? {
-                        index,
-                        total: stream.entries.length,
-                        onPrevious: () => goToPage(index - 1),
-                        onNext: () => goToPage(index + 1),
-                      }
-                    : undefined
-                }
               />
             ) : null}
           </View>
         ))}
       </PagerView>
-    </>
+    </View>
   );
 }
 
